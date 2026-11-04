@@ -77,6 +77,11 @@ const NPCS = {
     greet: "Use o poder umbral para forjar equipamentos superiores.",
     type: "umbral-creation",
   },
+  "sweaty": {
+    name: "A Sweaty Cyclops", role: "Forja", sprite: "sweaty-cyclops",
+    greet: "Cling clang! Me forge for lil' one. Trade, trade!",
+    type: "sweaty",
+  },
 };
 
 /* Visual de cada exercise weapon ao ser USADA no dummy — simula o

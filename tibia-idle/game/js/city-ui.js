@@ -54,6 +54,13 @@ const NPC_MODAL_CATALOG = [
     sprite: "umbral-creation",
     desc: "Cria, melhora e transforma itens Umbral.",
   },
+  {
+    shop: "sweaty",
+    name: "A Sweaty Cyclops",
+    role: "Forja",
+    sprite: "sweaty-cyclops",
+    desc: "Funde itens em materiais de forja e mais — troca instantânea.",
+  },
 ];
 
 /* Serviços do templo (Cyclopedia CIDADE) — modal paralelo ao NPCS. */
@@ -459,6 +466,7 @@ function openNpc(id) {
     case "travel": body = npcTravel(p); break;
     case "oberon-trader": body = npcOberonTraderHtml(p); break;
     case "umbral-creation": body = npcUmbralCreationHtml(p); break;
+    case "sweaty": body = npcSweatyHtml(p); break;
   }
 
   const npcTitleSprite = npc.sprite === "umbral-creation"
@@ -509,6 +517,7 @@ function refreshNpc(id) {
     case "travel": body = npcTravel(p); break;
     case "oberon-trader": body = npcOberonTraderHtml(p); break;
     case "umbral-creation": body = npcUmbralCreationHtml(p); break;
+    case "sweaty": body = npcSweatyHtml(p); break;
   }
   $("#npc-content").innerHTML = body;
   bindNpc(id, npc.type);
@@ -814,6 +823,95 @@ function npcBuyOnly(p, shopId) {
 }
 
 /* ---------------------------------------------------------- token barter (Gnomally) */
+/* ------------------------------------------------- A Sweaty Cyclops ------
+ * Trocas do crystalserver (a_sweaty_cyclops.lua) — sem o tempo de espera do
+ * npc: a troca é instantânea. Item de origem sai da bag, resultado entra. */
+const SWEATY_TRADES = [
+  { src: "crown-armor", dst: "piece-of-royal-steel", cid: 5887, qty: 1 },
+  { src: "dragon-shield", dst: "piece-of-draconian-steel", cid: 5889, qty: 1 },
+  { src: "devil-helmet", dst: "piece-of-hell-steel", cid: 5888, qty: 1 },
+  { src: "giant-sword", dst: "huge-chunk-of-crude-iron", cid: 5892, qty: 1 },
+  { src: "soul-orb", dst: "infernal-bolt", cid: 6528, qty: 100 },
+  { src: "gold-ingot", dst: "gold-bar", cid: 12804, qty: 1 },
+  { src: "iron-ore", dst: "gear-wheel", cid: 8775, qty: 1 },
+];
+const SWEATY_ITEM_DEFS = {
+  "piece-of-royal-steel": { n: "piece of royal steel", t: "loot", w: 5, cid: 5887 },
+  "piece-of-hell-steel": { n: "piece of hell steel", t: "loot", w: 5, cid: 5888 },
+  "piece-of-draconian-steel": { n: "piece of draconian steel", t: "loot", w: 5, cid: 5889 },
+  "huge-chunk-of-crude-iron": { n: "huge chunk of crude iron", t: "loot", w: 20, cid: 5892 },
+  "infernal-bolt": { n: "infernal bolt", t: "ammo", w: 1.1, cid: 6528 },
+  "gold-bar": { n: "gold bar", t: "loot", w: 21, cid: 12804 },
+  "gear-wheel": { n: "gear wheel", t: "loot", w: 13, cid: 8775 },
+};
+
+function ensureSweatyItems() {
+  if (typeof GAMEDATA === "undefined" || !GAMEDATA.items) return;
+  for (const [slug, def] of Object.entries(SWEATY_ITEM_DEFS))
+    GAMEDATA.items[slug] = Object.assign({}, GAMEDATA.items[slug] || {}, def);
+}
+
+function sweatyBagCount(p, slug) {
+  const e = p && p.bag && p.bag[slug];
+  if (!e) return 0;
+  return typeof e === "number" ? e : Number(e.n || e.count || e.qty || 0);
+}
+
+function sweatyBagRemove(p, slug, n) {
+  const c = sweatyBagCount(p, slug);
+  if (c < n) return false;
+  const e = p.bag[slug];
+  const left = c - n;
+  if (typeof e === "number") { if (left) p.bag[slug] = left; else delete p.bag[slug]; }
+  else { e.n = left; if (!e.n) delete p.bag[slug]; }
+  return true;
+}
+
+function sweatyBagAdd(p, slug, n) {
+  p.bag = p.bag || {};
+  const e = p.bag[slug];
+  if (!e) p.bag[slug] = n;
+  else if (typeof e === "number") p.bag[slug] = e + n;
+  else e.n = (e.n || e.count || 0) + n;
+}
+
+function exchangeSweaty(p, idx) {
+  ensureSweatyItems();
+  const t = SWEATY_TRADES[idx];
+  if (!t) return { ok: false, msg: "Troca inválida." };
+  const srcName = typeof itemName === "function" ? itemName(t.src) : t.src;
+  const dstName = typeof itemName === "function" ? itemName(t.dst) : t.dst;
+  if (sweatyBagCount(p, t.src) < 1)
+    return { ok: false, msg: "Você não tem " + srcName + " na bag." };
+  if (!sweatyBagRemove(p, t.src, 1))
+    return { ok: false, msg: "Você não tem " + srcName + " na bag." };
+  sweatyBagAdd(p, t.dst, t.qty);
+  const qty = t.qty > 1 ? t.qty + "x " : "";
+  return { ok: true, msg: "Cling clang! " + srcName + " → " + qty + dstName + "." };
+}
+
+function npcSweatyHtml(p) {
+  ensureSweatyItems();
+  const rows = SWEATY_TRADES.map((t, idx) => {
+    const srcName = typeof itemName === "function" ? itemName(t.src) : t.src;
+    const dstName = typeof itemName === "function" ? itemName(t.dst) : t.dst;
+    const have = sweatyBagCount(p, t.src);
+    const can = have >= 1;
+    const qty = t.qty > 1 ? t.qty + "x " : "";
+    return `<div class="shop-row npc-shop-row">
+      ${itemImg(t.src, 30)}
+      <div class="npc-shop-item-text" style="flex:1;min-width:0">
+        <div class="small">${srcName} → <b style="color:#ffe680">${qty}${dstName}</b></div>
+        <div class="tiny dim">na bag: ${fmtFull(have)}</div>
+      </div>
+      <button class="sm ${can ? "primary" : ""}" data-sweaty-trade="${idx}" ${can ? "" : "disabled"}>Trocar</button>
+    </div>`;
+  }).join("");
+  return `<div class="tiny dim mb8">Forja instantânea: troque equipamentos por materiais de forja.
+    Itens são tirados da sua <b>bag</b>.</div>
+    <div class="shop-list">${rows}</div>`;
+}
+
 function npcTokenBarter(p, shopId) {
   if (typeof ensureNpcShopItems === "function") ensureNpcShopItems();
   const shop = typeof npcShopDef === "function" ? npcShopDef(shopId) : null;
@@ -1356,6 +1454,17 @@ function bindNpc(id, type) {
       toast(r.msg, "level");
       addLog("sell", r.msg);
       hideTip();
+      refreshNpc(id);
+      renderAll();
+    }));
+
+  $$("#npc-content [data-sweaty-trade]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = exchangeSweaty(p, parseInt(b.dataset.sweatyTrade, 10));
+      if (!r.ok) { toast(r.msg); return; }
+      toast(r.msg, "level");
+      addLog("sell", r.msg);
+      save();
       refreshNpc(id);
       renderAll();
     }));
