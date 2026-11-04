@@ -149,6 +149,27 @@ function huntMapFromOtbmAsync(hunt, done) {
       mapa.idleFovHeight = Number(hunt.otbmFovHeight) || 0;
       const hm = OTBM.huntMapFromOtbm(mapa,
         (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {});
+      // Pisos funcionais da hunt (ex.: annihilator): ids de chão marcados
+      // como bloqueio no .dat liberam a célula — mesmo passe do servidor
+      // (questMapBlockedCells), senão o movimento local trava o mapa inteiro.
+      if (Array.isArray(hunt.walkFloors) && hunt.walkFloors.length && hm && hm.leg) {
+        const floors = new Set(hunt.walkFloors.map(Number));
+        const flags = (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {};
+        const freeLeg = (e) => e && e.bloc &&
+          (e.v || []).some((id) => floors.has(id)) &&
+          !(e.g || []).some((id) => flags[id] && flags[id][1]);
+        for (const key of Object.keys(hm.leg)) {
+          const e = hm.leg[key];
+          if (freeLeg(e)) e.bloc = false;
+        }
+        if (hm.footprintBlocked)
+          for (const k of Object.keys(hm.footprintBlocked)) {
+            const xy = k.split(":");
+            const e = hm.leg[hm.rows[Number(xy[1])] &&
+              hm.rows[Number(xy[1])][Number(xy[0])]];
+            if (freeLeg(e)) delete hm.footprintBlocked[k];
+          }
+      }
       if (typeof HUNTMAPS !== "undefined") HUNTMAPS[key] = hm;
       hunt.mapa = key;
       OTBM_HUNT_CACHE[hunt.otbm] = key;

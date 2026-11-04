@@ -243,7 +243,7 @@ function resumeIdleInstance(session){
           otbmFovBounds:questDef.otbmFovBounds,
           otbmFovWidth:questDef.otbmFovWidth,otbmFovHeight:questDef.otbmFovHeight,
           otbmRuntimeWidth:questDef.otbmRuntimeWidth,otbmRuntimeHeight:questDef.otbmRuntimeHeight,
-          otbmSpawn:questDef.otbmSpawn,
+          otbmSpawn:questDef.otbmSpawn,walkFloors:questDef.walkFloors,
           monsters:questDef.waveMonsters||[],level:questDef.level||1,
         };
       }
