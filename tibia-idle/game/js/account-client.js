@@ -267,6 +267,12 @@ async function accountAcquireLease(token,takeover){
       if(result.held){
         const until=new Date(result.expiresAt||0).getTime();
         ACCOUNT_LEASE.heldUntil=Math.max(Date.now()+2000,until||Date.now()+10000);
+        // Lease órfão do MESMO navegador (restart dentro de instância/quest):
+        // o takeover valida previous_holder no servidor — retomamos o controle
+        // em vez de travar no splash com 409. Se outra aba realmente segura o
+        // lease e o servidor recusar, caímos no pause normal.
+        const takeover=await accountAcquireLeaseRequest(token,true);
+        if(takeover&&takeover.ok){ACCOUNT_LEASE.heldUntil=0;return takeover;}
       }
       return result;
     }finally{ACCOUNT_LEASE_INFLIGHT=null;}
