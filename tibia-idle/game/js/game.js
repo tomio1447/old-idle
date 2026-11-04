@@ -2043,6 +2043,11 @@ const BOSS_MODAL_SECTIONS = [
     ids: ["plagueroot", "alptramun", "izcandar-champion-of-summer", "izcandar-champion-of-winter", "malofur-mangrinder", "maxxenius"],
   },
   {
+    title: "GRIMVALE 100+",
+    minLevel: 100,
+    ids: ["black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw"],
+  },
+  {
     title: "BOSSES 250+",
     minLevel: 250,
     ids: ["timira-the-many-headed", "scarlett-etzel", "faceless-bane", "doctor-marrow", "grand-master-oberon", "ratmiral-blackwhiskers", "the-brainstealer", "drume"],
