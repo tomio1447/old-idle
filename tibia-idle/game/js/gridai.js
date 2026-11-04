@@ -176,6 +176,10 @@ function playerThinkStep(c, p, alvo, occ, now) {
   if (typeof playerIsFeared === "function" && playerIsFeared(p))
     return fearThinkStep(c, p, pl, occ, now);
 
+  // Echo Raid (Helper → Ataque): AUTO corre pro portal; SAFE só sem monstros.
+  if (typeof echoRaidThinkStep === "function" && echoRaidThinkStep(c, p, pl, occ, now))
+    return true;
+
   if (!alvo) return false;
 
   const modo = (p.config && p.config.attackMode) || "chase";

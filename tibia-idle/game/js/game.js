@@ -3564,6 +3564,37 @@ function drainEvents() {
         r.addEffect(px, py, "poff", 300);
         break;
       }
+      case "echo-portal": {
+        const px = (e.x !== undefined && e.x !== null) ? e.x : 0.5;
+        const py = (e.y !== undefined && e.y !== null) ? e.y : 0.5;
+        r.addEffect(px, py, "teleport", 500);
+        addLog("info", `Uma <b>Echo Raid</b> apareceu — pise no portal para ativar.`);
+        if (typeof toast === "function") toast(`Uma <b>Echo Raid</b> apareceu!`, "level");
+        break;
+      }
+      case "echo-armed": {
+        const px = (e.x !== undefined && e.x !== null) ? e.x : 0.5;
+        const py = (e.y !== undefined && e.y !== null) ? e.y : 0.5;
+        r.addEffect(px, py, "magic-red", 500);
+        addLog("info", `Echo Raid ativada — o Echo Warden nasce em <b>60s</b>.`);
+        if (typeof toast === "function") toast(`Echo Raid ativada — warden em <b>60s</b>.`, "level");
+        break;
+      }
+      case "echo-spawn": {
+        const px = (e.x !== undefined && e.x !== null) ? e.x : 0.5;
+        const py = (e.y !== undefined && e.y !== null) ? e.y : 0.5;
+        r.addEffect(px, py, "groundshaker", 600);
+        addLog("info", `A <b>Echo Raid</b> começou — Echo Warden e seus minions!`);
+        break;
+      }
+      case "echo-reward": {
+        const pts = Number(e.points) || 0;
+        if (pts > 0) {
+          addLog("level", `Echo Warden abatido: <b>+${pts} charm points</b>.`);
+          if (typeof toast === "function") toast(`Echo Warden: <b>+${pts} charm points</b>`, "level");
+        }
+        break;
+      }
 
     }
   }
@@ -4846,61 +4877,25 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     }
   }
   G.combat=previous;
-  // Grand Master Oberon (online): o servidor é autoritativo — o modal do
-  // debate abre a partir do estado (state.oberon) e a réplica escolhida
-  // volta no próximo tick via oberonIntent. O servidor nunca envia a
-  // resposta correta, só a frase + opções embaralhadas.
-  // Regras anti-reabertura (bug "modal reabre instantaneamente ao clicar"):
-  //  - Depois de escolher a réplica (_oberonPendingAnswer setado) o modal
-  //    NUNCA reabre — o snapshot pode voltar 1 tick atrás (tick disparado
-  //    antes do clique ainda pendente) e o modal "piscava" de novo, o
-  //    jogador clicava várias vezes e as respostas se sobrescreviam.
-  //  - A resposta só é descartada quando o servidor processa (state sem
-  //    pending) — nunca num tick ok sem a resposta (corrida do visual_state).
-  //  - Timeout de segurança: se o servidor não processar em 6s, descarta a
-  //    resposta velha e reabre (envio pode ter sido perdido de verdade).
-  // Auto-recuperação: se o modal foi fechado por fora (ESC/closeModal) o
-  // callback de resposta nunca roda e `_oberonModalOpen` ficaria preso em
-  // true — a 2ª pergunta (2ª morte do boss) nunca abriria. Reabre quando a
-  // PERGUNTA muda e libera o flag sempre que o debate encerra no servidor.
+  // Echo Raid (online): portais e raids armadas vêm no state.echo da
+  // autoridade — o cliente só renderiza e pisa; a ativação é do servidor.
   try{
-    const obState=incoming&&incoming.oberon;
-    if(obState&&obState.pending&&obState.question&&obState.question.phrase&&
-       Array.isArray(obState.question.options)&&obState.question.options.length>=2&&
-       typeof oberonOpenDebateModalRemote==="function"){
-      const phrase=String(obState.question.phrase);
-      const changed=previous._oberonQuestionPhrase!==phrase;
-      let answered=previous._oberonPendingAnswer!==undefined&&previous._oberonPendingAnswer!==null;
-      // Resposta escolhida aguardando o servidor: descarta apenas se passou
-      // do timeout (6s) — o envio pode ter sido perdido de verdade. Após
-      // descartar, reavalia `answered` para o modal poder reabrir.
-      if(answered&&previous._oberonPendingAt&&(Date.now()-Number(previous._oberonPendingAt))>6000){
-        previous._oberonPendingAnswer=null;
-        previous._oberonPendingAt=0;
-        answered=false;
-      }
-      if(!answered&&(!previous._oberonModalOpen||changed)){
-        previous._oberonModalOpen=true;
-        previous._oberonQuestionPhrase=phrase;
-        const bossMob=(previous.mobs||[]).find((m)=>m&&m.boss)||null;
-        oberonOpenDebateModalRemote(bossMob,obState.question,(chosen)=>{
-          previous._oberonModalOpen=false;
-          previous._oberonPendingAnswer=String(chosen||"");
-          previous._oberonPendingAt=Date.now();
-          if(typeof requestOnlineAuthorityTick==="function")requestOnlineAuthorityTick();
-        });
-      }
-    }else if(obState&&!obState.pending){
-      // Debate processado pelo servidor (certo ou errado): a resposta foi
-      // entregue — libera tudo. Sem pergunta (acerto) zera a frase para a
-      // próxima pergunta abrir como "nova"; com pergunta (erro, reabre em
-      // 10s) mantém a frase para a reabertura.
-      previous._oberonModalOpen=false;
-      previous._oberonPendingAnswer=null;
-      previous._oberonPendingAt=0;
-      if(!obState.question)previous._oberonQuestionPhrase=null;
-    }
-  }catch(e){/* modal é opcional — nunca pode quebrar o tick */}
+    const ec=incoming&&incoming.echo;
+    previous.echo=ec?{
+      pending:[],
+      portals:Array.isArray(ec.portals)?ec.portals.map((po)=>({
+        id:String(po.id||""),slug:String(po.slug||""),
+        cx:Number(po.cx),cy:Number(po.cy),
+        x:Number(po.x)||0,y:Number(po.y)||0,
+        bornAt:Number(po.bornAt)||0,expiresAt:Number(po.expiresAt)||0,
+      })):[],
+      armed:Array.isArray(ec.armed)?ec.armed.map((ar)=>({
+        slug:String(ar.slug||""),cx:Number(ar.cx),cy:Number(ar.cy),
+        x:Number(ar.x)||0,y:Number(ar.y)||0,
+        armedAt:Number(ar.armedAt)||0,spawnAt:Number(ar.spawnAt)||0,
+      })):[],
+    }:null;
+  }catch(e){}
   if(Number.isFinite(incomingVersion)&&incomingVersion>0){
     ONLINE_AUTH_APPLIED_VERSION=incomingVersion;
     if(instanceId)ONLINE_AUTH_APPLIED_INSTANCE=instanceId;

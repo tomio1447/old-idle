@@ -673,7 +673,8 @@ function createQuestController(opts) {
     const acc = await db.findAccountByToken(body && body.token);
     if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
     const questId = String(body && body.questId || "");
-    if (!questDef(questId)) {
+    const q = questDef(questId);
+    if (!q || q.playable === false) {
       return { code: 400, body: { ok: false, error: "INVALID_QUEST", msg: "Quest inválida." } };
     }
     const r = createLobby(questId, acc.id);
@@ -697,7 +698,8 @@ function createQuestController(opts) {
     const acc = await db.findAccountByToken(body && body.token);
     if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
     const questId = String(body && body.questId || "");
-    if (!questDef(questId)) {
+    const q = questDef(questId);
+    if (!q || q.playable === false) {
       return { code: 400, body: { ok: false, error: "INVALID_QUEST" } };
     }
     // Encontra lobby aberto

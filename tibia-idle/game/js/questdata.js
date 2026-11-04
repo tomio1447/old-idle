@@ -60,6 +60,45 @@ var QUEST_DEFS = {
     kickOnDeath:  true,
     oneTimePerChar: true,
   },
+  /* Annihilator Quest — mecânica exclusiva (server/annihilator.js +
+   * annihilator-data.js): 4 personagens da MESMA conta posicionados nos
+   * SQMs de preparo, alavanca, 6 Demons, caminhada de saída e 1 recompensa
+   * por personagem vivo (máx. 4 por conta). Não usa o fluxo genérico de
+   * waves/boss — `playable:false` mantém a entrada visível no modal sem
+   * permitir lobby até a mecânica dedicada ser plugada. */
+  "annihilator": {
+    id:           "annihilator",
+    name:         "Annihilator Quest",
+    level:        100,
+    maxPlayers:   4,
+    maxPerAccount: 4,
+    playable:     true,
+    icon:         "demon-armor",
+    description:  "Posicione seus 4 personagens nos SQMs de preparo, acione a alavanca e sobreviva aos 6 Demons. Cada sobrevivente que chegar à saída escolhe 1 recompensa lendária (máx. 4 por conta).",
+    otbm:         "annihilator",
+    otbmFloor:    7,
+    /* FOV / runtime: bounds abs {1007..1045, 1015..1048} = 39x34.
+     * Entrance abs {1020..1023, 1026} → local {13..16, 11}. */
+    otbmFovBounds:     { x: 1007, y: 1015, w: 39, h: 34, z: 7 },
+    otbmFovWidth:      21,
+    otbmFovHeight:     13,
+    otbmRuntimeWidth:  39,
+    otbmRuntimeHeight: 34,
+    otbmSpawn:         { x: 1021, y: 1026, z: 7 },
+    spawnRange:   { minX: 13, maxX: 16, minY: 11, maxY: 11, z: 7 },
+    countdownSec: 10,
+    /* Encontro único: 6 Demons (a mecânica de preparo/alavanca/saída do
+     * server/annihilator.js é refinada depois — por ora roda como quest
+     * padrão de 1 wave com todos os demons). */
+    baseWaves:          1,
+    wavesPerPlayers:    999,
+    baseMonstersPerWave: 6,
+    monstersPerPlayers:  999,
+    waveMonsters: ["demon"],
+    boss:         "demon",
+    bossSprite:   "demon",
+    rewards:      ["demon-armor", "magic-sword", "stonecutter-axe", "demonbone"],
+  },
 };
 
 if (typeof module !== "undefined" && module.exports) {

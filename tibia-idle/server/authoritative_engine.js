@@ -406,23 +406,7 @@ const HEALTH_POTION_ORDER=["supreme-health-potion","ultimate-health-potion","ult
   "ultimate-healing-rune","intense-healing-rune"];
 const MANA_POTION_ORDER=["distilled-ultimate-mana-potion","ultimate-mana-potion","distilled-superior-mana-potion",
   "superior-mana-potion","great-mana-potion","strong-mana-potion","mana-potion"];
-/* Perguntas do debate do Grand Master Oberon. A lista canônica vive em
- * game/js/grandmaster-oberon.js (exposta via window.OBERON_DEBATE); o
- * servidor lê a MESMA lista para julgar a resposta — se as cópias
- * divergissem, nenhuma resposta acertaria. Fallback idêntico caso o vm
- * falhe ao carregar o arquivo. */
-const OBERON_FALLBACK_DEBATE=[
-  {phrase:"The world will suffer for its idle laziness!",answer:"Are you ever going to fight or do you prefer talking!"},
-  {phrase:"You appear like a worm among men!",answer:"How appropriate, you look like something worms already got the better of!"},
-  {phrase:"People fall at my feet when they see me coming!",answer:"Even before they smell your breath?"},
-  {phrase:"This will be the end of mortal man!",answer:"Then let me show you the concept of mortality before it!"},
-  {phrase:"I will remove you from this plane of existence!",answer:"Too bad you barely exist at all!"},
-  {phrase:"Dragons will soon rule this world, I am their herald!",answer:"Excuse me but I still do not get the message!"},
-  {phrase:"The true virtue of chivalry are my belief!",answer:"Dare strike up a Minnesang and you will receive your last accolade!"},
-  {phrase:"I lead the most honourable and formidable following of knights!",answer:"Then why are we fighting alone right now?"},
-  {phrase:"ULTAH SALID'AR, ESDO LO!",answer:"SEHWO ASIMO, TOLIDO ESD!"},
-];
-let OBERON_DEBATE=OBERON_FALLBACK_DEBATE;
+
 for(const slug of Object.keys(AMMO)){const raw=AMMO[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
   {name:raw.n||slug,slot:"ammo",type:"ammo",attack:Number(raw.atk)||0,level:Number(raw.lvl)||0});}
 for(const slug of Object.keys(QUIVERS)){const raw=QUIVERS[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
@@ -485,8 +469,7 @@ try{
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"falcon-bastion.js"),"utf8"),sandbox);}catch(_fb){/* opcional */}
   // Grand Master Oberon: boss 250+ com mecânica de debate + NPC Falcon Forge.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"grandmaster-oberon.js"),"utf8"),sandbox);}catch(_ob){/* opcional */}
-  if(sandbox.window&&Array.isArray(sandbox.window.OBERON_DEBATE)&&sandbox.window.OBERON_DEBATE.length)
-    OBERON_DEBATE=sandbox.window.OBERON_DEBATE;
+  // (debate do Oberon removido — OBERON_DEBATE não existe mais)
   // Doctor Marrow: boss de The Cradle of Monsters (nível 250+).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"doctor-marrow.js"),"utf8"),sandbox);}catch(_dm){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
@@ -500,6 +483,8 @@ try{
   // nao conhece a arma dos magos recém-criados.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"supplydata.js"),"utf8"),sandbox);}catch(_sd){/* opcional */}
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"supplies.js"),"utf8"),sandbox);}catch(_sp){/* opcional */}
+  vm.runInNewContext(fs.readFileSync(path.join(js,"grimvale.js"),"utf8"),sandbox);
+  vm.runInNewContext(fs.readFileSync(path.join(js,"grimvale-bosses.js"),"utf8"),sandbox);
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
   for(const slug of Object.keys(gd)){
     const src=gd[slug]||{},cur=ITEMS[slug]||{};
@@ -606,6 +591,8 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "the-unwelcome-room":{monsters:["the-unwelcome"]},
   "the-pale-worm-room":{monsters:["the-pale-worm"]},
 });
+Object.assign(HUNTS,require("../game/js/grimvale").hunts,
+  require("../game/js/grimvale-bosses").createRooms(MONSTERS));
 for(const slug of ["marapur-nagas","dt-seal","juggerseal","ferumbras-way","catacombs-oramond","minotaur-oramond-east"]){
   if(HUNTS[slug])Object.assign(HUNTS[slug],{cat:"hard",pack:10,packMin:6,packMax:10});
 }
@@ -1025,8 +1012,6 @@ function normalizeVisualState(raw,auth){
     if(clean)megaIntentsOut.push(clean);
     if(megaIntentsOut.length>=24)break;
   }
-  const oberonIntent=raw.oberonIntent&&typeof raw.oberonIntent==="object"?raw.oberonIntent:null;
-  const oberonAnswer=oberonIntent?String(oberonIntent.answer||""):"";
   return{players:normalize(raw.players,8),mobs:normalize(raw.mobs,64),
     scarlettIntent:intentDir==="up"||intentDir==="down"||intentDir==="left"||intentDir==="right"
       ?{dir:intentDir,pressAuth:Number.isFinite(pressAuth)&&pressAuth>0?pressAuth:undefined}:null,
@@ -1036,9 +1021,7 @@ function normalizeVisualState(raw,auth){
     maliceIntent:maliceMoves?{moves:maliceMoves}:null,
     megaIntent:megaOut,
     megaIntents:megaIntentsOut,
-    oberonIntent:oberonAnswer.length>0&&oberonAnswer.length<=300
-      ?{answer:oberonAnswer}
-      :(oberonIntent&&!!oberonIntent.skip?{skip:true}:null)};
+    megaIntents:megaIntentsOut};
 }
 function snapAuthorityEntityToCell(auth,ent){
   if(!ent)return;
@@ -1133,15 +1116,7 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       for(const intent of visual.megaIntents)if(intent)auth.mega.pendingIntents.push(Object.assign({},intent));
     }
   }
-  // Grand Master Oberon: réplica escolhida no modal (ou skip ao fechar).
-  // Só aceita a réplica com o debate ABERTO (pending): uma resposta atrasada
-  // de um debate já encerrado não pode ser julgada contra a pergunta nova
-  // (2ª morte abre a 2ª pergunta; uma intent velha viraria "wrong" e travaria).
-  if(auth.oberon&&auth.oberon.pending&&visual.oberonIntent){
-    auth.oberon.pendingIntent=visual.oberonIntent.skip
-      ?{skip:true}
-      :{answer:String(visual.oberonIntent.answer||"")};
-  }
+  // (Mecânica de debate do Oberon removida: sem intents a processar.)
   return visual;
 }
 function expForLevel(level){return Math.floor((50/3)*(level**3-6*level**2+17*level-12));}
@@ -4268,6 +4243,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
         for(let n=0;n<count;n++){
           const add=makeMob(auth,String(sk.summonSlug),false);
           if(!add)break;
+          add.summoned=true;
           const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
           const cell=claimSpawnCell(auth,Math.floor(w/2)+((n%3)-1),Math.floor(h/2)+Math.floor(n/3));
           add.cx=cell.cx;add.cy=cell.cy;
@@ -5878,13 +5854,10 @@ function arenaBossBindMechanics(auth,now){
       thresholdIndex:0,thresholds:[0.75,0.50,0.25]};
     boss.qteImmune=true;
   }
-  // Grand Master Oberon: precisa ser derrotado 4 vezes. Cada vez que o HP
-  // zera ele revive invulnerável e abre o debate (4 vidas). A resposta vem
-  // no tick via oberonIntent; a correta quebra a invulnerabilidade e spawna
-  // 2 Falcon Knights + 2 Falcon Paladins.
+  // Grand Master Oberon: precisa ser derrotado 4 vezes. Cada morte revive
+  // com HP cheio e invoca 4 falcons; a quarta é a morte real.
   if(auth.bossId==="grand-master-oberon"&&!auth.oberon){
-    auth.oberon={lives:4,phase:0,invulnerable:false,pending:false,nextAt:0,question:null,
-      pendingIntent:null,askedAt:0};
+    auth.oberon={lives:4};
     boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
   }
   syncBossImmunityFlags(auth);
@@ -6215,23 +6188,9 @@ function syncBossImmunityFlags(auth){
   for(const m of auth.mobs||[]){
     if(!m.boss){m.greedImmune=false;m.qteImmune=false;m.megaImmune=false;continue;}
     m.greedImmune=!!(auth.greed&&auth.greed.immune);
-    m.qteImmune=!!(auth.scarlett&&auth.scarlett.immune)||!!(auth.mega&&auth.mega.immune)||
-      !!(auth.oberon&&auth.oberon.invulnerable);
+    m.qteImmune=!!(auth.scarlett&&auth.scarlett.immune)||!!(auth.mega&&auth.mega.immune);
     m.megaImmune=!!(auth.mega&&auth.mega.immune);
   }
-}
-/* Monta a pergunta do debate: frase + 4 opções embaralhadas. A resposta
- * correta NUNCA sai do servidor (o cliente só recebe phrase/options). */
-function oberonDebateQuestion(auth,st){
-  if(!OBERON_DEBATE||!OBERON_DEBATE.length)return null;
-  const q=OBERON_DEBATE[(Number(st&&st.phase)||0)%OBERON_DEBATE.length];
-  if(!q||!q.phrase||!q.answer)return null;
-  const wrong=OBERON_DEBATE.filter((x)=>x&&x.answer&&x.answer!==q.answer)
-    .map((x)=>x.answer)
-    .sort(()=>random(auth)-0.5)
-    .slice(0,3);
-  const options=[q.answer].concat(wrong).sort(()=>random(auth)-0.5);
-  return {phrase:String(q.phrase),answer:String(q.answer),options:options.map((o)=>String(o))};
 }
 /* Spawna os ajudantes de Oberon ao redor do boss (2 Falcon Knights + 2
  * Falcon Paladins), espelhando o cliente (oberonSpawnHelpers). */
@@ -6274,59 +6233,101 @@ function oberonSpawnHelpersAuth(auth,now){
     auth.events.push({t:"spawn",slug:hp.slug,x:add.x,y:add.y,targetId:String(add.id),screen:true,ts:now||auth.clock});
   }
 }
-/* Tick da mecânica de Oberon: reabre o debate após erro (10s), processa a
- * resposta do cliente e garante imortalidade durante o debate. */
-function tickOberon(auth,now){
-  const st=auth&&auth.oberon;
-  if(!st)return;
-  const boss=(auth.mobs||[]).find((m)=>m&&m.boss&&(m.slug==="grand-master-oberon"||String(m.id)==="grand-master-oberon"));
-  if(!boss||boss.hp<=0){
-    if(arenaBossSpawnPending(auth))return;
-    auth.oberon=null;
+/* ================================================================ ECHO RAID
+ * Port do sistema do crystalserver (data-global/lib/core/echo_warden.lua):
+ * kill de monstro comum/incomum (1–2★, sem boss/summon/forge stack) rola
+ * 100/200000 (0.05%) → portal nasce no tile do cadáver 30s depois e fica
+ * 2min no chão. Jogador pisando arma a raid: portal some, aguarda 60s e
+ * nascem 1 Echo Warden (4x HP) + 7–12 minions (1.5x HP) no tile.
+ * Warden morto → charm points 1ª vez por espécie/personagem. */
+const ECHO_PORTAL_CHANCE_NUM=100,ECHO_PORTAL_CHANCE_DEN=200000;
+const ECHO_PORTAL_DELAY_MS=30000,ECHO_PORTAL_TTL_MS=120000,ECHO_ARM_DELAY_MS=60000;
+const ECHO_WARDEN_HP_MULT=4,ECHO_MINION_HP_MULT=1.5,ECHO_ADDS_MIN=7,ECHO_ADDS_MAX=12;
+const ECHO_CHARM_BY_STARS={0:1,1:10,2:15,3:20,4:25,5:30};
+function echoAuthState(auth){
+  auth.echo=auth.echo&&typeof auth.echo==="object"?auth.echo:{pending:[],portals:[],armed:[]};
+  if(!Array.isArray(auth.echo.pending))auth.echo.pending=[];
+  if(!Array.isArray(auth.echo.portals))auth.echo.portals=[];
+  if(!Array.isArray(auth.echo.armed))auth.echo.armed=[];
+  return auth.echo;
+}
+function echoMobStarsAuth(mob){
+  const def=(mob&&mob.def)||monsterDef(mob&&mob.slug);
+  const s=def&&def.best&&Number(def.best.stars);
+  return Number.isFinite(s)?s:0;
+}
+function echoEligibleAuth(mob){
+  if(!mob||mob.boss||mob.bossHelper||mob.summoned)return false;
+  if(mob.echoSpawned||mob.echoWarden||mob.echoMinion)return false;
+  if(mob.fiendish||mob.influenced||Number(mob.sinisterStacks)>0)return false;
+  const s=echoMobStarsAuth(mob);return s>=1&&s<=2;
+}
+/* Chamado no loop de mortes: warden → recompensa; elegível → roll do portal. */
+function echoOnKillAuth(auth,mob,now){
+  if(!auth||!mob)return;
+  const st=echoAuthState(auth);
+  if(mob.echoWarden){
+    const stars=echoMobStarsAuth(mob),pts=ECHO_CHARM_BY_STARS[stars]||ECHO_CHARM_BY_STARS[0];
+    for(const item of auth.players||[]){
+      const pl=item&&item.p;if(!pl)continue;
+      pl.echoWardenFirst=pl.echoWardenFirst&&typeof pl.echoWardenFirst==="object"?pl.echoWardenFirst:{};
+      if(pl.echoWardenFirst[mob.slug])continue;
+      pl.echoWardenFirst[mob.slug]=1;
+      pl.charmPoints=(Number(pl.charmPoints)||0)+pts;
+    }
+    auth.events.push({t:"echo-reward",points:pts,slug:String(mob.slug),
+      x:Number(mob.x)||.5,y:Number(mob.y)||.5,screen:true,ts:now});
     return;
   }
-  auth.events=auth.events||[];
-  // Resposta errada (ou fechar o modal): nova pergunta após 10s.
-  if(st.invulnerable&&!st.pending&&st.nextAt&&now>=st.nextAt){
-    st.nextAt=0;
-    st.pending=true;
-    st.question=oberonDebateQuestion(auth,st);
-    st.askedAt=now;
-    auth.events.push({t:"oberon-debate",screen:true,ts:now});
+  if(!echoEligibleAuth(mob))return;
+  if(random(auth)*ECHO_PORTAL_CHANCE_DEN>=ECHO_PORTAL_CHANCE_NUM)return;
+  const cell=entityGridCell(mob,auth);
+  st.pending.push({slug:String(mob.slug),cx:cell.cx,cy:cell.cy,at:now+ECHO_PORTAL_DELAY_MS});
+}
+/* Fim da espera de 60s: warden no tile + 7–12 minions ao redor. */
+function echoRunRaidAuth(auth,ar,now){
+  const slug=String(ar.slug||"");if(!monsterDef(slug))return;
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  const spawn=(mult,warden)=>{
+    const add=makeMob(auth,slug,false);
+    if(!add)return;
+    if(mult&&mult!==1){add.maxHp=Math.max(1,Math.floor(Number(add.maxHp)*mult));add.hp=add.maxHp;}
+    add.echoSpawned=true;
+    if(warden)add.echoWarden=true;else add.echoMinion=true;
+    const cell=claimSpawnCell(auth,ar.cx,ar.cy);
+    add.cx=cell.cx;add.cy=cell.cy;
+    add.x=(add.cx+.5)/w;add.y=(add.cy+.5)/h;add.sx=add.x;add.sy=add.y;
+    auth.mobs.unshift(add);
+    auth.events.push({t:"spawn",slug:slug,x:add.x,y:add.y,targetId:String(add.id),screen:true,ts:now});
+  };
+  spawn(ECHO_WARDEN_HP_MULT,true);
+  const adds=ECHO_ADDS_MIN+Math.floor(random(auth)*(ECHO_ADDS_MAX-ECHO_ADDS_MIN+1));
+  for(let i=0;i<adds;i++)spawn(ECHO_MINION_HP_MULT,false);
+}
+function tickEchoRaid(auth,now){
+  const st=echoAuthState(auth);
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  // 1) Portais agendados nascem no tile do cadáver.
+  for(let i=st.pending.length-1;i>=0;i--){const pd=st.pending[i];
+    if(now<pd.at)continue;st.pending.splice(i,1);
+    st.portals.push({id:"echo-"+Math.floor(now)+"-"+i,slug:String(pd.slug),cx:pd.cx,cy:pd.cy,
+      x:(pd.cx+.5)/w,y:(pd.cy+.5)/h,bornAt:now,expiresAt:now+ECHO_PORTAL_TTL_MS});
+    auth.events.push({t:"echo-portal",x:(pd.cx+.5)/w,y:(pd.cy+.5)/h,screen:true,ts:now});
   }
-  // Failsafe: jogador ausente durante o debate — conta como erro após 30s
-  // e reabre em 10s (a luta não progride sozinha com o modal aberto).
-  if(st.pending&&st.question&&!st.pendingIntent&&st.askedAt&&now>Number(st.askedAt)+30000){
-    st.pending=false;
-    st.nextAt=now+10000;
+  // 2) Jogador pisando no portal arma a raid (portal some).
+  for(let i=st.portals.length-1;i>=0;i--){const po=st.portals[i];
+    if(now>=po.expiresAt){st.portals.splice(i,1);continue;}
+    const stepper=(auth.players||[]).find((it)=>it&&it.p&&Number(it.p.hp)>0&&
+      Number.isFinite(Number(it.cx))&&Number.isFinite(Number(it.cy))&&
+      Math.round(it.cx)===po.cx&&Math.round(it.cy)===po.cy);
+    if(!stepper)continue;
+    st.portals.splice(i,1);
+    st.armed.push({slug:po.slug,cx:po.cx,cy:po.cy,x:po.x,y:po.y,armedAt:now,spawnAt:now+ECHO_ARM_DELAY_MS});
+    auth.events.push({t:"echo-armed",x:po.x,y:po.y,at:now+ECHO_ARM_DELAY_MS,screen:true,ts:now});
   }
-  // Processa a réplica escolhida no modal.
-  if(st.pending&&st.pendingIntent){
-    const intent=st.pendingIntent;
-    st.pendingIntent=null;
-    const skip=!!intent.skip;
-    const ans=String(intent.answer||"");
-    const correct=!skip&&!!st.question&&ans.length>0&&ans===st.question.answer;
-    if(correct){
-      st.lives=Math.max(0,Number(st.lives)-1);
-      st.phase=(Number(st.phase)||0)+1;
-      st.invulnerable=false;
-      st.pending=false;
-      st.nextAt=0;
-      st.question=null;
-      oberonSpawnHelpersAuth(auth,now);
-      // 4ª réplica correta: a última vida foi consumida — o boss morre de
-      // verdade agora (mesmo fluxo do cliente: boss.hp=0 após lives<=0).
-      if(st.lives<=0&&boss)boss.hp=0;
-      auth.events.push({t:"oberon-debate",result:"correct",lives:st.lives,screen:true,ts:now});
-    }else{
-      st.pending=false;
-      st.nextAt=now+10000;
-      auth.events.push({t:"oberon-debate",result:"wrong",screen:true,ts:now});
-    }
-  }
-  // Garante imortalidade enquanto o debate está aberto.
-  if(st.invulnerable&&boss.hp<=0)boss.hp=Math.max(1,Number(boss.maxHp)||60000);
+  // 3) Raids armadas: warden + minions após o delay de 60s.
+  for(let i=st.armed.length-1;i>=0;i--){const ar=st.armed[i];
+    if(now<ar.spawnAt)continue;st.armed.splice(i,1);echoRunRaidAuth(auth,ar,now);}
 }
 function tryFerumbrasSummon(auth,mob,now,stepTs){
   if(auth.bossId!=="ferumbras-mortal-shell"||!mob||!mob.boss)return false;
@@ -7146,7 +7147,7 @@ function step(auth,now,opts){if(auth.ended)return;
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
   tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);
-  tickOberon(auth,now);
+  tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);
   tickDelayedHits(auth,now);
@@ -7484,23 +7485,17 @@ function step(auth,now,opts){if(auth.ended)return;
   const survivors=[],dead=[];
   for(const mob of auth.mobs||[]){
     if(mob.hp>0){survivors.push(mob);continue;}
-    // Grand Master Oberon: precisa ser derrotado 4x. Enquanto restar MAIS de
-    // 1 vida (lives>1), ao zerar o HP ele revive invulnerável e abre o debate
-    // (a réplica vem no próximo tick). A ÚLTIMA vida (lives=1) é morte
-    // DIRETA — o modal NÃO é ativado na 4ª morte (pedido do dono).
+    // Grand Master Oberon: 4 mortes. Cada morte invoca 4 falcons (10% mini
+    // boss); com mais de 1 vida revive com HP cheio; a última morre de vez.
     if(mob.boss&&(mob.slug==="grand-master-oberon"||String(mob.id)==="grand-master-oberon")&&
-       auth.oberon&&Number(auth.oberon.lives)>1&&!auth.oberon.invulnerable){
-      mob.hp=Number(mob.maxHp)||60000;
-      auth.oberon.invulnerable=true;
-      auth.oberon.pending=true;
-      auth.oberon.question=oberonDebateQuestion(auth,auth.oberon);
-      auth.oberon.nextAt=0;
-      auth.oberon.askedAt=now;
-      auth.oberon.pendingIntent=null;
-      survivors.push(mob);
-      auth.events=auth.events||[];
-      auth.events.push({t:"oberon-debate",screen:true,ts:stepTs});
-      continue;
+       auth.oberon){
+      oberonSpawnHelpersAuth(auth,now);
+      if(Number(auth.oberon.lives)>1){
+        auth.oberon.lives--;
+        mob.hp=Number(mob.maxHp)||60000;
+        survivors.push(mob);
+        continue;
+      }
     }
     const leader=auth.players[0];
     if(leader&&leader.p&&soulwarTaintPreventMonsterDeath(auth,mob,leader.p))survivors.push(mob);
@@ -7538,6 +7533,8 @@ function step(auth,now,opts){if(auth.ended)return;
       loot:lootDrops,x:deadPos.x,y:deadPos.y,
       screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish,
       ts:stepTs+800});
+    // Echo Raid: roll do portal (1–2★) + recompensa do warden.
+    echoOnKillAuth(auth,mob,stepTs);
     if(mob.boss){
       const isHuntMiniBoss=auth.kind==="hunt";
       // Boss de arena (kind=boss) encerra a luta; mini boss de HUNT não —
@@ -7919,11 +7916,12 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
       influenced:!!m.influenced,fiendish:!!m.fiendish,
       sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
       qteImmune:!!((auth.scarlett&&auth.scarlett.immune&&m.boss)||(auth.mega&&auth.mega.immune&&m.boss)||
-        (auth.oberon&&auth.oberon.invulnerable&&m.boss)),hatredSummon:!!m.hatredSummon,
+        (auth.oberon&&auth.oberon.lives>1&&m.boss)),hatredSummon:!!m.hatredSummon,
       spiteTrash:!!m.spiteTrash,spiteDamageTakenMul:Number(m.spiteDamageTakenMul)||1,
       spiteDefenseStacks:Number(m.spiteDefenseStacks)||0,
       maliceTrash:!!m.maliceTrash,megaAspect:!!m.megaAspect,
       megaImmune:!!(auth.mega&&auth.mega.immune&&m.boss),
+      echoWarden:!!m.echoWarden,echoMinion:!!m.echoMinion,
       hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
       // def compacto: só campos necessários para o cliente renderizar.
       // O def completo (loot, skills, voices) é pesado e já existe no
@@ -7961,16 +7959,15 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     goal:auth.malice.goal?{x:Number(auth.malice.goal.x)||0,y:Number(auth.malice.goal.y)||0}:null,
     blocks:Array.isArray(auth.malice.blocks)?auth.malice.blocks.map((b)=>({
       x:Number(b.x)||0,y:Number(b.y)||0,len:Number(b.len)||1})):[]}:null;
-  descriptor.state.oberon=auth.oberon?{
-    lives:Number(auth.oberon.lives)||0,
-    phase:Number(auth.oberon.phase)||0,
-    invulnerable:!!auth.oberon.invulnerable,
-    pending:!!auth.oberon.pending,
-    nextAt:Number(auth.oberon.nextAt)||0,
-    question:auth.oberon.question?{
-      phrase:String(auth.oberon.question.phrase||""),
-      options:(Array.isArray(auth.oberon.question.options)?auth.oberon.question.options:[]).map((o)=>String(o)),
-    }:null,
+  descriptor.state.oberon=auth.oberon?{lives:Number(auth.oberon.lives)||0}:null;
+  // Echo Raid: portais visíveis + raids armadas (countdown de 60s no tile).
+  descriptor.state.echo=auth.echo?{
+    portals:(auth.echo.portals||[]).map((po)=>({id:String(po.id||""),slug:String(po.slug||""),
+      cx:Number(po.cx)||0,cy:Number(po.cy)||0,x:Number(po.x)||0,y:Number(po.y)||0,
+      bornAt:Number(po.bornAt)||0,expiresAt:Number(po.expiresAt)||0})),
+    armed:(auth.echo.armed||[]).map((ar)=>({slug:String(ar.slug||""),
+      cx:Number(ar.cx)||0,cy:Number(ar.cy)||0,x:Number(ar.x)||0,y:Number(ar.y)||0,
+      armedAt:Number(ar.armedAt)||0,spawnAt:Number(ar.spawnAt)||0})),
   }:null;
   descriptor.state.mega=auth.mega?{
     bossSpawnAt:Number(auth.mega.bossSpawnAt)||0,bossSpawned:!!auth.mega.bossSpawned,

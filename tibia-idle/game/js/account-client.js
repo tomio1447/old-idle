@@ -591,15 +591,7 @@ function accountAuthorityVisualState(){
     out.megaIntent={x:Number(combat._megaPendingMove.x),y:Number(combat._megaPendingMove.y)};
     combat._megaPendingMove=null;combat._megaPendingMoveAt=0;
   }
-  // Grand Master Oberon: resposta do debate escolhida no modal. O servidor
-  // julga o texto contra a resposta correta (nunca enviada ao cliente).
-  // NÃO limpa aqui: se o tick que carrega a resposta falhar (rede/409), a
-  // resposta é reenviada no próximo tick — só é descartada após sucesso
-  // (ver accountTickInstance/accountLoadInstance).
-  if(combat._oberonPendingAnswer!==undefined&&combat._oberonPendingAnswer!==null){
-    const answer=String(combat._oberonPendingAnswer||"");
-    out.oberonIntent=answer?{answer:answer}:{skip:true};
-  }
+
   return out;
 }
 function accountTickInstance(token){

@@ -129,7 +129,7 @@ function questCard(q) {
       ${questBossImg(q.bossSprite || q.boss, 48)}
     </button>
     <span class="info"><span class="nm">${q.name}</span><span class="meta">Level ${q.level}+</span>
-      <span class="tiny dim">Lobby: até ${q.maxPlayers} jogadores</span></span>
+      <span class="tiny dim">${q.playable === false ? "Em breve" : "Lobby: até " + q.maxPlayers + " jogadores"}</span></span>
     <span class="quest-card-rewards">${rewardsHtml}</span>
   </div>`;
 }
@@ -205,9 +205,13 @@ function openQuestDetail(questId) {
     <div class="panel-body quest-detail-body">
       <div class="quest-detail-desc">${q.description || ""}</div>
       <div class="quest-detail-summary">
-        <span>Lobby: <b style="color:#9ce84a">1–${q.maxPlayers} jogadores</b></span>
-        <span>Conclusão: <b>1x por personagem</b></span>
-        <span>Waves: <b>${q.baseWaves}+ (dinâmico)</b></span>
+        ${q.id === "annihilator"
+          ? `<span>Party: <b style="color:#9ce84a">4 personagens da conta</b></span>
+             <span>Conclusão: <b>1x por personagem · máx. 4 recompensas por conta</b></span>
+             <span>Encontro: <b>6 Demons + alavanca</b></span>`
+          : `<span>Lobby: <b style="color:#9ce84a">1–${q.maxPlayers} jogadores</b></span>
+             <span>Conclusão: <b>1x por personagem</b></span>
+             <span>Waves: <b>${q.baseWaves}+ (dinâmico)</b></span>`}
       </div>
       <div class="quest-detail-row">
         <section class="quest-detail-panel quest-boss-col">
@@ -232,8 +236,10 @@ function openQuestDetail(questId) {
       </section>` : ""}
       <div class="quest-detail-actions">
         <button type="button" class="sm" id="quest-detail-back">← Voltar</button>
-        <button type="button" class="sm primary quest-action" id="quest-detail-auto">AUTO JOIN</button>
-        <button type="button" class="danger sm quest-action" id="quest-detail-create">CREATE LOBBY</button>
+        ${q.playable === false
+          ? `<span class="tiny dim" style="margin-left:auto">EM BREVE — mecânica dedicada em implementação</span>`
+          : `<button type="button" class="sm primary quest-action" id="quest-detail-auto">AUTO JOIN</button>
+             <button type="button" class="danger sm quest-action" id="quest-detail-create">CREATE LOBBY</button>`}
       </div>
     </div>`;
   // Bind item tooltips
@@ -247,8 +253,9 @@ function openQuestDetail(questId) {
     ui.body.classList.remove("quest-detail-shell");
   };
   $("#quest-detail-back").onclick = openQuestsModal;
-  $("#quest-detail-auto").onclick = () => questAutoJoin(questId);
-  $("#quest-detail-create").onclick = () => questCreateLobby(questId);
+  const autoBtn = $("#quest-detail-auto"), createBtn = $("#quest-detail-create");
+  if (autoBtn) autoBtn.onclick = () => questAutoJoin(questId);
+  if (createBtn) createBtn.onclick = () => questCreateLobby(questId);
 }
 
 /* ---- Character picker (reuse megaLobbyConfirmCharModal) ---- */

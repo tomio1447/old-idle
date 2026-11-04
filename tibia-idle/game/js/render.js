@@ -2196,6 +2196,46 @@ function bossSpawnCountdownSeconds(combat, now) {
   return Math.max(0, Math.ceil(((Number(spawn.at) || 0) - (Number(now) || Date.now())) / 1000));
 }
 
+/* Echo Raid: portal (anel dourado pulsante + aura) e raid armada (anel
+ * vermelho + countdown em segundos até nascer o warden). Desenhado depois
+ * das criaturas — o portal é um item no chão mas precisa ser visível. */
+function drawEchoRaidMarkers(ctx, echo, W, H, now) {
+  const tp = tilePx(W);
+  for (const po of (echo && echo.portals) || []) {
+    const x = Number(po.x) * W, y = Number(po.y) * H;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const pulse = 0.5 + 0.5 * Math.sin(now / 180);
+    const r = tp * (0.30 + 0.08 * pulse);
+    const grad = ctx.createRadialGradient(x, y, tp * 0.05, x, y, r * 1.8);
+    grad.addColorStop(0, "rgba(255, 215, 94, 0.85)");
+    grad.addColorStop(0.55, "rgba(200, 120, 30, 0.35)");
+    grad.addColorStop(1, "rgba(200, 120, 30, 0)");
+    ctx.save();
+    ctx.globalAlpha = 0.75 + 0.25 * pulse;
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(x, y, r * 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = Math.max(1.5, tp * 0.06);
+    ctx.strokeStyle = "#ffd75e";
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  for (const ar of (echo && echo.armed) || []) {
+    const x = Number(ar.x) * W, y = Number(ar.y) * H;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const left = Math.max(0, Math.ceil(((Number(ar.spawnAt) || now) - now) / 1000));
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = Math.max(1.5, tp * 0.06);
+    ctx.strokeStyle = "#ff5a4a";
+    ctx.beginPath(); ctx.arc(x, y, tp * 0.34, 0, Math.PI * 2); ctx.stroke();
+    ctx.font = "bold " + Math.max(9, Math.floor(tp * 0.34)) + "px monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffb3a8";
+    ctx.fillText(String(left), x, y);
+    ctx.restore();
+  }
+}
+
 Renderer.prototype.draw = function (combat, player, dt) {
   const ctx = this.ctx;
   const canvasW = this.c.width, canvasH = this.c.height;
@@ -2344,6 +2384,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.save(); ctx.shadowColor = ent.fiendish ? '#c14bff' : '#39a8ff'; ctx.shadowBlur = ent.fiendish ? 22 : 18;
       ctx.globalAlpha = .92; drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug); ctx.restore();
     }
+    // Echo Warden: brilho dourado de líder (glow nativo do crystalserver).
+    if (e.kind === "monster" && ent.echoWarden) {
+      ctx.save(); ctx.shadowColor = '#ffd75e'; ctx.shadowBlur = 20;
+      ctx.globalAlpha = .95; drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug); ctx.restore();
+    }
     if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
     else if (ent.ghost) {
       // Espectador GM: translúcido com brilho — visualmente intangível.
@@ -2386,6 +2431,12 @@ Renderer.prototype.draw = function (combat, player, dt) {
   for (const info of entityInfo) {
     if (info.e.kind === "monster")
       drawSinisterDust(ctx, info.ent, info.cx, info.cy, info.tile, Date.now());
+  }
+
+  // --- Echo Raid: portal dourado pulsante (esperando o step) e marcador
+  // de raid armada com o countdown de 60s até o warden nascer.
+  if (combat && combat.echo) {
+    drawEchoRaidMarkers(ctx, combat.echo, W, H, Date.now());
   }
 
   // --- projeteis / ataques a distancia

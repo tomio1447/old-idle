@@ -3790,7 +3790,22 @@ function renderHelper(p) {
       ${renderStancePicker(p)}
       ${challengeHtml}
       ${renderBuffPicker(p)}
-      ${renderHastePicker(p)}`;
+      ${renderHastePicker(p)}
+      <div class="small mb4 mt8" style="color:#d4af37;font-weight:bold">Echo Raid</div>
+      <div class="row wrap" style="gap:8px;align-items:center">
+        <label class="row" style="gap:6px;align-items:center;cursor:pointer" title="Se ativo, o personagem pisa no portal da Echo Raid para ativá-la">
+          <input type="checkbox" id="helper-echo-raid" ${p.config.echoRaid ? "checked" : ""}>
+          <span class="small">Ativar</span>
+        </label>
+        ${[["auto", "AUTO"], ["safe", "SAFE"]].map(([id, label]) =>
+          `<button class="sm ${((p.config.echoRaidMode || "auto") === id) ? "primary" : ""}" data-echo-raid-mode="${id}"
+            ${p.config.echoRaid ? "" : "disabled"} title="${id === "auto"
+              ? "O personagem corre instantaneamente para pisar na raid"
+              : "O personagem só pisa na raid quando não houver monstros vivos"}">${label}</button>`).join("")}
+      </div>
+      <div class="tiny dim mt4">Quando uma <b>Echo Raid</b> aparece na hunt, o personagem pisa no portal
+        para ativá-la. Ao acionar, a raid aguarda <b>60s</b> e nasce um Echo Warden (4x HP) com 7–12 minions.
+        <b>AUTO</b>: corre na hora. <b>SAFE</b>: só pisa sem monstros vivos.</div>`;
     $$("#helper-attack [data-buff]").forEach((b) => b.addEventListener("click", () => {
       const k = b.dataset.buff;
       p.config.buff = p.config.buff === k ? null : k;
@@ -3846,6 +3861,19 @@ function renderHelper(p) {
           ? "Exeta Res ATIVO — marca 1 inimigo (Challenge)."
           : "Exeta Res desativado.");
       }
+      renderHelper(p);
+    }));
+    // Echo Raid: checkbox liga o auto-step no portal; AUTO/SAFE o modo.
+    const echoChk = $("#helper-echo-raid");
+    if (echoChk) echoChk.addEventListener("change", () => {
+      p.config.echoRaid = !!echoChk.checked;
+      toast(p.config.echoRaid
+        ? "Echo Raid <b>ATIVA</b> — o personagem pisará no portal quando ela aparecer."
+        : "Echo Raid desativada.");
+      renderHelper(p);
+    });
+    $$("#helper-attack [data-echo-raid-mode]").forEach((b) => b.addEventListener("click", () => {
+      p.config.echoRaidMode = b.dataset.echoRaidMode;
       renderHelper(p);
     }));
     const kd = $("#kite-distance");

@@ -5174,6 +5174,7 @@ function combatTick(c, p, dt, now) {
   if (typeof heartBossTick === "function" && heartBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
+  if (typeof echoRaidTick === "function") echoRaidTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
   if (typeof surviveMissionTick === "function") surviveMissionTick(c, p, dt);
   if (typeof huntTimeMissionTick === "function") huntTimeMissionTick(c, p, dt);
@@ -5506,6 +5507,8 @@ function combatTick(c, p, dt, now) {
                     profXp: profKill ? profKill.xp : 0,
                     profSlug: profKill ? profKill.slug : null,
                     profUps: profKill ? profKill.ups : 0 });
+    // Echo Raid: roll do portal (monstros 1–2★) + recompensa do warden.
+    if (typeof echoRaidOnKill === "function") echoRaidOnKill(c, m, now);
   }
   c.mobs = alive;
   // Wave clear: agenda o blink/respawn da próxima onda (evita spawnWave /

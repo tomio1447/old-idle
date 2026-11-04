@@ -1,11 +1,10 @@
 /* grandmaster-oberon.js — Boss Grand Master Oberon (Falcon Bastion).
  *
  * Mecânica exclusiva: Oberon precisa ser derrotado 4 vezes. Cada vez que
- * zera de HP ele fica invulnerável e abre um modal de debate. O jogador
- * escolhe 1 entre 4 réplicas; a correta quebra a invulnerabilidade, spawna
- * 2 Falcon Knights + 2 Falcon Paladins e o combate continua normalmente. Se
- * errar, ele fica invulnerável por 10s e uma nova pergunta é oferecida.
- */
+ * zera de HP ele revive com HP cheio e invoca 4 falcons (2 Falcon Knights +
+ * 2 Falcon Paladins — ou 10% de chance de 1 mini boss do Falcon Bastion).
+ * A quarta morte é a morte real. (Mecânica de debate/falas removida a
+ * pedido do dono.) */
 "use strict";
 
 const OBERON_ROOM = {
@@ -26,50 +25,43 @@ const OBERON_STATS = {
   defense: 60,
 };
 
-/* Debate: frases de Oberon e a réplica correta do jogador. */
-const OBERON_DEBATE = [
-  {
-    phrase: "The world will suffer for its idle laziness!",
-    answer: "Are you ever going to fight or do you prefer talking!",
-  },
-  {
-    phrase: "You appear like a worm among men!",
-    answer: "How appropriate, you look like something worms already got the better of!",
-  },
-  {
-    phrase: "People fall at my feet when they see me coming!",
-    answer: "Even before they smell your breath?",
-  },
-  {
-    phrase: "This will be the end of mortal man!",
-    answer: "Then let me show you the concept of mortality before it!",
-  },
-  {
-    phrase: "I will remove you from this plane of existence!",
-    answer: "Too bad you barely exist at all!",
-  },
-  {
-    phrase: "Dragons will soon rule this world, I am their herald!",
-    answer: "Excuse me but I still do not get the message!",
-  },
-  {
-    phrase: "The true virtue of chivalry are my belief!",
-    answer: "Dare strike up a Minnesang and you will receive your last accolade!",
-  },
-  {
-    phrase: "I lead the most honourable and formidable following of knights!",
-    answer: "Then why are we fighting alone right now?",
-  },
-  {
-    phrase: "ULTAH SALID'AR, ESDO LO!",
-    answer: "SEHWO ASIMO, TOLIDO ESD!",
-  },
-];
-
-/* Expõe o banco de perguntas para o servidor (vm sandbox do
- * authoritative_engine). O servidor julga a resposta do debate com a MESMA
- * lista do cliente — se as cópias divergissem, nenhuma resposta acertaria. */
-if (typeof window !== "undefined") window.OBERON_DEBATE = OBERON_DEBATE;
+/* Spawn genérico de monstro numa célula do combate (usado pelos helpers do
+ * Oberon e pelas skills de summon). Entra pela fila pendingSpawns — blink
+ * de teleporte como nas waves normais. */
+function spawnMobAt(c, slug, cx, cy, opts) {
+  opts = opts || {};
+  const base = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters && GAMEDATA.monsters[slug]) ||
+    (typeof MONSTERDATA !== "undefined" && MONSTERDATA[slug]);
+  if (!c || !base) return null;
+  const m = Object.assign({}, base);
+  m.name = (typeof displayMonsterName === "function") ? displayMonsterName(base.name) : base.name;
+  const as = Math.max(500, Number(m.attackSpeed) || 2000);
+  const atkMin = Math.floor(as * 0.15);
+  const mob = {
+    slug: slug, def: m,
+    boss: !!opts.boss, bossHelper: !!opts.bossHelper,
+    influenced: false, fiendish: false,
+    hp: m.hp, maxHp: m.hp,
+    atkCd: atkMin + Math.random() * (as - atkMin),
+    id: "mob-" + Math.random().toString(36).slice(2, 8),
+    dir: "w", moving: false, attackAnim: 0,
+    speed: 0.000045 + Math.random() * 0.000025,
+    spawnAt: opts.now || Date.now(),
+  };
+  c.pendingSpawns = c.pendingSpawns || [];
+  const occ = (typeof buildOccupancy === "function") ? buildOccupancy(c, null) : null;
+  if (occ) {
+    for (const sp of c.pendingSpawns) {
+      if (sp && Number.isFinite(Number(sp.cx)) && Number.isFinite(Number(sp.cy)))
+        occ.set(Number(sp.cx) + ":" + Number(sp.cy), true);
+    }
+    const ent = { cx: undefined, cy: undefined };
+    if (typeof placeFree === "function") placeFree(ent, occ, cx, cy);
+    if (Number.isFinite(ent.cx)) { cx = ent.cx; cy = ent.cy; }
+  }
+  c.pendingSpawns.push({ mob: mob, cx: cx, cy: cy, startedAt: opts.now || Date.now(), blink: 0, done: false });
+  return mob;
+}
 
 /* Tabela de Loot corrigida para dropar o item correto do gamedata */
 const OBERON_LOOT = [
@@ -166,11 +158,11 @@ const OBERON_ITEMS = {
       text: "Requer nível 250+ (Falcon Bastion)",
     },
     cooldown: typeof BOSS_COOLDOWN !== "undefined" ? BOSS_COOLDOWN : 0,
-    mechanic: "oberon-debate",
+    mechanic: "oberon-lives",
   };
 })();
 
-/* ===================================================== mecânica do debate */
+/* ===================================================== mecânica das 4 vidas */
 
 function isOberonCombat(c) {
   if (!c) return false;
@@ -186,15 +178,7 @@ function getOberonMob(c) {
 
 function oberonBossState(c) {
   if (!c) return null;
-  if (!c.oberon) {
-    c.oberon = {
-      lives: 4,
-      phase: 0,
-      invulnerable: false,
-      pending: false,
-      nextAt: 0,
-    };
-  }
+  if (!c.oberon) c.oberon = { lives: 4 };
   return c.oberon;
 }
 
@@ -202,15 +186,9 @@ function oberonBossInit(c, player) {
   if (!c || c.oberonInit) return;
   c.oberonInit = true;
   oberonBossState(c);
-  const boss = getOberonMob(c);
-  if (boss) boss.oberonInvulnerable = false;
 }
 
 function oberonBossCanTakeDamage(c, mob) {
-  if (!mob) return true;
-  if (isOberonCombat(c) && (mob.boss || mob.slug === "grand-master-oberon")) {
-    return !mob.oberonInvulnerable;
-  }
   return true;
 }
 
@@ -243,140 +221,35 @@ function oberonSpawnHelpers(c, player, now) {
   }
 }
 
-/* Renderiza o modal de debate a partir de um payload {phrase, options}.
- * Usado pelo fluxo LOCAL (opções montadas com OBERON_DEBATE) e pelo fluxo
- * ONLINE (opções enviadas pelo servidor — que nunca envia a resposta certa).
- * `onAnswer` recebe o TEXTO da réplica escolhida ("" se fechou o modal).
- * Visual dedicado (.oberon-debate-shell): bordas escuras, fundo quase
- * transparente e texto amarelo — dá para acompanhar a luta atrás do modal. */
-function oberonOpenDebateModalRemote(boss, payload, onAnswer) {
-  const modal = document.getElementById("modal");
-  const body = document.getElementById("modal-body");
-  if (!modal || !body || !payload) { if (onAnswer) onAnswer(""); return; }
-
-  const phrase = String(payload.phrase || "");
-  const options = Array.isArray(payload.options)
-    ? payload.options.map((o) => String(o)).filter(Boolean).slice(0, 6) : [];
-  if (!phrase || options.length < 2) { if (onAnswer) onAnswer(""); return; }
-
-  body.classList.remove(...(body.className.match(/\S+/g) || []).filter((s) => s.endsWith("-modal-shell")));
-  body.classList.add("oberon-debate-shell");
-  body.innerHTML = `
-    <div class="panel-title">
-      <span style="color:#ffd700">Grand Master Oberon</span>
-      <button class="sm" id="oberon-debate-close" style="margin-left:auto">✕</button>
-    </div>
-    <div class="panel-body" style="text-align:center;max-width:440px">
-      <div class="mb8" style="font-style:italic;color:#ffd700">"${phrase}"</div>
-      <div class="small dim mb8" style="color:#e8c94a">Escolha a réplica correta para quebrar a invulnerabilidade.</div>
-      <div id="oberon-debate-options" class="list" style="text-align:left;gap:6px;display:flex;flex-direction:column">
-        ${options.map((a, i) => `<button class="sm" data-oberon-answer="${i}" style="white-space:normal;height:auto;line-height:1.3;padding:8px">${a}</button>`).join("")}
-      </div>
-    </div>`;
-  modal.classList.add("show");
-
-  const close = (value) => {
-    modal.classList.remove("show");
-    body.classList.remove("oberon-debate-shell");
-    if (onAnswer) onAnswer(value);
-  };
-  document.getElementById("oberon-debate-close").addEventListener("click", () => close(""));
-  document.querySelectorAll("#oberon-debate-options [data-oberon-answer]").forEach((btn) =>
-    btn.addEventListener("click", () => close(options[Number(btn.dataset.oberonAnswer)])));
-}
-
-function oberonOpenDebateModal(boss, question, onAnswer) {
-  if (!question) { if (onAnswer) onAnswer(false); return; }
-
-  const answers = [question.answer];
-  const wrong = OBERON_DEBATE
-    .filter((q) => q.answer !== question.answer)
-    .map((q) => q.answer)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3);
-  answers.push(...wrong);
-  answers.sort(() => Math.random() - 0.5);
-
-  oberonOpenDebateModalRemote(boss, { phrase: question.phrase, options: answers }, (chosen) => {
-    if (onAnswer) onAnswer(!!chosen && chosen === question.answer);
-  });
-}
-
-function oberonBossAsk(c, player, now) {
-  const st = oberonBossState(c);
-  const boss = getOberonMob(c);
-  if (!st || !boss || st.pending || st.phase >= OBERON_DEBATE.length) return;
-
-  st.pending = true;
-  const question = OBERON_DEBATE[st.phase % OBERON_DEBATE.length];
-
-  oberonOpenDebateModal(boss, question, (correct) => {
-    st.pending = false;
-    if (!c) return;
-    if (correct) {
-      st.lives--;
-      st.phase++;
-      st.invulnerable = false;
-      if (boss) boss.oberonInvulnerable = false;
-      oberonSpawnHelpers(c, player, Date.now());
-      if (st.lives <= 0 && boss) {
-        boss.oberonInvulnerable = false;
-        boss.hp = 0; // Permite morrer de verdade
-      }
-    } else {
-      st.nextAt = Date.now() + 10000;
-    }
-  });
-}
-
 function oberonBossTick(c, p, dt, now) {
-  const tickDebug = isOberonCombat(c);
-  if (typeof addLog === "function" && tickDebug) addLog("info", `[Oberon] tick ativo. boss.hp=${(getOberonMob(c)||{}).hp} lives=${(c.oberon||{}).lives} inv=${(c.oberon||{}).invulnerable}`);
-  if (!tickDebug) return true;
+  if (!isOberonCombat(c)) return true;
   oberonBossInit(c, p);
   const st = oberonBossState(c);
   const boss = getOberonMob(c);
-  if (!boss || !st) { if (typeof addLog === "function") addLog("bad", "[Oberon] boss ou estado nulo"); return true; }
+  if (!boss || !st) return true;
 
-  // Se o boss zerou o HP e ainda tem MAIS de 1 vida: resgata, cura e abre o
-  // debate. A ÚLTIMA vida (lives=1) é morte direta — o modal não é ativado
-  // na 4ª morte (pedido do dono).
-  if (boss.hp <= 0 && st.lives > 1 && !st.invulnerable) {
+  // Zerou o HP com mais de 1 vida: revive instantâneo + 4 falcons.
+  if (boss.hp <= 0 && st.lives > 1) {
+    st.lives--;
     boss.hp = boss.maxHp || OBERON_STATS.hp;
-    st.invulnerable = true;
-    boss.oberonInvulnerable = true;
-    oberonBossAsk(c, p, now);
-  }
-
-  // Se errou a resposta, reabre após 10 segundos
-  if (st.invulnerable && !st.pending && st.nextAt && now >= st.nextAt) {
-    st.nextAt = 0;
-    oberonBossAsk(c, p, now);
-  }
-
-  // Garante imortalidade enquanto debate
-  if (st.invulnerable && boss.hp <= 0) {
-    boss.hp = Math.max(1, boss.maxHp || OBERON_STATS.hp);
+    oberonSpawnHelpers(c, p, now);
   }
 
   return true;
 }
 
 function oberonBossHandleKill(c, m, now) {
-  if (typeof addLog === "function") addLog("info", `[Oberon] kill trigger. combat=${isOberonCombat(c)} slug=${m && m.slug} boss=${m && m.boss} hp=${m && m.hp}`);
   if (!isOberonCombat(c) || !m) return false;
   const boss = getOberonMob(c);
-  if (m !== boss && !m.boss && m.slug !== "grand-master-oberon") { if (typeof addLog === "function") addLog("info", "[Oberon] morte ignorada (nao e o boss)"); return false; }
+  if (m !== boss && !m.boss && m.slug !== "grand-master-oberon") return false;
 
   const st = oberonBossState(c);
-  if (m.oberonInvulnerable || (st && st.invulnerable)) return true; // Impede morte real
-
-  // Só revive+debate com MAIS de 1 vida; a última (lives=1) morre direto.
+  // Toda morte traz 4 falcons (ou 10% de chance de 1 mini boss).
+  oberonSpawnHelpers(c, (c.player && c.player.p) || (typeof G !== "undefined" && G.p), now);
+  // Com mais de 1 vida: revive com HP cheio e aborta a morte real.
   if (st && st.lives > 1) {
+    st.lives--;
     m.hp = m.maxHp || OBERON_STATS.hp;
-    m.oberonInvulnerable = true;
-    st.invulnerable = true;
-    oberonBossAsk(c, (c.player && c.player.p) || (typeof G !== "undefined" && G.p), now);
     return true; // Retorna true para a engine de combate abortar a morte
   }
   return false;

@@ -27,6 +27,8 @@ const HELPER_PRESET_CONFIG_FIELDS = [
   "attackMode", "kiteDistance", "buff",
   "exetaRes", "exetaAmpRes",
   "hasteSpell", "autoHaste", "autoWalk", "autoRetreat",
+  // Echo Raid (auto-step no portal + modo AUTO/SAFE)
+  "echoRaid", "echoRaidMode",
   // Magias automáticas / shooter
   "spellAttack", "useRunes", "attackSpells",
   "shooterType", "shooterSpell", "shooterRune",
