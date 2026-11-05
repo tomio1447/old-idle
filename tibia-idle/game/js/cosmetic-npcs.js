@@ -75,7 +75,7 @@ function renderCosmeticNpcOffers(id, offers) {
           return `${item ? itemImg(i.slug, 22) : ""} ${i.count}× ${escape(item ? item.n : i.slug.replace(/-/g, " "))}`;
         }).join(" + ")}</span><button class="sm" data-cosmetic-exchange="${escape(r.id)}" data-alternative="${index}" ${r.owned || !r.available || !enough ? "disabled" : ""}>Trocar</button></div>`;
       }).join("");
-      return `<div class="panel mb8"><div class="panel-body"><b>${title}</b><div class="tiny dim mb4">${r.owned ? "Desbloqueado na conta" : escape(r.reason || "Troca por itens")}</div>${r.catalyst && !r.owned ? `<div class="tiny dim">Também requer ${escape(r.catalyst.replace(/-/g, " "))} na Bag (não consumido).</div>` : ""}${r.owned ? "" : costs}</div></div>`;
+      return `<div class="panel mb8"><div class="panel-body"><b>${title}</b><div class="tiny dim mb4">${r.owned ? "Desbloqueado na conta" : escape(r.reason || "Troca por itens")}</div>${r.catalyst && !r.owned ? `<div class="tiny dim">Também requer ${escape(r.catalyst.replace(/-/g, " "))} na Bag (não consumido).</div>` : ""}${costs}</div></div>`;
     }).join("") || `<div class="tiny dim">Nenhum resultado.</div>`;
     content.querySelectorAll("[data-cosmetic-exchange]").forEach((button) => {
       button.onclick = () => { button.disabled = true; openCosmeticNpc(id, button.dataset.cosmeticExchange, Number(button.dataset.alternative)); };

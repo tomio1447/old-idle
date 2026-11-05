@@ -282,15 +282,17 @@ canvas { image-rendering: pixelated; }
 #social-announce-modal .alpha-announce-box {
   width: min(460px, 96vw);
 }
+/* Estética da cidade: superfícies #1a1915/#414037, texto #d8d0bc,
+   valor #9ce84a — mesmo padrão dos modais da CIDADE (.ranking-table). */
 .alpha-update-at {
   color: #9ce84a;
   padding: 4px 8px; margin-bottom: 6px;
-  background: rgba(10, 12, 16, .5); border: 1px solid #33373f; border-radius: 4px;
+  background: #1a1915; border: 1px solid #414037; border-radius: 4px;
 }
 .alpha-announce-updates { max-height: 180px; overflow-y: auto; }
 .alpha-announce-list {
   margin: 0; padding-left: 18px;
-  color: #d4cbb8; font-size: 12px; line-height: 1.45;
+  color: #d8d0bc; font-size: 12px; line-height: 1.45;
 }
 .alpha-announce-list li { margin-bottom: 4px; }
 .alpha-discord-link {
@@ -304,10 +306,10 @@ canvas { image-rendering: pixelated; }
 .alpha-social {
   display: flex; gap: 12px; align-items: center;
   padding: 8px 10px;
-  background: rgba(10, 12, 16, .5); border: 1px solid #33373f; border-radius: 6px;
+  background: #1a1915; border: 1px solid #414037; border-radius: 6px;
 }
 .alpha-social-links { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.alpha-wa-line { display: flex; align-items: center; gap: 6px; color: #d4cbb8; }
+.alpha-wa-line { display: flex; align-items: center; gap: 6px; color: #d8d0bc; }
 .alpha-wa-logo { width: 16px; height: 16px; flex: none; }
 .alpha-wa-qr {
   width: 160px; height: 160px; flex: none;
@@ -2164,24 +2166,25 @@ button.full { width: 100%; }
 }
 #login .box {
   width: min(470px, 96vw);
-  background: url("../assets/loginbackground.png?v=login-background-fix-v2") center / 100% 100% no-repeat;
-  background-color: var(--panel);
+  /* Estética da cidade: painel escuro quente no padrão dos modais da
+     CIDADE (.ranking-table/.market-tabs) — sem artwork de fundo. */
+  background: #24221e;
   position: relative;
 }
 #login .box > .panel-title {
-  background: rgba(5, 11, 20, 0.38);
-  border-bottom-color: rgba(30, 58, 82, 0.55);
+  background: #1a1915;
+  color: #ffe680;
+  border-bottom-color: #16140f;
 }
 #login .box .panel-body {
-  background: rgba(5, 10, 18, 0.24);
-  backdrop-filter: blur(0);
+  background: transparent;
 }
 .field { margin-bottom: 10px; }
-.field label { display: block; font-size: 10px; color: #9a9078; margin-bottom: 3px; }
+.field label { display: block; font-size: 10px; color: #a89f88; margin-bottom: 3px; }
 .field input, .field select {
   width: 100%; padding: 6px 8px;
-  background: #14120e; color: var(--text-bright);
-  border: 2px solid; border-color: #16140f #5a5348 #5a5348 #16140f;
+  background: #1c1a16; color: var(--text-bright);
+  border: 2px solid; border-color: #17150f #4b493e #4b493e #17150f;
   font: 12px Verdana, sans-serif;
 }
 .field input:focus, .field select:focus { outline: 1px solid var(--gold); }
@@ -4815,7 +4818,7 @@ a:hover { color: #aab6f7; }
   inset: 0;
   z-index: 10050;
   padding: 12px;
-  background: #080a0e;
+  background: #0d0c0a;
   align-items: center;
   justify-content: center;
 }
@@ -4836,11 +4839,14 @@ html.boot-loading #ui-mode-modal { display: none !important; }
 .gl-box {
   width: min(520px, 92vw);
   padding: 22px;
-  background: linear-gradient(180deg, #262b34, #171a20);
-  border: 1px solid #8b742d;
+  /* Estética da cidade: marrom escuro + dourado dos modais da CIDADE
+     (.ranking-table/.market-tabs) em vez do cinza-azulado anterior. */
+  background: linear-gradient(180deg, #2a261e, #1a1915);
+  border: 2px solid;
+  border-color: #4b493e #17150f #17150f #4b493e;
   color: #ffe680;
   text-align: center;
-  box-shadow: 0 12px 45px #000, inset 0 0 0 1px #343a45;
+  box-shadow: 0 12px 45px #000;
 }
 .gl-brand {
   font: bold 20px Georgia, serif;
@@ -4854,11 +4860,11 @@ html.boot-loading #ui-mode-modal { display: none !important; }
   align-items: center;
   margin: 18px 0 15px;
   padding: 13px;
-  background: linear-gradient(90deg, #101319, #1c2028);
-  border: 1px solid #4b5059;
-  border-left: 3px solid #a88932;
+  background: #1c1a16;
+  border: 1px solid #4b493e;
+  border-left: 3px solid #8a7a40;
   text-align: left;
-  box-shadow: inset 0 0 20px #080a0e;
+  box-shadow: inset 0 0 20px #16140f;
 }
 .gl-hint-art {
   width: 92px;
@@ -4866,8 +4872,8 @@ html.boot-loading #ui-mode-modal { display: none !important; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle, #303641 0, #11141a 70%);
-  border: 1px solid #555b64;
+  background: radial-gradient(circle, #2a261e 0, #14120e 70%);
+  border: 1px solid #4b493e;
   overflow: hidden;
 }
 .gl-hint-art .mob-img {
@@ -4878,28 +4884,28 @@ html.boot-loading #ui-mode-modal { display: none !important; }
 .gl-hint-label {
   display: block;
   margin-bottom: 4px;
-  color: #a88932;
+  color: #d4af37;
   font: bold 9px Verdana;
   letter-spacing: 1.4px;
 }
 .gl-hint-info strong {
   display: block;
-  color: #f5e2a1;
+  color: #ffe680;
   font: 700 16px Georgia, serif;
   text-transform: capitalize;
 }
 .gl-hint-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
 .gl-hint-stats span {
   padding: 3px 6px;
-  background: #090b0f;
-  border: 1px solid #393e47;
-  color: #9da3ad;
+  background: #16140f;
+  border: 1px solid #4b493e;
+  color: #a89f88;
   font: 9px Verdana;
 }
-.gl-hint-stats b { color: #e7d081; }
-.gl-hint-info p { margin: 8px 0 0; color: #b8bdc5; font: 10px/1.4 Verdana; }
-.gl-text { font-size: 11px; color: #d8d8dc; margin: 10px 0 8px; }
-.gl-bar { height: 8px; background: #0b0d11; border: 1px solid #555; }
+.gl-hint-stats b { color: #ffe680; }
+.gl-hint-info p { margin: 8px 0 0; color: #c8c0a8; font: 10px/1.4 Verdana; }
+.gl-text { font-size: 11px; color: #d8d0bc; margin: 10px 0 8px; }
+.gl-bar { height: 8px; background: #16140f; border: 1px solid #4b493e; }
 .gl-fill {
   display: block;
   height: 100%; width: 0;
@@ -5602,3 +5608,72 @@ body.quest-lobby-open #party-panel { display:none !important; }
   padding:4px 6px; font-size:11px; font-family:inherit;
 }
 .cal-in:focus { border-color:#a89f88; outline:none; }
+
+/* ============================================================
+   Estética da cidade — telas pré-jogo (login, seleção de
+   personagens, patch notes/social, loading). Paleta dos modais
+   da CIDADE (.ranking-table/.market-tabs): #1c1a16/#24221e,
+   bordas #4b493e/#17150f, texto #d8d0bc/#c8c0a8/#a89f88,
+   dourados #ffe680/#8a7a40/#d4af37.
+   ============================================================ */
+
+/* --- botões primários: faixa dourada escura --- */
+#login button.primary,
+.alpha-announce-box button.primary,
+.account-flow-body button.primary,
+.ui-mode-box button.primary {
+  background: #2a2618;
+  border: 1px solid #8a7a40;
+  color: #ffe680;
+  text-shadow: 1px 1px 0 #000;
+}
+#login button.primary:hover:not(:disabled),
+.alpha-announce-box button.primary:hover:not(:disabled),
+.account-flow-body button.primary:hover:not(:disabled) {
+  background: #35301f;
+  border-color: #b09a55;
+  color: #fff0b3;
+}
+
+/* --- botões secundários: quadrado escuro da cidade --- */
+#login button:not(.primary):not(#acc-btn-login):not(#acc-open-register),
+.alpha-announce-box button:not(.primary),
+.account-flow-body button:not(.primary) {
+  background: #1c1a16;
+  border: 1px solid #4b493e;
+  color: #c8c0a8;
+  text-shadow: 1px 1px 0 #000;
+}
+#login button:not(.primary):hover:not(:disabled),
+.alpha-announce-box button:not(.primary):hover:not(:disabled),
+.account-flow-body button:not(.primary):hover:not(:disabled) {
+  border-color: #6a6558;
+  color: #fff;
+}
+
+/* --- botão perigo (logout): vermelho discreto como boss-section-gate.no */
+#login .btn-danger,
+.account-flow-body .btn-danger,
+.account-flow-body button.danger {
+  border-color: #5a3a2e;
+  color: #ff9a6a;
+}
+
+/* --- títulos dos modais pré-login: faixa escura + dourado --- */
+.alpha-announce-box > .panel-title,
+.ui-mode-box > .panel-title {
+  background: #1a1915;
+  color: #ffe680;
+  border-bottom-color: #16140f;
+}
+.alpha-announce-box .panel-body { color: #d8d0bc; }
+
+/* --- cartões/seleção de personagens: superfícies quentes --- */
+.account-character-list-head { color: #a89f88; }
+.account-character-card {
+  background: linear-gradient(180deg, #292720, #1c1a16);
+  border-color: #4b493e #17150f #17150f #4b493e;
+}
+.account-character-card:hover { border-color: #8a7a40 #4b493e #4b493e #8a7a40; }
+.account-character-empty { color: #a89f88; border-color: #4b493e; }
+.creator-look-editor { background: #1a1915; border-color: #414037; }

@@ -2676,6 +2676,16 @@ async function tickInstance(db,body){
         delete visual.megaIntent;
       }
     }
+    // Instâncias de quest salvas antes de `walkFloors` carregam blockedCells
+    // obsoletos (sala inteira bloqueada). Recalcula ao avançar a autoridade.
+    try{
+      const auth=state&&state.authority;
+      const quest=auth&&auth.questId&&QUEST_DEFS?QUEST_DEFS[auth.questId]:null;
+      if(auth&&quest&&Array.isArray(quest.walkFloors)){
+        const fresh=questMapBlockedCells(quest);
+        if(fresh){auth.blockedCells=fresh;if(state.state)state.state.blockedCells=fresh;}
+      }
+    }catch(_e){}
     return advanceAuthorityState(state,elapsed,checkpointAt,visual);
   };
   const result=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceWithVisuals,lease,

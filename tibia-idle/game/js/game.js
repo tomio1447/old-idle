@@ -270,6 +270,12 @@ function resumeIdleInstance(session){
         }
         G.combat=restoreCombatSessionState(fresh,session);
         if(questDef)G.combat.questId=questDef.id;
+        // A intro da annihilator dispara por evento no start — em instância
+        // retomada o init não re-emite; reabre uma vez por sessão.
+        if(questDef&&questDef.id==="annihilator"&&!window.__annIntroShown){
+          window.__annIntroShown=true;
+          if(typeof openAnnihilatorIntro==="function")openAnnihilatorIntro();
+        }
         G.p.hunt=session.kind==="hunt"?session.huntId:null;
         G.p.instanceMode=session.kind==="quest"?"quest":(session.kind==="boss"?"boss":session.instanceMode);
         // O worker já reivindicou intervalos completos sem lease. Soma o
@@ -2059,12 +2065,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 1–250",
     minLevel: 150,
-    ids: ["leiden", "tentugly-s-head"],
-  },
-  {
-    title: "GRIMVALE 100+",
-    minLevel: 100,
-    ids: ["black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw"],
+    ids: ["leiden", "tentugly-s-head", "black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw", "katex-blood-tongue", "srezz-yellow-eyes", "utua-stone-sting", "yirkas-blue-scales"],
   },
   {
     title: "HEART OF DESTRUCTION 150+",
@@ -2103,6 +2104,76 @@ const BOSS_MODAL_SECTIONS = [
     ],
   },
 ];
+
+// SQMs de preparo da Annihilator (coords locais do .otbm — igual
+// ANNIHILATOR_CELLS.prep/.entrance do servidor).
+const ANNIHILATOR_PREP_CELLS = [[16, 23], [17, 23], [18, 23], [19, 23]];
+const ANNIHILATOR_ENTRANCE_CELLS = [[13, 11], [14, 11], [15, 11], [16, 11]];
+
+function openAnnihilatorPrep() {
+  const modal = $("#modal"), body = $("#modal-body");
+  if (!modal || !body || !G.combat) return;
+  const players = (G.combat.players || [])
+    .filter((e) => e && e.p && e.p.hp > 0)
+    .map((e, i) => ({ ent: e, id: String(e.id || i), name: e.p.name || ("Player " + (i + 1)) }));
+  if (!players.length) return;
+  const order = window.__annPrepOrder =
+    (window.__annPrepOrder || []).filter((id) => players.some((p) => p.id === id))
+      .concat(players.map((p) => p.id).filter((id) => !window.__annPrepOrder || !window.__annPrepOrder.includes(id)));
+  const roles = ["Blocker", "Shooter 1", "Shooter 2", "Shooter 3"];
+  const render = () => {
+    body.innerHTML = `<div class="panel-title">Annihilator — Posicionamento
+      <button class="sm" id="ann-prep-close" style="margin-left:auto">Fechar</button></div>
+      <div class="panel-body" style="max-width:480px">
+        <div class="tiny dim mb8">Organize a ordem dos 4 nos SQMs de preparo
+          (esquerda → direita = esquerda → direita na entrada). Depois clique em
+          <b>Posicionar</b>: cada personagem caminha até seu SQM. Quando todos
+          estiverem parados nos SQMs por 3s, a alavanca dispara.</div>
+        <div class="row" style="gap:8px;justify-content:center;margin:10px 0">
+          ${order.map((id, i) => {
+            const pl = players.find((p) => p.id === id); if (!pl) return "";
+            const pv = (typeof OutfitRenderer !== "undefined" && OutfitRenderer.preview)
+              ? OutfitRenderer.preview(pl.ent.p || pl.ent, "s") : null;
+            return `<div class="ann-prep-slot" style="text-align:center">
+              <div class="tiny dim">${roles[i] || ""}</div>
+              <div style="border:1px solid #3a3324;border-radius:4px;padding:4px;width:56px;height:56px;display:flex;align-items:center;justify-content:center">
+                ${pv ? `<img src="${pv}" style="max-width:48px;max-height:48px">` : `<span class="tiny">${pl.name}</span>`}
+              </div>
+              <div class="tiny" style="max-width:64px;overflow:hidden;text-overflow:ellipsis">${pl.name}</div>
+              <div class="row" style="gap:2px;justify-content:center;margin-top:2px">
+                ${i > 0 ? `<button class="sm" data-ann-move="${i}:-1">◀</button>` : ""}
+                ${i < order.length - 1 ? `<button class="sm" data-ann-move="${i}:1">▶</button>` : ""}
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+        <div class="row" style="gap:6px;justify-content:center">
+          <button class="primary sm" id="ann-prep-go">Posicionar</button>
+        </div>
+      </div>`;
+    body.querySelectorAll("[data-ann-move]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const [i, d] = b.dataset.annMove.split(":").map(Number);
+        const j = i + d;
+        [order[i], order[j]] = [order[j], order[i]];
+        render();
+      }));
+    const go = $("#ann-prep-go");
+    if (go) go.addEventListener("click", () => {
+      order.forEach((id, i) => {
+        const pl = players.find((p) => p.id === id);
+        const cell = ANNIHILATOR_PREP_CELLS[i];
+        if (pl && cell && pl.ent) pl.ent.walkGoal = { cx: cell[0], cy: cell[1] };
+      });
+      modal.classList.remove("show");
+      toast("Personagens indo aos SQMs de preparo…");
+    });
+    const close = $("#ann-prep-close");
+    if (close) close.onclick = () => modal.classList.remove("show");
+  };
+  render();
+  modal.classList.add("show");
+}
 
 function openAnnihilatorIntro() {
   const modal = $("#modal"), body = $("#modal-body");
@@ -3680,12 +3751,32 @@ function drainEvents() {
         break;
       }
       case "annihilator-start": {
-        if (typeof openAnnihilatorIntro === "function") openAnnihilatorIntro();
+        if (typeof openAnnihilatorPrep === "function") openAnnihilatorPrep();
         break;
       }
       case "annihilator-lever": {
         addLog("info", `A alavanca foi acionada — <b>6 Demons</b> nasceram!`);
         if (typeof toast === "function") toast(`Annihilator: <b>6 Demons</b>!`, "level");
+        /* O servidor teleporta para a entrada, mas o merge de checkpoint
+         * preserva a posição visual local — sem este snap o grupo ficava
+         * preso nos SQMs de preparo (o teleporte era descartado).
+         * Mesma ordem do servidor: índice do SQM de preparo esq→dir. */
+        if (G.combat && G.combat.players) {
+          const prepIdx = {};
+          ANNIHILATOR_PREP_CELLS.forEach((c, i) => { prepIdx[c[0] + ":" + c[1]] = i; });
+          const alive = G.combat.players.filter((e) => e && e.p && e.p.hp > 0);
+          alive.sort((a, b) => {
+            const ka = prepIdx[Math.round(a.cx) + ":" + Math.round(a.cy)];
+            const kb = prepIdx[Math.round(b.cx) + ":" + Math.round(b.cy)];
+            return (ka != null ? ka : 9) - (kb != null ? kb : 9);
+          });
+          alive.forEach((ent, i) => {
+            const cell = ANNIHILATOR_ENTRANCE_CELLS[i % ANNIHILATOR_ENTRANCE_CELLS.length];
+            ent.cx = cell[0]; ent.cy = cell[1];
+            ent.moving = false; ent.walkGoal = null;
+            if (typeof snapIdleToCell === "function") snapIdleToCell(ent);
+          });
+        }
         break;
       }
       case "annihilator-exit": {
@@ -4569,6 +4660,13 @@ function scheduleOnlineAuthorityEvents(events,receivedAt){
 function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdHint){
   if(!descriptor||!G.combat)return false;
   const previous=G.combat;
+  // questId chega no descriptor de quests (state.questId / authority.questId)
+  // — sem isso followPlayer e os ajustes por-quest (alcance etc.) não ativam
+  // fora do caminho de resume.
+  const _questId = descriptor.questId ||
+    (descriptor.state && descriptor.state.questId) ||
+    (descriptor.authority && descriptor.authority.questId);
+  if (_questId) G.combat.questId = String(_questId);
   const incomingProbe=(descriptor.state&&(descriptor.state.players||descriptor.state.mobs||
     descriptor.state.events))?descriptor.state:descriptor;
   const incomingWb=!!(descriptor.worldBoss||incomingProbe&&incomingProbe.worldBoss||

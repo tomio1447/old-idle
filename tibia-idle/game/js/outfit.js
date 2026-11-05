@@ -211,7 +211,9 @@ const OutfitRenderer = {
       // arena. Usa temporariamente a sprite clássica da mesma vocação/sexo;
       // o próximo frame volta a tentar a outfit atual com cores e addons.
     }
-    const numericFrame = typeof frame === "number" ? frame : 0;
+    // Fallback clássico tem no máximo _dir1 e _dir2 — o frame vem do ciclo
+    // da appearance (até 8) e pedir _dir3+ gerava 404 em loop.
+    const numericFrame = Math.min(2, typeof frame === "number" ? frame : 0);
     const suf = numericFrame ? `${dir}${numericFrame}` : dir;
     const cv = this.get(o.name, suf, o.colors);
     if (cv) return cv;

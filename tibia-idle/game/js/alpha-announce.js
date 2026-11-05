@@ -6,10 +6,15 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "31/10/2026 às 18:10";
+const ALPHA_UPDATE_AT = "05/11/2026 às 19:15";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — 4 bosses Archfoe no Lion Sanctum: Katex Blood Tongue, Srezz Yellow Eyes, Utua Stone Sting e Yirkas Blue Scales (BOSSES 1–250)",
+  "FIX — Buraco nas paredes: sprites de chão 'fake 2×2' recortadas (Lion Sanctum, Grimvale, Brainstealer)",
+  "FIX — Annihilator: grupo teleporta para a entrada ao disparar a alavanca; líder também caminha ao SQM de preparo",
+  "NOVO — Login, patch notes, seleção de personagens e loading agora seguem a estética da cidade",
+  "Preços oficiais de NPC em 34 itens novos/existentes (creature products, Spellweaver's Robe, Warrior's Axe, Ring of Green Plasma)",
   "NOVO — Guilds: crie ou entre numa guild, tasks diárias, loja de bônus, chat e ranking",
   "NOVO — Daily Boost: Monstro do Dia (+EXP) e Boss do Dia (+loot) sorteados a cada server save",
   "NOVO — Party automática: seus 4 personagens já formam PT — arraste na seleção para escolher o líder",

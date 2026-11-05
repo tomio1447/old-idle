@@ -5269,7 +5269,9 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   // DAILY BOSS: +15%–35% chance de loot no boss do dia (sorteado por dia).
   const dailyLoot=(mob&&mob.boss&&isDailyBoss(mob.slug))?dailyBossLootMul():1;
   // idle: l.chance * lootRate * (c.lootMul || 1) — PVP usa lootMul 1.25
-  const chanceMult=lootRate*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot*gTempLoot*dailyLoot;
+  // Boss: rate de loot dobrada (2x a chance — quantidade nunca multiplica).
+  const bossRateMul=mob&&mob.boss?2:1;
+  const chanceMult=lootRate*bossRateMul*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot*gTempLoot*dailyLoot;
   if(mob.boss&&(auth.kind==="hunt"||!auth.rewardBundleId))
     auth.rewardBundleId=String(auth.bossId||mob.slug)+"-"+String(auth.clock||stepTs||Date.now());
   // Mini boss de hunt: bundle PRÓPRIO por morte (o reward chest lista cada
@@ -6341,7 +6343,8 @@ const ANNIHILATOR_CELLS={
 };
 function annihilatorInit(auth){
   auth.annihilator={phase:"prep",arrived:[],demonIds:[],prepSince:0};
-  if(auth.events)auth.events.push({t:"annihilator-start"});
+  auth.events=auth.events||[];
+  auth.events.push({t:"annihilator-start"});
 }
 function annihilatorTick(auth,now){
   const st=auth.annihilator;if(!st)return;
@@ -6354,7 +6357,11 @@ function annihilatorTick(auth,now){
     if(!st.prepSince){st.prepSince=now;return;}
     if(now-st.prepSince<3000)return;
     // Alavanca: players teleportados para a entrada + 6 demons nascem.
+    // A ordem nos SQMs de preparo determina a posição na entrada (esq→dir).
     st.phase="combat";st.prepSince=0;
+    const prepIdx=new Map(ANNIHILATOR_CELLS.prep.map((cc,ii)=>[cc[0]+":"+cc[1],ii]));
+    alive.sort((a,b)=>((prepIdx.get(Math.round(a.cx)+":"+Math.round(a.cy))!=null?prepIdx.get(Math.round(a.cx)+":"+Math.round(a.cy)):9)-
+                       (prepIdx.get(Math.round(b.cx)+":"+Math.round(b.cy))!=null?prepIdx.get(Math.round(b.cx)+":"+Math.round(b.cy)):9)));
     alive.forEach((pl,i)=>{
       const e=ANNIHILATOR_CELLS.entrance[i%ANNIHILATOR_CELLS.entrance.length];
       pl.cx=e[0];pl.cy=e[1];pl.x=(e[0]+0.5)/auth.gridW;pl.y=(e[1]+0.5)/auth.gridH;

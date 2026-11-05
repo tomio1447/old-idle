@@ -4,6 +4,61 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-05 — Buraco nas paredes corrigido, telas com cara da cidade
+
+### Correções
+
+- **Espaço vazio nas paredes da Lion Sanctum (e de ~25 mapas)** — grounds
+  como `16866` (swamp clay mountain) têm grupo 2×2 no .dat, mas só 1 dos 4
+  sprites tem pixels (quadrante superior-esquerdo). Ancorados no canto
+  inferior-direito, a textura caía um SQM para cima/esquerda e as células
+  da borda ficavam vazias (buraco preto / parede "comendo" a sprite).
+  Os **11 ids** afetados (`1128, 4415, 4416, 9246, 16866, 26995, 32570,
+  32638, 36565, 36566, 36571`) foram recortados para o 1×1 real e o
+  `import_otbm_sprites.py` agora detecta esses "grupos fake multi-SQM"
+  automaticamente em imports futuros.
+- **Bordas de ground border** (brainstealer, grimvale etc.) passam a
+  renderizar exatamente na célula onde foram pintadas no RME.
+- **Annihilator: grupo teleportado para a entrada** — o servidor teleporta
+  ao disparar a alavanca, mas o merge de checkpoint preservava a posição
+  local e o teleporte era descartado (o grupo ficava travado nos SQMs de
+  preparo). O evento `annihilator-lever` agora também posiciona os
+  personagens na entrada, na mesma ordem esq→dir do servidor.
+- **Annihilator: líder caminha ao SQM de preparo** — o `walkGoal`
+  scriptado (botão "Posicionar") era ignorado para `c.player`; se o líder
+  não estava num SQM de preparo, a alavanca nunca disparava.
+
+### Interface
+
+- **Login, patch notes e tela de loading** agora usam a estética da
+  cidade — paleta escura quente (`#1c1a16`/`#4b493e`/`#d8d0bc`) com
+  acentos dourados (`#ffe680`/`#8a7a40`/`#d4af37`), no padrão
+  `.ranking-table`/`.market-tabs`.
+- **Seleção de personagens e modais pré-jogo** (login, patch notes,
+  social, ui-mode) na mesma estética da cidade: botões `.primary` dourados,
+  secundários escuros, cartões com bevel `#4b493e`/`#17150f`.
+
+### Bosses
+
+- **4 novos Archfoe na seção BOSSES 1–250** (últimos da lista): **Katex
+  Blood Tongue** (6.300 HP / 5.000 exp), **Srezz Yellow Eyes** (6.200 /
+  4.800), **Utua Stone Sting** (6.400 / 5.100) e **Yirkas Blue Scales**
+  (6.300 / 4.900) — stats e loot oficiais do Canary/TibiaWiki.
+- Sala dos 4: `lion_sanctum.otbm` (a própria sala do Sanctum) — spawn do
+  jogador `{1024,1031,7}`, boss `{1023,1024,7}`, com `walkFloors` de
+  areia/trilha igual à hunt.
+- **20 itens novos** no catálogo (creature products + Spellweaver's Robe,
+  Warrior's Axe, Ring of Green Plasma) com sprites extraídos do DAT e
+  preços oficiais de NPC onde existem; itens sem comprador oficial ficam
+  com valor 0.
+- **14 itens sem preço ganham venda a NPC** (valores oficiais Rashid):
+  Skull Helmet 40k, Mercenary Sword 43k, Demonrage Sword 36k, Jade
+  Hammer 25k, Assassin Dagger 20k, Ornate Crossbow 12k, Spellweaver's
+  Robe 12k, Alloy/Magma/Lightning Legs e Glacier Kilt/Robe 11k, Noble
+  Axe 10k, Chaos Mace e Guardian Axe 9k.
+
+---
+
 ## 2026-11-04 (b) — Annihilator jogável, abas no personagem, bosses em breve
 
 ### Quests

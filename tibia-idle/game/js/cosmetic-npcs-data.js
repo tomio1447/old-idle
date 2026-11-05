@@ -123,6 +123,8 @@ COSMETIC_NPC_RECIPES.push(
   ]] },
   { id: "addon:afflicted:1", npc: "addoner", kind: "addon", target: "afflicted", addon: 1, requireBase: true, alternatives: [[{ slug: "plague-bell", count: 1 }]] },
   { id: "addon:afflicted:2", npc: "addoner", kind: "addon", target: "afflicted", addon: 2, requireBase: true, alternatives: [[{ slug: "plague-mask", count: 1 }]] },
+  { id: "addon:mage:1", npc: "addoner", kind: "addon", target: "mage", addon: 1, requireBase: true, alternatives: [[{ slug: "soul-stone", count: 1 }]] },
+  { id: "addon:mage:2", npc: "addoner", kind: "addon", target: "mage", addon: 2, requireBase: true, alternatives: [[{ slug: "ferumbras-hat", count: 1 }]] },
 );
 
 for (const [target, addon, costs] of [

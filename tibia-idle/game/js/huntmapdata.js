@@ -138,7 +138,7 @@ function huntMapBlocked(map, cx, cy) {
   const row = map.rows[cy];
   if (!row || cx < 0 || cx >= row.length) return true;
   const fov = huntMapFovBounds(map);
-  if (fov && (cx < fov.x || cy < fov.y || cx > fov.maxX || cy > fov.maxY)) return true;
+  if (!map.noFovBound && fov && (cx < fov.x || cy < fov.y || cx > fov.maxX || cy > fov.maxY)) return true;
   if (map.footprintBlocked && map.footprintBlocked[cx + ":" + cy]) return true;
   const L = map.leg && map.leg[row[cx]];
   return !!(L && L.bloc);

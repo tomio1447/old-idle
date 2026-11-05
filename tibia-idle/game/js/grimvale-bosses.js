@@ -1,7 +1,9 @@
 "use strict";
 
 const GRIMVALE_BOSS_IDS = ["black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw"];
-const GRIMVALE_BOSS_ITEMS = { "wolf-trophy": { n: "wolf trophy", s: null, t: "loot", w: 5, cid: 7394, sell: 3000, npcSell: 3000 } };
+const GRIMVALE_BOSS_ITEMS = {
+  "wolf-trophy": { n: "wolf trophy", s: null, t: "loot", w: 5, cid: 7394, sell: 3000, npcSell: 3000 },
+};
 const GRIMVALE_BOSS_MISSIONS = {
   "grimvale-1st-floor": { werefox: 250, werebadger: 250, werewolf: 250 },
   "grimvale-2nd-floor": { wereboar: 500, werebear: 500 },
@@ -57,7 +59,8 @@ function grimvaleBossRooms(monsters) {
       id, name: monster.name, title: "Grimvale Bosses (100+)",
       hunt: "grimvale-" + id + "-room", baseMonster: id, sprite: id, mult: 1,
       hp: monster.hp, exp: monster.exp, damage: monster.damage, armor: monster.armor, defense: monster.defense,
-      resist: Object.assign({}, monster.resist), loot: monster.loot,
+      resist: Object.assign({}, monster.resist),
+      loot: (monster.loot || []).concat({ chance: 100, max: 1, item: "silver-token" }),
       cooldown: typeof BOSS_COOLDOWN !== "undefined" ? BOSS_COOLDOWN : 16 * 60 * 60 * 1000,
       requirement: { level: 100, missions: Object.keys(GRIMVALE_BOSS_MISSIONS), enforced: true,
         text: "Requer nível 100+ e as duas missões de Grimvale completas na conta." },

@@ -688,12 +688,26 @@ function updateGridMovement(c, p, dt, now) {
   // (fica no SQM até o jogador trocar e mover com clique/WASD).
   if (c.players && c.players.length > 1) {
     for (const ent of c.players) {
-      if (ent === c.player || !ent.p || ent.p.hp <= 0) continue;
+      if (!ent.p || ent.p.hp <= 0) continue;
       if (typeof playerIsRooted === "function" && playerIsRooted(ent.p)) {
         ent.moving = false;
         ent.stepT = 0;
         continue;
       }
+      // walkGoal scriptado (ex.: posicionamento da Annihilator) — o aliado
+      // caminha para o SQM alvo antes de qualquer lógica de formação.
+      // Vale também para o líder (c.player): ele precisa ir ao SQM de
+      // preparo — ignorado aqui, a alavanca nunca disparava.
+      if (ent.walkGoal && Number.isFinite(ent.walkGoal.cx) && Number.isFinite(ent.walkGoal.cy)) {
+        if (ent.cx === ent.walkGoal.cx && ent.cy === ent.walkGoal.cy) ent.walkGoal = null;
+        else if (!(ent.nextStepAt && now < ent.nextStepAt)) {
+          const dir = stepToward(ent, ent.walkGoal.cx, ent.walkGoal.cy, occ);
+          if (dir) { beginStep(ent, dir, occ, false); ent.nextStepAt = now + ent.stepDur; }
+          else ent.nextStepAt = now + 80;
+        }
+        continue;
+      }
+      if (ent === c.player) continue;
       if (typeof playerAutoWalkOn === "function" && !playerAutoWalkOn(ent.p)) continue;
       const fm = formationMode(c, ent);
       if (fm === "box") {

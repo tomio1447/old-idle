@@ -827,9 +827,12 @@ function resolveSQMOccupancy(c) {
 
 function playerAttackRange(p) {
   const d = playerDamage(p);
-  if (d.type === "distance") return 0.58;
-  if (d.type === "magic") return 0.52;
-  return 0.145;
+  let r = d.type === "distance" ? 0.58 : d.type === "magic" ? 0.52 : 0.145;
+  // Annihilator: alcance máximo de visão/ataque = 9 SQM — o jogador não
+  // acerta demons fora desse raio (luta em linha reta).
+  if (typeof G !== "undefined" && G.combat && G.combat.questId === "annihilator")
+    r = Math.min(r, 9 / (G.combat.gridW || 24));
+  return r;
 }
 
 /* Palavras magicas faladas ao conjurar: usa o proprio id da spell
@@ -4693,7 +4696,7 @@ function rollLoot(c, p, mob) {
   const staminaLootMul = Math.max(0, Number(p && p.stamina) || 0) < 3 * 3600 ? 0.5 : 1;
   for (const l of (mob.def.loot || [])) {
     // Chance efetiva = chance base * lootRate (cap 100%)
-    const effectiveChance = Math.min(100, l.chance * lootRate * (c.lootMul || 1) * staminaLootMul);
+    const effectiveChance = Math.min(100, l.chance * lootRate * (mob.boss ? 2 : 1) * (c.lootMul || 1) * staminaLootMul);
     if (Math.random() * 100 > effectiveChance) continue;
     // Multiplicadores aumentam SOMENTE a chance. A quantidade respeita o
     // max original do Canary; não multiplicar aqui evita 15 blank runes.

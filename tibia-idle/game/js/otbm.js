@@ -462,6 +462,11 @@
       8416: true,  // steam (vapor decorativo): sem sprite no client 15.x
       10526: true, // decoração Canary Brain Grounds (sem sprite 8.60)
       10532: true, // decoração Canary Brain Grounds (sem sprite 8.60)
+      614: true,   // marcador invisível (sem pixels no DAT 8.60)
+      // Cliff borders da Lion Sanctum: no client moderno são itens 2×2 com
+      // âncora própria; sem tileflags o renderer os desenha desalinhados.
+      // Esconder deixa só o piso (areia/montanha) — transição limpa.
+      16668: true, 16669: true, 16670: true, 16674: true,
     };
     var CH = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
              "0123456789<>[](){}.,;:!@$%&*^_+-=?~|";

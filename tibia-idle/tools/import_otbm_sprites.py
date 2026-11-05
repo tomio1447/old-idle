@@ -220,6 +220,24 @@ def recorte32(img):
     return base
 
 
+def quadrante_unico(img):
+    """Se todo o conteúdo visível couber num único quadrante 32x32 do grupo,
+    devolve a caixa (x0, y0, x1, y1) desse quadrante; senão devolve None.
+
+    Grounds/borders "fake multi-SQM" (ex.: mountain 2x2 com 3 sprites
+    vazios, como 16866) só têm pixels num quadrante. Desenhados com a
+    âncora inferior-direita do client, a textura cai um SQM para
+    cima/esquerda e a célula dona fica vazia — o "espaço" nas paredes.
+    Recortar o quadrante transforma o item no 1x1 que ele realmente é."""
+    b = img.getbbox()
+    if not b:
+        return (0, 0, 32, 32)
+    qx, qy = b[0] // 32 * 32, b[1] // 32 * 32
+    if b[2] <= qx + 32 and b[3] <= qy + 32:
+        return (qx, qy, qx + 32, qy + 32)
+    return None
+
+
 def carregar_patterns():
     if not os.path.exists(PATTERN_DATA):
         return {}
@@ -258,19 +276,33 @@ def extrair_patterns(dat, spr, usados):
         frames = max(1, group.anim)
         aw, ah = group.width * 32, group.height * 32
         total = frames * group.py * group.px
-        strip = Image.new("RGBA", (aw * total, ah), (0, 0, 0, 0))
+        fases = []
         visible = False
-        index = 0
         for frame in range(frames):
             for yp in range(group.py):
                 for xp in range(group.px):
                     image = render_item_860(dat, spr, cid, frame=frame, xp=xp, yp=yp)
-                    if image is not None:
-                        strip.alpha_composite(image, (index * aw, 0))
-                        visible = visible or bool(image.getbbox())
-                    index += 1
+                    fases.append(image)
+                    visible = visible or bool(image and image.getbbox())
         if not visible:
             continue
+        # Squeeze: se TODAS as fases couberem num único quadrante 32x32,
+        # o grupo é um "fake multi-SQM" — recorta para 1x1 real.
+        quads = None
+        if aw > 32 or ah > 32:
+            quads = [(quadrante_unico(f) if f is not None else (0, 0, 32, 32))
+                     for f in fases]
+            if all(q is not None for q in quads):
+                aw = ah = 32
+            else:
+                quads = None
+        strip = Image.new("RGBA", (aw * total, ah), (0, 0, 0, 0))
+        for index, image in enumerate(fases):
+            if image is None:
+                continue
+            if quads:
+                image = image.crop(quads[index])
+            strip.alpha_composite(image, (index * aw, 0))
         strip.save(os.path.join(TILES_DIR, "%d_pattern.png" % cid), optimize=True)
         ds = list(group.durations[:frames]) if group.durations else [120] * frames
         if len(ds) < frames:
@@ -335,12 +367,23 @@ def main():
             raise RuntimeError("Tibia.dat/Tibia.spr ausentes em " + SRC)
         for cid in falta:
             img = render_item_860(dat, spr, cid)
+            fonte = dat
             if img is None or not img.getbbox():
                 if fallback_dat and fallback_spr:
                     img = render_item_860(fallback_dat, fallback_spr, cid)
+                    fonte = fallback_dat
             if img is None or not img.getbbox():
                 print("  %d: sem sprite no client (N/A), pulando" % cid)
                 continue
+            # Ground/border "fake multi-SQM" (conteúdo num só quadrante
+            # 32x32): recorta para 1x1 — ancorar em 2x2 jogava a textura
+            # um SQM para cima/esquerda e abria buracos nas paredes.
+            obj = fonte.item(cid) if fonte else None
+            if (img.size[0] > 32 or img.size[1] > 32) and obj and bool(
+                    {"Ground", "GroundBorder", "OnBottom"} & obj.flags):
+                quad = quadrante_unico(img)
+                if quad is not None:
+                    img = img.crop(quad)
             recorte32(img).save(os.path.join(TILES_DIR, "%d.png" % cid))
             criar.append(cid)
         print("extraidos %d sprites para %s" % (len(criar), TILES_DIR))

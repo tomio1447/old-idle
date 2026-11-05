@@ -19,3 +19,9 @@ add_*.py
 .idea/
 *.exe
 Dream_Matter.gif
+
+# artefatos locais
+_tmp_*.png
+refs.zip
+canary-map-editor-v4.0-bin/
+canary-map-editor-v4.0-windows/

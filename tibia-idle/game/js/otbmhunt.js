@@ -152,8 +152,16 @@ function huntMapFromOtbmAsync(hunt, done) {
       // Pisos funcionais da hunt (ex.: annihilator): ids de chão marcados
       // como bloqueio no .dat liberam a célula — mesmo passe do servidor
       // (questMapBlockedCells), senão o movimento local trava o mapa inteiro.
-      if (Array.isArray(hunt.walkFloors) && hunt.walkFloors.length && hm && hm.leg) {
-        const floors = new Set(hunt.walkFloors.map(Number));
+      // Fallback: caminhos que montam o hunt sem copiar walkFloors — resolve
+      // pela definição da quest (casado pelo .otbm, ex.: annihilator).
+      const wfDef = (!Array.isArray(hunt.walkFloors) && typeof QUEST_DEFS !== "undefined")
+        ? Object.values(QUEST_DEFS).find((q) => q && q.otbm === hunt.otbm) : null;
+      const wf = hunt.walkFloors || (wfDef && wfDef.walkFloors);
+      if (Array.isArray(wf) && wf.length && hm && hm.leg) {
+        // Colisão pelo leg.bloc/paredes — o fov é só câmera, não cerca de
+        // movimento (senão a sala de preparo fora do fov fica inacessível).
+        hm.noFovBound = true;
+        const floors = new Set(wf.map(Number));
         const flags = (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {};
         const freeLeg = (e) => e && e.bloc &&
           (e.v || []).some((id) => floors.has(id)) &&

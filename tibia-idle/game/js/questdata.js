@@ -82,6 +82,9 @@ var QUEST_DEFS = {
     /* FOV / runtime: bounds abs {1007..1045, 1015..1048} = 39x34.
      * Entrance abs {1020..1023, 1026} → local {13..16, 11}. */
     otbmFovBounds:     { x: 1007, y: 1015, w: 39, h: 34, z: 7 },
+    // Fov de câmera padrão (segue o líder). A fileira de preparo ficava fora
+    // do fov e huntMapBlocked a bloqueava — resolvido por noFovBound via
+    // walkFloors (o mapa usa leg.bloc/paredes para colisão, não o fov).
     otbmFovWidth:      21,
     otbmFovHeight:     13,
     otbmRuntimeWidth:  39,
@@ -93,7 +96,7 @@ var QUEST_DEFS = {
     countdownSec: 0,
     // Ids de chão do .otbm marcados como bloqueio no .dat — liberados para o
     // jogador poder andar pela sala (ver questMapBlockedCells).
-    walkFloors:   [101, 377, 381],
+    walkFloors:   [101, 377, 381, 410, 10145],
     /* Encontro único: 6 Demons (a mecânica de preparo/alavanca/saída do
      * server/annihilator.js é refinada depois — por ora roda como quest
      * padrão de 1 wave com todos os demons). */
