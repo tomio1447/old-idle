@@ -82,6 +82,14 @@ const NPCS = {
     greet: "Cling clang! Me forge for lil' one. Trade, trade!",
     type: "sweaty",
   },
+  "coco": {
+    /* Fada de Candia — troca Dark/Milk Chocolate Coins por equipamentos.
+     * lookType 141 (sorcerer f) em tons de doce; sprite assets/npc/coco_s.png. */
+    name: "Coco", role: "Trocas de Candia", sprite: "coco",
+    look: { lookType: 141, lookHead: 79, lookBody: 210, lookLegs: 212, lookFeet: 190 },
+    greet: "Chocolate Coins? Eu troco pelos meus doces favoritos de Candia!",
+    type: "tokenbarter", shopId: "coco",
+  },
 };
 
 /* Visual de cada exercise weapon ao ser USADA no dummy — simula o

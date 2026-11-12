@@ -523,6 +523,22 @@ function createQuestController(opts) {
     if (!lobby || lobby.phase !== "combat") return;
     console.log("[quest] success", lobby.id);
     const host = lobby.hostAccountId, instanceId = lobby.instanceId;
+    if (questDef(lobby.questId)?.flow === "annihilator") {
+      lobby.phase = "returning";
+      if (typeof opts.endSharedInstance === "function" && host) await opts.endSharedInstance(host, instanceId, "quest-completed");
+      lobby.phase = "lobby";
+      lobby.instanceId = null;
+      lobby.countdownEndsAt = 0;
+      lobby.combatStartedAt = 0;
+      for (const [accountId, join] of lobby.joins) {
+        join.kicked = false;
+        join.rewardPending = false;
+        for (const c of join.chars || []) c.dead = false;
+        publishAccount(accountId, "quest", { action: "return-lobby", questId: lobby.questId, lobby: publicLobbyState(lobby, accountId) });
+      }
+      broadcastLobby(lobby);
+      return;
+    }
     removeLobby(lobby.id, { status: "success" });
     if (typeof opts.endSharedInstance === "function" && host) {
       try { await opts.endSharedInstance(host, instanceId, "quest-completed"); }

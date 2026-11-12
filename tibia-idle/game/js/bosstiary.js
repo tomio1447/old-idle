@@ -73,6 +73,38 @@ function bosstiaryKill(p, slug, n) {
   const depois = antes + (n || 1);
   p.bosstiary[slug] = depois;
 
+  /* Gnomprona: kill do The Primal Menace libera +1 nível de hazard na
+   * CONTA (cap 12) — MAS só se a luta foi no hazard atual desbloqueado
+   * (sel === level). Lutar abaixo não libera o próximo nível.
+   * Marcos: nível 6 → montaria Noxious Ripptor (conta);
+   *         nível 12 → 4× Primal Bag. */
+  if (slug === "the-primal-menace") {
+    p.hazardKills = depois;
+    const level = Math.max(0, Math.min(12,
+      typeof gnompronaHazardUnlock === "function"
+        ? gnompronaHazardUnlock(p) : (Number(p.hazardLevel) || 0)));
+    const fought = Math.max(0, Math.min(12,
+      typeof gnompronaHazardActive === "function"
+        ? gnompronaHazardActive(p)
+        : (p.hazardSel !== undefined ? Number(p.hazardSel) : level)));
+    if (fought >= level && level < 12) {
+      const novo = level + 1;
+      p.hazardLevel = novo;
+      addLog("level", `Hazard Level <b>${novo}</b> desbloqueado para a conta!`);
+      toast(`Hazard Level ${novo} desbloqueado!`, "level");
+      if (novo === 6 && typeof grantMissionReward === "function") {
+        grantMissionReward(p, { accountMount: "noxious-ripptor" });
+        addLog("level", "Montaria <b>Noxious Ripptor</b> desbloqueada!");
+        toast("Montaria desbloqueada: Noxious Ripptor!", "level");
+      }
+      if (novo === 12 && typeof grantMissionReward === "function") {
+        grantMissionReward(p, { items: [{ slug: "primal-bag", count: 4 }] });
+        addLog("level", "Recompensa: <b>4× Primal Bag</b>!");
+      }
+    }
+    if (typeof gnompronaSyncAccount === "function") gnompronaSyncAccount(p);
+  }
+
   const cat = BOSS_CATS[bossCategory(slug)];
   // pontos saem por abate ate o limite da categoria; depois disso o boss
   // continua dando loot, mas nao inflaciona mais o nivel

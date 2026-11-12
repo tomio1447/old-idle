@@ -6,10 +6,15 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "05/11/2026 às 19:15";
+const ALPHA_UPDATE_AT = "11/11/2026 às 22:50";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — World Boss BAKRAGORE: lobby de até 5 jogadores (nível 600+) no catálogo de World Bosses",
+  "NOVO — Bakragore's Burden: no lobby, cada jogador adiciona suas Taints de Murcion, Vemiath, Chagorz e Ichgahal — cada taint invoca +1 Elder Bloodjaw e aumenta o HP do boss em 5%",
+  "NOVO — Derrotar Bakragore conclui a Blood Rotten Quest (agora em World Quests) e libera a recompensa 1x por personagem: Figurine of Bakragore + Bag You Covet",
+  "NOVO — Modal de bosses reordenado por nível: EM BREVE no topo e Bloodrotten por último",
+  "NOVO — Bloodrotten completa: Murcion, Vemiath, Chagorz e Ichgahal com arenas, echoes e Pillars of Dark Energy",
   "NOVO — 4 bosses Archfoe no Lion Sanctum: Katex Blood Tongue, Srezz Yellow Eyes, Utua Stone Sting e Yirkas Blue Scales (BOSSES 1–250)",
   "FIX — Buraco nas paredes: sprites de chão 'fake 2×2' recortadas (Lion Sanctum, Grimvale, Brainstealer)",
   "FIX — Annihilator: grupo teleporta para a entrada ao disparar a alavanca; líder também caminha ao SQM de preparo",

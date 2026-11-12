@@ -288,6 +288,23 @@ function applyAccountMissionsToPlayer(p, acc) {
   if (!p || typeof p !== "object" || !acc || typeof acc !== "object") return p;
   p.missions = mergeMissionMaps(p.missions, acc.missions);
   p.missionsDone = mergeFlagMap(p.missionsDone, acc.missionsDone);
+  /* Hazard level (Gnomprona) é por CONTA: cosmetics.hazard = {kills,
+   * level, sel}. O membro hidratado carrega o desbloqueio (level = max
+   * entre o próprio e o da conta) e a escolha (sel travada ao level). */
+  try {
+    const cos = acc.cosmetics && typeof acc.cosmetics === "object" &&
+      !Array.isArray(acc.cosmetics) ? acc.cosmetics : {};
+    const h = cos.hazard && typeof cos.hazard === "object" ? cos.hazard : null;
+    // Todas as contas começam com hazard 1 desbloqueado (floor global).
+    const accLevel = h ? Math.max(0, Math.min(12,
+      Number(h.level) || 0)) : 0;
+    const level = Math.max(1, Math.min(12,
+      Math.max(accLevel, Number(p.hazardLevel) || 0)));
+    p.hazardLevel = level;
+    const selSrc = h && h.sel !== undefined ? Number(h.sel)
+      : (p.hazardSel !== undefined ? Number(p.hazardSel) : level);
+    p.hazardSel = Math.max(1, Math.min(level, Number(selSrc) || 0));
+  } catch (e) { /* hazard opcional */ }
   return p;
 }
 

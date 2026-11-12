@@ -469,12 +469,20 @@ function huntWaveSize(hunt, randomValue) {
   const minPack = hunt.packMin || (hunt.cat === "hard" ? 6 : 0);
   const maxPack = hunt.packMax || (hunt.cat === "hard" ? 10 : 0);
   const roll = randomValue === undefined ? Math.random() : randomValue;
-  return (minPack && maxPack)
+  const base = (minPack && maxPack)
     ? minPack + Math.floor(Math.max(0, Math.min(0.999999, roll)) * (maxPack - minPack + 1))
     : (hunt.pack || 3);
+  // Gnomprona: pack base 5 + 1 por nível de hazard ativo (gnomprona.js).
+  return base + (hunt.gnomprona && typeof gnompronaPackBonus === "function"
+    ? gnompronaPackBonus() : 0);
 }
 
 function pickHuntMonsterSlug(hunt) {
+  // Gnomprona: Plunder Patriarch (miniboss) — chance por hazard level.
+  if (hunt && hunt.gnomprona &&
+      typeof gnompronaPlunderChance === "function" &&
+      Math.random() < gnompronaPlunderChance())
+    return "plunder-patriarch";
   // Inclui os bossMobs da hunt (ex.: 4 mini bosses do Falcon Bastion com
   // peso próprio em spawnWeights) — antes só hunt.monsters era sorteado e
   // os mini bosses nunca spawnavam.
@@ -5167,6 +5175,7 @@ function combatTick(c, p, dt, now) {
   p.playtime += dt;
   // Spawn adiado antes das mecânicas (Hatred/Spite/Malice/Mega).
   arenaBossSpawnTick(c, now);
+  if (typeof bloodrottenBossTick === "function") bloodrottenBossTick(c, now);
   if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
   if (typeof greedBossTick === "function" && greedBossTick(c, now) === false) return;
   if (typeof hatredBossTick === "function" && hatredBossTick(c, now) === false) return;

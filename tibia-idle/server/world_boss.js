@@ -55,7 +55,25 @@ const WARZONES = [
     id: "megalomania", name: "Soul War", bossName: "Goshnar's Megalomania", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "goshnar-s-megalomania-purple", baseMonster: "goshnar-s-megalomania-green", maxChars: 5,
   },
+  {
+    /* Bakragore — Rotten Blood. Lobby de até 5 jogadores, nível 600+.
+     * Grid local = bounds do bakragore_room.otbm (z=7, origem 1009,1016).
+     * otbm alimenta o blockedCells da instância compartilhada.
+     * `burden` habilita o modal de taints (Bakragore's Burden). */
+    id: "bakragore", name: "Rotten Blood", bossName: "Bakragore",
+    bossHp: 660000, bossSprite: "bakragore", baseMonster: "bakragore",
+    maxChars: 5, minLevel: 600, burden: true,
+    gridW: 24, gridH: 24, playerSpawn: { x: 11, y: 15 }, bossSpawn: { x: 11, y: 5 },
+    otbm: "bakragore_room", otbmFloor: 7,
+    /* huntMapFromOtbm tem largura mínima 24: o crop inclui uma coluna void
+     * a leste (x 1032, toda bloqueada) para grid cliente==server. */
+    otbmBounds: { x: 1009, y: 1016, w: 24, h: 24, z: 7 },
+  },
 ];
+
+/* Taints contribuídas no lobby do Bakragore (Bakragore's Burden). Só vale
+ * se o personagem do membro tiver kill registrada no boss filho. */
+const BAKRAGORE_TAINT_BOSSES = ["murcion", "vemiath", "chagorz", "ichgahal"];
 
 const SCORE_WEIGHTS = { damage: 1.0, heal: 0.5, taken: 0.25 };
 const MAJOR_CRYSTAL_TOKEN = "major-crystalline-token";
@@ -106,16 +124,18 @@ function bossIdForWarzone(warzoneId) {
   if (id === "devourer") return "world-devourer";
   if (id === "pale-worm") return "the-pale-worm";
   if (id === "megalomania") return "goshnar-s-megalomania";
+  if (id === "bakragore") return "bakragore";
   return /^wz[1-6]$/.test(id) ? "world-boss-" + id : "world-boss-wz1";
 }
 function isWorldBossBossId(id) {
-  return /^world-boss-wz[1-6]$/.test(String(id || "")) || ["world-devourer", "the-pale-worm", "goshnar-s-megalomania"].includes(String(id || ""));
+  return /^world-boss-wz[1-6]$/.test(String(id || "")) || ["world-devourer", "the-pale-worm", "goshnar-s-megalomania", "bakragore"].includes(String(id || ""));
 }
 function warzoneIdFromBossId(bossId) {
   const id = String(bossId || "");
   if (id === "world-devourer") return "devourer";
   if (id === "the-pale-worm") return "pale-worm";
   if (id === "goshnar-s-megalomania") return "megalomania";
+  if (id === "bakragore") return "bakragore";
   const m = id.match(/^world-boss-(wz[1-6])$/);
   return m ? m[1] : null;
 }
@@ -186,6 +206,14 @@ function createWorldBossController(opts) {
     let n = 0;
     for (const join of event.joins.values()) n += (join.chars || []).length;
     return n;
+  }
+
+  function burdenTotal(ev) {
+    const target = ev || event;
+    if (!target || !target.burden) return 0;
+    let total = 0;
+    for (const list of target.burden.values()) total += (list || []).length;
+    return total;
   }
 
   function joinedCharIds() {
@@ -309,6 +337,17 @@ function createWorldBossController(opts) {
       message: event.phase === "countdown"
         ? "EM BREVE VOCÊ IRÁ PARTICIPAR DE UM WORLD BOSS, VERIFIQUE SEU HELPER E AJUSTE PARA A BATALHA!"
         : null,
+      burden: wz.burden ? {
+        enabled: true,
+        bosses: BAKRAGORE_TAINT_BOSSES.slice(),
+        total: burdenTotal(event),
+        contributions: Array.from(event.burden ? event.burden.entries() : []).map(([accId, taints]) => ({
+          accountId: Number(accId),
+          name: ((event.joins.get(Number(accId)) || {}).chars || [])[0] ?
+            String(event.joins.get(Number(accId)).chars[0].name) : "?",
+          taints: (taints || []).slice(),
+        })),
+      } : null,
       result: event.result || null,
       bossHp: event.bossHp,
       bossMaxHp: event.bossMaxHp,
@@ -326,6 +365,9 @@ function createWorldBossController(opts) {
         loaded: !!join.loaded,
         failed: !!join.failed,
         score: join.score,
+        taints: event.burden && event.burden.get(Number(accountId))
+          ? event.burden.get(Number(accountId)).slice() : [],
+        earnedTaints: (join.chars[0] && join.chars[0].earnedTaints) || [],
       };
     }
     return base;
@@ -361,6 +403,9 @@ function createWorldBossController(opts) {
       hostAccountId: Number(ownerAccountId) || null,
       instanceId: null,
       invited: new Set(),
+      /* Bakragore's Burden: accountId -> [taint slugs] contribuídas no lobby. */
+      burden: new Map(),
+      burdenTotal: 0,
     };
     if (event.lobbyType !== "open" && event.lobbyType !== "closed") event.lobbyType = "open";
     if (event.hostAccountId) event.invited.add(event.hostAccountId);
@@ -445,6 +490,9 @@ function createWorldBossController(opts) {
     const wz = warzoneById(event.warzoneId);
     event.bossHp = wz.bossHp;
     event.bossMaxHp = wz.bossHp;
+    /* Congela o Bakragore's Burden no início do combate — a instância
+     * compartilhada lê event.burdenTotal ao criar o descriptor. */
+    if (wz.burden) event.burdenTotal = burdenTotal();
     const host = joinedAccountIds()[0];
     event.hostAccountId = host || null;
     console.log("[world-boss] combat", event.id, "host=" + event.hostAccountId);
@@ -534,6 +582,26 @@ function createWorldBossController(opts) {
             const want = Math.max(MAJOR_CRYSTAL_PER_ACCOUNT, fromShared);
             if (have < want) rewardChestAdd(p, MAJOR_CRYSTAL_TOKEN, want - have, source);
           }
+          /* Bakragore — Rotten Blood: cada personagem participante registra
+           * a kill (objetivo da quest), ganha a Final Taint e conclui a The
+           * Blood Rotten Quest. A recompensa é 1x por personagem — quem já
+           * completou não ganha a Figurine/Bag de novo. */
+          if (current.warzoneId === "bakragore") {
+            p.bosses = p.bosses && typeof p.bosses === "object" && !Array.isArray(p.bosses) ? p.bosses : {};
+            p.bosses.bakragore = p.bosses.bakragore && typeof p.bosses.bakragore === "object" ? p.bosses.bakragore : {};
+            p.bosses.bakragore.kills = (Number(p.bosses.bakragore.kills) || 0) + 1;
+            p.bosses.bakragore.lastFight = Date.now();
+            p.bloodrotten = p.bloodrotten && typeof p.bloodrotten === "object" && !Array.isArray(p.bloodrotten) ? p.bloodrotten : {};
+            p.bloodrotten.finalTaint = true;
+            p.bloodrotten.finalTaintAt = Date.now();
+            p.quests = p.quests && typeof p.quests === "object" && !Array.isArray(p.quests) ? p.quests : {};
+            const quest = p.quests["bloodrotten-quest"];
+            if (!quest || !quest.completed) {
+              rewardChestAdd(p, "figurine-of-bakragore", 1, source);
+              rewardChestAdd(p, "bag-you-covet", 1, source);
+              p.quests["bloodrotten-quest"] = { completed: true, completedAt: Date.now(), rewardClaimed: true };
+            }
+          }
           const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
           const voc = String(p.voc || character.voc || "none");
           await db.updateCharacter(character.id, voc, level, p, {});
@@ -543,7 +611,9 @@ function createWorldBossController(opts) {
             item: MAJOR_CRYSTAL_TOKEN,
             items: crystalBoss
               ? fixedLoot.concat([{ item: MAJOR_CRYSTAL_TOKEN, count: MAJOR_CRYSTAL_PER_ACCOUNT }])
-              : fixedLoot,
+              : (current.warzoneId === "bakragore"
+                ? [{ item: "figurine-of-bakragore", count: 1 }, { item: "bag-you-covet", count: 1 }]
+                : fixedLoot),
             charId: character.id,
             rewardChest: p.rewardChest,
             rewardChestBundles: p.rewardChestBundles,
@@ -729,12 +799,21 @@ function createWorldBossController(opts) {
       if (typeof data === "string") {
         try { data = JSON.parse(data); } catch (e) { data = {}; }
       }
+      const wz = warzoneById(event.warzoneId);
+      const level = Math.max(1, Number((data && data.level) || character.level) || 1);
+      if (wz.minLevel && level < wz.minLevel) {
+        return { code: 403, body: { ok: false, error: "LEVEL_REQUIRED",
+          msg: `${character.name || "?"} precisa ser nível ${wz.minLevel}+.` } };
+      }
+      const charBosses = data && data.bosses && typeof data.bosses === "object" ? data.bosses : {};
       chars.push({
         id: Number(character.id),
         name: String((data && data.name) || character.name || "?"),
         voc: String((data && data.voc) || character.voc || "none"),
-        level: Math.max(1, Number((data && data.level) || character.level) || 1),
+        level,
         dead: false,
+        earnedTaints: BAKRAGORE_TAINT_BOSSES.filter((slug) =>
+          Number(charBosses[slug] && charBosses[slug].kills) > 0),
       });
     }
     event.joins.set(Number(acc.id), {
@@ -876,6 +955,45 @@ function createWorldBossController(opts) {
     return { code: 200, body: publicState(acc.id) };
   }
 
+  /* Bakragore's Burden — qualquer membro do lobby contribui com as taints
+   * que o personagem dele já ganhou (kill registrada no boss filho). A
+   * seleção é autoritativa: valida lobby, membership e progresso no banco. */
+  async function setBurden(db, body) {
+    const acc = await db.findAccountByToken(body && body.token);
+    if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+    if (!event || event.phase !== "lobby") {
+      return { code: 409, body: { ok: false, error: "NO_LOBBY", msg: "O burden só pode ser alterado no lobby." } };
+    }
+    const wz = warzoneById(event.warzoneId);
+    if (!wz.burden) {
+      return { code: 400, body: { ok: false, error: "NO_BURDEN", msg: "Este world boss não usa o Bakragore's Burden." } };
+    }
+    const join = event.joins.get(Number(acc.id));
+    if (!join) return { code: 404, body: { ok: false, error: "NOT_JOINED", msg: "Entre no lobby para contribuir." } };
+    const requested = Array.isArray(body && body.taints) ? body.taints : [];
+    const unique = [...new Set(requested.map((t) => String(t || "").toLowerCase()))];
+    if (unique.some((slug) => !BAKRAGORE_TAINT_BOSSES.includes(slug))) {
+      return { code: 400, body: { ok: false, error: "INVALID_TAINT", msg: "Taint desconhecida." } };
+    }
+    const char = join.chars && join.chars[0];
+    if (!char) return { code: 400, body: { ok: false, error: "NO_CHAR", msg: "Sem personagem no lobby." } };
+    const character = await db.findCharacter(char.id);
+    let data = character && character.data;
+    if (typeof data === "string") { try { data = JSON.parse(data); } catch (e) { data = {}; } }
+    const charBosses = data && data.bosses && typeof data.bosses === "object" ? data.bosses : {};
+    const earned = BAKRAGORE_TAINT_BOSSES.filter((slug) =>
+      Number(charBosses[slug] && charBosses[slug].kills) > 0);
+    char.earnedTaints = earned;
+    const denied = unique.filter((slug) => !earned.includes(slug));
+    if (denied.length) {
+      return { code: 403, body: { ok: false, error: "TAINT_NOT_EARNED",
+        msg: "Seu personagem ainda não conquistou: " + denied.join(", ") + "." } };
+    }
+    event.burden.set(Number(acc.id), unique);
+    broadcast();
+    return { code: 200, body: publicState(acc.id) };
+  }
+
   async function toggleInvite(db, body) {
     const acc = await db.findAccountByToken(body && body.token);
     if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
@@ -961,7 +1079,7 @@ function createWorldBossController(opts) {
   return {
     start, stop, tick, publicState,
     join, leave, markLoaded, reportCombat, forceOpen, forceClose, stateFor,
-    createLobby, autoJoin, invite, startFight, toggleInvite,
+    createLobby, autoJoin, invite, startFight, toggleInvite, setBurden,
     bindShare, sharedForAccount, getEvent, getEventByOwner, onSharedEnded,
     joinedCharIds, joinedAccountIds, membersForStart,
     timers, minStart, maxChars,
@@ -971,4 +1089,5 @@ function createWorldBossController(opts) {
 module.exports = {
   createWorldBossController, WARZONES, MAJOR_CRYSTAL_TOKEN, SCORE_WEIGHTS,
   bossIdForWarzone, isWorldBossBossId, warzoneIdFromBossId, WORLD_BOSS_MAX_MEMBERS,
+  BAKRAGORE_TAINT_BOSSES,
 };

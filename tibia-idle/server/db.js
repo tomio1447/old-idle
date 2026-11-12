@@ -722,6 +722,23 @@ JsonStore.prototype.setAccountCosmetics = function (accountId, cosmetics) {
   this._save();
   return a;
 };
+/* Hazard level (Gnomprona, por CONTA): grava cosmetics.hazard já
+ * mergeado pelo endpoint (kills/level/sel) dentro do JSON de cosmetics. */
+JsonStore.prototype.setAccountHazard = function (accountId, hazard) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  let cos = a.cosmetics;
+  if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch (e) { cos = null; } }
+  cos = cos && typeof cos === "object" && !Array.isArray(cos) ? cos : {};
+  cos.hazard = {
+    kills: Math.max(0, Math.floor(Number(hazard && hazard.kills) || 0)),
+    level: Math.max(0, Math.min(12, Math.floor(Number(hazard && hazard.level) || 0))),
+    sel: Math.max(0, Math.min(12, Math.floor(Number(hazard && hazard.sel) || 0))),
+  };
+  a.cosmetics = cos;
+  this._save();
+  return a;
+};
 JsonStore.prototype.changePreyCards = function (accountId, delta, cost) {
   const a = this.findAccountById(accountId);
   if (!a || !Number.isSafeInteger(delta) || !Number.isSafeInteger(cost) || cost < 0) return false;
@@ -2717,6 +2734,21 @@ async function MysqlStore() {
         await conn.commit();
       } catch (error) { await conn.rollback(); throw error; }
       finally { conn.release(); }
+      return this.findAccountById(accountId);
+    },
+    /* Hazard level (Gnomprona, por CONTA): cosmetics.hazard já mergeado
+     * pelo endpoint — JSON_SET no campo cosmetics (mesma coluna do bless). */
+    async setAccountHazard(accountId, hazard) {
+      const h = {
+        kills: Math.max(0, Math.floor(Number(hazard && hazard.kills) || 0)),
+        level: Math.max(0, Math.min(12, Math.floor(Number(hazard && hazard.level) || 0))),
+        sel: Math.max(0, Math.min(12, Math.floor(Number(hazard && hazard.sel) || 0))),
+      };
+      await this.run(
+        `UPDATE accounts SET cosmetics = JSON_SET(
+           CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END,
+           '$.hazard', JSON_EXTRACT(?, '$')) WHERE id = ?`,
+        [JSON.stringify(h), Number(accountId)]);
       return this.findAccountById(accountId);
     },
     async setAccountMissions(accountId, missions, missionsDone) {

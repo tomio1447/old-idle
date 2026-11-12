@@ -74,6 +74,21 @@ const NPC_SHOPS = {
       { kind: "outfit", outfitBase: "soil-guardian", cost: 20, name: "Soil Guardian Outfit" },
       { kind: "outfit", outfitBase: "crystal-warlord", cost: 20, name: "Crystal Warlord Outfit" }
     ]
+  },
+  coco: {
+    /* Coco (Candia): cada item custa 250 Dark OU Milk Chocolate Coins —
+     * o jogador escolhe com qual moeda pagar (botão por moeda). */
+    currencies: ["dark-chocolate-coin", "milk-chocolate-coin"],
+    currencyFrom: "bag",
+    buyOnly: true,
+    items: [
+      { slug: "peppermint-backpack", cost: 250 },
+      { slug: "candy-necklace", cost: 250 },
+      { slug: "candy-coated-quiver", cost: 250 },
+      { slug: "biscuit-barrier", cost: 250 },
+      { slug: "cocoa-grimoire", cost: 250 },
+      { slug: "creamy-grimoire", cost: 250 }
+    ]
   }
 };
 
@@ -179,14 +194,19 @@ function buyYanaPackageLocal(p, offerId) {
   return { ok: true, offer, goldTokens: yanaGoldTokenCount(p) };
 }
 
-function exchangeNpcBarter(p, shopId, index) {
+function exchangeNpcBarter(p, shopId, index, currency) {
   const shop = npcShopDef(shopId);
   if (!shop || shop.currency === "gold")
     return { ok: false, msg: "Troca inválida." };
   const entry = (shop.items || [])[index];
   if (!entry) return { ok: false, msg: "Oferta inválida." };
   const cost = Math.max(0, Math.floor(Number(entry.cost) || 0));
-  const token = shop.currency;
+  /* Lojas multi-moeda (Coco): o botão informa com qual moeda pagar;
+   * lojas de moeda única seguem usando shop.currency. */
+  const token = currency || shop.currency;
+  if (!token || (Array.isArray(shop.currencies) &&
+      shop.currencies.indexOf(token) === -1))
+    return { ok: false, msg: "Moeda inválida." };
   const have = bagTokenCount(p, token);
   if (have < cost)
     return { ok: false, msg: "Tokens insuficientes na backpack." };

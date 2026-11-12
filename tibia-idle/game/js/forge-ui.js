@@ -16,13 +16,16 @@ function forgeOpenModal(html, wide2) {
   var modal = forgeModalRoot();
   var body = forgeModalBody();
   if (!modal || !body) return;
+  if (typeof hideContextMenu === 'function') hideContextMenu();
+  if (typeof hideTip === 'function') hideTip();
+  if (typeof clearCityModalShells === 'function') clearCityModalShells(body);
   body.innerHTML = html;
   if (modal) modal.classList.toggle("forge-modal-shell", String(html || "").indexOf("forge-client") !== -1);
   if (wide2) {
     document.body.classList.add("modal-wide2", "wide");
     document.body.dataset.modalWide2 = "1";
   } else {
-    document.body.classList.remove("modal-wide2");
+    document.body.classList.remove("modal-wide2", "wide");
     document.body.dataset.modalWide2 = "";
   }
   modal.classList.add("show");
@@ -33,6 +36,9 @@ function forgeCloseModal() {
   var modal = forgeModalRoot();
   if (!modal) return;
   modal.classList.remove("show", "wide", "forge-modal-shell");
+  if (typeof hideContextMenu === 'function') hideContextMenu();
+  if (typeof hideTip === 'function') hideTip();
+  if (typeof clearCityModalShells === 'function') clearCityModalShells(forgeModalBody());
   document.body.classList.remove("modal-wide2", "wide");
   document.body.dataset.modalWide2 = "";
 }
@@ -486,9 +492,10 @@ function renderDepotStoreList(p) {
   }
   equipables.sort(function(a, b) { return a.it.n < b.it.n ? -1 : 1; });
   if (!equipables.length) return '<div class="tiny dim mt8">Nenhum equipamento na mochila para guardar.</div>';
-  for (var j = 0; j < equipables.length && j < 12; j++) {
+  for (var j = 0; j < equipables.length; j++) {
     var e = equipables[j];
     rows += '<div class="shop-row">'
+      + '<span class="depot-store-icon">' + itemImg(e.slug, 28) + '</span>'
       + '<span class="small">' + e.it.n + ' <span class="dim">' + (e.tier ? ('T' + e.tier) : ('x' + e.count)) + '</span></span>'
       + '<button class="sm" data-depot-store="' + e.ref + '">Guardar 1x</button>'
       + '</div>';
@@ -525,7 +532,7 @@ function renderLegacyExaGrid(p) {
 }
 
 function renderDepotModal() {
-  var p = G.p;
+  var p = typeof equipmentPreviewPlayer === 'function' ? equipmentPreviewPlayer(G.p) : G.p;
   if (!p) return '';
   ensureForge(p);
   var hasLegacy = (p.exaltationBox || []).length > 0;
@@ -535,11 +542,11 @@ function renderDepotModal() {
     + '</div>';
   var body = DEPOT_UI.tab === 'legacy' ? renderLegacyExaGrid(p) : (renderDepotGrid(p) + renderDepotStoreList(p));
   return ''
-    + '<div class="panel-title">Depot <span class="spacer"></span><span class="tiny dim">Forge e Depot agora estão desacoplados</span></div>'
-    + '<div class="panel-body">'
+    + '<div class="panel-title cidade-modal-title">Depot <span class="spacer"></span><button class="sm" id="depot-close">Fechar</button></div>'
+    + '<div class="panel-body depot-modal-content">'
+    + '<div class="tiny dim depot-help">Clique em um item para equipar ou retirar. Arraste da mochila para guardar.</div>'
     + tabs
     + body
-    + '<div class="row" style="justify-content:flex-end;margin-top:6px;gap:8px"><button class="sm" id="depot-close">Fechar</button></div>'
     + '</div>';
 }
 
@@ -548,7 +555,15 @@ function openDepotModal() {
   if (!p) return;
   ensureForge(p);
   if (DEPOT_UI.tab !== 'legacy') DEPOT_UI.tab = 'depot';
+  var body = forgeModalBody();
+  var scroll = body && body.querySelector('.depot-modal-content');
+  var scrollTop = scroll ? scroll.scrollTop : 0;
   forgeOpenModal(renderDepotModal(), false);
+  if (body) {
+    body.classList.add('cidade-modal-shell', 'depot-modal-shell');
+    var content = body.querySelector('.depot-modal-content');
+    if (content) content.scrollTop = scrollTop;
+  }
   bindDepotModal();
 }
 
@@ -563,6 +578,7 @@ function bindDepotModal() {
 
   body.querySelectorAll('[data-depot-store]').forEach(function(el) {
     el.addEventListener('click', function() {
+      if (typeof persistDepotAction === 'function') { persistDepotAction(G.p, 'store', el.dataset.depotStore, { source: 'bag' }); return; }
       var r = depotStore(G.p, el.dataset.depotStore);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();
@@ -602,6 +618,10 @@ function bindDepotModal() {
   if (depotGrid && typeof bindDrop === 'function') {
     bindDrop(depotGrid, function(payload) {
       if (!payload || (payload.source !== 'bag' && payload.source !== 'equip') || !payload.slug) return false;
+      if (typeof persistDepotAction === 'function') {
+        persistDepotAction(G.p, 'store', payload.instId || payload.slug, { source: payload.source, slot: payload.slot });
+        return false;
+      }
       var r = depotStore(G.p, payload.instId || payload.slug);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (r.ok) openDepotModal();
@@ -635,12 +655,14 @@ function openDepotItemMenu(p, ref, el) {
   if (!it) return;
   var opts = [
     { label: 'Equipar', action: function() {
+      if (typeof persistDepotAction === 'function') { persistDepotAction(p, 'equip', ref); return; }
       var r = depotEquip(p, ref);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();
       openDepotModal();
     }},
     { label: 'Retirar para mochila', action: function() {
+      if (typeof persistDepotAction === 'function') { persistDepotAction(p, 'retrieve', ref); return; }
       var r = depotRetrieve(p, ref);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();

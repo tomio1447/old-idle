@@ -127,6 +127,27 @@
       transformEquipSlug: "enchanted-ring-of-souls",
       res: { physical: 2 }, lifeLeech: 10, lvl: 200,
     },
+    "charged-spiritthorn-ring": {
+      chargeMode: "time", durationSec: 10800, charges: durCharges(10800),
+      decayToSlug: "spiritthorn-ring", lvl: 400, vocs: ["knight"],
+      arm: 2, sword: 3, axe: 3, club: 3, prot: 8,
+      res: { physical: 8, fire: 4, earth: 4, energy: 4, ice: 4 },
+    },
+    "charged-alicorn-ring": {
+      chargeMode: "time", durationSec: 10800, charges: durCharges(10800),
+      decayToSlug: "alicorn-ring", lvl: 400, vocs: ["paladin"],
+      mag: 1, dist: 3, res: { fire: 4, earth: 4, energy: 4, ice: 4, holy: 4, death: 4 },
+    },
+    "charged-arcanomancer-sigil": {
+      chargeMode: "time", durationSec: 10800, charges: durCharges(10800),
+      decayToSlug: "arcanomancer-sigil", lvl: 400, vocs: ["sorcerer"],
+      mag: 2, manaLeech: 1, res: { fire: 4, earth: 4, energy: 4, ice: 4 },
+    },
+    "charged-arboreal-ring": {
+      chargeMode: "time", durationSec: 10800, charges: durCharges(10800),
+      decayToSlug: "arboreal-ring", lvl: 400, vocs: ["druid"],
+      mag: 2, manaLeech: 1, res: { fire: 4, earth: 4, energy: 4, ice: 4 },
+    },
     "spiritthorn-ring": {
       chargeMode: "time", durationSec: 3600, charges: durCharges(3600),
       transformEquipSlug: "charged-spiritthorn-ring",

@@ -24,4 +24,18 @@ for(const slug of Object.keys(ctx.MOBSHEETS)){
 }
 if(missing.length) throw Error('Assets ausentes: '+missing.slice(0,20).join(', ')+' ('+missing.length+' total)');
 if(invalidSheets.length) throw Error('Geometria inválida de sheets: '+invalidSheets.slice(0,10).join('; ')+' ('+invalidSheets.length+' total)');
+const requested=[];
+ctx.Sprites={get:(p)=>{requested.push(p);return null;}};
+vm.runInContext(fs.readFileSync(path.join(game,'js/appearance.js'),'utf8'),ctx);
+const preload=fs.readFileSync(path.join(game,'js/preload.js'),'utf8');
+vm.runInContext(preload.slice(preload.indexOf('function preloadGameAssets(')),ctx);
+ctx.preloadAssetPaths=(paths)=>Array.from(paths);
+for(const outfit of ctx.APPEARANCES.outfits.filter((o)=>o.addons===0&&o.sexo!=='avatar')){
+ requested.length=0;
+ vm.runInContext(`AppearanceRenderer.outfit(${JSON.stringify(outfit.id)},3,[0,0,0,0],'s',0)`,ctx);
+ if(requested.some((p)=>/-a[12]/.test(p)))throw Error('Renderer pediu addon inexistente: '+outfit.id);
+ ctx.currentAppearance=()=>outfit;
+ const paths=ctx.preloadGameAssets({outfit:{addons:3}});
+ if(paths.some((p)=>/-a[12]/.test(p)))throw Error('Preloader pediu addon inexistente: '+outfit.id);
+}
 console.log('OK: outfits, addons, mounts e sheets de monstros presentes e geometricamente válidos.');

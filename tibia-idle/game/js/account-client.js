@@ -40,7 +40,12 @@ function accountApiConfigured() {
 
 const ONLINE_CHARACTER_CACHE_KEY="tibia-idle-online-character-cache-v1";
 function accountCharacterCacheWrite(characters){
-  try{sessionStorage.setItem(ONLINE_CHARACTER_CACHE_KEY,JSON.stringify(characters||[]));}catch(e){}
+  const previous=accountCharacterCacheRead();
+  const next=(characters||[]).map((character)=>{
+    const old=previous.find((row)=>String(row.id)===String(character.id));
+    return old&&(Number(old.saveVersion)||0)>(Number(character.saveVersion)||0)?old:character;
+  });
+  try{sessionStorage.setItem(ONLINE_CHARACTER_CACHE_KEY,JSON.stringify(next));}catch(e){}
 }
 function accountCharacterCacheRead(){
   try{const raw=sessionStorage.getItem(ONLINE_CHARACTER_CACHE_KEY);return raw?JSON.parse(raw):[];}catch(e){return [];}
@@ -90,6 +95,7 @@ function accountInvalidateSession(token,data){
  * Ao detectar outra sessão, o personagem fica bloqueado até recarregar; sem
  * isso, o autosave seguinte poderia sobrescrever silenciosamente o vencedor. */
 let ACCOUNT_SAVE_QUEUE=Promise.resolve(true);
+let ACCOUNT_INVENTORY_EPOCH=0,ACCOUNT_SAVE_PENDING=0;
 let ACCOUNT_LAST_SAVE_PROMISE=ACCOUNT_SAVE_QUEUE;
 const ACCOUNT_SAVE_CONFLICTS=new Set();
 function accountMergeCharacterCache(characters){
@@ -111,7 +117,10 @@ function accountMergeCharacterCache(characters){
   accountCharacterCacheWrite(cache);return cache;
 }
 function accountQueueSave(task){
-  const run=ACCOUNT_SAVE_QUEUE.catch(()=>false).then(task);
+  ACCOUNT_INVENTORY_EPOCH++;ACCOUNT_SAVE_PENDING++;
+  const run=ACCOUNT_SAVE_QUEUE.catch(()=>false).then(task).finally(()=>{
+    ACCOUNT_INVENTORY_EPOCH++;ACCOUNT_SAVE_PENDING--;
+  });
   ACCOUNT_SAVE_QUEUE=run.catch(()=>false);ACCOUNT_LAST_SAVE_PROMISE=run;return run;
 }
 function accountLastSavePromise(){return ACCOUNT_LAST_SAVE_PROMISE.catch(()=>false);}
@@ -342,7 +351,10 @@ let ACCOUNT_INSTANCE_EPOCH=0,ACCOUNT_INSTANCE_CAN_CREATE=false;
 let ACCOUNT_INSTANCE_QUEUE=Promise.resolve(true);
 let ACCOUNT_INSTANCE_LAST_PROMISE=ACCOUNT_INSTANCE_QUEUE;
 function accountQueueInstance(task){
-  const run=ACCOUNT_INSTANCE_QUEUE.catch(()=>false).then(task);
+  ACCOUNT_INVENTORY_EPOCH++;ACCOUNT_SAVE_PENDING++;
+  const run=ACCOUNT_INSTANCE_QUEUE.catch(()=>false).then(task).finally(()=>{
+    ACCOUNT_INVENTORY_EPOCH++;ACCOUNT_SAVE_PENDING--;
+  });
   ACCOUNT_INSTANCE_QUEUE=run.catch(()=>false);ACCOUNT_INSTANCE_LAST_PROMISE=run;return run;
 }
 function accountLastInstancePromise(){return ACCOUNT_INSTANCE_LAST_PROMISE.catch(()=>false);}
@@ -679,15 +691,33 @@ function accountSelectInstanceAmmo(token,charId,slug,automatic){
  * caminho de save (expected_version = saveVersion). Sem a API de cidade o
  * equip que consumia a pouch "atrasava"/se perdia: o PUT comum não persiste
  * pouch/bag protegidos e uma troca rápida de personagem revertia o item. */
+function accountEquipmentResult(data,charId){
+  if(data.instance)accountInstanceApply(data.instance);
+  if(data.character)accountMergeCharacterCache([data.character]);
+  accountMaybeApplyShared(data);
+  let state=data.instance&&data.instance.state;
+  if(typeof state==="string"){try{state=JSON.parse(state);}catch(e){state=null;}}
+  const entries=state&&(state.authority&&state.authority.players||state.state&&state.state.players||state.players)||[];
+  const entry=entries.find((e)=>String(e.id)===String(charId));
+  const source=data.equip?data:entry&&entry.p;
+  const inventory={};
+  for(const key of ["equip","bag","lootPouch","supplyStash","depot","itemInstances"])
+    if(source&&source[key]!==undefined)inventory[key]=source[key];
+  if(typeof G!=="undefined"&&G.p&&String(G.p.id)===String(charId))Object.assign(G.p,inventory);
+  return {ok:true,msg:data.msg||"",state,version:data.instance&&data.instance.version,
+    saveVersion:data.saveVersion,inventory};
+}
+function accountDepotAction(token,charId,opts){
+  return accountEquipItem(token,charId,Object.assign({},opts,{depotAction:opts.action}));
+}
 function accountEquipItem(token,charId,opts){
   opts=opts||{};
-  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
-  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+  if(ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
     return accountQueueInstance(async()=>{
       if(!accountLeaseAllowsSimulation())return {ok:false};
       const r=await _api("POST","/api/instance/equip",Object.assign({
         token,char_id:Number(charId),
-        unequip:!!opts.unequip,
+        unequip:!!opts.unequip,depot_action:opts.depotAction||null,ref:opts.ref||null,
         slug:String(opts.slug||""),
         slot:String(opts.slot||""),
         source:String(opts.source||"bag"),
@@ -695,13 +725,10 @@ function accountEquipItem(token,charId,opts){
         inst_id:opts.instId?String(opts.instId):null,
         instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
       if(r.data.ok){
-        accountInstanceApply(r.data.instance);
         // A bag é da conta: o servidor sincronizou o shared com o delta do
         // equip/desequip — aplica para a troca de personagem (e o /api/me
         // de outras abas) ver o item desequipado na backpack.
-        if(r.data.sharedInventory)accountApplySharedInventory(r.data.sharedInventory);
-        return {ok:true,state:r.data.instance&&r.data.instance.state,
-          version:r.data.instance&&r.data.instance.version};
+        return accountEquipmentResult(r.data,charId);
       }
       if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
       return {ok:false,msg:r.data.msg||"Não foi possível equipar"};
@@ -714,7 +741,7 @@ function accountEquipItem(token,charId,opts){
     const summary=cache.find((c)=>String(c.id)===id);
     const r=await _api("POST","/api/instance/equip",Object.assign({
       token,char_id:Number(charId),
-      unequip:!!opts.unequip,
+      unequip:!!opts.unequip,depot_action:opts.depotAction||null,ref:opts.ref||null,
       slug:String(opts.slug||""),
       slot:String(opts.slot||""),
       source:String(opts.source||"bag"),
@@ -722,17 +749,7 @@ function accountEquipItem(token,charId,opts){
       inst_id:opts.instId?String(opts.instId):null,
       expected_version:Number(summary&&summary.saveVersion)||0,
     },accountLeaseFields()));
-    if(r.data.ok){
-      if(r.data.character)accountMergeCharacterCache([r.data.character]);
-      accountMaybeApplyShared(r.data);
-      if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id){
-        if(r.data.equip)G.p.equip=r.data.equip||{};
-        if(r.data.bag)G.p.bag=r.data.bag||{};
-        if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
-        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
-      }
-      return {ok:true,saveVersion:r.data.saveVersion};
-    }
+    if(r.data.ok)return accountEquipmentResult(r.data,charId);
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
     return {ok:false,msg:r.data.msg||"Não foi possível equipar",code:r.code};
@@ -847,6 +864,49 @@ function accountDestroyLootPouchItem(token,charId,slug){
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
     return {ok:false,msg:r.data.msg||"Não foi possível destruir o item",code:r.code};
+  });
+}
+/** Abre a Primal Bag (online): mesma rota da Bag You Desire, pool Gnomprona. */
+function accountOpenPrimalBag(token, charId) {
+  const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+  if (onlineCombat && ACCOUNT_INSTANCE.id && ACCOUNT_INSTANCE.status === "active") {
+    return accountQueueInstance(async () => {
+      if (!accountLeaseAllowsSimulation()) return { ok: false };
+      const body = Object.assign({ token, char_id: Number(charId),
+        instance_id: ACCOUNT_INSTANCE.id, expected_version: ACCOUNT_INSTANCE.version }, accountLeaseFields());
+      const r = await _api("POST", "/api/instance/open-primal-bag", body);
+      if (r.data.ok) {
+        accountInstanceApply(r.data.instance);
+        return { ok: true, item: r.data.item, state: r.data.instance && r.data.instance.state,
+          version: r.data.instance && r.data.instance.version };
+      }
+      if (r.code === 423) accountLeaseMarkLost(r.data.msg); if (r.data.instance) accountInstanceApply(r.data.instance);
+      return { ok: false, msg: r.data.msg || "Não foi possível abrir a Primal Bag" };
+    });
+  }
+  return accountQueueSave(async () => {
+    if (!accountLeaseAllowsSimulation()) return { ok: false };
+    const id = String(charId || "");
+    const cache = await accountEnsureVersions(token, [id]);
+    const summary = cache.find((c) => String(c.id) === id);
+    const body = Object.assign({
+      token, char_id: Number(charId),
+      expected_version: Number(summary && summary.saveVersion) || 0,
+    }, accountLeaseFields());
+    const r = await _api("POST", "/api/pouch/open-primal-bag", body);
+    if (r.data.ok) {
+      if (r.data.character) accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if (typeof G !== "undefined" && G.p && String(G.p.id) === id) {
+        if (r.data.lootPouch) G.p.lootPouch = r.data.lootPouch || {};
+        if (r.data.depot) G.p.depot = r.data.depot || [];
+      }
+      return { ok: true, item: r.data.item, lootPouch: r.data.lootPouch, depot: r.data.depot,
+        saveVersion: r.data.saveVersion };
+    }
+    if (r.code === 423) accountLeaseMarkLost(r.data.msg);
+    if (r.code === 409) accountSaveConflict([id], r.data.characters || [], r.data.msg);
+    return { ok: false, msg: r.data.msg || "Não foi possível abrir a Primal Bag", code: r.code };
   });
 }
 /** Abre a Bag You Desire (online): remove 1 da pouch e sorteia 1 item Soul War
@@ -1601,6 +1661,7 @@ function accountSyncCursor(value){
 function accountSyncDispatch(type,detail){try{window.dispatchEvent(new CustomEvent("tibia-idle-sync-"+type,{detail:detail||{}}));}catch(e){}}
 async function accountSyncRefreshCharacters(token){
   if(ACCOUNT_SYNC.charRefresh)return ACCOUNT_SYNC.charRefresh;
+  const inventoryEpoch=ACCOUNT_INVENTORY_EPOCH;
   ACCOUNT_SYNC.charRefresh=accountMe(token).then((fresh)=>{
     if(fresh.ok){
       accountCharacterCacheWrite(fresh.characters||[]);
@@ -1609,8 +1670,8 @@ async function accountSyncRefreshCharacters(token){
       // Loot Pouch — assim uma venda/movimentação feita em outra aba ou por
       // outro personagem aparece na hora, sem recarregar.
       try{
-        if(fresh.sharedInventory&&typeof G!=="undefined"&&G&&G.p&&
-           !(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat())){
+        if(fresh.sharedInventory&&inventoryEpoch===ACCOUNT_INVENTORY_EPOCH&&!ACCOUNT_SAVE_PENDING&&
+           typeof G!=="undefined"&&G&&G.p&&!(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat())){
           accountApplySharedInventory(fresh.sharedInventory);
           if(typeof renderLootPouch==="function")renderLootPouch(G.p);
           if(typeof renderInventory==="function")renderInventory(G.p);
@@ -2425,6 +2486,13 @@ async function accountAddVipDays(token, days, clear) {
 async function accountUpdateMissions(token, missions, missionsDone) {
   const r = await _api("POST", "/api/account/missions", { token, missions, missionsDone });
   return r.data.ok ? { ok: true, missions: r.data.missions, missionsDone: r.data.missionsDone } : { ok: false };
+}
+
+/* Hazard level (Gnomprona, por conta): espelha {kills, level, sel} em
+ * accounts.cosmetics.hazard — merge no servidor (level/kills = max). */
+async function accountUpdateHazard(token, hazard) {
+  const r = await _api("POST", "/api/account/hazard", { token, hazard });
+  return r.data.ok ? { ok: true, hazard: r.data.hazard } : { ok: false };
 }
 
 /* Tutorial de onboarding (por conta): estado completo enviado a cada

@@ -381,20 +381,21 @@ function forgeFindContainerIndex(p, arr, ref) {
   return -1;
 }
 
-function depotStore(p, ref) {
+function depotStore(p, ref, options) {
+  options = options || {};
   ensureForge(p);
   if (p.depot.length >= 30) return { ok: false, msg: "Depot cheio (30 slots)." };
   var resolved = forgeResolveRef(p, ref);
   var slug = resolved.slug;
   if (!slug) return { ok: false, msg: "Item não encontrado." };
 
-  if (resolved.inst && resolved.inst.loc === "bag") {
+  if (options.source !== "equip" && resolved.inst && resolved.inst.loc === "bag") {
     resolved.inst.loc = "depot";
     p.depot.push(resolved.inst.id);
     if (typeof syncBagCountsFromInstances === "function") syncBagCountsFromInstances(p);
     return { ok: true, msg: forgeEntryLabel(slug) + " guardado no Depot." };
   }
-  if (forgeBagCount(p, slug) > 0) {
+  if (options.source !== "equip" && forgeBagCount(p, slug) > 0) {
     removeItem(p, slug, 1);
     p.depot.push(slug);
     return { ok: true, msg: forgeEntryLabel(slug) + " guardado no Depot." };

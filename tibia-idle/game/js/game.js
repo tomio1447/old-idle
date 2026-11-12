@@ -871,6 +871,16 @@ const MISSION_DEFS = {
   // o set Zaoan + 25k de EXP para TODOS os personagens da party — a EXP é
   // concedida com autoridade pelo engine (cada membro recebe a sua); os
   // itens caem na Loot Pouch da conta no claim.
+  // Missão da Azzilon Castle: 500× cada Inferniarch — libera o acesso ao
+  // boss Arbaziloth (gate checado via requirement.mission quando enforced).
+  "azzilon-castle": {
+    title: "Missão: Azzilon Castle",
+    tasks: [
+      { monster: "broodrider-inferniarch", target: 500 },
+      { monster: "gorger-inferniarch", target: 500 },
+      { monster: "sineater-inferniarch", target: 500 },
+    ],
+  },
   "lizardstown": {
     title: "Missão: Lizards Town",
     tasks: [
@@ -887,6 +897,28 @@ const MISSION_DEFS = {
       ],
       partyExp: 25000,
     },
+  },
+  // Missão das Carniphilas (PH): completar o bestiário oficial (1000 kills)
+  // concede 1 Mandrake — item do addon de Shaman.
+  "carniphilas-ph": {
+    title: "Missão: Carniphilas",
+    tasks: [
+      { monster: "carniphila", target: 1000, label: "Completar o bestiário de Carniphila" },
+    ],
+    completeReward: { items: [{ slug: "mandrake", count: 1 }] },
+  },
+  /* Gnomprona Weagon 1: 5.000 kills de cada monstro da hunt —
+   * recompensa 1× Primal Bag. Plunder Patriarch (miniboss) não conta. */
+  "gnomprona-weagon1": {
+    title: "Missão: Monster Graveyard",
+    tasks: [
+      { monster: "nighthunter", target: 5000 },
+      { monster: "stalking-stalk", target: 5000 },
+      { monster: "sulphider", target: 5000 },
+      { monster: "sulphur-spouter", target: 5000 },
+      { monster: "undertaker", target: 5000 },
+    ],
+    completeReward: { items: [{ slug: "primal-bag", count: 1 }] },
   },
   "dark-thais": {
     title: "Missão: Mirrored Nightmare",
@@ -1689,6 +1721,8 @@ GAMEDATA.hunts["abyssador-room"] = {
   otbmFovWidth: 23, otbmFovHeight: 17,
   otbmRuntimeWidth: 26, otbmRuntimeHeight: 26,
 };
+/* A sala "bakragore-room" (world boss Rotten Blood) é registrada por
+ * bloodrotten.js junto das demais rooms — spawns/bounds vêm de B.rooms. */
 const BOSS_DEFS = {
   "the-monster": {
     id: "the-monster",
@@ -1859,13 +1893,40 @@ const BOSS_DEFS = {
   },
 
   // ---- EM BREVE (preview, não jogáveis) ----
-  "the-primal-menace": { id: "the-primal-menace", name: "The Primal Menace", title: "EM BREVE", unavailable: true, sprite: "the-primal-menace" },
+  /* The Primal Menace — boss da Primal Ordeal (Gnomprona 400+).
+   * Libera +1 hazard level POR CONTA quando derrotado no hazard atual
+   * máximo desbloqueado (regra em bosstiary.js). Sala primal_room.otbm;
+   * invoca até 5 monstros das hunts de Gnomprona (motor). */
+  "the-primal-menace": {
+    id: "the-primal-menace", name: "The Primal Menace",
+    title: "Boss de Gnomprona", hunt: "the-primal-menace-room",
+    baseMonster: "the-primal-menace", sprite: "the-primal-menace",
+    hp: 400000, exp: 0, damage: 763, armor: 100, defense: 100,
+    cooldown: 0,
+    hazardFight: true,
+    requirement: {
+      level: 400, enforced: false,
+      text: "Requer nível 400+ (Gnomprona)",
+    },
+    /* Sem loot direto: a recompensa é o hazard level (+1 por conta,
+     * só vencendo no nível desbloqueado). Montaria Noxious Ripptor no
+     * hazard 6 e 4× Primal Bag no hazard 12 via bosstiary.js. */
+    loot: [],
+  },
   "magma-bubble":      { id: "magma-bubble", name: "Magma Bubble", title: "EM BREVE", unavailable: true, sprite: "magma-bubble" },
   "court-warlock":     { id: "court-warlock", name: "Court Warlock", title: "EM BREVE", unavailable: true, sprite: "court-warlock", portraitImage: "assets/mob/court-warlock-preview.gif" },
   "maior-domus":       { id: "maior-domus", name: "Maior Domus", title: "EM BREVE", unavailable: true, sprite: "maior-domus", portraitImage: "assets/mob/maior-domus-preview.gif" },
   "phosphorus":        { id: "phosphorus", name: "Phosphorus", title: "EM BREVE", unavailable: true, sprite: "phosphorus", portraitImage: "assets/mob/phosphorus-preview.gif" },
   "mitmah-vanguard":   { id: "mitmah-vanguard", name: "Mitmah Vanguard", title: "EM BREVE", unavailable: true, sprite: "mitmah-vanguard" },
-  "bakragore":         { id: "bakragore", name: "Bakragore", title: "EM BREVE", unavailable: true, sprite: "bakragore" },
+  /* Bakragore — Rotten Blood world boss. Entrada exclusiva pelo lobby de
+   * World Boss (warzoneId "bakragore", até 5 jogadores, nível 600+). O HP
+   * real vem do MONSTERDATA no servidor (660k + burden das taints). */
+  "bakragore": {
+    id: "bakragore", name: "Bakragore", title: "World Boss — Rotten Blood",
+    hunt: "bakragore-room", worldBoss: true, baseMonster: "bakragore", sprite: "bakragore",
+    hp: 660000, exp: 15000000, damage: 3000, armor: 135, defense: 135, cooldown: 0, loot: [],
+    requirement: { level: 600, text: "Entra pelo lobby do World Boss (nível 600+)" },
+  },
   "vladrukh":          { id: "vladrukh", name: "Vladrukh", title: "EM BREVE", unavailable: true, sprite: "vladrukh" },
 };
 window.BOSS_DEFS = BOSS_DEFS;
@@ -1898,7 +1959,7 @@ function bossArenaDefinition(boss){
  * mais alto ficam anotados como conteudo futuro. */
 const QUIVER_DROPS = {
   "jungle-quiver": { boss: "the-monster", nome: "The Monster" },
-  "candy-coated-quiver": { boss: null, nome: "boss de nível 200" },
+  "candy-coated-quiver": { boss: "sugar-daddy", nome: "Sugar Daddy" },
   "eldritch-quiver": { boss: null, nome: "boss de nível 250" },
   "naga-quiver": { boss: null, nome: "boss de nível 250" },
   "alicorn-quiver": { boss: null, nome: "boss de nível 400" },
@@ -1941,6 +2002,13 @@ function bossReadyInfo(p, boss) {
     if (boss.requirement.killsRequired &&
         !feastBossesKilled(p, boss.requirement.killsRequired)) {
       return { ok: false, reason: boss.requirement.text, left: 0 };
+    }
+    /* Arbaziloth: 500 kills de cada Inferniarch do Azzilon Castle. */
+    if (boss.requirement.azKills) {
+      const need = { "broodrider-inferniarch": 500, "gorger-inferniarch": 500,
+        "sineater-inferniarch": 500 };
+      const ok = Object.keys(need).every((s) => Number(p.kills && p.kills[s]) >= need[s]);
+      if (!ok) return { ok: false, reason: boss.requirement.text, left: 0 };
     }
     if (boss.requirement.access) {
       p.bossAccess = p.bossAccess || {};
@@ -2065,7 +2133,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 1–250",
     minLevel: 150,
-    ids: ["leiden", "tentugly-s-head", "black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw", "katex-blood-tongue", "srezz-yellow-eyes", "utua-stone-sting", "yirkas-blue-scales"],
+    ids: ["leiden", "tentugly-s-head", "black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw", "katex-blood-tongue", "srezz-yellow-eyes", "utua-stone-sting", "yirkas-blue-scales", "sugar-daddy", "sugar-mommy"],
   },
   {
     title: "HEART OF DESTRUCTION 150+",
@@ -2085,12 +2153,17 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 250+",
     minLevel: 250,
-    ids: ["timira-the-many-headed", "scarlett-etzel", "faceless-bane", "doctor-marrow", "grand-master-oberon", "ratmiral-blackwhiskers", "the-brainstealer", "drume"],
+    ids: ["timira-the-many-headed", "scarlett-etzel", "faceless-bane", "doctor-marrow", "grand-master-oberon", "ratmiral-blackwhiskers", "the-brainstealer", "drume", "mitmah-vanguard"],
   },
   {
-    title: "FEAST OF SOULS",
+    title: "FEAST OF SOULS 250+",
     minLevel: 250,
     ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "brain-head"],
+  },
+  {
+    title: "BOSSES 400+",
+    minLevel: 400,
+    ids: ["arbaziloth", "magma-bubble", "the-primal-menace"],
   },
   {
     title: "SOULWAR 400+",
@@ -2103,12 +2176,125 @@ const BOSS_MODAL_SECTIONS = [
       "goshnar-s-cruelty",
     ],
   },
+  {
+    title: "BLOODROTTEN 600+",
+    minLevel: 600,
+    ids: ["murcion", "vemiath", "chagorz", "ichgahal"],
+  },
 ];
 
 // SQMs de preparo da Annihilator (coords locais do .otbm — igual
 // ANNIHILATOR_CELLS.prep/.entrance do servidor).
 const ANNIHILATOR_PREP_CELLS = [[16, 23], [17, 23], [18, 23], [19, 23]];
 const ANNIHILATOR_ENTRANCE_CELLS = [[13, 11], [14, 11], [15, 11], [16, 11]];
+/* Alavanca em coordenadas de célula local (mapa 39×34, bounds x1007 y1015).
+ * Botão "PRONTO" pulsando em vermelho sobre a alavanca — clique puxa ela. */
+const ANNIHILATOR_LEVER_CELL = [20, 23];
+const ANNIHILATOR_GRID = { w: 39, h: 34 };
+function annihilatorChestClick(cell) {
+  const c = G.combat;
+  if (!cell || c?.questId !== "annihilator" || typeof ANNIHILATOR === "undefined") return false;
+  const b = ANNIHILATOR.bounds;
+  const chest = ANNIHILATOR.chests.find((ch) => ch.x - b.x === cell.cx && ch.y - b.y === cell.cy);
+  if (!chest || !c.player) return false;
+  c.annihilatorPendingChest = { reward: chest.reward, id: String(c.player.id || G.p.id), chest };
+  c.player.walkGoal = { cx: chest.x - b.x, cy: chest.y - b.y + 1 };
+  return true;
+}
+async function annihilatorPollChest() {
+  const c = G.combat, pending = c?.annihilatorPendingChest;
+  if (!pending || pending.busy || typeof ANNIHILATOR === "undefined") return;
+  const pl = (c.players || []).find((p) => String(p.id) === pending.id) || c.player;
+  if (!pl || !(pl.p?.hp > 0)) { c.annihilatorPendingChest = null; return; }
+  const b = ANNIHILATOR.bounds;
+  if (pl.moving || Math.max(Math.abs(pl.cx - (pending.chest.x - b.x)), Math.abs(pl.cy - (pending.chest.y - b.y))) > 1) return;
+  pending.busy = true;
+  try {
+    const token = sessionToken();
+    if (typeof accountTickInstance === "function") await accountTickInstance(token);
+    await accountQueueInstance(async () => {
+      const body = Object.assign({ token, char_id: Number(pending.id), reward: pending.reward,
+        instance_id: ACCOUNT_INSTANCE.id, expected_version: Number(ACCOUNT_INSTANCE.version) }, accountLeaseFields());
+      const r = await fetch((typeof ACCOUNT_API_URL !== "undefined" ? ACCOUNT_API_URL : "") + "/api/instance/annihilator-chest", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await r.json();
+      if (data.instance && typeof accountInstanceApply === "function") accountInstanceApply(data.instance);
+      if (!r.ok || !data.ok) throw new Error(data.msg || "Não foi possível abrir o baú.");
+      const name = GAMEDATA.items[pending.reward]?.n || pending.reward;
+      toast(name + " recebido no Reward Chest!", "level");
+    });
+  } catch (e) { toast(e.message || "Não foi possível abrir o baú.", "bad"); }
+  finally { if (c.annihilatorPendingChest === pending) c.annihilatorPendingChest = null; }
+}
+let _anniLeverBtnStyleInjected = false;
+function annihilatorShowLeverButton() {
+  const canvas = document.getElementById("scene");
+  if (!canvas) return;
+  if (!_anniLeverBtnStyleInjected) {
+    _anniLeverBtnStyleInjected = true;
+    const st = document.createElement("style");
+    st.textContent = `
+#anni-lever-btn{position:absolute;z-index:60;width:38px;height:38px;border-radius:50%;
+ border:2px solid #ff5a4a;background:radial-gradient(circle,#5a1208,#2a0804);cursor:pointer;
+ animation:anni-lever-pulse .7s ease-in-out infinite alternate;transform:translate(-50%,-50%)}
+#anni-lever-btn .pronto{position:absolute;left:50%;top:-18px;transform:translateX(-50%);
+ color:#ff8a7a;font:bold 11px/1 monospace;text-shadow:0 0 6px #ff2a1a;white-space:nowrap;
+ animation:anni-pronto-rise 1.2s ease-in-out infinite}
+@keyframes anni-lever-pulse{from{box-shadow:0 0 4px 1px rgba(255,60,40,.35)}to{box-shadow:0 0 18px 6px rgba(255,60,40,.85)}}
+@keyframes anni-pronto-rise{0%,100%{transform:translateX(-50%) translateY(0);opacity:.75}50%{transform:translateX(-50%) translateY(-7px);opacity:1}}`;
+    document.head.appendChild(st);
+  }
+  let btn = document.getElementById("anni-lever-btn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "anni-lever-btn";
+    btn.type = "button";
+    btn.title = "Puxar a alavanca — PRONTO";
+    btn.innerHTML = `<span class="pronto">PRONTO</span>`;
+    btn.addEventListener("click", () => {
+      annihilatorHideLeverButton();
+      /* Flag não cabe no visual_state do checkpoint — endpoint dedicado. */
+      if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+          typeof sessionToken === "function" && G.p && G.p.id &&
+          typeof ACCOUNT_INSTANCE !== "undefined" && ACCOUNT_INSTANCE && ACCOUNT_INSTANCE.id) {
+        const body = Object.assign({
+          token: sessionToken(), char_id: Number(G.p.id),
+          instance_id: ACCOUNT_INSTANCE.id,
+          expected_version: Number(ACCOUNT_INSTANCE.version) || 0,
+        }, typeof accountLeaseFields === "function" ? accountLeaseFields() : {});
+        fetch((typeof ACCOUNT_API_URL !== "undefined" ? ACCOUNT_API_URL : "") + "/api/instance/annihilator-lever", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(() => { if (typeof toast === "function") toast("Alavanca puxada!", "level"); })
+          .catch(() => { if (typeof toast === "function") toast("Não foi possível puxar a alavanca.", "bad"); });
+      } else if (G.p) {
+        /* Offline/teste local: flag direto no blob (checkpoint carrega). */
+        G.p.annihilatorLever = true;
+        if (typeof toast === "function") toast("Alavanca puxada!", "level");
+      }
+    });
+    const parent = canvas.parentElement;
+    if (parent && getComputedStyle(parent).position === "static") parent.style.position = "relative";
+    (parent || document.body).appendChild(btn);
+  }
+  /* Posição pela projeção do FOV (21×13 centrado no mapa 39×34), igual ao
+   * renderer — posicionar por % da grade cai no SQM errado. */
+  const c = G.combat || {};
+  const gridW = Number(c.gridW) || ANNIHILATOR_GRID.w, gridH = Number(c.gridH) || ANNIHILATOR_GRID.h;
+  const fovW = Number(c.huntMap && c.huntMap.fovWidth) || 21;
+  const fovH = Number(c.huntMap && c.huntMap.fovHeight) || 13;
+  const ox = Math.max(0, (gridW - fovW) / 2), oy = Math.max(0, (gridH - fovH) / 2);
+  const rect = canvas.getBoundingClientRect();
+  const px = (ANNIHILATOR_LEVER_CELL[0] + 0.5 - ox) * (rect.width / fovW);
+  const py = (ANNIHILATOR_LEVER_CELL[1] + 0.5 - oy) * (rect.height / fovH);
+  btn.style.left = px.toFixed(1) + "px";
+  btn.style.top = py.toFixed(1) + "px";
+  btn.style.display = "block";
+}
+function annihilatorHideLeverButton() {
+  const btn = document.getElementById("anni-lever-btn");
+  if (btn) btn.style.display = "none";
+}
 
 function openAnnihilatorPrep() {
   const modal = $("#modal"), body = $("#modal-body");
@@ -2221,19 +2407,8 @@ function renderBosses(p) {
       <span class="risk ${r.ok ? "low" : "high"}">${r.left ? "Cooldown" : (r.ok ? "Disponível" : "Pendente")}</span>
     </button>`;
   };
-  el.innerHTML = BOSS_MODAL_SECTIONS.map((section) => {
-    const levelOk = !section.minLevel || (p.level || 0) >= section.minLevel;
-    const cards = section.ids.map(card).filter(Boolean).join("");
-    const gate = section.minLevel
-      ? `<span class="boss-section-gate ${levelOk ? "ok" : "no"}">${levelOk ? "☑" : "☐"} Nível ${section.minLevel}+</span>`
-      : "";
-    return `<section class="hunt-modal-section boss-modal-section accordion-section ${levelOk ? "" : "boss-section-locked"}">
-      <div class="hunt-cat-title accordion-head" role="button" tabindex="0"
-        aria-expanded="false">${section.title} ${gate}</div>
-      <div class="hunts-group collapsed">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
-    </section>`;
-  }).join("");
   const soonIds = Object.keys(BOSS_DEFS).filter((id) => BOSS_DEFS[id].unavailable);
+  let soonHtml = "";
   if (soonIds.length) {
     const soonCard = (id) => {
       const b = BOSS_DEFS[id];
@@ -2245,10 +2420,22 @@ function renderBosses(p) {
         <span class="info"><span class="nm">${b.name}</span><span class="meta">${b.title || ""}</span></span>
         <span class="risk high">Em breve</span></button>`;
     };
-    el.innerHTML += `<section class="hunt-modal-section boss-modal-section accordion-section">
+    soonHtml = `<section class="hunt-modal-section boss-modal-section accordion-section">
       <div class="hunt-cat-title accordion-head" role="button" tabindex="0" aria-expanded="false">EM BREVE</div>
       <div class="hunts-group collapsed">${soonIds.map(soonCard).join("")}</div></section>`;
   }
+  el.innerHTML = soonHtml + BOSS_MODAL_SECTIONS.map((section) => {
+    const levelOk = !section.minLevel || (p.level || 0) >= section.minLevel;
+    const cards = section.ids.map(card).filter(Boolean).join("");
+    const gate = section.minLevel
+      ? `<span class="boss-section-gate ${levelOk ? "ok" : "no"}">${levelOk ? "☑" : "☐"} Nível ${section.minLevel}+</span>`
+      : "";
+    return `<section class="hunt-modal-section boss-modal-section accordion-section ${levelOk ? "" : "boss-section-locked"}">
+      <div class="hunt-cat-title accordion-head" role="button" tabindex="0"
+        aria-expanded="false">${section.title} ${gate}</div>
+      <div class="hunts-group collapsed">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
+    </section>`;
+  }).join("");
   if (typeof bindCatalogAccordion === "function") bindCatalogAccordion(el, "accordion");
   $$("#bosses-modal-list [data-boss-info]").forEach((btn) =>
     btn.addEventListener("click", () => {
@@ -2329,6 +2516,26 @@ function openBossModal(id) {
         `<div class="boss-access-item ${c.ok ? "ok" : "no"}">${c.ok ? "☑" : "☐"} ${c.label}</div>`
       ).join("")}</div>`
     : "";
+  /* Gnomprona (hazardFight): box 1–12 para escolher o hazard da luta.
+   * Só libera o próximo nível se lutar no hazard máximo desbloqueado. */
+  const bossHzBox = !boss.hazardFight ? "" : (() => {
+    const unlock = typeof gnompronaHazardUnlock === "function" ? gnompronaHazardUnlock(G.p) : 0;
+    const active = typeof gnompronaHazardActive === "function" ? gnompronaHazardActive(G.p) : 0;
+    const nums = [];
+    for (let i = 1; i <= 12; i++) {
+      const cls = i === active ? "on" : (i <= unlock ? "ok" : "lock");
+      nums.push(`<button class="hazard-num ${cls}" data-hazard="${i}" ${i <= unlock ? "" : "disabled"}>${i}</button>`);
+    }
+    return `<div class="hazard-box">
+      <div class="hazard-box-head">
+        <span class="hazard-box-title">HAZARD LEVEL</span>
+        <span class="tiny dim">${unlock
+          ? `luta em <b>${active}</b> · vença em <b>${unlock}</b> para liberar o próximo`
+          : "sem hazard desbloqueado — derrote-o para liberar o nível 1"}</span>
+      </div>
+      <div class="hazard-nums">${nums.join("")}</div>
+    </div>`;
+  })();
   const modalBox = $("#modal-body");
   modalBox.classList.remove("reward-modal-shell", "bosses-modal-shell", "hunts-modal-shell");
   modalBox.classList.add("boss-modal-shell");
@@ -2345,6 +2552,7 @@ function openBossModal(id) {
         <span>Vitórias: <b>${fmtFull(st.kills || 0)}</b></span>
       </div>
       ${checksHtml}
+      ${bossHzBox}
       <div class="hunt-best-card boss-best-card">
         <div class="hunt-best-sprite boss-best-sprite">${portrait(boss.sprite, 76)}</div>
         <div class="hunt-best-name">${boss.name}</div>
@@ -2379,6 +2587,15 @@ function openBossModal(id) {
   };
   $("#modal").classList.add("show");
   $("#boss-close").addEventListener("click", closeBossModal);
+  // Hazard level do The Primal Menace: escolha vale para a luta (e para
+  // as hunts gnomprona — mesma sel da conta).
+  $$("#modal-body [data-hazard]").forEach((el) => {
+    el.addEventListener("click", () => {
+      if (typeof gnompronaSetHazard !== "function") return;
+      gnompronaSetHazard(G.p, Number(el.dataset.hazard));
+      openBossModal(id);
+    });
+  });
   $("#boss-fight").addEventListener("click", () => {
     closeBossModal();
     // Megalomania: Fight sempre abre o lobby (nunca combate direto).
@@ -2403,8 +2620,35 @@ function openBossModal(id) {
       toast("Lobby do Pale Worm indisponível. Recarregue a página.", "bad");
       return;
     }
+    /* Arbaziloth: escolha de modo (fácil/hard) antes do combate. */
+    if (id === "arbaziloth") { arbazilothPickMode(id); return; }
     startBoss(id);
   });
+}
+/* Seletor de modo do Arbaziloth — box com FÁCIL/DIFÍCIL + confirmar. */
+let _arbaModeBox = null;
+function arbazilothPickMode(id) {
+  const boss = (typeof BOSS_DEFS !== "undefined" && BOSS_DEFS[id]) || {};
+  if (_arbaModeBox) _arbaModeBox.remove();
+  _arbaModeBox = document.createElement("div");
+  _arbaModeBox.id = "arba-mode-box";
+  _arbaModeBox.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999";
+  _arbaModeBox.innerHTML = `<div style="background:#1c1408;border:2px solid #8a5a1a;padding:18px 22px;text-align:center;min-width:260px">
+    <div style="color:#e8c27a;font:bold 14px monospace;margin-bottom:12px">ARBAZILOTH — escolha o modo</div>
+    <button id="arba-facil" style="display:block;width:100%;margin:6px 0;padding:10px;background:#2a3a1a;color:#a8d878;border:1px solid #5a8a3a;cursor:pointer">FÁCIL — stats ×0.6</button>
+    <button id="arba-hard" style="display:block;width:100%;margin:6px 0;padding:10px;background:#3a1a14;color:#f0a890;border:1px solid #a04030;cursor:pointer">DIFÍCIL — stats ×1.0</button>
+    <button id="arba-cancel" style="margin-top:8px;padding:6px 14px;background:none;color:#9a8a6a;border:1px solid #555;cursor:pointer">Cancelar</button>
+  </div>`;
+  document.body.appendChild(_arbaModeBox);
+  const pick = (mode) => {
+    const m = boss.modes && boss.modes[mode];
+    if (m) boss.mult = m.mult;
+    _arbaModeBox.remove(); _arbaModeBox = null;
+    startBoss(id);
+  };
+  _arbaModeBox.querySelector("#arba-facil").addEventListener("click", () => pick("facil"));
+  _arbaModeBox.querySelector("#arba-hard").addEventListener("click", () => pick("hard"));
+  _arbaModeBox.querySelector("#arba-cancel").addEventListener("click", () => { _arbaModeBox.remove(); _arbaModeBox = null; });
 }
 
 function startBoss(id, force, arenaReady) {
@@ -2999,6 +3243,7 @@ function addCombatHitLog(comboKey, alvo, col, amount, elName) {
 }
 
 function drainEvents() {
+  if (typeof annihilatorPollRewardCart === "function") annihilatorPollRewardCart();
   const c = G.combat;
   if (!c) return;
   const r = G.renderer;
@@ -3494,7 +3739,7 @@ function drainEvents() {
             pos={x:Number(cel.x),y:Number(cel.y)};
           }
           if (!pos) continue;
-          r.addEffect(pos.x, pos.y, e.fx || "explosion-area");
+          r.addEffect(pos.x, pos.y, e.fx || "explosion-area", e.duration);
         }
         break;
       }
@@ -3754,7 +3999,15 @@ function drainEvents() {
         if (typeof openAnnihilatorPrep === "function") openAnnihilatorPrep();
         break;
       }
+      case "annihilator-ready": {
+        /* Grupo nos SQMs há 3s: botão PRONTO pulsando em cima da alavanca;
+         * o clique marca p.annihilatorLever que o servidor usa para
+         * teleportar + spawnar os demons. */
+        annihilatorShowLeverButton();
+        break;
+      }
       case "annihilator-lever": {
+        annihilatorHideLeverButton();
         addLog("info", `A alavanca foi acionada — <b>6 Demons</b> nasceram!`);
         if (typeof toast === "function") toast(`Annihilator: <b>6 Demons</b>!`, "level");
         /* O servidor teleporta para a entrada, mas o merge de checkpoint
@@ -3780,8 +4033,8 @@ function drainEvents() {
         break;
       }
       case "annihilator-exit": {
-        addLog("info", `Todos os Demons caíram — <b>vá para a saída</b> ao norte!`);
-        if (typeof toast === "function") toast(`Demons mortos — vá para a <b>saída</b>!`, "level");
+        addLog("info", `Todos os Demons caíram — pise em <b>(1027, 1026, 7)</b> para escolher as recompensas da conta. O teleport de saída retorna ao lobby.`);
+        if (typeof toast === "function") toast(`Vá ao SQM <b>(1027, 1026, 7)</b> para abrir o carrinho de recompensas.`, "level");
         break;
       }
       case "annihilator-rewards": {
@@ -4507,7 +4760,10 @@ async function requestOnlineRuntimeRecovery(options){
       }
       if(G.combat&&!(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))){
         clearInstanceSession(remote.terminalReason||"remote-ended",true);
-        setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+        setTimeout(()=>{
+          if (typeof annihilatorReturnToLobby === "function" && annihilatorReturnToLobby(G.combat, remote.terminalReason)) return;
+          if(G.combat)stopHunt(true);
+        },0);
       }else if(G.combat){
         if(typeof wbExitCombat==="function")wbExitCombat("fail");
         else clearInstanceSession(remote.terminalReason||"remote-ended",true);
@@ -5119,6 +5375,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     setTimeout(()=>{
       if(!G.combat)return;
       if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
+      if (typeof annihilatorReturnToLobby === "function" && annihilatorReturnToLobby(G.combat, terminalReason)) return;
       stopHunt(true,{skipMegaLeave:true});
       // Stamina zerada: a PT toda vai para a ala de treino (não para o templo).
       if(terminalReason==="stamina"&&typeof startTrainingArea==="function"){
@@ -5161,6 +5418,7 @@ function requestOnlineAuthorityTick(){
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
       if(combatInstanceEntryPending())return;
       clearInstanceSession(result.terminalReason,true);setTimeout(()=>{
+        if (typeof annihilatorReturnToLobby === "function" && annihilatorReturnToLobby(G.combat, result.terminalReason)) return;
         if(G.combat)stopHunt(true);
         if(result.terminalReason==="stamina"&&typeof startTrainingArea==="function")startTrainingArea();
       },0);
@@ -5190,7 +5448,10 @@ if(typeof window!=="undefined"){
         clearInstanceSession(remote.terminalReason||detail.terminalReason||"shared-ended",true);
         // Não derrubar arena World Boss ao encerrar a hunt anterior.
         if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
-        setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+        setTimeout(()=>{
+          if (typeof annihilatorReturnToLobby === "function" && annihilatorReturnToLobby(G.combat, remote.terminalReason || detail.terminalReason)) return;
+          if(G.combat)stopHunt(true);
+        },0);
       }
       return;
     }
@@ -5819,11 +6080,10 @@ function bindControls() {
   cv.addEventListener("contextmenu", (e) => e.preventDefault());
   cv.addEventListener("click", (e) => {
     if (G.combat) {
-      if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p)) return;
       const { mx, my } = canvasPos(e);
-      if (typeof canvasToCombatCell === "function" && G.combat.player) {
-        G.combat.player.walkGoal = canvasToCombatCell(mx, my, cv.width, cv.height, G.combat);
-      }
+      const cell = typeof canvasToCombatCell === "function" ? canvasToCombatCell(mx, my, cv.width, cv.height, G.combat) : null;
+      if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p) && G.combat.questId !== "annihilator") return;
+      if (cell && G.combat.player) G.combat.player.walkGoal = cell;
       return;
     }
     if (!G.inCity) return;

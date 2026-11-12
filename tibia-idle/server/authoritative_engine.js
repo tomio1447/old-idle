@@ -2,6 +2,7 @@
 "use strict";
 const fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
 const DATA=path.join(__dirname,"..","game","data");
+const ANNIHILATOR_DATA=require("../game/js/annihilator-data");
 let WAND_SHOOT={};
 try{WAND_SHOOT=require(path.join(__dirname,"..","game","js","wandshootdata.js"))||{};}
 catch(e){WAND_SHOOT={};}
@@ -24,6 +25,9 @@ const selfHealSpellIds=CanaryVocation.selfHealSpellIds;
 const sanitizePlayerSpells=(p,spells)=>CanaryVocation.sanitizePlayerSpells(p,spells||ALL_SPELLS);
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
+const BLOODROTTEN_DATA=require("../game/js/bloodrotten.js");
+MONSTERS["pillar-of-dark-energy"]=BLOODROTTEN_DATA.pillar;
+BLOODROTTEN_DATA.registerBagLoot(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -485,6 +489,19 @@ try{
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"supplies.js"),"utf8"),sandbox);}catch(_sp){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"grimvale.js"),"utf8"),sandbox);
   vm.runInNewContext(fs.readFileSync(path.join(js,"grimvale-bosses.js"),"utf8"),sandbox);
+  // Lion Sanctum Archfoe + Mitmah Vanguard: registram itens de loot em
+  // GAMEDATA.items — sem isso o servidor vende por 0/ignora no Sell All.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"ravenous-bosses.js"),"utf8"),sandbox);}catch(_rv){/* opcional */}
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"mitmah-vanguard.js"),"utf8"),sandbox);}catch(_mv){/* opcional */}
+  // Conteúdo novo: cada arquivo registra itens de loot em GAMEDATA.items —
+  // sem carregar aqui o servidor não conhece os slugs e o Sell All ignora.
+  for(const f of ["lion-sanctum.js","rotworm-darashia.js","elder-wyrm-darashia.js",
+    "lions-rock-darashia.js","dl-darashia.js","feast-of-souls.js","scarlett-boss.js",
+    "hyaena-lairs.js","wyrm-lb.js","medusa-tower-ph.js","carniphilas-ph.js",
+    "asura-palace.js","azzilon-castle.js","arbaziloth.js","magma-bubble.js",
+    "sugar-daddy.js","sugar-mommy.js","gnomprona.js","bloodrotten.js"]){
+    try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
+  }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
   for(const slug of Object.keys(gd)){
     const src=gd[slug]||{},cur=ITEMS[slug]||{};
@@ -585,6 +602,13 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "goshnars-spite-room":{monsters:["goshnar-s-spite","dreadful-harvester","spiteful-spitter","weeping-soul"],soulWarZone:true,soulWarZoneMonster:"bony-sea-devil"},
   "goshnars-malice-room":{monsters:["goshnar-s-malice","dreadful-harvester","malicious-soul"],soulWarZone:true,soulWarZoneMonster:"dreadful-harvester"},
   "goshnars-megalomania-room":{monsters:["goshnar-s-megalomania-purple","goshnar-s-megalomania-green","goshnar-s-megalomania-blue","aspect-of-power"],soulWarZone:true,soulWarZoneMonster:"aspect-of-power"},
+  "gnomprona-weagon1":{monsters:["nighthunter","stalking-stalk","sulphider","sulphur-spouter","undertaker"],cat:"gnomprona",gnomprona:true,pack:5,packMin:5,packMax:5,bossMobs:["plunder-patriarch"],
+    spawnWeights:{"nighthunter":20,"stalking-stalk":20,"sulphider":20,"sulphur-spouter":20,"undertaker":20,"plunder-patriarch":0}},
+  "gnomprona-weagon2":{monsters:["headpecker","mantosaurus","mercurial-menace","noxious-ripptor","shrieking-cry-stal"],cat:"gnomprona",gnomprona:true,pack:5,packMin:5,packMax:5,bossMobs:["plunder-patriarch"],
+    spawnWeights:{"headpecker":20,"mantosaurus":20,"mercurial-menace":20,"noxious-ripptor":20,"shrieking-cry-stal":20,"plunder-patriarch":0}},
+  "gnomprona-weagon3":{monsters:["emerald-tortoise","gore-horn","gorerilla","hulking-prehemoth","sabretooth"],cat:"gnomprona",gnomprona:true,pack:5,packMin:5,packMax:5,bossMobs:["plunder-patriarch"],
+    spawnWeights:{"emerald-tortoise":20,"gore-horn":20,"gorerilla":20,"hulking-prehemoth":20,"sabretooth":20,"plunder-patriarch":0}},
+  "the-primal-menace-room":{monsters:["the-primal-menace","nighthunter","stalking-stalk","sulphider","sulphur-spouter","undertaker"],cat:"gnomprona",gnomprona:true,pack:1},
   "scarlett-room":{monsters:["scarlett-etzel"]},
   "the-dread-maiden-room":{monsters:["the-dread-maiden"]},
   "the-fear-feaster-room":{monsters:["the-fear-feaster"]},
@@ -1456,6 +1480,31 @@ function openAuthBagYouDesire(p){
   p.depot.push(item);
   return {ok:true,item:item};
 }
+/** Pool da Primal Bag (Gnomprona): equipamentos da Primal Ordeal — o
+ * equivalente gnomprona da Bag You Desire. */
+const PRIMAL_BAG_POOL=["arboreal-tome","arboreal-crown","spiritthorn-armor",
+  "spiritthorn-helmet","alicorn-headguard","alicorn-quiver","arcanomancer-regalia",
+  "arcanomancer-folio","charged-arcanomancer-sigil","charged-arboreal-ring",
+  "charged-alicorn-ring","charged-spiritthorn-ring"];
+/** Abre uma Primal Bag: remove 1 da Loot Pouch e sorteia 1 item do set de
+ * Gnomprona para o Depot (cap de 30 slots). */
+function openAuthPrimalBag(p){
+  if(!p)return {ok:false,msg:"Personagem inválido"};
+  p.lootPouch=p.lootPouch||{};p.bag=p.bag||{};
+  // Consome da mochila ou da Loot Pouch (a recompensa de missão/marco
+  // pode cair em qualquer um dos dois containers).
+  const inBag=Math.max(0,Math.floor(Number(p.bag["primal-bag"])||0));
+  const inPouch=Math.max(0,Math.floor(Number(p.lootPouch["primal-bag"])||0));
+  if(inBag<=0&&inPouch<=0)
+    return {ok:false,msg:"Primal Bag não encontrada na mochila nem na Loot Pouch"};
+  p.depot=Array.isArray(p.depot)?p.depot:[];
+  if(p.depot.length>=30)return {ok:false,msg:"Depot cheio (30 slots)"};
+  if(inBag>0){if(inBag<=1)delete p.bag["primal-bag"];else p.bag["primal-bag"]=inBag-1;}
+  else{if(inPouch<=1)delete p.lootPouch["primal-bag"];else p.lootPouch["primal-bag"]=inPouch-1;}
+  const item=PRIMAL_BAG_POOL[Math.floor(Math.random()*PRIMAL_BAG_POOL.length)];
+  p.depot.push(item);
+  return {ok:true,item:item};
+}
 /** Itens que ocupam 1 slot/instância na bag (armas, armaduras…). */
 function authItemNeedsBagInstance(slug){
   const it=ITEMS[slug];
@@ -2206,6 +2255,17 @@ function applyOutgoingDamage(mob,element,dmg,now,piercePct){
     return out;
   }
   if(mob&&(mob.greedImmune||mob.qteImmune))return 0;
+  /* Hazard dodge (Gnomprona, crystalserver): 0,85%/nível de anular por
+   * completo o dano recebido do jogador (qualquer fonte de combate). */
+  if(mob&&Number(mob.hazard)>0){
+    const auth=mob._auth;
+    if(auth&&random(auth)<0.0085*Math.min(12,Number(mob.hazard))){
+      if(mob.x!=null)auth.events.push({t:"miss",x:mob.x,y:mob.y,
+        targetId:String(mob.id),hazardDodge:true,screen:true,fx:"poff",
+        ts:now||auth.clock});
+      return 0;
+    }
+  }
   // The Unwelcome: imune a death — cura 200% do dano de death que sofreria
   // (pré-resistência). Espelho do cliente (combat.js unwelcomeAbsorbDeath).
   if(mob&&mob.def&&mob.def.deathAbsorbs&&(element||"physical")==="death"&&dmg>0){
@@ -3141,6 +3201,12 @@ function bosstiaryKill(p,slug,n){
   p.bossPoints=Number(p.bossPoints)||0;
   const cat=BOSS_CATS[bosstiaryCategory(slug)],antes=Number(p.bosstiary[slug])||0,depois=antes+(n||1);
   p.bosstiary[slug]=depois;
+  // Gnomprona: kill do The Primal Menace libera +1 hazard (cap 12) SÓ se
+  // a luta foi no nível desbloqueado atual (sel travado ao level).
+  if(slug==="the-primal-menace"){p.hazardKills=depois;
+    const lvl=Math.max(0,Math.min(12,Number(p.hazardLevel)||0));
+    const fought=Math.max(0,Math.min(12,Number(p.hazardSel!==undefined?p.hazardSel:lvl)||0));
+    if(fought>=lvl&&lvl<12)p.hazardLevel=lvl+1;}
   const pagosAntes=Math.min(antes,cat.kills),pagosAgora=Math.min(depois,cat.kills);
   const ganho=(pagosAgora-pagosAntes)*cat.pts;
   if(ganho>0)p.bossPoints+=ganho;
@@ -3633,6 +3699,18 @@ function absorbMagicShield(auth,item,p,dmg,now,pos,element){
 function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
   dmg=Math.max(0,Math.floor(Number(dmg)||0));
   if(dmg<=0)return 0;
+  /* Hazard (Gnomprona, crystalserver): todo hit do monstro hazard leva
+   * damage boost +2%/nível e tem 7,5% de chance de CRIT (+50% de dano
+   * +0,25%/nível) com janela de 2s por monstro. */
+  if(mob&&Number(mob.hazard)>0){
+    const hz=Math.max(0,Math.min(12,Number(mob.hazard)||0));
+    dmg=Math.max(0,Math.floor(dmg*(1+hz*0.02)));
+    const nowMs=Number(now)||0;
+    if(random(auth)<0.075&&Number(mob._hazardCritAt||0)<=nowMs){
+      mob._hazardCritAt=nowMs+2000;
+      dmg=Math.max(0,Math.floor(dmg*(1.5+Math.max(0,hz-1)*0.0025)));
+    }
+  }
   const attackerSlug=mob&&mob.slug||null;
   const dodge=charmTotals(p,attackerSlug).esquiva+(WHEEL_FN?Number(WHEEL_FN.wheelTotals(p).dodge)||0:0)
     +guildBonusLevel(p,"dodge")*0.1;
@@ -4434,6 +4512,8 @@ function claimSpawnCell(auth,cx,cy){
   return {cx,cy};
 }
 function makeMob(auth,slug,boss,id,source,slot){
+  if(boss&&BLOODROTTEN_DATA.bosses.includes(slug)&&MONSTERS[slug])source=Object.assign({},source,{
+    def:MONSTERS[slug],hp:MONSTERS[slug].hp,maxHp:MONSTERS[slug].hp});
   // Boss de arena: a definição real (stats + loot próprio) vive no BOSS_DEFS
   // do cliente e chega em source.def. Sem este merge a autoridade lutava com
   // o def do sprite-base: Leiden (slug próprio, sem MONSTERS.loot) não
@@ -4821,6 +4901,96 @@ function stashEquippedAuth(p,slot,dest){
   return true;
 }
 
+function depotActionAuth(p,opts){
+  opts=opts||{};
+  const action=String(opts.action||""),ref=String(opts.ref||"");
+  if(!p||!["store","retrieve","equip"].includes(action)||!ref||ref.length>160)
+    return {ok:false,msg:"Operação do Depot inválida"};
+  const q=JSON.parse(JSON.stringify(p));
+  q.bag=q.bag||{};q.equip=q.equip||{};
+  q.depot=Array.isArray(q.depot)?q.depot:[];
+  q.itemInstances=Array.isArray(q.itemInstances)?q.itemInstances:[];
+  const fail=(msg)=>({ok:false,msg});
+  const equippedToDepot=(slot,replaceDefault)=>{
+    const entry=q.equip[slot];if(!entry)return true;
+    if(slot==="ammo")return false;
+    if(slot==="backpack"&&entry.item==="bag"){
+      if(!replaceDefault)return false;
+      delete q.equip[slot];return true;
+    }
+    if(q.depot.length>=30)return false;
+    let inst=entry.instId&&q.itemInstances.find((i)=>i&&String(i.id)===String(entry.instId));
+    if(entry.instId&&(!inst||inst.loc!=="equip:"+slot))return false;
+    if(!inst&&(authItemNeedsBagInstance(entry.item)||entry.charges!=null||Number(entry.tier)>0)){
+      inst={id:"srv-"+crypto.randomBytes(12).toString("hex"),slug:entry.item,tier:Number(entry.tier)||0};
+      q.itemInstances.push(inst);
+    }
+    if(inst){
+      for(const key of ["charges","_chargeAcc"])if(entry[key]!=null)inst[key]=entry[key];
+      inst.loc="depot";q.depot.push(inst.id);
+    }else q.depot.push(entry.item);
+    delete q.equip[slot];return true;
+  };
+  let slug="";
+  if(action==="store"){
+    if(q.depot.length>=30)return fail("Depot cheio (30 slots)");
+    const inst=q.itemInstances.find((i)=>i&&String(i.id)===ref);
+    const slot=Object.keys(q.equip).find((s)=>{
+      const e=q.equip[s];return e&&(inst?String(e.instId)===ref:e.item===ref)&&
+        (!opts.slot||opts.slot===s);
+    });
+    if(opts.source==="equip"||(inst&&String(inst.loc).startsWith("equip:"))||
+        (!inst&&!(Number(q.bag[ref])>0)&&slot)){
+      if(!slot||!equippedToDepot(slot,false))return fail("Não foi possível guardar o equipamento");
+      slug=inst?inst.slug:ref;
+    }else if(inst){
+      if(inst.loc!=="bag")return fail("Item não está na mochila");
+      slug=inst.slug;inst.loc="depot";q.depot.push(inst.id);
+    }else{
+      if(!ITEMS[ref]||!(Number(q.bag[ref])>0))return fail("Item não está na mochila");
+      slug=ref;q.bag[ref]--;if(q.bag[ref]<=0)delete q.bag[ref];q.depot.push(ref);
+    }
+  }else{
+    const index=q.depot.findIndex((entry)=>String(entry)===ref);
+    if(index<0)return fail("Item não está no Depot");
+    const inst=q.itemInstances.find((i)=>i&&String(i.id)===ref);
+    if(inst&&inst.loc!=="depot")return fail("Instância não está no Depot");
+    slug=inst?String(inst.slug):ref;
+    const it=ITEMS[slug];if(!it)return fail("Item desconhecido");
+    q.depot.splice(index,1);
+    if(action==="equip"){
+      if(!it.s||it.s==="ammo")return fail("Item não pode ser equipado");
+      if(!equippedToDepot(String(it.s),true))return fail("Depot cheio para guardar o item anterior");
+      if(it.s==="weapon"&&it.th&&q.equip.shield){
+        const shield=ITEMS[q.equip.shield.item];
+        if((!shield||shield.t!=="quiver")&&!equippedToDepot("shield",false))
+          return fail("Depot cheio para guardar o escudo");
+      }
+    }
+    if(itemUnitWeight(slug)>freeCapacity(q)+1e-9)return fail("Capacidade insuficiente");
+    let incoming=inst;
+    if(incoming){
+      incoming.loc="bag";
+      if(authItemNeedsBagInstance(slug))q.bag[slug]=(Number(q.bag[slug])||0)+1;
+    }else if(action==="equip"){
+      if(authItemNeedsBagInstance(slug)){
+        incoming={id:"srv-"+crypto.randomBytes(12).toString("hex"),slug,loc:"bag",tier:0};
+        q.itemInstances.push(incoming);
+      }
+      q.bag[slug]=(Number(q.bag[slug])||0)+1;
+    }else if(!authAddItemToBag(q,slug,1))return fail("Mochila cheia");
+    if(action==="equip"){
+      const result=equipFromContainerAuth(q,slug,"bag",{instId:incoming&&incoming.id});
+      if(!result.ok)return result;
+    }
+  }
+  authSyncBagCountsFromInstances(q);
+  if(authBagUsedSlots(q)>authBagSlots(q))return fail("Mochila cheia");
+  for(const key of ["bag","depot","equip","itemInstances","config"])p[key]=q[key];
+  const name=ITEMS[slug]&&(ITEMS[slug].n||ITEMS[slug].name)||slug;
+  return {ok:true,msg:name+(action==="store"?" guardado no Depot.":action==="equip"?" equipado.":" retirado do Depot.")};
+}
+
 /* Troca de equipamento com fonte bag/pouch (espelho do equipItemFromContainer).
  * Também aplica a munição automática por tipo de arma (autoAmmoForWeaponAuth). */
 function equipFromContainerAuth(p,slug,source,opts){
@@ -4839,7 +5009,7 @@ function equipFromContainerAuth(p,slug,source,opts){
   if(fromPouch){
     const n=Number(p.lootPouch&&p.lootPouch[slug])||0;
     if(n<=0)return {ok:false,msg:"Item não está na Loot Pouch"};
-  }else if(authItemNeedsBagInstance(slug)){
+  }else if(authItemNeedsBagInstance(slug)||opts.instId){
     // Itens instanciados: a presença é o itemInstances (loc "bag"), não o
     // contador p.bag[slug] — o contador diverge quando a bag vem do shared
     // inventory (instância compartilhada sem entrada no mapa de stacks),
@@ -4884,7 +5054,7 @@ function equipFromContainerAuth(p,slug,source,opts){
   if(fromPouch){
     const n=Number(p.lootPouch&&p.lootPouch[slug])||0;
     if(n>1)p.lootPouch[slug]=n-1;else delete p.lootPouch[slug];
-  }else{
+  }else if(!takenInst||authItemNeedsBagInstance(slug)){
     const n=Number(p.bag&&p.bag[slug])||0;
     if(n>1)p.bag[slug]=n-1;else delete p.bag[slug];
   }
@@ -4904,6 +5074,7 @@ function equipFromContainerAuth(p,slug,source,opts){
     p.itemInstances.push(takenInst);
     p.equip[slot].instId=takenInst.id;
     p.equip[slot].tier=takenInst.tier||0;
+    for(const key of ["charges","_chargeAcc"])if(takenInst[key]!=null)p.equip[slot][key]=takenInst[key];
   }
   autoAmmoForWeaponAuth(p,slug,it);
   return {ok:true};
@@ -5238,6 +5409,8 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     let share=finalExp(item.p,portion,mob.slug,auth.expMul||1);
     const taintExp=soulwarTaintExpMultiplier(auth,item.p);
     if(taintExp!==1)share=Math.floor(share*taintExp);
+    // Hazard exp bonus (crystalserver): +3,5% por nível de hazard.
+    if(Number(mob.hazard)>0)share=Math.floor(share*(1+0.035*Math.min(12,Number(mob.hazard))));
     totalShare+=share;
     const beforeLevel=Number(item.p.level)||1;
     addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
@@ -5281,6 +5454,12 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     bundleId:auth.rewardBundleId,bossId:auth.bossId||mob.slug,
     name:bossMeta.name||mob.slug,
     sprite:auth.kind==="hunt"||auth.worldBoss?mob.slug:(auth.bossId||mob.slug)}:null;
+  // Hazard loot bonus (crystalserver ondroploot_hazard): 4% por nível de
+  // rolagem extra da tabela completa (só monstros hazard, nunca o miniboss).
+  const hazardLootRolls=(()=>{const pts=Math.max(0,Math.min(12,Number(mob&&mob.hazard)||0));
+    if(!pts||mob.boss)return 0;const c=4*pts/100;
+    return Math.floor(c)+(random(auth)<c%1?1:0);})();
+  for(let lootPass=0;lootPass<1+hazardLootRolls;lootPass++)
   for(const entry of mob.def.loot||[]){
     const chance=Math.min(100,(Number(entry.chance)||0)*chanceMult);
     if(random(auth)*100>chance)continue;
@@ -5526,6 +5705,24 @@ function fillHatred(auth){
   while(auth.mobs.filter((m)=>m.hatredSummon&&m.hp>0).length<5){
     const slug=random(auth)<.10?"hateful-soul":"dreadful-harvester";
     if(!hatredMakeSummon(auth,slug))break;
+  }
+}
+/* The Primal Menace (Gnomprona): invoca até 5 monstros das hunts de
+ * Gnomprona enquanto o boss vive. Os adds nascem hazard-flagged quando
+ * a instância tem hazardLevel>0 (mesma regra do spawn das hunts). */
+const PRIMAL_ADDS=["nighthunter","stalking-stalk","sulphider","sulphur-spouter","undertaker"];
+function fillPrimalAdds(auth){
+  if(!auth||auth.bossId!=="the-primal-menace"||auth.ended)return;
+  const boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+  if(!boss&&!arenaBossSpawnPending(auth))return;
+  while(auth.mobs.filter((m)=>m.primalAdd&&m.hp>0).length<5){
+    const slug=PRIMAL_ADDS[roll(auth,0,PRIMAL_ADDS.length-1)];
+    const mob=makeMob(auth,slug,false);if(!mob)break;
+    mob.primalAdd=true;
+    if(Number(auth.hazardLevel)>0)mob.hazard=Math.max(0,Math.min(12,Number(auth.hazardLevel)));
+    auth.mobs.unshift(mob);
+    const pos=entityPosition(mob,.5,.5);
+    auth.events.push({t:"spawn",slug,x:pos.x,y:pos.y,targetId:String(mob.id),screen:true,ts:auth.clock});
   }
 }
 function tickHatred(auth,now){
@@ -6083,7 +6280,7 @@ const SCARLETT_KEYS=["up","down","left","right"];
 /* Timing alinhado ao cliente (scarlett-boss.js): lead, gap, janela ±ms e
  * folga online (~1.5×AUTH_STEP + RTT). pressAuth julga o instante do tecla,
  * não o atraso do tick — anti-cheat ainda rejeita pressAuth no futuro. */
-const SCARLETT_LEAD_MS=1000,SCARLETT_NOTE_GAP=560,SCARLETT_TIMING_WINDOW=520,SCARLETT_ONLINE_SLACK=320;
+const SCARLETT_LEAD_MS=1400,SCARLETT_NOTE_GAP=800,SCARLETT_TIMING_WINDOW=750,SCARLETT_ONLINE_SLACK=320;
 function scarlettBuildSequence(auth){
   return Array.from({length:5},()=>SCARLETT_KEYS[Math.min(3,Math.floor(random(auth)*4))]);
 }
@@ -6338,13 +6535,41 @@ function tickEchoRaid(auth,now){
 const ANNIHILATOR_CELLS={
   prep:[[16,23],[17,23],[18,23],[19,23]],
   entrance:[[13,11],[14,11],[15,11],[16,11]],
-  demons:[[17,11],[18,11],[16,13],[14,13],[13,9],[15,9]],
+  demons:[[13,9],[15,9],[14,13],[16,13],[17,11],[18,11]],
   exit:[[22,11],[23,11],[24,11],[25,11]],
 };
 function annihilatorInit(auth){
   auth.annihilator={phase:"prep",arrived:[],demonIds:[],prepSince:0};
   auth.events=auth.events||[];
   auth.events.push({t:"annihilator-start"});
+}
+function bloodrottenTick(auth,now){
+  BLOODROTTEN_DATA.tick(auth,now,{
+    random:()=>random(auth),
+    blocked:(cx,cy)=>cx<0||cy<0||cx>=auth.gridW||cy>=auth.gridH||authorityCellBlocked(auth,cx,cy),
+    spawn:(slug,cell)=>{
+      const mob=makeMob(auth,slug,false);if(!mob)return null;
+      mob.cx=cell.cx;mob.cy=cell.cy;
+      mob.x=(cell.cx+.5)/auth.gridW;mob.y=(cell.cy+.5)/auth.gridH;mob.sx=mob.x;mob.sy=mob.y;
+      auth.mobs.push(mob);
+      auth.events.push({t:"spawn",slug,targetId:String(mob.id),x:mob.x,y:mob.y,screen:true,ts:now});
+      return mob;
+    },
+    warn:(mob,cells,duration)=>auth.events.push({t:"areafx",cells,fx:"magic-blue",duration,screen:true,ts:now}),
+    explode:(mob,cells,raw)=>{
+      auth.events.push({t:"areafx",cells,fx:"energy-area",screen:true,ts:now});
+      const targets=new Set(cells.map((p)=>p.cx+":"+p.cy));
+      for(const item of auth.players||[]){
+        if(!(item.p?.hp>0)||item.downUntil||!targets.has(item.cx+":"+item.cy))continue;
+        const pos=entityPosition(item,.5,.5),damage=absorbIncomingDamage(auth,item,item.p,raw,now,pos,"energy",mob);
+        item.p.hp-=damage;item.p._lastHitBy=mob.def.name;
+        auth.events.push({t:"taken",dmg:damage,x:pos.x,y:pos.y,targetId:String(item.id),sourceId:String(mob.id),
+          el:"energy",fx:"energy-area",screen:true,ts:now});
+        if(item.p.hp<=0){authMarkPlayerDeath(auth,item,now);
+          auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),permadead:!!item.permadead,screen:true,ts:now});}
+      }
+    },
+  });
 }
 function annihilatorTick(auth,now){
   const st=auth.annihilator;if(!st)return;
@@ -6356,7 +6581,7 @@ function annihilatorTick(auth,now){
     if(!ready){st.prepSince=0;return;}
     if(!st.prepSince){st.prepSince=now;return;}
     if(now-st.prepSince<3000)return;
-    // Alavanca: players teleportados para a entrada + 6 demons nascem.
+    // Alavanca automática: players teleportados para a entrada + 6 demons.
     // A ordem nos SQMs de preparo determina a posição na entrada (esq→dir).
     st.phase="combat";st.prepSince=0;
     const prepIdx=new Map(ANNIHILATOR_CELLS.prep.map((cc,ii)=>[cc[0]+":"+cc[1],ii]));
@@ -6370,26 +6595,79 @@ function annihilatorTick(auth,now){
     ANNIHILATOR_CELLS.demons.forEach(([cx,cy],i)=>{
       const mob=makeMob(auth,"demon",false);if(!mob)return;
       mob.id="annihilator-demon-"+i;mob.cx=cx;mob.cy=cy;
+      // Demons da Annihilator não andam: ficam estáticos no SQM escolhido.
+      mob.staticAttack=100;mob.noMove=true;
       mob.x=(cx+0.5)/auth.gridW;mob.y=(cy+0.5)/auth.gridH;
       auth.mobs.unshift(mob);st.demonIds.push(mob.id);
     });
     auth.events.push({t:"annihilator-lever",screen:true,ts:now});
   }else if(st.phase==="combat"){
     if(st.demonIds.length&&st.demonIds.every((id)=>!(auth.mobs||[]).some((m)=>m&&m.id===id&&m.hp>0))){
-      st.phase="exit";
+      st.phase="rewards";
       auth.events.push({t:"annihilator-exit",screen:true,ts:now});
     }
-  }else if(st.phase==="exit"){
-    const exitSet=new Set(ANNIHILATOR_CELLS.exit.map((c)=>c[0]+":"+c[1]));
-    for(const pl of alive){
-      if(exitSet.has(Math.round(pl.cx)+":"+Math.round(pl.cy))&&!st.arrived.includes(String(pl.id)))
-        st.arrived.push(String(pl.id));
-    }
-    if(alive.length>0&&alive.every((pl)=>st.arrived.includes(String(pl.id)))){
-      st.phase="rewards";
+  }else if(st.phase==="exit"||st.phase==="rewards"){
+    st.phase="rewards";
+    const exit=ANNIHILATOR_DATA.teleport,bounds=ANNIHILATOR_DATA.bounds;
+    if(alive.some((pl)=>Math.round(pl.cx)===exit.x-bounds.x&&Math.round(pl.cy)===exit.y-bounds.y)){
+      st.phase="completed";
       auth.ended=true;auth.terminalReason="quest-completed";
     }
   }
+}
+function annihilatorRewardOffer(auth,characterId,previousClaims=[]){
+  const actor=auth?.players?.find((p)=>String(p.id)===String(characterId));
+  const phase=auth?.annihilator?.phase,point=ANNIHILATOR_DATA.rewardTrigger,b=ANNIHILATOR_DATA.bounds;
+  if(auth?.questId!=="annihilator"||auth.ended||!["exit","rewards"].includes(phase)||!(actor?.p?.hp>0))
+    return {ok:false,msg:"Derrote os seis Demons antes de escolher as recompensas."};
+  if(!Number.isFinite(actor.cx)||!Number.isFinite(actor.cy)||Math.round(actor.cx)!==point.x-b.x||Math.round(actor.cy)!==point.y-b.y)
+    return {ok:false,msg:"Pise no SQM de recompensas (1027, 1026, 7)."};
+  const accountId=Number(actor.accountId||actor.p.accountId),claimed=new Set(previousClaims.map(String));
+  const members=auth.players.filter((p)=>Number(p.accountId||p.p?.accountId)===accountId);
+  for(const p of members)if(p.p?.quests?.annihilator?.completed)claimed.add(String(p.id));
+  const ids=members.filter((p)=>!claimed.has(String(p.id))).map((p)=>String(p.id));
+  const count=Math.max(0,Math.min(ids.length,ANNIHILATOR_DATA.accountRewardLimit-claimed.size));
+  return {ok:true,count,claimed:claimed.size,characterIds:ids.slice(0,count)};
+}
+function claimAnnihilatorCart(auth,characterId,quantities,previousClaims=[]){
+  const offer=annihilatorRewardOffer(auth,characterId,previousClaims);
+  if(!offer.ok)return offer;
+  if(!offer.count)return {ok:false,msg:"A conta já resgatou todas as recompensas disponíveis."};
+  if(!quantities||typeof quantities!=="object"||Array.isArray(quantities)||Object.entries(quantities).some(([slug,n])=>
+    !ANNIHILATOR_DATA.rewards.includes(slug)||!Number.isSafeInteger(n)||n<0||n>ANNIHILATOR_DATA.accountRewardLimit))
+    return {ok:false,msg:"Quantidades de recompensas inválidas."};
+  const selected=ANNIHILATOR_DATA.rewards.flatMap((slug)=>Array(quantities[slug]||0).fill(slug));
+  if(selected.length!==offer.count)return {ok:false,msg:"Escolha exatamente "+offer.count+" recompensas."};
+  shareInstanceContainers(auth);
+  const actor=auth.players.find((p)=>String(p.id)===String(characterId)),claimedAt=Date.now();
+  for(let i=0;i<offer.characterIds.length;i++){
+    const pl=auth.players.find((p)=>String(p.id)===offer.characterIds[i]);
+    pl.p.quests=pl.p.quests||{};
+    pl.p.quests.annihilator={completed:true,completedAt:claimedAt,reward:selected[i]};
+  }
+  for(const slug of ANNIHILATOR_DATA.rewards)if(quantities[slug]>0)rewardChestAdd(actor.p,slug,quantities[slug],{
+    bundleId:"quest-annihilator-cart-"+(actor.accountId||actor.p.accountId),bossId:"annihilator",name:ANNIHILATOR_DATA.name,sprite:"demon"});
+  return {ok:true,count:offer.count,rewards:quantities};
+}
+function claimAnnihilatorReward(auth,characterId,reward,previousClaims=[]){
+  const st=auth&&auth.annihilator;
+  const pl=auth&&(auth.players||[]).find((p)=>String(p.id)===String(characterId));
+  const chest=ANNIHILATOR_DATA.chests.find((c)=>c.reward===reward),b=ANNIHILATOR_DATA.bounds;
+  if(auth?.questId!=="annihilator"||auth.ended||!st||!["exit","rewards"].includes(st.phase)||!pl||!(pl.p?.hp>0)||!chest)
+    return {ok:false,msg:"Recompensa indisponível. Derrote os seis Demons primeiro."};
+  if(!Number.isFinite(pl.cx)||!Number.isFinite(pl.cy)||Math.max(Math.abs(pl.cx-(chest.x-b.x)),Math.abs(pl.cy-(chest.y-b.y)))>1)
+    return {ok:false,msg:"Aproxime-se do baú para retirar a recompensa."};
+  const claimed=new Set(previousClaims.map(String));
+  for(const p of auth.players||[])
+    if(Number(p.accountId||p.p?.accountId)===Number(pl.accountId||pl.p?.accountId)&&p.p?.quests?.annihilator?.completed)claimed.add(String(p.id));
+  if(claimed.has(String(pl.id))||pl.p.quests?.annihilator?.completed)
+    return {ok:false,msg:"Este personagem já recebeu sua recompensa."};
+  if(claimed.size>=ANNIHILATOR_DATA.accountRewardLimit)return {ok:false,msg:"A conta já recebeu quatro recompensas."};
+  shareInstanceContainers(auth);
+  rewardChestAdd(pl.p,reward,1,{bundleId:"quest-annihilator-"+pl.id,bossId:"annihilator",name:ANNIHILATOR_DATA.name,sprite:"demon"});
+  pl.p.quests=pl.p.quests||{};
+  pl.p.quests.annihilator={completed:true,completedAt:Date.now(),reward};
+  return {ok:true,reward,charId:String(pl.id)};
 }
 function tryFerumbrasSummon(auth,mob,now,stepTs){
   if(auth.bossId!=="ferumbras-mortal-shell"||!mob||!mob.boss)return false;
@@ -6427,6 +6705,7 @@ function captureAuthHuntDef(auth,hunt){
   if(Number(hunt.packMax)>0)auth.huntPackMax=Number(hunt.packMax);
   if(Number(hunt.pack)>0)auth.huntPack=Number(hunt.pack);
   if(hunt.cat)auth.huntCat=String(hunt.cat);
+  if(hunt.gnomprona)auth.huntGnomprona=true;
 }
 function authHuntDef(auth){
   if(!auth)return null;
@@ -6440,7 +6719,32 @@ function authHuntDef(auth){
   if(Number(auth.huntPackMax)>0)out.packMax=Number(auth.huntPackMax);
   if(Number(auth.huntPack)>0)out.pack=Number(auth.huntPack);
   if(auth.huntCat)out.cat=String(auth.huntCat);
+  if(auth.huntGnomprona)out.gnomprona=true;
   return (out.monsters||out.spawnWeights||out.packMin)?out:null;
+}
+/* Hazard level (Gnomprona): a instância usa o MENOR hazard efetivo entre
+ * os membros (mesma regra do crystalserver — points do jogador com menor
+ * nível). efetivo = sel da conta travado ao desbloqueio (p.hazardLevel,
+ * hidratado da conta em applyAccountMissionsToPlayer). */
+function authHazardLevel(auth){
+  const hunt=authHuntDef(auth);
+  if(!hunt||!hunt.gnomprona)return 0;
+  let lvl=null;
+  for(const item of auth.players||[]){
+    const p=item&&item.p;
+    // Todas as contas já começam com hazard 1 desbloqueado.
+    const max=Math.max(1,Math.min(12,Number(p&&p.hazardLevel)||0));
+    const sel=p&&p.hazardSel!==undefined?Number(p.hazardSel):max;
+    const eff=Math.max(0,Math.min(max,Number(sel)||0));
+    lvl=lvl===null?eff:Math.min(lvl,eff);
+  }
+  return Math.max(0,Math.min(12,lvl===null?0:lvl));
+}
+/* Plunder Patriarch (miniboss): hazard<10 → (1%+1%/nível)/10;
+ * ≥10 → (10%+10%/nível)/10 — chance pedida reduzida 10× pelo usuário. */
+function hazardPlunderChance(level){
+  const l=Math.max(0,Math.min(12,Number(level)||0));
+  return Math.min(1,(l<10?0.01+0.01*l:0.1+0.1*l)/10);
 }
 function huntWaveSize(auth){
   const hunt=authHuntDef(auth)||{};
@@ -6448,11 +6752,17 @@ function huntWaveSize(auth){
   const hard=cat==="hard"||cat==="hardcore";
   const minPack=Number(hunt.packMin)||(hard?6:0);
   const maxPack=Number(hunt.packMax)||(hard?(cat==="hardcore"?12:10):0);
-  if(minPack&&maxPack)return minPack+roll(auth,0,maxPack-minPack);
-  return Math.max(1,Number(hunt.pack)||Number(auth&&auth.pack)||3);
+  const base=(minPack&&maxPack)?minPack+roll(auth,0,maxPack-minPack)
+    :Math.max(1,Number(hunt.pack)||Number(auth&&auth.pack)||3);
+  // Gnomprona: 5 base + 1 por hazard level ativo na instância.
+  return base+(hunt.gnomprona?Math.max(0,Math.min(12,Number(auth&&auth.hazardLevel)||0)):0);
 }
 function pickHuntSpawnSlug(auth){
   const hunt=authHuntDef(auth),pool=auth&&auth.spawnPool||[];
+  // Gnomprona: Plunder Patriarch (miniboss) — chance escala com o hazard.
+  if(hunt&&hunt.gnomprona&&monsterDef("plunder-patriarch")&&
+     random(auth)<hazardPlunderChance(auth&&auth.hazardLevel))
+    return "plunder-patriarch";
   const weights=hunt&&hunt.spawnWeights;
   if(weights&&typeof weights==="object"){
     // Inclui os bossMobs da hunt (ex.: 4 mini bosses do Falcon Bastion com
@@ -6494,6 +6804,8 @@ function spawnHuntWave(auth,now,opts){
       }
     }
   }
+  if(hunt&&hunt.gnomprona&&auth.hazardLevel===undefined)
+    auth.hazardLevel=authHazardLevel(auth);
   const living=(auth.mobs||[]).filter((m)=>m&&m.hp>0);
   if(!opts.force&&(living.length||(auth.pendingSpawns&&auth.pendingSpawns.length)))return;
   auth.mobs=living;
@@ -6513,6 +6825,10 @@ function spawnHuntWave(auth,now,opts){
     const isMiniBoss=!!(hunt&&Array.isArray(hunt.bossMobs)&&hunt.bossMobs.indexOf(slug)!==-1);
     const m=makeMob(auth,slug,isMiniBoss,id,null,i);
     if(!m)break;
+    // Gnomprona: monstros comuns viram "hazard monsters" (crit/dodge/
+    // damage boost no combate); o miniboss Plunder não é hazard.
+    if(hunt&&hunt.gnomprona&&!isMiniBoss&&Number(auth.hazardLevel)>0)
+      m.hazard=Math.max(0,Math.min(12,Number(auth.hazardLevel)));
     occupied.add(id);
     auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
   }
@@ -6983,6 +7299,8 @@ function advanceAuthorityMovement(auth,now,opts){
     }
   }
   for(const mob of livingMobs){
+    // noMove: mobs travados no SQM (Annihilator demons) — atacam sem andar.
+    if(mob.noMove)continue;
     const victim=authorityMobTarget(auth,mob);if(!victim)continue;
     // Sem rota (hasFollowPath=false) o Canary não insiste no follow — vagueia
     // / espera retarget. Evita softlock no greedy contra parede.
@@ -7208,7 +7526,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);
@@ -7611,8 +7929,10 @@ function step(auth,now,opts){if(auth.ended)return;
     }
   }
 
+  bloodrottenTick(auth,now);
   /* ---------- ATAQUE DOS MONSTROS (melee + skills) ---------- */
   for(const mob of auth.mobs){
+    if(mob.def?.noAttack)continue;
     mob.attackAcc+=dt;
     let mobHitIdx=0;
     const mobInterval=Math.max(500,Number(mob.attackSpeed)||2000);
@@ -7671,6 +7991,7 @@ function step(auth,now,opts){if(auth.ended)return;
   }
 
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
+  if(auth.ended&&auth.bloodrotten)bloodrottenTick(auth,now);
   if(!auth.ended)for(const mob of auth.mobs||[])if(mob.hp>0)monsterThinkYell(auth,mob,now);
   if(!auth.ended)advanceAuthorityMovement(auth,now,{freezePlayers:!!(opts&&opts.freezeVisual)});
   // Wave clear: agenda AUTH_WAVE_CLEAR_RESPAWN_MS (4s) até o monstro nascer.
@@ -7777,10 +8098,13 @@ function shareInstanceContainers(auth){
   }
 }
 function initializeAuthority(descriptor,instanceId,now){
-  const combat=descriptor.state||{},active=Array.isArray(combat.mobs)?combat.mobs:[];
+  const combat=descriptor.state||{},incoming=Array.isArray(combat.mobs)?combat.mobs:[];
+  const bloodBoss=descriptor.kind==="boss"&&BLOODROTTEN_DATA.bosses.includes(descriptor.bossId);
+  const active=bloodBoss?[Object.assign({},incoming.find((m)=>m?.slug===descriptor.bossId)||combat.arenaBossSpawn?.pending,
+    {slug:descriptor.bossId,boss:true})]:incoming;
   // HARD hunts come in with teleport-blink entries in pendingSpawns. Keep
   // them pending so the Canary 3×/1s preview runs before combat starts.
-  const pendingIn=Array.isArray(combat.pendingSpawns)?combat.pendingSpawns.filter((sp)=>sp&&sp.mob):[];
+  const pendingIn=!bloodBoss&&Array.isArray(combat.pendingSpawns)?combat.pendingSpawns.filter((sp)=>sp&&sp.mob):[];
   const seen=new Set(),visual=active.filter((mob)=>{
     const key=String(mob&&mob.id||mob&&mob.slug||"");if(!key||seen.has(key))return false;seen.add(key);return true;});
   const oldPlayers=Array.isArray(combat.players)?combat.players:[];
@@ -7791,6 +8115,9 @@ function initializeAuthority(descriptor,instanceId,now){
   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",
     worldBoss:!!(descriptor.worldBoss||combat.worldBoss||/^world-boss-wz[123]$/.test(String(descriptor.bossId||""))),
+    /* Bakragore's Burden (Rotten Blood world boss): soma das taints
+     * contribuídas no lobby — o tick escala summons e HP do boss. */
+    bakragoreBurden:Math.max(0,Math.floor(Number(combat.bakragoreBurden)||0)),
     rewardBundleId:combat.rewardBundleId?String(combat.rewardBundleId):null,
     pvp:!!(descriptor.instanceMode==="pvp"),
     wallets:{},
@@ -7951,6 +8278,8 @@ function initializeAuthority(descriptor,instanceId,now){
       item.p.rewardChestBundles=[];
     }
   }
+  // Gnomprona: menor hazard efetivo dos membros define o nível da instância.
+  auth.hazardLevel=authHazardLevel(auth);
   descriptor.authority=auth;return materializeAuthority(descriptor);
 }
 function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;
@@ -8028,7 +8357,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     blocks:Array.isArray(auth.malice.blocks)?auth.malice.blocks.map((b)=>({
       x:Number(b.x)||0,y:Number(b.y)||0,len:Number(b.len)||1})):[]}:null;
   descriptor.state.oberon=auth.oberon?{lives:Number(auth.oberon.lives)||0}:null;
-  descriptor.state.annihilator=auth.annihilator?{phase:String(auth.annihilator.phase||"prep")}:null;
+  descriptor.state.annihilator=auth.annihilator?{phase:String(auth.annihilator.phase||"prep"),leverReady:!!auth.annihilator.leverReady}:null;
   // Echo Raid: portais visíveis + raids armadas (countdown de 60s no tile).
   descriptor.state.echo=auth.echo?{
     portals:(auth.echo.portals||[]).map((po)=>({id:String(po.id||""),slug:String(po.slug||""),
@@ -8082,6 +8411,9 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   // o renderer cai no fallback GRID_W=21 e os floaters saem na posição
   // errada (o grid real pode ser 30x30).
   descriptor.state.gridW=Number(auth.gridW)||30;descriptor.state.gridH=Number(auth.gridH)||30;
+  /* Bakragore's Burden: o tick Bloodrotten no cliente usa o mesmo total
+   * autoritativo para escalar summons (estado online compartilhado). */
+  descriptor.state.bakragoreBurden=Math.max(0,Math.floor(Number(auth.bakragoreBurden)||0));
   descriptor.state.wave=Number(auth.wave)||0;
   descriptor.state.huntMode=auth.huntMode||"";
   descriptor.state.instanceMode=auth.instanceMode||"non-pvp";
@@ -8183,8 +8515,9 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
 }
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
+  annihilatorTick,claimAnnihilatorReward,annihilatorRewardOffer,claimAnnihilatorCart,bloodrottenTick,
   normalizeVisualState,sanitizeHelperPresets,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
-  spawnHuntWave,pickHuntSpawnSlug,openAuthBagYouDesire,
+  spawnHuntWave,pickHuntSpawnSlug,openAuthBagYouDesire,openAuthPrimalBag,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   skillWaveCells,
   bresenhamCells,spellChainPathCells,spellChainVisualPath,
@@ -8219,7 +8552,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   tickAccessoryCharges,tryAccessoryHelper,consumeAccessoryHitCharge,energyRingOn,
   isAutoSupplyStash,addSupplyStash,ensureSupplyStash,isSupplyStashableItem,moveItemToSupplyStash,
   moveItemFromSupplyStash,equipFromSupplyStash,removeSupplyStashCount,creditHuntLoot,
-  equipFromContainerAuth,unequipFromContainerAuth,stashEquippedAuth,authCanAddToBag,autoAmmoForWeaponAuth,
+  equipFromContainerAuth,unequipFromContainerAuth,depotActionAuth,stashEquippedAuth,authCanAddToBag,autoAmmoForWeaponAuth,
   nextComboSpell,playerSpellList,spellValues,spellVisual,absorbIncomingDamage,authorityPlayerTarget,
   authorityMobTarget,authorityMobHasFollowPath,authorityFindPathStep,authorityCellBlocked,
   densestPackTarget,mobClusterDensity,packOpportunity,spellIsMultiHit,runeIsMultiHit,

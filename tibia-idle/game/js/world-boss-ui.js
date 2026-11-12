@@ -252,6 +252,10 @@ function wbEnsurePanelShell() {
         </div>
         <div class="wb-lobby-sub" id="wb-lobby-sub"></div>
         <div class="wb-lobby-slots" id="wb-participants"></div>
+        <div class="wb-burden-row" id="wb-burden-row" style="display:none">
+          <button type="button" class="sm" id="wb-burden-btn">BAKRAGORE'S BURDEN</button>
+          <span class="tiny dim" id="wb-burden-summary"></span>
+        </div>
         <div class="wb-lobby-actions">
           <button type="button" class="sm primary" id="wb-fight-btn" style="display:none">FIGHT</button>
           <button type="button" class="sm" id="wb-toggle-invite-btn" style="display:none">INVITE ON</button>
@@ -277,6 +281,8 @@ function wbEnsurePanelShell() {
   if (toggleInviteBtn) toggleInviteBtn.onclick = (e) => { e.stopPropagation(); wbToggleInvite(); };
   const inviteNameBtn = document.getElementById("wb-invite-name-btn");
   if (inviteNameBtn) inviteNameBtn.onclick = (e) => { e.stopPropagation(); wbInviteByName(); };
+  const burdenBtn = document.getElementById("wb-burden-btn");
+  if (burdenBtn) burdenBtn.onclick = (e) => { e.stopPropagation(); wbOpenBurdenModal(); };
 }
 
 function wbApplyLobbyAccessLock(locked) {
@@ -370,6 +376,20 @@ function wbRenderPanel() {
   if (picker && (!showJoin || joined)) {
     picker.style.display = "none";
     picker.innerHTML = "";
+  }
+
+  /* Bakragore's Burden — modal de taints disponível para TODO membro do
+   * lobby (cada um contribui com as taints que o próprio personagem ganhou). */
+  const burdenRow = document.getElementById("wb-burden-row");
+  const burdenSummary = document.getElementById("wb-burden-summary");
+  const showBurden = !!(ev.burden && ev.burden.enabled && joined && ev.phase === "lobby");
+  if (burdenRow) burdenRow.style.display = showBurden && !WB.panelCollapsed ? "" : "none";
+  if (showBurden && burdenSummary) {
+    const total = Number(ev.burden.total) || 0;
+    const mine = (st.you.taints || []).length;
+    const names = (ev.burden.contributions || [])
+      .map((c) => `${(c.name || "?").slice(0, 12)}:${(c.taints || []).length}`).join(" · ");
+    burdenSummary.textContent = `Taints: ${total} total${mine ? ` (${mine} suas)` : ""}` + (names ? ` — ${names}` : "");
   }
 
   const partEl = document.getElementById("wb-participants");
@@ -573,6 +593,90 @@ async function wbInviteByName() {
     wbRenderPanel();
     wbRenderOverlay();
     if (typeof toast === "function") toast(wbT("wb.inviteSent", "Convite enviado para {name}").replace("{name}", info.name), "ok");
+  } finally { WB.busy = false; }
+}
+
+/* ---- Bakragore's Burden — modal de taints (todo membro contribui) ---- */
+
+function wbBurdenBosses() {
+  const data = typeof BLOODROTTEN !== "undefined" && BLOODROTTEN.burden;
+  return (data && data.bosses) || [
+    { slug: "murcion", name: "Murcion", taint: "Taint of the Jaded Roots" },
+    { slug: "vemiath", name: "Vemiath", taint: "Taint of the Darklight Core" },
+    { slug: "chagorz", name: "Chagorz", taint: "Taint of the Gloom Pillars" },
+    { slug: "ichgahal", name: "Ichgahal", taint: "Taint of the Putrefactory" },
+  ];
+}
+
+function wbBurdenEarned() {
+  const st = WB.state || {};
+  if (st.you && Array.isArray(st.you.earnedTaints) && st.you.earnedTaints.length)
+    return new Set(st.you.earnedTaints);
+  /* Fallback local: bosses com kill registrada no personagem ativo. */
+  const out = new Set(), p = typeof G !== "undefined" && G && G.p;
+  for (const b of wbBurdenBosses())
+    if (p && p.bosses && p.bosses[b.slug] && Number(p.bosses[b.slug].kills) > 0) out.add(b.slug);
+  return out;
+}
+
+function wbOpenBurdenModal() {
+  const st = WB.state, ev = st && st.event;
+  if (!ev || !ev.burden || !ev.burden.enabled || ev.phase !== "lobby") return;
+  const modal = document.getElementById("modal"), body = document.getElementById("modal-body");
+  if (!modal || !body) return;
+  const earned = wbBurdenEarned();
+  const selected = new Set((st.you && st.you.taints) || []);
+  const contributions = (ev.burden.contributions || []).map((c) =>
+    `<div class="shop-row"><span class="info">${(c.name || "?")}</span><b>${(c.taints || []).length} taint(s)</b></div>`).join("")
+    || `<div class="tiny dim">Ninguém contribuiu ainda.</div>`;
+  const rows = wbBurdenBosses().map((b) => {
+    const has = earned.has(b.slug);
+    return `<label class="wb-burden-taint ${has ? "" : "dim"}" style="display:flex;align-items:center;gap:8px;padding:4px 0">
+      <input type="checkbox" value="${b.slug}" ${selected.has(b.slug) ? "checked" : ""} ${has ? "" : "disabled"}>
+      <span><b>${b.taint}</b> <span class="tiny dim">(${b.name}${has ? "" : " — ainda não conquistada"})</span></span>
+    </label>`;
+  }).join("");
+  body.innerHTML = `<div class="panel-title">BAKRAGORE'S BURDEN<button class="sm" id="wb-burden-close">Fechar</button></div>
+    <div class="panel-body">
+      <div class="tiny dim">Cada membro do lobby contribui com as taints que seu personagem conquistou
+        nos bosses da Rotten Blood. Cada taint somada aumenta o desafio: <b>+1 Elder Bloodjaw</b> e
+        <b>+5% de HP</b> do Bakragore (até 8 summons).</div>
+      <div class="hunt-best-title mt8">SUAS TAINTS</div>${rows}
+      <div class="hunt-best-title mt8">CONTRIBUIÇÕES DO LOBBY — total <b id="wb-burden-total">${Number(ev.burden.total) || 0}</b></div>
+      ${contributions}
+      <div class="row mt8" style="gap:6px;justify-content:flex-end">
+        <button type="button" class="sm" id="wb-burden-clear">Limpar</button>
+        <button type="button" class="sm primary" id="wb-burden-save">Confirmar contribuição</button>
+      </div>
+    </div>`;
+  modal.classList.add("show");
+  document.getElementById("wb-burden-close").onclick = () => modal.classList.remove("show");
+  document.getElementById("wb-burden-clear").onclick = () => wbSaveBurden([]);
+  document.getElementById("wb-burden-save").onclick = () => {
+    const taints = Array.from(body.querySelectorAll('input[type="checkbox"]:checked'))
+      .map((i) => String(i.value));
+    wbSaveBurden(taints);
+  };
+}
+
+async function wbSaveBurden(taints) {
+  if (WB.busy) return;
+  WB.busy = true;
+  try {
+    const r = await wbFetch("POST", "/api/world-boss/burden", { taints: taints || [] });
+    if (!r.data || !r.data.ok) {
+      if (typeof toast === "function") toast((r.data && r.data.msg) || "Não foi possível contribuir.", "bad");
+      return;
+    }
+    WB.state = r.data;
+    const modal = document.getElementById("modal");
+    if (modal) modal.classList.remove("show");
+    wbRenderPanel();
+    wbRenderOverlay();
+    const total = WB.state && WB.state.event && WB.state.event.burden
+      ? Number(WB.state.event.burden.total) || 0 : 0;
+    if (typeof toast === "function")
+      toast(`Bakragore's Burden: ${(taints || []).length} taint(s) suas · ${total} no lobby`, "ok");
   } finally { WB.busy = false; }
 }
 

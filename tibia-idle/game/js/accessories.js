@@ -581,6 +581,10 @@ function unequipToContainer(p, slot, dest) {
 function moveItemToBag(p, payload) {
   if (!payload) return false;
   if (payload.source === "depot") {
+    if (typeof persistDepotAction === "function" && typeof accountApiConfigured === "function" && accountApiConfigured()) {
+      persistDepotAction(p, "retrieve", payload.ref);
+      return false;
+    }
     if (typeof depotRetrieve !== "function") return false;
     const r = depotRetrieve(p, payload.ref);
     if (!r || !r.ok) {
@@ -636,6 +640,10 @@ function moveItemToEquip(p, payload, slot) {
   if (!payload) return false;
   if (payload.source === "equip") return false;
   if (payload.source === "depot") {
+    if (typeof persistDepotAction === "function" && typeof accountApiConfigured === "function" && accountApiConfigured()) {
+      persistDepotAction(p, "equip", payload.ref);
+      return false;
+    }
     if (typeof depotEquip !== "function") return false;
     const r = depotEquip(p, payload.ref);
     if (!r || !r.ok) {

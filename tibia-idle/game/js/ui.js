@@ -567,6 +567,7 @@ const SLOT_ORDER = [
 ];
 
 function renderEquip(p) {
+  const view = equipmentPreviewPlayer(p);
   if (typeof ensurePlayerCapacity === "function") ensurePlayerCapacity(p);
   let h = "";
   for (const slot of SLOT_ORDER) {
@@ -583,7 +584,7 @@ function renderEquip(p) {
       </div>`;
       continue;
     }
-    const e = p.equip[slot];
+    const e = view.equip[slot];
     if (e) {
       const cnt = slot === "ammo" ? "∞" : e.count;
       const tierTxt = typeof forgeTierTextForEntry === "function" ? forgeTierTextForEntry(e) : forgeTierText(e.item);
@@ -593,7 +594,7 @@ function renderEquip(p) {
       const glow = (slot === "ring" || slot === "amulet") ? " acc-active" : "";
       const showSlug = (typeof accessoryDisplaySlug === "function")
         ? accessoryDisplaySlug(e.item, true) : e.item;
-      const chg = (typeof accessoryChargesNow === "function") ? accessoryChargesNow(p, slot) : null;
+      const chg = (typeof accessoryChargesNow === "function") ? accessoryChargesNow(view, slot) : null;
       let chgTxt = "";
       if (chg) {
         if (chg.mode === "hits") {
@@ -609,12 +610,12 @@ function renderEquip(p) {
       h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}${glow}" data-slot="${slot}" data-item="${e.item}">
         ${itemImg(showSlug, 0, null, e.count || 1)}${tierTxt ? `<span class="tier-badge ${tierCls}">${tierTxt}</span>` : ""}${chgTxt}
       </div>`;
-    } else if (slot === "shield" && p.equip.weapon &&
+    } else if (slot === "shield" && view.equip.weapon &&
                (p.voc === "knight" || p.voc === "elite knight" || p.voc === "monk") &&
-               (GAMEDATA.items[p.equip.weapon.item] || {}).th) {
+               (GAMEDATA.items[view.equip.weapon.item] || {}).th) {
       // Armas de duas mãos ocupam a mão secundária apenas VISUALMENTE. Não
       // criamos p.equip.shield: logo nenhum atributo/imbuement é aplicado.
-      const weapon = p.equip.weapon.item;
+      const weapon = view.equip.weapon.item;
       h += `<div class="slot two-hand-shadow" data-label="duas mãos" title="Arma de duas mãos — visual no escudo">${itemImg(weapon)}</div>`;
     } else {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
@@ -637,7 +638,7 @@ function renderEquip(p) {
       // local+save continua (bag/equip são do cliente no PUT de cidade).
       if (payload && (payload.source === "pouch" || payload.source === "bag") &&
           typeof persistEquipFromContainer === "function" &&
-          typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          typeof accountApiConfigured === "function" && accountApiConfigured()) {
         persistEquipFromContainer(G.p, payload.slug, payload.source, slotDrop, payload.instId || null);
         return false;
       }
@@ -646,7 +647,7 @@ function renderEquip(p) {
     }
     const slug = el.dataset.item;
     if (!slug) return;
-    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "equip", slug: slug, slot: slotDrop, instId: p.equip[slotDrop] && p.equip[slotDrop].instId ? p.equip[slotDrop].instId : null });
+    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "equip", slug: slug, slot: slotDrop, instId: view.equip[slotDrop] && view.equip[slotDrop].instId ? view.equip[slotDrop].instId : null });
     el.addEventListener("mouseenter", () => {
       const slot = el.dataset.slot;
       const extra = slot === "backpack" ? `${GAMEDATA.items[slug] ? GAMEDATA.items[slug].n : "Bag"} · ${bagSlots(p)} slots` :
@@ -665,6 +666,10 @@ function renderEquip(p) {
       if (slot === "backpack") {
         const bp = p.equip && p.equip.backpack;
         if (!bp || bp.item === "bag") { toast("A bag padrão de 8 slots não pode ser removida."); return; }
+        if (typeof accountApiConfigured === "function" && accountApiConfigured()) {
+          persistUnequipFromContainer(G.p, "backpack", "bag");
+          return;
+        }
         if (typeof unequipToContainer === "function" && unequipToContainer(p, "backpack", "bag")) {
           renderAll();
         }
@@ -673,7 +678,7 @@ function renderEquip(p) {
       if (slot === "ammo") { setActiveAmmo(G.p, null); hideTip(); renderAll(); return; }
       // Instância online: desequip autoritativo (senão o tick restaura o slot).
       if (typeof persistUnequipFromContainer === "function" &&
-          typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          typeof accountApiConfigured === "function" && accountApiConfigured()) {
         persistUnequipFromContainer(G.p, slot, "bag");
         hideTip();
         return;
@@ -780,6 +785,17 @@ function collectConditionBarItems(p) {
       tempo: tempo || "",
     });
   };
+
+  if (typeof gnompronaHazardActive === "function") {
+    const level = gnompronaHazardActive(p);
+    const unlocked = gnompronaHazardUnlock(p);
+    itens.push({
+      icon: "cond-hazard-shield", img: "assets/ui/conditions/cond-hazard-shield.svg",
+      nome: "Hazard Shield — Level " + level, tipo: "neutral", tempo: String(level),
+      desc: "Hazard ativo da conta: " + level + ". Máximo desbloqueado: " + unlocked +
+        ". Compartilhado entre os personagens da conta. Vença The Primal Menace no nível máximo para liberar o próximo.",
+    });
+  }
 
   if (p.conditions) {
     const keys = typeof conditionList === "function" ? conditionList(p) : Object.keys(p.conditions);
@@ -1099,7 +1115,31 @@ function openHuntInfoModal(id) {
   if (hu.floors && hu.floors.length) { openHuntFloorSelection(id); return; }
   const risk = huntRisk(p, hu);
   const modo = G.combat ? G.combat.instanceMode : (p.instanceMode || "non-pvp");
-  const packLabel = (hu.packMin && hu.packMax) ? `${hu.packMin}–${hu.packMax}` : (hu.pack || 3);
+  // Gnomprona: pack = 5 base + 1 por nível de hazard ativo na conta.
+  const hzActive = hu.gnomprona && typeof gnompronaHazardActive === "function"
+    ? gnompronaHazardActive(p) : 0;
+  const packLabel = hu.gnomprona
+    ? `${(hu.pack || 5) + hzActive} (5+hz${hzActive})`
+    : (hu.packMin && hu.packMax) ? `${hu.packMin}–${hu.packMax}` : (hu.pack || 3);
+  // Caixa de HAZARD LEVEL (1–12): números ≤ nível desbloqueado são
+  // clicáveis e definem o hazard ativo da conta (sel).
+  const hazardBox = !hu.gnomprona ? "" : (() => {
+    const unlock = typeof gnompronaHazardUnlock === "function"
+      ? gnompronaHazardUnlock(p) : 0;
+    const nums = [];
+    for (let i = 1; i <= 12; i++) {
+      const cls = i === hzActive ? "on" : (i <= unlock ? "ok" : "lock");
+      nums.push(`<button class="hazard-num ${cls}" data-hazard="${i}" ${
+        i <= unlock ? "" : "disabled"}>${i}</button>`);
+    }
+    return `<div class="hazard-box">
+      <div class="hazard-box-head">
+        <span class="hazard-box-title">HAZARD LEVEL</span>
+        <span class="tiny dim">${unlock ? `nível <b>${hzActive}</b> ativo · desbloqueado até <b>${unlock}</b>` : "derrote The Primal Menace para desbloquear"}</span>
+      </div>
+      <div class="hazard-nums">${nums.join("")}</div>
+    </div>`;
+  })();
 
   const monsterCard = (slug) => {
     const m = GAMEDATA.monsters[slug];
@@ -1152,6 +1192,23 @@ function openHuntInfoModal(id) {
           <span class="tiny dim">Pack: <b>${packLabel}</b> criaturas</span>
           <span class="tiny dim">Respawn: <b>${hu.respawn || 0.8}s</b></span>
         </div>
+        ${hu.gnomprona ? (() => {
+          const unlocked = typeof gnompronaHazardUnlock === "function" ? gnompronaHazardUnlock(p) : 0;
+          const active = typeof gnompronaHazardActive === "function" ? gnompronaHazardActive(p) : 0;
+          const cells = Array.from({ length: 12 }, (_, i) => {
+            const lv = i + 1, ok = lv <= unlocked, sel = lv === active;
+            return `<button type="button" class="sm ${sel ? "primary" : ""}" data-hazard="${lv}"
+              ${ok ? "" : "disabled"} style="min-width:26px;${ok ? "" : "opacity:.35"}">${lv}</button>`;
+          }).join("");
+          const pct = Math.round((typeof gnompronaPlunderChance === "function"
+            ? gnompronaPlunderChance(active) : 0) * 100);
+          return `<div class="panel" style="margin-bottom:8px;padding:8px">
+            <div class="tiny dim mb4">HAZARD LEVEL — ${unlocked}/12 desbloqueado (The Primal Menace libera +1 por kill) · ativo ${active}</div>
+            <div class="row" style="gap:4px;flex-wrap:wrap">${cells}</div>
+            <div class="tiny dim mt4">Pack: 5 + ${active} · chance Plunder Patriarch: ${pct}%</div>
+          </div>`;
+        })() : ""}
+        ${hazardBox}
         <div class="hunt-monsters">${hu.monsters.map(monsterCard).join("")}</div>
       </div>
       <div class="row mt8 huntinfo-actions" style="gap:6px;justify-content:flex-end">
@@ -1167,6 +1224,15 @@ function openHuntInfoModal(id) {
   $("#huntinfo-close").addEventListener("click", close);
   $("#huntinfo-cancel").addEventListener("click", close);
   $("#huntinfo-back").addEventListener("click", () => { openHuntsModal(); });
+  // Hazard level (Gnomprona): clique num número desbloqueado define o
+  // hazard ativo da conta e re-renderiza o modal (pack/plunder mudam).
+  $$("#modal-body [data-hazard]").forEach((el) => {
+    el.addEventListener("click", () => {
+      if (typeof gnompronaSetHazard !== "function") return;
+      gnompronaSetHazard(p, Number(el.dataset.hazard));
+      openHuntInfoModal(id);
+    });
+  });
   // Tooltip dos drops: nome do item + % de chance (mesmo padrão do boss).
   $$("#modal-body [data-hunt-drop]").forEach((el) => {
     const drop = {
@@ -1177,6 +1243,14 @@ function openHuntInfoModal(id) {
       showTip(dropTooltipHtml(el.dataset.huntDrop, hu.name, drop)));
     el.addEventListener("mouseleave", hideTip);
   });
+  /* Gnomprona: células 1–12 da caixa de hazard — níveis desbloqueados
+   * são clicáveis e escolhem o hazard ativo (re-render do modal). */
+  $$("#modal-body [data-hazard]").forEach((b) =>
+    b.addEventListener("click", () => {
+      if (typeof gnompronaSetHazard === "function")
+        gnompronaSetHazard(p, Number(b.dataset.hazard));
+      openHuntInfoModal(id);
+    }));
   if (!soon) {
     $("#huntinfo-go").addEventListener("click", () => { close(); startHunt(id); });
   }
@@ -1280,8 +1354,9 @@ function huntEstimate(p, hu) {
 
 function renderInventory(p) {
   if (typeof ensureItemInstances === "function") ensureItemInstances(p);
-  const slots = bagSlots(p);
-  const instanced = (p.itemInstances || [])
+  const view = equipmentPreviewPlayer(p);
+  const slots = bagSlots(view);
+  const instanced = (view.itemInstances || [])
     .filter((inst) => inst && inst.loc === "bag")
     .sort((a, b) => {
       const A = GAMEDATA.items[a.slug], B = GAMEDATA.items[b.slug];
@@ -1293,13 +1368,13 @@ function renderInventory(p) {
       slug: inst.slug, instId: inst.id, tier: itemInstanceTier(inst), count: 1, instanced: true,
       charges: inst.charges, maxCharges: inst.maxCharges,
     }));
-  const stacked = Object.keys(p.bag)
-    .filter((slug) => (p.bag[slug] || 0) > 0 && !(typeof itemUsesInstances === "function" && itemUsesInstances(slug)))
+  const stacked = Object.keys(view.bag)
+    .filter((slug) => (view.bag[slug] || 0) > 0 && !(typeof itemUsesInstances === "function" && itemUsesInstances(slug)))
     .sort((a, b) => {
       const A = GAMEDATA.items[a], B = GAMEDATA.items[b];
       return (B ? B.sell || 0 : 0) - (A ? A.sell || 0 : 0);
     })
-    .map((slug) => ({ slug: slug, count: p.bag[slug], instanced: false }));
+    .map((slug) => ({ slug: slug, count: view.bag[slug], instanced: false }));
   const entries = instanced.concat(stacked);
   const displaySlots = Math.max(slots, entries.length);
   const cells = [];
@@ -1681,6 +1756,49 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
   const refresh = () => { if (after) after(); else renderAll(); };
   const opts = [{ label: "Detalhes", action: () => openItemDetails(slug, count) }];
 
+  // Primal Bag (Gnomprona): abre e sorteia 1 item do set → Depot.
+  if (slug === "primal-bag") {
+    opts.push({
+      label: "Abrir",
+      hint: "item de Gnomprona aleatório → Depot",
+      action: () => {
+        const openLocal = () => {
+          const depot = Array.isArray(p.depot) ? p.depot : [];
+          if (depot.length >= 30) { toast("Depot cheio (30 slots).", "bad"); return; }
+          const item = typeof gnompronaOpenBag === "function" ? gnompronaOpenBag(p) : null;
+          if (!item) { toast("Não foi possível abrir a bag.", "bad"); return; }
+          if ((p.bag[slug] || 0) <= 1) delete p.bag[slug]; else p.bag[slug]--;
+          addLog("loot", `Abriu <b>Primal Bag</b> e recebeu <b>${itemName(item)}</b> no Depot.`);
+          const bagImg = typeof itemImg === "function" ? itemImg(item, 24) : "";
+          toast(`<span style="display:flex;align-items:center;gap:6px">${bagImg}<span>Primal Bag:<br><b>${itemName(item)}</b> no Depot</span></span>`, "rare");
+          refresh();
+        };
+        // Online: bag/pouch são protegidos no PUT — a bag abre no servidor.
+        if (typeof sessionToken === "function" && sessionToken() && p && p.id &&
+            typeof accountOpenPrimalBag === "function") {
+          accountOpenPrimalBag(sessionToken(), p.id).then((result) => {
+            if (result && result.ok) {
+              if (result.state && typeof applyOnlineAuthorityState === "function")
+                applyOnlineAuthorityState(result.state, null, result.version);
+              else if (result.lootPouch || result.depot) {
+                if (result.lootPouch) p.lootPouch = result.lootPouch || {};
+                if (result.depot) p.depot = result.depot || [];
+              }
+              addLog("loot", `Abriu <b>Primal Bag</b> e recebeu <b>${itemName(result.item)}</b> no Depot.`);
+              const bagImg2 = typeof itemImg === "function" ? itemImg(result.item, 24) : "";
+              toast(`<span style="display:flex;align-items:center;gap:6px">${bagImg2}<span>Primal Bag:<br><b>${itemName(result.item)}</b> no Depot</span></span>`, "rare");
+              refresh();
+            } else {
+              toast((result && result.msg) || "Não foi possível abrir a bag.", "bad");
+            }
+          });
+          return;
+        }
+        openLocal();
+      },
+    });
+  }
+
   if (it.s) {
     opts.push({
       label: it.s === "ammo" ? "Selecionar munição" : "Equipar",
@@ -1838,7 +1956,9 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
 }
 
 /* ---------------------------------------------------------- context menu */
+let CONTEXT_MENU_CLEANUP = null;
 function hideContextMenu() {
+  if (CONTEXT_MENU_CLEANUP) { CONTEXT_MENU_CLEANUP(); CONTEXT_MENU_CLEANUP = null; }
   const el = document.getElementById("ctx-menu");
   if (el) el.remove();
 }
@@ -1866,13 +1986,18 @@ function showContextMenu(x, y, title, options) {
     if (!opt || opt.disabled) return;
     node.addEventListener("click", () => { hideContextMenu(); opt.action(); });
   });
-  setTimeout(() => {
-    document.addEventListener("click", hideContextMenu, { once: true });
-    document.addEventListener("contextmenu", hideContextMenu, { once: true });
-    document.addEventListener("keydown", function esc(ev) {
-      if (ev.key === "Escape") { hideContextMenu(); document.removeEventListener("keydown", esc); }
-    });
+  const esc = (ev) => { if (ev.key === "Escape") hideContextMenu(); };
+  const timer = setTimeout(() => {
+    document.addEventListener("click", hideContextMenu);
+    document.addEventListener("contextmenu", hideContextMenu);
+    document.addEventListener("keydown", esc);
   }, 0);
+  CONTEXT_MENU_CLEANUP = () => {
+    clearTimeout(timer);
+    document.removeEventListener("click", hideContextMenu);
+    document.removeEventListener("contextmenu", hideContextMenu);
+    document.removeEventListener("keydown", esc);
+  };
 }
 
 /* Modal com os atributos completos de um item */
@@ -2216,6 +2341,73 @@ function persistMoveToSupplyStash(p, payload) {
  * Fora do combate o caminho local + save continua. A munição automática por
  * tipo de arma (bow→arrow, crossbow→bolt) é aplicada nos dois caminhos
  * (no online o servidor já faz; aqui o setActiveAmmo persiste pela API). */
+const EQUIPMENT_PREVIEWS = new Map();
+function equipmentPreviewPlayer(p) {
+  const pending = p && EQUIPMENT_PREVIEWS.get(String(p.id));
+  return pending && pending.length ? Object.assign({}, p, pending[pending.length - 1].inventory) : p;
+}
+function beginEquipmentPreview(p, change) {
+  const view = equipmentPreviewPlayer(p);
+  const inventory = JSON.parse(JSON.stringify({ equip: view.equip || {}, bag: view.bag || {},
+    lootPouch: view.lootPouch || {}, supplyStash: view.supplyStash || {}, depot: view.depot || [], itemInstances: view.itemInstances || [] }));
+  const projected = Object.assign({}, p, inventory);
+  if (!change(projected)) return null;
+  const preview = { inventory: { equip: projected.equip, bag: projected.bag, lootPouch: projected.lootPouch,
+    supplyStash: projected.supplyStash, depot: projected.depot, itemInstances: projected.itemInstances } };
+  const key = String(p.id), pending = EQUIPMENT_PREVIEWS.get(key) || [];
+  pending.push(preview);
+  EQUIPMENT_PREVIEWS.set(key, pending);
+  return preview;
+}
+function finishEquipmentPreview(p, preview) {
+  if (!preview) return;
+  const key = String(p.id), pending = (EQUIPMENT_PREVIEWS.get(key) || []).filter((entry) => entry !== preview);
+  if (pending.length) EQUIPMENT_PREVIEWS.set(key, pending);
+  else EQUIPMENT_PREVIEWS.delete(key);
+}
+function renderEquipmentChange(p) {
+  if (typeof G !== "undefined" && G.p && String(G.p.id) !== String(p.id)) return;
+  if (typeof renderEquip === "function") renderEquip(p);
+  if (typeof renderInventory === "function") renderInventory(p);
+}
+function persistDepotAction(p, action, ref, options) {
+  const local = (target) => action === "store" ? depotStore(target, ref, options)
+    : action === "equip" ? depotEquip(target, ref) : depotRetrieve(target, ref);
+  const refresh = () => {
+    if (typeof G !== "undefined" && G.p && String(G.p.id) !== String(p.id)) return;
+    if (typeof renderAll === "function") renderAll();
+    if (typeof document !== "undefined" && document.querySelector("#depot-grid") && typeof openDepotModal === "function") openDepotModal();
+  };
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountDepotAction === "function" && typeof sessionToken === "function" && p && p.id;
+  if (!online) {
+    const result = local(p);
+    if (result.ok && typeof save === "function") save();
+    refresh();
+    if (typeof toast === "function") toast(result.msg, result.ok ? "ok" : "bad");
+    return Promise.resolve(result);
+  }
+  let preview = null;
+  try { preview = beginEquipmentPreview(p, (view) => local(view).ok); } catch (e) {}
+  refresh();
+  return accountDepotAction(sessionToken(), p.id, Object.assign({}, options, { action, ref })).then((result) => {
+    finishEquipmentPreview(p, preview);
+    if (result && result.ok) {
+      if (result.inventory) Object.assign(p, result.inventory);
+      if (result.state && typeof applyOnlineAuthorityState === "function" &&
+          typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat())
+        applyOnlineAuthorityState(result.state, null, result.version);
+    }
+    refresh();
+    if (typeof toast === "function") toast(result && result.msg || (result && result.ok ? "Depot atualizado." : "Não foi possível atualizar o Depot."), result && result.ok ? "ok" : "bad");
+    return result || { ok: false };
+  }).catch(() => {
+    finishEquipmentPreview(p, preview); refresh();
+    if (typeof toast === "function") toast("Não foi possível atualizar o Depot.", "bad");
+    return { ok: false };
+  });
+}
+
 function persistEquipFromContainer(p, slug, source, slot, instId) {
   if (!slug || !slot) { toast("Item/slot inválido para equipar."); return Promise.resolve(false); }
   const inCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
@@ -2226,18 +2418,19 @@ function persistEquipFromContainer(p, slug, source, slot, instId) {
     // a API confirma/persiste (evita o equip "atrasado"/perdido ao trocar de
     // personagem — o PUT comum não persiste pouch/bag protegidos). Em combate
     // a autoridade decide (o tick restaura qualquer preview).
-    let optimistic = false;
-    if (!inCombat && typeof equipItemFromContainer === "function") {
+    let optimistic = null;
+    if (typeof equipItemFromContainer === "function" && slot !== "ammo") {
       try {
-        optimistic = !!equipItemFromContainer(p, slug, source, slot, instId);
-        if (optimistic) {
-          if (typeof autoSelectAmmoForWeapon === "function") autoSelectAmmoForWeapon(p, slug);
-          if (typeof renderAll === "function") renderAll();
-        }
-      } catch (e) { optimistic = false; }
+        optimistic = beginEquipmentPreview(p, (view) => equipItemFromContainer(view, slug, source, slot, instId));
+        if (!optimistic) return Promise.resolve(false);
+        renderEquipmentChange(p);
+      } catch (e) { finishEquipmentPreview(p, optimistic); optimistic = null; }
     }
+    if (instId && !(p.itemInstances || []).some((inst) => String(inst.id) === String(instId))) instId = null;
     return accountEquipItem(sessionToken(), p.id, { slug, source, slot, instId }).then((result) => {
+      finishEquipmentPreview(p, optimistic);
       if (result && result.ok) {
+        if (result.inventory) Object.assign(p, result.inventory);
         if (result.state && typeof applyOnlineAuthorityState === "function" && inCombat) {
           applyOnlineAuthorityState(result.state, null, result.version);
         }
@@ -2263,9 +2456,12 @@ function persistEquipFromContainer(p, slug, source, slot, instId) {
         } catch (e) { /* restauração best-effort */ }
         if (typeof renderAll === "function") renderAll();
       }
+      renderEquipmentChange(p);
       toast((result && result.msg) || "Não foi possível equipar.", "bad");
       return false;
     }).catch(() => {
+      finishEquipmentPreview(p, optimistic);
+      renderEquipmentChange(p);
       toast("Não foi possível equipar.", "bad");
       return false;
     });
@@ -2289,15 +2485,18 @@ function persistUnequipFromContainer(p, slot, dest) {
     typeof accountEquipItem === "function" && typeof sessionToken === "function" && p && p.id;
   if (useAccount) {
     // Preview imediato fora de combate (cidade), igual ao equip.
-    let optimistic = false;
-    if (!inCombat && typeof unequipToContainer === "function") {
+    let optimistic = null;
+    if (typeof unequipToContainer === "function" && slot !== "ammo") {
       try {
-        optimistic = !!unequipToContainer(p, slot, dest || "bag");
-        if (optimistic && typeof renderAll === "function") renderAll();
-      } catch (e) { optimistic = false; }
+        optimistic = beginEquipmentPreview(p, (view) => unequipToContainer(view, slot, dest || "bag"));
+        if (!optimistic) return Promise.resolve(false);
+        renderEquipmentChange(p);
+      } catch (e) { finishEquipmentPreview(p, optimistic); optimistic = null; }
     }
     return accountEquipItem(sessionToken(), p.id, { unequip: true, slot, dest }).then((result) => {
+      finishEquipmentPreview(p, optimistic);
       if (result && result.ok) {
+        if (result.inventory) Object.assign(p, result.inventory);
         if (result.state && typeof applyOnlineAuthorityState === "function" && inCombat) {
           applyOnlineAuthorityState(result.state, null, result.version);
         }
@@ -2318,9 +2517,12 @@ function persistUnequipFromContainer(p, slot, dest) {
         } catch (e) { /* restauração best-effort */ }
         if (typeof renderAll === "function") renderAll();
       }
+      renderEquipmentChange(p);
       toast((result && result.msg) || "Não foi possível desequipar.", "bad");
       return false;
     }).catch(() => {
+      finishEquipmentPreview(p, optimistic);
+      renderEquipmentChange(p);
       toast("Não foi possível desequipar.", "bad");
       return false;
     });
@@ -2337,7 +2539,16 @@ function persistEquipFromSupplyStash(p, slug, slot) {
   const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
     typeof accountEquipFromSupplyStash === "function" && typeof sessionToken === "function" && p.id;
   if (useAccount) {
+    let preview = null;
+    if (typeof equipItemFromContainer === "function") {
+      try {
+        preview = beginEquipmentPreview(p, (view) => equipItemFromContainer(view, slug, "stash", slot));
+        if (!preview) return Promise.resolve({ ok: false });
+        renderEquipmentChange(p);
+      } catch (e) { finishEquipmentPreview(p, preview); preview = null; }
+    }
     return accountEquipFromSupplyStash(sessionToken(), p.id, { slug, slot }).then((result) => {
+      finishEquipmentPreview(p, preview);
       if (result && result.ok) {
         if (result.state && typeof applyOnlineAuthorityState === "function" &&
             typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
@@ -2358,6 +2569,8 @@ function persistEquipFromSupplyStash(p, slug, slot) {
       if (typeof renderAll === "function") renderAll();
       return result || { ok: false };
     }).catch(() => {
+      finishEquipmentPreview(p, preview);
+      renderEquipmentChange(p);
       toast("Não foi possível equipar da Supply Stash.", "bad");
       return { ok: false };
     });
@@ -3002,6 +3215,49 @@ function openPouchItemMenu(p, slug, x, y) {
               addLog("loot", `Abriu <b>Bag You Desire</b> e recebeu <b>${itemName(result.item)}</b> no Depot.`);
               const bagImg2 = typeof itemImg === "function" ? itemImg(result.item, 24) : "";
               toast(`<span style="display:flex;align-items:center;gap:6px">${bagImg2}<span>Bag You Desire:<br><b>${itemName(result.item)}</b> no Depot</span></span>`, "rare");
+              renderAll();
+            } else {
+              toast((result && result.msg) || "Não foi possível abrir a bag.", "bad");
+            }
+          });
+          return;
+        }
+        openLocal();
+      },
+    }] : []),
+    ...(slug === "primal-bag" ? [{
+      label: "Abrir",
+      hint: "item de Gnomprona aleatório → Depot",
+      action: () => {
+        const openLocal = () => {
+          const depot = Array.isArray(p.depot) ? p.depot : [];
+          if (depot.length >= 30) { toast("Depot cheio (30 slots).", "bad"); return; }
+          const item = typeof gnompronaOpenBag === "function" ? gnompronaOpenBag(p) : null;
+          if (!item) { toast("Não foi possível abrir a bag.", "bad"); return; }
+          // A bag pode estar na mochila (recompensa de missão/marco) ou na pouch.
+          if ((p.bag && p.bag[slug] || 0) > 0) {
+            if (p.bag[slug] <= 1) delete p.bag[slug]; else p.bag[slug]--;
+          } else {
+            removeLootPouch(p, slug, 1);
+          }
+          addLog("loot", `Abriu <b>Primal Bag</b> e recebeu <b>${itemName(item)}</b> no Depot.`);
+          const bagImg = typeof itemImg === "function" ? itemImg(item, 24) : "";
+          toast(`<span style="display:flex;align-items:center;gap:6px">${bagImg}<span>Primal Bag:<br><b>${itemName(item)}</b> no Depot</span></span>`, "rare");
+          renderAll();
+        };
+        if (typeof sessionToken === "function" && sessionToken() && p && p.id &&
+            typeof accountOpenPrimalBag === "function") {
+          accountOpenPrimalBag(sessionToken(), p.id).then((result) => {
+            if (result && result.ok) {
+              if (result.state && typeof applyOnlineAuthorityState === "function")
+                applyOnlineAuthorityState(result.state, null, result.version);
+              else if (result.lootPouch) {
+                p.lootPouch = result.lootPouch || {};
+                if (result.depot) p.depot = result.depot || [];
+              }
+              addLog("loot", `Abriu <b>Primal Bag</b> e recebeu <b>${itemName(result.item)}</b> no Depot.`);
+              const bagImg2 = typeof itemImg === "function" ? itemImg(result.item, 24) : "";
+              toast(`<span style="display:flex;align-items:center;gap:6px">${bagImg2}<span>Primal Bag:<br><b>${itemName(result.item)}</b> no Depot</span></span>`, "rare");
               renderAll();
             } else {
               toast((result && result.msg) || "Não foi possível abrir a bag.", "bad");
@@ -3791,7 +4047,7 @@ function renderHelper(p) {
       ${challengeHtml}
       ${renderBuffPicker(p)}
       ${renderHastePicker(p)}
-      <div class="small mb4 mt8" style="color:#d4af37;font-weight:bold"><img src="assets/ui/echo-raid-portal.gif" width="22" height="22" style="vertical-align:middle;margin-right:4px" alt="">Echo Raid</div>
+      <div class="small mb4 mt8" style="color:#d4af37;font-weight:bold"><img src="assets/ui/echo-raid-portal.gif" width="30" height="30" style="vertical-align:middle;margin-right:5px" alt="">Echo Raid${G.combat && G.combat.echo && G.combat.echo.portals && G.combat.echo.portals.length ? ` <span class="tiny" style="color:#9ce84a;font-weight:normal">— portal ATIVO em (${G.combat.echo.portals[0].cx},${G.combat.echo.portals[0].cy})${p.config.echoRaid ? " — pisando" : ""}</span>` : ""}</div>
       <div class="row wrap" style="gap:8px;align-items:center">
         <label class="row" style="gap:6px;align-items:center;cursor:pointer" title="Se ativo, o personagem pisa no portal da Echo Raid para ativá-la">
           <input type="checkbox" id="helper-echo-raid" ${p.config.echoRaid ? "checked" : ""}>

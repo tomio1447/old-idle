@@ -137,6 +137,7 @@ function huntMapFromOtbmAsync(hunt, done) {
       // somente a atualização visual pertence à geração que iniciou a carga.
       reportGuarded("Montando mapa", 12);
       let mapa = OTBM.read(buf, { z: hunt.otbmFloor });
+      if (hunt.otbm === "annihilator" && typeof ANNIHILATOR !== "undefined") ANNIHILATOR.prepareMap(mapa);
       if (hunt.otbmBounds && typeof OTBM.crop === "function") mapa = OTBM.crop(mapa, hunt.otbmBounds);
       applyHuntOtbmZones(mapa, hunt);
       // Alguns itens 2×2 da borda extrapolam visualmente seu SQM. O offset
@@ -149,6 +150,7 @@ function huntMapFromOtbmAsync(hunt, done) {
       mapa.idleFovHeight = Number(hunt.otbmFovHeight) || 0;
       const hm = OTBM.huntMapFromOtbm(mapa,
         (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {});
+      if (hm && hunt.noFovBound) hm.noFovBound = true;
       // Pisos funcionais da hunt (ex.: annihilator): ids de chão marcados
       // como bloqueio no .dat liberam a célula — mesmo passe do servidor
       // (questMapBlockedCells), senão o movimento local trava o mapa inteiro.

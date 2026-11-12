@@ -61,6 +61,13 @@ const NPC_MODAL_CATALOG = [
     sprite: "sweaty-cyclops",
     desc: "Funde itens em materiais de forja e mais — troca instantânea.",
   },
+  {
+    shop: "coco",
+    name: "Coco",
+    role: "Trocas de Candia",
+    sprite: "coco",
+    desc: "Troca Dark/Milk Chocolate Coins por equipamentos de Candia.",
+  },
 ];
 
 /* Serviços do templo (Cyclopedia CIDADE) — modal paralelo ao NPCS. */
@@ -116,7 +123,7 @@ const CITY_MODAL_SHELLS = [
   "npcs-modal-shell", "npc-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
   "hunts-modal-shell", "bosses-modal-shell", "boss-modal-shell", "reward-modal-shell",
   "social-modal-shell", "calendar-modal-shell", "chard-modal-shell",
-  "lootcfg-modal-shell",
+  "lootcfg-modal-shell", "depot-modal-shell",
 ];
 
 const RANKING_TABS = [
@@ -919,20 +926,28 @@ function npcSweatyHtml(p) {
 function npcTokenBarter(p, shopId) {
   if (typeof ensureNpcShopItems === "function") ensureNpcShopItems();
   const shop = typeof npcShopDef === "function" ? npcShopDef(shopId) : null;
-  const token = (shop && shop.currency) || "major-crystalline-token";
-  const have = typeof bagTokenCount === "function" ? bagTokenCount(p, token) : ((p.bag && p.bag[token]) || 0);
+  /* Lojas multi-moeda (Coco): currencies = [moeda1, moeda2] — cada oferta
+   * ganha um botão por moeda, o jogador escolhe com qual pagar. */
+  const currencies = Array.isArray(shop && shop.currencies) && shop.currencies.length
+    ? shop.currencies
+    : [(shop && shop.currency) || "major-crystalline-token"];
+  const token = currencies[0];
+  const haveOf = (tok) => typeof bagTokenCount === "function"
+    ? bagTokenCount(p, tok) : ((p.bag && p.bag[tok]) || 0);
   const tokenName = typeof itemName === "function" ? itemName(token) : token;
   const items = (shop && shop.items) || [];
 
-  const costBtn = (cost, can, extraAttr, disabled) =>
-    `<button class="sm npc-barter-btn ${can ? "primary" : ""}" data-npc-barter="${extraAttr}"
-      data-shop="${shopId}" ${disabled ? "disabled" : ""}>
-      <span class="npc-barter-qty">${fmtFull(cost)}</span>${itemImg(token, 16, "npc-barter-token")}
+  const costBtn = (cost, can, extraAttr, disabled) => currencies.map((tok) => {
+    const canTok = can && haveOf(tok) >= cost;
+    return `<button class="sm npc-barter-btn ${canTok ? "primary" : ""}" data-npc-barter="${extraAttr}"
+      data-shop="${shopId}" data-currency="${tok}" ${disabled || !canTok ? "disabled" : ""}>
+      <span class="npc-barter-qty">${fmtFull(cost)}</span>${itemImg(tok, 16, "npc-barter-token")}
     </button>`;
+  }).join("");
 
   const rows = items.map((e, idx) => {
     const cost = e.cost || 0;
-    const can = have >= cost;
+    const can = currencies.some((tok) => haveOf(tok) >= cost);
     if (e.kind === "outfit") {
       const oid = typeof npcOutfitIdForPlayer === "function"
         ? npcOutfitIdForPlayer(p, e.outfitBase) : null;
@@ -960,9 +975,9 @@ function npcTokenBarter(p, shopId) {
     <div class="row mb8" style="justify-content:space-between;align-items:center">
       <span class="small dim">${typeof t === "function" ? t("npc.tokensInBag") : "Tokens na backpack"}</span>
       <span class="row" style="gap:6px;align-items:center">
-        ${itemImg(token, 22)}
-        <b class="gold-txt">${fmtFull(have)}</b>
-        <span class="tiny dim">${tokenName}</span>
+        ${currencies.map((tok) =>
+          `${itemImg(tok, 22)}<b class="gold-txt">${fmtFull(haveOf(tok))}</b>`).join("")}
+        <span class="tiny dim">${currencies.length > 1 ? "(qualquer uma)" : tokenName}</span>
       </span>
     </div>
     <div class="tiny dim mb8">${typeof t === "function" ? t("npc.tokenBarterHint") : "Trocas só com tokens da backpack (não da pouch)."}</div>
@@ -1452,7 +1467,7 @@ function bindNpc(id, type) {
       const idx = parseInt(b.dataset.npcBarter, 10);
       const shopId = b.dataset.shop;
       const r = typeof exchangeNpcBarter === "function"
-        ? exchangeNpcBarter(p, shopId, idx)
+        ? exchangeNpcBarter(p, shopId, idx, b.dataset.currency || null)
         : { ok: false, msg: "Troca indisponível." };
       if (!r.ok) { toast(r.msg); return; }
       toast(r.msg, "level");

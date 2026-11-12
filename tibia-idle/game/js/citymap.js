@@ -176,6 +176,7 @@ const TEMPLE_REMOVED_NPC_POSITIONS = [
 const TEMPLE_SERVICE_NPC_OFFSETS = {
   enpa: { dx: -3, dy: -1 },
   gnomally: { dx: 3, dy: -1 },
+  coco: { dx: 0, dy: 2 },
 };
 
 function templeFindWalkableNear(tx, ty) {

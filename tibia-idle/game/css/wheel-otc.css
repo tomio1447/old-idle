@@ -62,7 +62,7 @@
 }
 .wn-med {
   position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%,-50%);
+  transform: translate(-50%,-50%) scale(1.35);
   width: 30px; height: 30px;
   background-image: url('../assets/wheel/icons-skillwheel-mediumperks.png');
   background-size: 1470px 30px; background-repeat: no-repeat;
@@ -70,7 +70,7 @@
 }
 .wn-small {
   position: absolute; width: 16px; height: 16px;
-  transform: translate(-50%,-50%);
+  transform: translate(-50%,-50%) scale(1.35);
   background-image: url('../assets/wheel/icons-skillwheel-smallperks.png');
   background-size: 208px 16px; background-repeat: no-repeat;
   image-rendering: pixelated; pointer-events: none;

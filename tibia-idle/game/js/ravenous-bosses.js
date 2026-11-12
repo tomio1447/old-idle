@@ -61,7 +61,7 @@ const RAVENOUS_ITEMS = {
   "werehyaena-nose":            { n: "werehyaena nose",            s: null, t: "loot", w: 1.0,  cid: 33943, sell: 220,   npcSell: 220 },
   "katex-blood":                { n: "katex' blood",             s: null, t: "loot", w: 0.7,  cid: 34100, sell: 210,   npcSell: 210 },
   "werehyaena-talisman":        { n: "werehyaena talisman",        s: null, t: "loot", w: 0.8,  cid: 33944, sell: 350,   npcSell: 350 },
-  "werehyaena-trophy":          { n: "werehyaena trophy",          s: null, t: "loot", w: 5.0,  cid: 34219, sell: 0,     npcSell: 0 },
+  "werehyaena-trophy":          { n: "werehyaena trophy",          s: null, t: "loot", w: 5.0,  cid: 34219, sell: 12000, npcSell: 12000 },
   "moonlight-crystals":         { n: "moonlight crystals",         s: null, t: "loot", w: 4.0,  cid: 22083, sell: 0,     npcSell: 0 },
   "red-silk-flower":            { n: "red silk flower",            s: null, t: "loot", w: 3.0,  cid: 34258, sell: 0,     npcSell: 0 },
   "raw-watermelon-tourmaline":  { n: "raw watermelon tourmaline",  s: null, t: "loot", w: 1.5,  cid: 33778, sell: 0,     npcSell: 0 },

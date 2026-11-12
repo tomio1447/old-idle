@@ -48,10 +48,10 @@ const {
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
   sanitizeHelperPresets, advanceTrainingPlayer, staminaRegenPlayer,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
-  sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, setAuthAutoSupplyStash, setAuthLootConfig,
+  sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, openAuthPrimalBag, claimAnnihilatorReward, annihilatorRewardOffer, claimAnnihilatorCart, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
   destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authAddItemToBag,
-  equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
+  equipFromContainerAuth, unequipFromContainerAuth, depotActionAuth } = require("./authoritative_engine");
 const { forgeCanFuse, forgeFuseAuth } = require("./forge");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const { createQuestController, QUEST_DEFS } = require("./quest_controller");
@@ -390,6 +390,38 @@ async function updateAccountMissions(db,body){
     if(typeof db._save==="function")db._save();
   }
   return {code:200,body:{ok:true,missions:mergedMissions,missionsDone:mergedDone}};
+}
+/* Hazard level (Gnomprona, por CONTA): espelhado em
+ * accounts.cosmetics.hazard = {kills, level, sel}. Merge: kills/level
+ * sobem por max (desbloqueio via kill do The Primal Menace); sel = a
+ * escolha do cliente travada ao nível desbloqueado (cap 12). */
+async function updateAccountHazard(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const inc=body.hazard&&typeof body.hazard==="object"?body.hazard:{};
+  const prior=(()=>{try{
+    const cos=typeof acc.cosmetics==="string"?JSON.parse(acc.cosmetics):(acc.cosmetics||{});
+    const h=cos&&cos.hazard&&typeof cos.hazard==="object"?cos.hazard:{};
+    return {kills:Math.max(0,Math.floor(Number(h.kills)||0)),
+      level:Math.max(0,Math.floor(Number(h.level)||0)),
+      sel:Math.max(0,Math.floor(Number(h.sel)||0))};
+  }catch(e){return {kills:0,level:0,sel:0};}})();
+  const kills=Math.min(9999,Math.max(prior.kills,
+    Math.floor(Number(inc.kills)||0),Math.floor(Number(inc.killsDelta)||0)+prior.kills));
+  // Todas as contas começam com hazard 1 desbloqueado.
+  const level=Math.max(1,Math.min(12,Math.max(prior.level,
+    Math.floor(Number(inc.level)||0))));
+  const sel=Math.max(1,Math.min(level,inc.sel!==undefined
+    ?Math.floor(Number(inc.sel)||0):Math.max(1,prior.sel)));
+  const hazard={kills,level,sel};
+  if(typeof db.setAccountHazard==="function")await db.setAccountHazard(acc.id,hazard);
+  else{try{
+    const cos=typeof acc.cosmetics==="string"?JSON.parse(acc.cosmetics):(acc.cosmetics||{});
+    cos.hazard=hazard;acc.cosmetics=cos;
+    if(typeof db.setAccountCosmetics==="function")await db.setAccountCosmetics(acc.id,cos);
+    else if(typeof db._save==="function")db._save();
+  }catch(e){}}
+  return {code:200,body:{ok:true,hazard}};
 }
 async function updateAccountTutorial(db,body){
   const acc=await db.findAccountByToken(body.token);
@@ -1535,17 +1567,16 @@ async function syncCityWallet(db,acc,p){
 }
 async function persistClaimedPlayer(db,acc,character,p,lease,claimedCount){
   await syncCityWallet(db,acc,p);
-  // Inventário da conta: operações de cidade mudam o shared (pouch/depot/
-  // reward); o save do personagem vira mirror do shared.
-  let sharedInventory=null;
-  if(SharedInv&&typeof db.accountSharedInventory==="function")
-    sharedInventory=await splitSharedInventory(db,acc,p,true);
+
   const result=await db.saveCharactersVersioned(acc.id,[{
     id:Number(character.id),expectedVersion:Number(character.save_version),voc:character.voc,
     level:Math.max(1,Number(p.level)||Number(character.level)||1),data:JSON.stringify(p),
     extra:{hp:Math.max(0,Number(p.hp)||0),mp:Math.max(0,Number(p.mp)||0)},
   }],lease);
   if(!result.ok)return saveConflictResponse(result,acc);
+  let sharedInventory=null;
+  if(SharedInv&&typeof db.accountSharedInventory==="function")
+    sharedInventory=await splitSharedInventory(db,acc,p,true);
   const updated=result.characters[0];
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"reward-claim",updated,false);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"reward-claim"});
@@ -2067,6 +2098,11 @@ async function prepareInstanceState(db,acc,input){
   if(!kind||(kind==="hunt"&&!idPattern.test(huntId||""))||(kind==="boss"&&!idPattern.test(bossId||""))
     ||(kind==="quest"&&!idPattern.test(bossId||"")))
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_KIND",msg:"Hunt/boss inválido"}}};
+  const bloodrottenBosses=require("../game/js/bloodrotten").bosses;
+  const bloodrottenBossId=bossId&&bloodrottenBosses.includes(bossId)?bossId:
+    (huntId&&bloodrottenBosses.includes(String(huntId).replace(/-room$/,""))?String(huntId).replace(/-room$/,""):null);
+  if(bloodrottenBossId&&(kind!=="boss"||bossId!==bloodrottenBossId))
+    return {error:{code:400,body:{ok:false,error:"INVALID_BLOODROTTEN_INSTANCE",msg:"Bosses da Bloodrotten devem ser enfrentados em sua instância de boss."}}};
   let mode=["non-pvp","pvp","boss","quest"].includes(String(input.instanceMode))?String(input.instanceMode):
     (kind==="boss"?"boss":kind==="quest"?"quest":"non-pvp");
   // Idle: non-pvp e pvp são instâncias distintas. Após criar, o modo fica
@@ -2165,6 +2201,16 @@ async function prepareInstanceState(db,acc,input){
   let ids=members.map((member)=>Number(member&&member.id));
   if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros duplicados ou inválidos"}}};
+  /* Bakragore é exclusivo do lobby de World Boss (Rotten Blood): um PUT
+   * direto de instância boss fora do roster compartilhado não cria a sala. */
+  if(bossId==="bakragore"){
+    const wbCtrlB=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
+    const wbShareB=wbCtrlB&&typeof wbCtrlB.sharedForAccount==="function"?wbCtrlB.sharedForAccount(acc.id):null;
+    const wbIdsB=wbCtrlB&&typeof wbCtrlB.joinedCharIds==="function"?new Set(wbCtrlB.joinedCharIds().map(Number)):null;
+    const bakragoreOk=!!(wbShareB&&wbIdsB&&wbIdsB.size&&ids.every((id)=>wbIdsB.has(Number(id))));
+    if(!bakragoreOk)return {error:{code:403,body:{ok:false,error:"WORLD_BOSS_LOBBY_REQUIRED",
+      msg:"Bakragore só pode ser enfrentado pelo lobby de World Boss."}}};
+  }
   const activeId=Number(input.activeCharacterId);
   if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
   // Party/ordem ANTES da hidratação (o rebuild de tolerância abaixo adiciona
@@ -2217,6 +2263,8 @@ async function prepareInstanceState(db,acc,input){
       if(typeof db.migrateAccountGold==="function")ownerAcc=await db.migrateAccountGold(c.account_id)||ownerAcc;
       accountCache.set(Number(c.account_id),ownerAcc);
     }
+    const bloodrottenReason=require("../game/js/bloodrotten").accessError(bloodrottenBossId||bossId,c.level);
+    if(bloodrottenReason)return {error:{code:403,body:{ok:false,error:"BLOODROTTEN_LEVEL_REQUIRED",msg:c.name+": "+bloodrottenReason}}};
     const grimvaleBosses=require("../game/js/grimvale-bosses");
     if(grimvaleBosses.ids.some((slug)=>bossId===slug||huntId==="grimvale-"+slug+"-room")){
       const reason=grimvaleBosses.accessError(ownerAcc,c.level);
@@ -2394,6 +2442,30 @@ async function prepareInstanceState(db,acc,input){
     party_version:partyVersion,member_ids:ids,active_character_id:activeId,
     saved_at:new Date(now),started_at:new Date(now)}};
 }
+/* Colisão OTBM para warzones com sala real (Bakragore). Mesma lógica do
+ * questMapBlockedCells: crop nos bounds e `x:y` local → true quando o tile
+ * bloqueia (paredes/deco) ou o footprint está proibido. */
+let _wbTileFlags=null;
+function worldBossMapBlockedCells(wz){
+  try{
+    if(!_wbTileFlags){
+      const sandbox={window:{}};sandbox.window=sandbox;vm.createContext(sandbox);
+      vm.runInContext(fs.readFileSync(path.join(STATIC_DIR,"js","tileflags.js"),"utf8"),sandbox);
+      _wbTileFlags=sandbox.TILEFLAGS||{};
+    }
+    const OTBM=require(path.join(STATIC_DIR,"js","otbm.js"));
+    const bytes=fs.readFileSync(path.join(STATIC_DIR,"maps",wz.otbm+".otbm"));
+    let parsed=OTBM.read(bytes,{z:wz.otbmFloor});
+    const crop=wz.otbmFovBounds||wz.otbmBounds;
+    if(crop)parsed=OTBM.crop(parsed,crop);
+    const map=OTBM.huntMapFromOtbm(parsed,_wbTileFlags),blocked={};
+    for(let y=0;y<map.rows.length;y++)for(let x=0;x<map.rows[y].length;x++){
+      const legend=map.leg[map.rows[y][x]];
+      if(!legend||legend.bloc||map.footprintBlocked&&map.footprintBlocked[x+":"+y])blocked[x+":"+y]=true;
+    }
+    return blocked;
+  }catch(error){console.error("[world-boss] map collision",error&&error.message);return null;}
+}
 async function createWorldBossSharedInstance(db,event){
   if(!event||!event.joins||!event.joins.size)return {ok:false,error:"NO_JOINS"};
   const wz=WARZONES.find((w)=>w.id===event.warzoneId)||WARZONES[0];
@@ -2434,12 +2506,18 @@ async function createWorldBossSharedInstance(db,event){
   if(!members.length)return {ok:false,error:"NO_MEMBERS"};
   const bossHp=Math.max(1,Number(event.bossMaxHp||wz.bossHp)||2500000);
   const slug=wz.baseMonster||wz.bossSprite||"deathstrike";
+  const blockedCells=wz.otbm?worldBossMapBlockedCells(wz):null;
   const descriptor={
     v:1,kind:"boss",huntId:null,bossId,instanceMode:"boss",worldBoss:true,
     activeCharacterId:String(members[0].id),members,
     state:{
       worldBoss:true,instanceMode:"boss",gridW,gridH,huntId:null,
       rewardBundleId:"world-boss-"+event.id,
+      blockedCells:blockedCells||undefined,
+      /* Bakragore's Burden: soma das taints contribuídas pelos membros.
+       * initializeAuthority copia para auth.bakragoreBurden e o tick
+       * Bloodrotten escala summons/HP. */
+      bakragoreBurden:Math.max(0,Math.floor(Number(event.burdenTotal)||0)),
       raidEnabled:false,influencedChance:0,fiendishChance:0,players,
       mobs:[{
         slug,boss:true,worldBoss:true,id:"boss-"+bossId,
@@ -2817,7 +2895,11 @@ async function clearInstanceLootPouch(db,body){
  * na cidade grava o personagem (lootPouch é protected no PUT comum). */
 
 /** Abre a Bag You Desire com persistência autoritativa (instância ou cidade). */
-async function openBagYouDesire(db, body) {
+async function openBagYouDesire(db, body, opts) {
+  opts=opts||{};
+  const bagSlug=String(opts.slug||"bag-you-desire");
+  const openFn=typeof opts.openFn==="function"?opts.openFn:openAuthBagYouDesire;
+  const bagName=String(opts.name||"Bag You Desire");
   const acc = await db.findAccountByToken(body.token); if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const denied = await requireLease(db, acc, body); if (denied) return denied;
   const charId = Number(body.char_id);
@@ -2841,21 +2923,21 @@ async function openBagYouDesire(db, body) {
       const entry = descriptor.authority && descriptor.authority.players &&
         descriptor.authority.players.find((en) => String(en.id) === String(charId));
       if (!entry || !entry.p) { rejection = "Personagem não participa desta instância"; return null; }
-      const r = openAuthBagYouDesire(entry.p);
+      const r = openFn(entry.p);
       if (!r.ok) { rejection = r.msg; return null; }
       item = r.item;
       descriptor = materializeAuthority(descriptor); return JSON.stringify(descriptor);
     }, lease);
     if (!result.ok) return { code: result.error === "LEASE_REQUIRED" ? 423 : result.error === "INSTANCE_PATCH_REJECTED" ? 400 : 409,
-      body: { ok: false, error: result.error, msg: rejection || "Não foi possível abrir a Bag You Desire",
+      body: { ok: false, error: result.error, msg: rejection || ("Não foi possível abrir a "+bagName),
         instance: instanceSummary(result.instance, true) } };
     await publishInstanceForRow(db, result.instance, { id: result.instance.instance_id, version: Number(result.instance.version),
-      status: result.instance.status, source: "bag-you-desire", holderId: String(body.holder_id || "") });
+      status: result.instance.status, source: bagSlug, holderId: String(body.holder_id || "") });
     return { code: 200, body: { ok: true, item: item, instance: instanceSummary(result.instance, true) } };
   }
   let p = character.data; if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { p = {}; } }
   p = p && typeof p === "object" && !Array.isArray(p) ? cloneJson(p) : {};
-  const r = openAuthBagYouDesire(p);
+  const r = openFn(p);
   if (!r.ok) return { code: 400, body: { ok: false, error: "BAG_OPEN_FAILED", msg: r.msg } };
   const persisted = await persistClaimedPlayer(db, acc, character, p, lease);
   if (persisted.code !== 200) return persisted;
@@ -3027,8 +3109,8 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
   if(!sellerAcc)return null;
   const deltaOf=(pre,post)=>{
     const out={};
-    for(const slug of Object.keys(pre||{})){
-      const d=(Number(post&&post[slug])||0)-(Number(pre[slug])||0);
+    for(const slug of new Set([...Object.keys(pre||{}),...Object.keys(post||{})])){
+      const d=(Number(post&&post[slug])||0)-(Number(pre&&pre[slug])||0);
       if(d)out[slug]=d;
     }
     return out;
@@ -3058,6 +3140,7 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
   }
   const finalPouch=Object.assign({},live.p.lootPouch||{});
   const finalBag=Object.assign({},live.p.bag||{});
+  const finalDepot=Array.isArray(preSnapshot.depot)?(seller.p.depot||[]).slice():null;
   // Instâncias compartilhadas (bag/depot): a fonte da mutação é a cópia do
   // executor (pode ter ganho instâncias novas ao mover para a mochila).
   const finalInsts=(Array.isArray(seller.p.itemInstances)?seller.p.itemInstances:[])
@@ -3073,6 +3156,7 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
     live.p.supplyStash=live.p.supplyStash||{};
     entry.p.lootPouch=live.p.lootPouch;
     entry.p.bag=live.p.bag;
+    if(finalDepot)entry.p.depot=finalDepot;
     if(entry.p.supplyStash!==live.p.supplyStash){
       // Stashes legadas por personagem podem divergir: une por máximo antes
       // de unificar a referência (mesma regra do shareInstanceContainers).
@@ -3091,7 +3175,8 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
      * descontar de novo o que já foi gravado no shared. */
     entry.p._pouchBase=Object.assign({},finalPouch);
   }
-  return {pouch:finalPouch,bag:finalBag,supplyStash:Object.assign({},live.p.supplyStash||{}),instances:finalInsts};
+  return {pouch:finalPouch,bag:finalBag,supplyStash:Object.assign({},live.p.supplyStash||{}),instances:finalInsts,
+    ...(finalDepot?{depot:finalDepot}:{})};
 }
 
 /* Grava o resultado sincronizado de uma mutação de pouch no shared da conta
@@ -3105,6 +3190,7 @@ async function persistSharedPouchSync(db,acc,synced){
     const shared=await db.accountSharedInventory(acc.id);
     shared.lootPouch=Object.assign({},synced.pouch||{});
     if(synced.bag)shared.bag=Object.assign({},synced.bag||{});
+    if(Array.isArray(synced.depot))shared.depot=synced.depot.slice();
     if(synced.supplyStash)shared.supplyStash=Object.assign({},synced.supplyStash);
     if(Array.isArray(synced.instances))
       shared.itemInstances=synced.instances.map((i)=>Object.assign({},i));
@@ -3227,6 +3313,48 @@ async function sellBagItems(db,body){
 
 /** Move bag/pouch → Supply Stash (autoritativo). Em combate usa a instância;
  * fora dela grava o personagem (lootPouch/supplyStash são protected no PUT comum). */
+/* Alavanca da Annihilator: marca p.annihilatorLever nos players da
+ * instância; o tick consome o flag e dispara teleporte + 6 demons (o
+ * visual_state do checkpoint não carrega campos arbitrários). */
+async function annihilatorLeverPull(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+    return {code:400,body:{ok:false,error:"INVALID_ANNIHILATOR_LEVER",msg:"Alavanca inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))return {code:403,body:{ok:false,msg:"Personagem não pertence à conta"}};
+  const previousClaims=[];
+  if(body.reward||body.preview||body.quantities!==undefined)for(const c of await db.charactersOf(acc.id)){
+    let p=c.data;try{if(typeof p==="string")p=JSON.parse(p);}catch(e){p=null;}
+    if(p?.quests?.annihilator?.completed)previousClaims.push(String(c.id));
+  }
+  let rejection=null,claimed=null;
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
+    return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+  if(body.preview===true){
+    let descriptor;try{descriptor=typeof row.state==="string"?JSON.parse(row.state):cloneJson(row.state);}catch(e){return {code:400,body:{ok:false,msg:"Instância inválida"}};}
+    const offer=annihilatorRewardOffer(descriptor.authority,charId,previousClaims);
+    return {code:offer.ok?200:409,body:{...offer,instance:instanceSummary(row,true)}};
+  }
+  const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+    let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+    if(descriptor.authority?.questId!=="annihilator"||!descriptor.authority.players?.some((p)=>String(p.id)===String(charId)))return null;
+    if(body.quantities!==undefined||body.reward){
+      claimed=body.quantities!==undefined?claimAnnihilatorCart(descriptor.authority,charId,body.quantities,previousClaims):
+        claimAnnihilatorReward(descriptor.authority,charId,String(body.reward),previousClaims);
+      if(!claimed.ok){rejection=claimed.msg;return null;}
+    }else for(const pl of descriptor.authority.players)if(pl&&pl.p)pl.p.annihilatorLever=true;
+    descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+  },lease);
+  if(!result.ok)return {code:409,body:{ok:false,error:result.error,msg:rejection||"Não foi possível interagir com a Annihilator",instance:instanceSummary(result.instance,true)}};
+  await publishInstanceForRow(db,result.instance,{id:instanceId,version:Number(result.instance.version),status:result.instance.status,source:"annihilator-chest",holderId:String(body.holder_id||"")});
+  return {code:200,body:{ok:true,...(claimed||{}),instance:instanceSummary(result.instance,true)}};
+}
+
 async function moveToSupplyStash(db,body){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
@@ -3413,9 +3541,10 @@ async function equipInstanceItem(db,body){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
   const charId=Number(body.char_id);
-  const unequip=!!body.unequip;
-  const slug=unequip?String(body.slot||""):String(body.slug||"");
-  if(!Number.isSafeInteger(charId)||charId<=0||!slug)
+  const unequip=!!body.unequip,depotAction=String(body.depot_action||"");
+  const slug=depotAction?String(body.ref||""):unequip?String(body.slot||""):String(body.slug||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!slug||
+    (depotAction&&!["store","retrieve","equip"].includes(depotAction)))
     return {code:400,body:{ok:false,error:"INVALID_EQUIP",msg:"Equipamento inválido"}};
   const character=await db.findCharacter(charId);
   if(!character||Number(character.account_id)!==Number(acc.id))
@@ -3443,9 +3572,11 @@ async function equipInstanceItem(db,body){
       const preSnapshot={
         pouch:Object.assign({},item.p.lootPouch||{}),
         bag:Object.assign({},item.p.bag||{}),
+        ...(depotAction?{depot:(item.p.depot||[]).slice()}:{})
       };
       let r;
-      if(unequip)r=unequipFromContainerAuth(item.p,String(body.slot||""),String(body.dest||"bag"));
+      if(depotAction)r=depotActionAuth(item.p,{action:depotAction,ref:slug,source:body.source,slot:body.slot});
+      else if(unequip)r=unequipFromContainerAuth(item.p,String(body.slot||""),String(body.dest||"bag"));
       else r=equipFromContainerAuth(item.p,String(body.slug||""),String(body.source||"bag"),
         {instId:body.inst_id?String(body.inst_id):null});
       if(!r||!r.ok){rejection=(r&&r.msg)||"Não foi possível equipar";return null;}
@@ -3470,15 +3601,16 @@ async function equipInstanceItem(db,body){
   }
   let p=await loadCityPlayer(db,acc,character);
   let r;
-  if(unequip)r=unequipFromContainerAuth(p,String(body.slot||""),String(body.dest||"bag"));
+  if(depotAction)r=depotActionAuth(p,{action:depotAction,ref:slug,source:body.source,slot:body.slot});
+  else if(unequip)r=unequipFromContainerAuth(p,String(body.slot||""),String(body.dest||"bag"));
   else r=equipFromContainerAuth(p,String(body.slug||""),String(body.source||"bag"),
     {instId:body.inst_id?String(body.inst_id):null});
   if(!r||!r.ok)
     return {code:400,body:{ok:false,error:"EQUIP_FAILED",msg:(r&&r.msg)||"Não foi possível equipar"}};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
   if(persisted.code!==200)return persisted;
-  return {code:200,body:Object.assign({},persisted.body,{ok:true,
-    equip:p.equip||{},bag:p.bag||{},lootPouch:p.lootPouch||{},itemInstances:p.itemInstances||[]})};
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,msg:r.msg||"",
+    equip:p.equip||{},bag:p.bag||{},depot:p.depot||[],lootPouch:p.lootPouch||{},itemInstances:p.itemInstances||[]})};
 }
 
 /* Remove 1 unidade do item compartilhado das cópias dos membros da
@@ -4949,6 +5081,7 @@ async function main() {
       const OTBM=require(path.join(STATIC_DIR,"js","otbm.js"));
       const bytes=fs.readFileSync(path.join(STATIC_DIR,"maps",quest.otbm+".otbm"));
       let parsed=OTBM.read(bytes,{z:quest.otbmFloor});
+      if(quest.flow==="annihilator")require("../game/js/annihilator-data").prepareMap(parsed);
       if(quest.otbmFovBounds)parsed=OTBM.crop(parsed,quest.otbmFovBounds);
       const map=OTBM.huntMapFromOtbm(parsed,questTileFlags),blocked={};
       for(let y=0;y<map.rows.length;y++)for(let x=0;x<map.rows[y].length;x++){
@@ -5317,6 +5450,9 @@ async function main() {
       if(req.method==="POST"&&url==="/api/social/lobby-join"){
         const r=await socialLobbyJoin(db,await readBody(req));return send(res,r.code,r.body);
       }
+      if(req.method==="POST"&&url==="/api/account/hazard"){
+        const r=await updateAccountHazard(db,await readBody(req));return send(res,r.code,r.body);
+      }
       if(req.method==="POST"&&url==="/api/account/tutorial"){
         const r=await updateAccountTutorial(db,await readBody(req));return send(res,r.code,r.body);
       }
@@ -5344,6 +5480,16 @@ async function main() {
       if(req.method==="POST"&&url==="/api/instance/ammo"){
         const r=await selectInstanceAmmo(db,await readBody(req));return send(res,r.code,r.body);
       }
+      if(req.method==="POST"&&url==="/api/instance/annihilator-rewards"){
+        const body=await readBody(req);
+        if(body.preview!==true&&body.quantities===undefined)return send(res,400,{ok:false,msg:"Carrinho inválido"});
+        const r=await annihilatorLeverPull(db,body);return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/instance/annihilator-chest"){
+        const body=await readBody(req);
+        if(typeof body.reward!=="string"||!body.reward)return send(res,400,{ok:false,msg:"Baú inválido"});
+        const r=await annihilatorLeverPull(db,body);return send(res,r.code,r.body);
+      }
       if(req.method==="POST"&&url==="/api/instance/equip"){
         const r=await equipInstanceItem(db,await readBody(req));return send(res,r.code,r.body);
       }
@@ -5357,6 +5503,12 @@ async function main() {
       if((req.method==="POST"&&url==="/api/instance/open-bag-you-desire")||
          (req.method==="POST"&&url==="/api/pouch/open-bag-you-desire")){
         const r=await openBagYouDesire(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if((req.method==="POST"&&url==="/api/instance/open-primal-bag")||
+         (req.method==="POST"&&url==="/api/pouch/open-primal-bag")){
+        const r=await openBagYouDesire(db,await readBody(req),
+          {slug:"primal-bag",openFn:openAuthPrimalBag,name:"Primal Bag"});
+        return send(res,r.code,r.body);
       }
       if((req.method==="POST"&&url==="/api/instance/pouch-sell")||
          (req.method==="POST"&&url==="/api/pouch/sell")){
@@ -5980,6 +6132,11 @@ async function main() {
       if(req.method==="POST"&&url==="/api/world-boss/toggle-invite"){
         const limited=rateLimit(req,"wb-toggle",30,60000);if(limited)return send(res,limited.code,limited.body);
         const r=await WORLD_BOSS.toggleInvite(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/burden"){
+        const limited=rateLimit(req,"wb-burden",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await WORLD_BOSS.setBurden(db,bodyWithSessionToken(req,await readBody(req)));
         return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/world-boss/admin/force-open"){

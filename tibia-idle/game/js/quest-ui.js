@@ -129,7 +129,7 @@ function questCard(q) {
       ${questBossImg(q.bossSprite || q.boss, 48)}
     </button>
     <span class="info"><span class="nm">${q.name}</span><span class="meta">Level ${q.level}+</span>
-      <span class="tiny dim">${q.playable === false ? "Em breve" : "Lobby: até " + q.maxPlayers + " jogadores"}</span></span>
+      <span class="tiny dim">${q.questType === "boss" ? "Progresso dos bosses e recompensas" : q.playable === false ? "Em breve" : "Lobby: até " + q.maxPlayers + " jogadores"}</span></span>
     <span class="quest-card-rewards">${rewardsHtml}</span>
   </div>`;
 }
@@ -142,8 +142,9 @@ function openQuestsModal() {
   const ui = questPrepareModal("quests-modal-shell");
   if (!ui) return;
   const quests = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS : {};
-  const worldCards = Object.values(quests).filter((q) => q.questType !== "party").map(questCard).join("");
+  const worldCards = Object.values(quests).filter((q) => (q.questType !== "party" && q.questType !== "boss") || q.worldQuest).map(questCard).join("");
   const partyCards = Object.values(quests).filter((q) => q.questType === "party").map(questCard).join("");
+  const bossCards = Object.values(quests).filter((q) => q.questType === "boss" && !q.worldQuest).map(questCard).join("");
   const section = (title, cards) => cards
     ? `<div class="small mb4 mt8" style="color:#d4af37;font-weight:bold;letter-spacing:.5px">${title}</div>
        <div style="display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:10px 14px;">${cards}</div>`
@@ -154,7 +155,8 @@ function openQuestsModal() {
     <div class="panel-body" id="quests-modal-list">
       ${section("WORLD QUESTS", worldCards)}
       ${section("PARTY QUESTS", partyCards)}
-      ${(!worldCards && !partyCards) ? '<span class="dim">Nenhuma quest disponível.</span>' : ""}</div>`;
+      ${section("BOSSES QUESTS", bossCards)}
+      ${(!worldCards && !partyCards && !bossCards) ? '<span class="dim">Nenhuma quest disponível.</span>' : ""}</div>`;
   $("#quests-modal-close").onclick = () => {
     ui.modal.classList.remove("show");
     ui.body.classList.remove("quests-modal-shell");
@@ -201,12 +203,39 @@ function questMonsterListHtml(q) {
   }).join("");
 }
 
+function renderBossQuestDetail(q, ui) {
+  const p = G.p;
+  const rows = (q.objectives || []).map((slug, index) => {
+    const done = Number(p.bosses && p.bosses[slug] && p.bosses[slug].kills) > 0;
+    const monster = typeof MONSTERDATA !== "undefined" && MONSTERDATA[slug];
+    const name = monster && monster.name || slug.replace(/-/g, " ");
+    return `<div class="shop-row">${questBossImg(slug, 28)}<span class="info">${name}${index === q.objectives.length - 1 ? " — Final" : ""}</span><b>${done ? "1/1" : "0/1"}</b></div>`;
+  }).join("");
+  const hazard = q.id === "primal-ordeal" && typeof gnompronaHazardUnlock === "function"
+    ? gnompronaHazardUnlock(p) : 0;
+  const progress = q.id === "primal-ordeal"
+    ? `<div class="shop-row">Hazard ativo: <b>${typeof gnompronaHazardActive === "function" ? gnompronaHazardActive(p) : 0}</b></div>
+       <div class="shop-row">Maior hazard desbloqueado: <b>${hazard}</b></div>
+       <div class="shop-row">Noxious Ripptor <b>${Math.min(6, hazard)}/6</b></div>
+       <div class="shop-row">Primal Bags <b>${Math.min(12, hazard)}/12</b></div>` : rows;
+  ui.body.innerHTML = `<div class="panel-title">${q.name} — Level ${q.level}+<span class="spacer"></span><button class="sm" id="boss-quest-close">Fechar</button></div>
+    <div class="panel-body quest-detail-body"><div class="quest-detail-desc">${q.description}</div>
+    <section class="quest-detail-panel"><div class="hunt-best-title">PROGRESSO REGISTRADO</div>${progress}</section>
+    <section class="quest-detail-panel"><div class="hunt-best-title">RECOMPENSAS</div><p>${q.rewardDescription}</p>
+    <div class="quest-rewards-grid">${questRewardDetailHtml(q)}</div>
+    <div class="tiny dim">${q.id === "primal-ordeal" ? "Os marcos são concedidos pelo sistema de hazard da conta." : q.id === "bloodrotten-quest" ? "Entregue no Reward Chest ao derrotar Bakragore — uma vez por personagem." : "O resgate dedicado desta quest ainda não está disponível."}</div></section>
+    <button class="sm" id="boss-quest-back">Voltar</button></div>`;
+  $("#boss-quest-close").onclick = () => { ui.modal.classList.remove("show"); ui.body.classList.remove("quest-detail-shell"); };
+  $("#boss-quest-back").onclick = openQuestsModal;
+}
+
 function openQuestDetail(questId) {
   questStopPoll();
   const q = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS[questId] : null;
   if (!q) return;
   const ui = questPrepareModal("quest-detail-shell");
   if (!ui) return;
+  if (q.questType === "boss") return renderBossQuestDetail(q, ui);
   ui.body.innerHTML = `<div class="panel-title">${questBossImg(q.bossSprite || q.boss, 24)} ${q.name} — <span class="dim" style="font-weight:normal">Level ${q.level}+</span>
     <span style="flex:1"></span><button class="sm" id="quest-detail-close">✕</button></div>
     <div class="panel-body quest-detail-body">
@@ -736,6 +765,110 @@ function openQuestRewardChoice(data) {
 
 /* ---- Event handler (called from game.js sync) ---- */
 
+async function annihilatorCartRequest(combat, payload) {
+  const token = sessionToken();
+  if (typeof accountTickInstance === "function") await accountTickInstance(token);
+  return accountQueueInstance(async () => {
+    const body = Object.assign({ token, char_id: Number(combat.player?.id || G.p.id),
+      instance_id: ACCOUNT_INSTANCE.id, expected_version: Number(ACCOUNT_INSTANCE.version) }, accountLeaseFields(), payload);
+    const r = await fetch((typeof ACCOUNT_API_URL !== "undefined" ? ACCOUNT_API_URL : "") + "/api/instance/annihilator-rewards", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.instance && typeof accountInstanceApply === "function") accountInstanceApply(data.instance);
+    if (!r.ok || !data.ok) throw new Error(data.msg || "Não foi possível resgatar as recompensas.");
+    return data;
+  });
+}
+function annihilatorPollRewardCart() {
+  const c = G.combat;
+  if (c?.questId !== "annihilator" || typeof ANNIHILATOR === "undefined") return;
+  const point = ANNIHILATOR.rewardTrigger, b = ANNIHILATOR.bounds, p = c.player;
+  const inside = p && p.p?.hp > 0 && Math.round(p.cx) === point.x - b.x && Math.round(p.cy) === point.y - b.y;
+  if (!inside || (c.mobs || []).some((m) => m.hp > 0)) { c.annihilatorRewardTileSeen = false; return; }
+  if (c.annihilatorRewardTileSeen || c.annihilatorCartLoading) return;
+  c.annihilatorRewardTileSeen = true;
+  openAnnihilatorRewardCart(c).catch((e) => questToast(e.message, "bad"));
+}
+async function openAnnihilatorRewardCart(combat) {
+  combat.annihilatorCartLoading = true;
+  try {
+    const offer = await annihilatorCartRequest(combat, { preview: true });
+    if (G.combat !== combat) return;
+    if (!offer.count) return questToast("A conta já resgatou todas as recompensas da Annihilator.", "ok");
+    const ui = questPrepareModal("quest-reward-shell");
+    if (!ui) return;
+    const quantities = Object.fromEntries(ANNIHILATOR.rewards.map((slug) => [slug, 0]));
+    let busy = false;
+    const render = () => {
+      const total = Object.values(quantities).reduce((sum, n) => sum + n, 0);
+      ui.body.innerHTML = `<div class="panel-title">Annihilator — ESCOLHA ${offer.count} RECOMPENSAS
+        <button class="sm" id="anni-cart-close" style="margin-left:auto" ${busy ? "disabled" : ""}>Fechar</button></div>
+        <div class="panel-body quest-reward-body">
+          <div class="quest-reward-info">Você pode repetir o mesmo item. ${offer.claimed ? offer.claimed + " recompensa(s) já resgatada(s)." : ""}</div>
+          <div class="quest-reward-grid">${ANNIHILATOR.rewards.map((slug) => {
+            const item = GAMEDATA.items[slug];
+            return `<div class="quest-reward-choice-card" data-slug="${slug}">${questRewardImg(slug, 48)}
+              <div class="quest-reward-choice-info"><b>${item?.n || slug}</b>
+                <div class="row" style="gap:10px;margin-top:8px">
+                  <button class="sm" data-anni-item="${slug}" data-anni-change="-1" ${busy || !quantities[slug] ? "disabled" : ""}>−1</button>
+                  <b>${quantities[slug]}</b>
+                  <button class="sm" data-anni-item="${slug}" data-anni-change="1" ${busy || total >= offer.count ? "disabled" : ""}>+1</button>
+                </div></div></div>`;
+          }).join("")}</div>
+          <div class="row mt8" style="justify-content:space-between"><b>Selecionadas: ${total}/${offer.count}</b>
+            <button class="danger sm" id="anni-cart-confirm" ${busy || total !== offer.count ? "disabled" : ""}>${busy ? "RECEBENDO…" : "RECEBER RECOMPENSAS"}</button>
+          </div></div>`;
+      $("#anni-cart-close").onclick = () => ui.modal.classList.remove("show");
+      $$("#modal-body [data-anni-change]").forEach((button) => {
+        button.onclick = () => {
+          const slug = button.dataset.anniItem, change = Number(button.dataset.anniChange);
+          if (busy || quantities[slug] + change < 0 || total + change > offer.count) return;
+          quantities[slug] += change; render();
+        };
+      });
+      $("#anni-cart-confirm").onclick = async () => {
+        if (busy || total !== offer.count) return;
+        busy = true; render();
+        try {
+          await annihilatorCartRequest(combat, { quantities: { ...quantities } });
+          if (ui.body.querySelector("#anni-cart-confirm")) ui.modal.classList.remove("show");
+          questToast(offer.count + " recompensas recebidas no Reward Chest!", "ok");
+        } catch (e) { questToast(e.message, "bad"); busy = false; if (G.combat === combat) render(); }
+      };
+      if (typeof bindFullItemTooltip === "function") $$("#modal-body .quest-reward-choice-card").forEach((card) => bindFullItemTooltip(card, card.dataset.slug));
+    };
+    render();
+  } finally { combat.annihilatorCartLoading = false; }
+}
+
+function annihilatorReturnToLobby(combat, reason) {
+  if (combat?.questId !== "annihilator" || reason !== "quest-completed") return false;
+  if (combat.annihilatorReturning) return true;
+  combat.annihilatorReturning = true;
+  const accountId = Number(G.p?.accountId || (typeof sessionAccount === "function" && sessionAccount()?.id));
+  const ids = (combat.players || []).filter((p) => !p.p?.accountId || Number(p.p.accountId) === accountId)
+    .map((p) => Number(p.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+  questReturnToTemple();
+  (async () => {
+    if (typeof accountLastInstancePromise === "function") await accountLastInstancePromise();
+    let lobby = null;
+    for (let i = 0; i < 10; i++) {
+      const r = await questFetch("GET", "/api/quest/state?questId=annihilator");
+      if (r.status !== 200) throw new Error("Não foi possível recuperar o lobby.");
+      const mine = (r.data?.lobbys || []).find((l) => (l.participants || []).some((p) => ids.includes(Number(p.id))));
+      if (!mine || mine.phase === "lobby") { lobby = mine; break; }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    if (!lobby) {
+      const r = await questFetch("POST", "/api/quest/create", { questId: "annihilator", characterIds: ids });
+      if (r.status !== 200 || !r.data?.ok) throw new Error(r.data?.msg || "Não foi possível retornar ao lobby.");
+      lobby = r.data;
+    }
+    if (!G.combat || G.combat === combat) openQuestLobby(lobby);
+  })().catch((e) => questToast(e.message, "bad"));
+  return true;
+}
+
 function handleQuestEvent(data) {
   if (!data || !data.action) return;
   switch (data.action) {
@@ -749,6 +882,11 @@ function handleQuestEvent(data) {
     case "kicked":
       questCloseLobbyPanel();
       questToast("Você morreu e foi removido da quest.", "bad");
+      break;
+    case "return-lobby":
+      questCloseLobbyPanel();
+      if (data.lobby) openQuestLobby(data.lobby);
+      questToast("Você saiu da Annihilator e voltou ao lobby.", "ok");
       break;
     case "success":
       questCloseLobbyPanel();

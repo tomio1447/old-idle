@@ -11,11 +11,13 @@ const SCARLETT_KEY_ICON = { up: "↑", down: "↓", left: "←", right: "→" };
  * Offline: 520ms — stream mais rápido, janela ainda generosa.
  * Online: +SCARLETT_ONLINE_SLACK (~1.5×AUTH_STEP + RTT) no servidor.
  * TRAVEL menor + GAP menor = esteira contínua, sem espera entre notas. */
-const SCARLETT_TIMING_WINDOW = 520;
 const SCARLETT_ONLINE_SLACK = 320;
-const SCARLETT_NOTE_GAP = 560;
-const SCARLETT_LEAD_MS = 1000;
-const SCARLETT_TRAVEL_MS = 1700;
+/* Mecânica desacelerada (pedido): notas mais espaçadas e janela mais
+ * tolerante. O servidor usa os mesmos valores (authoritative_engine.js). */
+const SCARLETT_TIMING_WINDOW = 750;
+const SCARLETT_NOTE_GAP = 800;
+const SCARLETT_LEAD_MS = 1400;
+const SCARLETT_TRAVEL_MS = 2000;
 const SCARLETT_HIT_PCT = 20;
 
 (function registerScarlett() {

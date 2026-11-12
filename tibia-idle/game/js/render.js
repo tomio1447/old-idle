@@ -2199,6 +2199,12 @@ function bossSpawnCountdownSeconds(combat, now) {
 /* Echo Raid: portal (anel dourado pulsante + aura) e raid armada (anel
  * vermelho + countdown em segundos até nascer o warden). Desenhado depois
  * das criaturas — o portal é um item no chão mas precisa ser visível. */
+/* Sprite real do portal (Exploraid_Trigger do TibiaWiki, mesmo ícone do
+ * helper). Carrega uma vez; o círculo dourado fica como fallback. */
+const ECHO_PORTAL_IMG = (typeof Image !== "undefined") ? (() => {
+  const img = new Image(); img.src = "assets/ui/echo-raid-portal.gif"; return img;
+})() : null;
+
 function drawEchoRaidMarkers(ctx, echo, W, H, now) {
   const tp = tilePx(W);
   for (const po of (echo && echo.portals) || []) {
@@ -2214,8 +2220,17 @@ function drawEchoRaidMarkers(ctx, echo, W, H, now) {
     ctx.globalAlpha = 0.75 + 0.25 * pulse;
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(x, y, r * 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    /* Exploraid_Trigger (tibiawiki) desenhado sobre o brilho — ocupa o
+     * tile inteiro para ficar reconhecível no zoom padrão. */
+    ctx.save();
+    if (ECHO_PORTAL_IMG && ECHO_PORTAL_IMG.complete && ECHO_PORTAL_IMG.naturalWidth) {
+      const sz = tp * 0.95;
+      ctx.drawImage(ECHO_PORTAL_IMG, x - sz / 2, y - sz / 2, sz, sz);
+    }
     ctx.lineWidth = Math.max(1.5, tp * 0.06);
     ctx.strokeStyle = "#ffd75e";
+    ctx.globalAlpha = 0.55 + 0.35 * pulse;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }

@@ -43166,4 +43166,9 @@ window.TILEDATA = {
 
   "7109": {"n": "geyser"},
   "8770": {"n": "sand"},
+
+  "614": {"n": "sand"},
+  "2187": {"n": "nothing special"},
+  "8426": {"n": "item 8426"},
+  "20661": {"n": "item 20661"},
 };

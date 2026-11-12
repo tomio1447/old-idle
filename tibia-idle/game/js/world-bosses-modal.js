@@ -21,6 +21,8 @@ const WARZONES = [
     description: "A Verme Pálida se alimenta de almas perdidas no banquete dos mortos. Raid de 5 personagens para os mais corajosos." },
   { id: "megalomania", name: "Goshnar's Megalomania", title: "Soul War", sprite: "goshnar-s-megalomania-purple", dataMonster: "goshnar-s-megalomania-green", hp: WORLD_BOSS_TEST_HP, maxChars: 5,
     description: "A Megalomania de Goshnar é a culminância da Soul War. Cinco guerreiros devem enfrentar a encarnação do orgulho absoluto." },
+  { id: "bakragore", name: "Bakragore", title: "Rotten Blood", sprite: "bakragore", dataMonster: "bakragore", hp: 660000, maxChars: 5,
+    description: "Bakragore, a fusão suprema da Rotten Blood. Lobby de até 5 jogadores (nível 600+): cada membro contribui suas taints pelo modal Bakragore's Burden — mais taints, mais Elder Bloodjaws e mais HP. Derrotá-lo conclui a The Blood Rotten Quest (recompensa 1x por personagem)." },
 ];
 window.WORLD_BOSS_DEFS = WARZONES;
 

@@ -158,6 +158,16 @@ CANARY_COLORS = {
     "faceless-bane":  (0, 2, 95, 97),
     # Cradle of Monsters: looktype 1611, cores oficiais do Canary.
     "doctor-marrow":  (57, 0, 0, 95),
+    # Lycanthropes (Hyaena Lairs / Lion Sanctum): looktype 1300/1301 com
+    # cores oficiais do canary .lua; werelion usa addon 3.
+    "werehyaena":        (57, 77, 1, 1),
+    "werehyaena-shaman": (0, 0, 94, 95),
+    "werelion":          (58, 2, 94, 10),
+    "werelioness":       (0, 2, 0, 94),
+    # Asuras (Asura Palace): looktype 150 com cores + addons do canary .lua.
+    "dawnfire-asura":     (114, 94, 78, 79),
+    "midnight-asura":     (0, 114, 90, 90),
+    "frost-flower-asura": (0, 0, 0, 86),
     # Falcon Bastion: looktype 1071 (Preceptor Lazare 1078) oficiais.
     "falcon-knight":              (57, 96, 38, 105),
     "falcon-paladin":             (57, 96, 38, 105),
@@ -218,6 +228,8 @@ CANARY_ADDONS = {"pirat-bombardier": 2, "pirat-cutthroat": 1, "pirat-mate": 3,
                  "cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
                   "fury": 1,
                   "falcon-knight": 1, "falcon-paladin": 2,
+                  "werelion": 3,
+                  "dawnfire-asura": 1, "midnight-asura": 1, "frost-flower-asura": 3,
                   "grand-commander-soeren": 2,
                   "preceptor-lazare": 0,
                   "grand-chaplain-gaunder": 1,

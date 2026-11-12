@@ -524,8 +524,22 @@
         var anchorX = sourceX + padX, anchorY = sourceY + padY;
         for (var fy = 0; fy < th; fy++) for (var fx = 0; fx < tw; fx++) {
           var bx = anchorX - fx, by = anchorY - fy;
-          if (bx >= 0 && by >= 0 && bx < targetW && by < targetH)
-            footprintBlocked[bx + ":" + by] = true;
+          if (!(bx >= 0 && by >= 0 && bx < targetW && by < targetH)) continue;
+          /* Piso walkable de verdade NÃO vira bloqueio por footprint: a
+           * sprite da parede transborda visual sobre a célula (ex.: parede
+           * do sul sobe 1 SQM sobre o piso à frente), mas o chão continua
+           * pisável — só células já bloqueadas/vazias herdam o footprint. */
+          var cov = map.cells[(bx - padX) + "," + (by - padY)];
+          if (cov) {
+            var covFlags = cov.g ? tileflags[cov.g] : null;
+            var covWalkable = !!(covFlags && covFlags[0] !== 0) &&
+              !(cov.items || []).some(function (ii) {
+                var f = tileflags[ii && ii.id ? ii.id : ii];
+                return f && f[0] === 0;
+              });
+            if (covWalkable) continue;
+          }
+          footprintBlocked[bx + ":" + by] = true;
         }
       }
     });
