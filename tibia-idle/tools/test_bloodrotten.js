@@ -516,15 +516,13 @@ test("Bakragore world boss lobby validates taints, seats five and rewards once p
   await ctrl.onSharedEnded("boss-defeated");
 });
 
-test("Bloodrotten quest is listed in World Quests and Bakragore is a playable world boss", () => {
+test("Bloodrotten quest is listed in Bosses Quests and Bakragore is a playable world boss", () => {
   const questSource = fs.readFileSync(path.join(js, "questdata.js"), "utf8");
-  const uiSource = fs.readFileSync(path.join(js, "quest-ui.js"), "utf8");
   const modalSource = fs.readFileSync(path.join(js, "world-bosses-modal.js"), "utf8");
   const gameSource = fs.readFileSync(path.join(js, "game.js"), "utf8");
-  assert.ok(/"bloodrotten-quest":\s*\{[^}]*worldQuest:\s*true/s.test(questSource));
+  assert.ok(/"bloodrotten-quest":\s*\{[^}]*questType:\s*"boss"/s.test(questSource));
   assert.ok(/"bloodrotten-quest":\s*\{[^}]*boss:\s*"bakragore"/s.test(questSource));
   assert.ok(/"bloodrotten-quest":\s*\{[^}]*objectives:\s*\[[^\]]*"bakragore"/s.test(questSource));
-  assert.ok(uiSource.includes("q.worldQuest"));
   assert.ok(/"bakragore"[^}]*maxChars:\s*5/s.test(modalSource));
   assert.ok(/"bakragore":\s*\{[^}]*worldBoss:\s*true/s.test(gameSource));
   assert.ok(/"bakragore":\s*\{[^}]*hunt:\s*"bakragore-room"/s.test(gameSource));

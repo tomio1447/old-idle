@@ -76,8 +76,8 @@ function bosstiaryKill(p, slug, n) {
   /* Gnomprona: kill do The Primal Menace libera +1 nível de hazard na
    * CONTA (cap 12) — MAS só se a luta foi no hazard atual desbloqueado
    * (sel === level). Lutar abaixo não libera o próximo nível.
-   * Marcos: nível 6 → montaria Noxious Ripptor (conta);
-   *         nível 12 → 4× Primal Bag. */
+   * Marcos: nível 6 → montaria Noxious Ripptor (resgatar na quest
+   *         Primal Ordeal); nível 12 → 4× Primal Bag (automático). */
   if (slug === "the-primal-menace") {
     p.hazardKills = depois;
     const level = Math.max(0, Math.min(12,
@@ -92,11 +92,6 @@ function bosstiaryKill(p, slug, n) {
       p.hazardLevel = novo;
       addLog("level", `Hazard Level <b>${novo}</b> desbloqueado para a conta!`);
       toast(`Hazard Level ${novo} desbloqueado!`, "level");
-      if (novo === 6 && typeof grantMissionReward === "function") {
-        grantMissionReward(p, { accountMount: "noxious-ripptor" });
-        addLog("level", "Montaria <b>Noxious Ripptor</b> desbloqueada!");
-        toast("Montaria desbloqueada: Noxious Ripptor!", "level");
-      }
       if (novo === 12 && typeof grantMissionReward === "function") {
         grantMissionReward(p, { items: [{ slug: "primal-bag", count: 4 }] });
         addLog("level", "Recompensa: <b>4× Primal Bag</b>!");

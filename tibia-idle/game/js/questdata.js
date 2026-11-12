@@ -114,7 +114,7 @@ var QUEST_DEFS = {
 Object.assign(QUEST_DEFS, {
   "soulwar-quest": {
     id: "soulwar-quest", name: "Soulwar Quest", level: 400, questType: "boss", playable: false,
-    boss: "goshnar-s-megalomania", bossSprite: "goshnar-s-megalomania",
+    boss: "goshnar-s-megalomania", bossSprite: "goshnar-s-malice",
     description: "Derrote os cinco bosses de acesso e, por último, Goshnar’s Megalomania. Progresso por personagem.",
     objectives: ["goshnar-s-malice", "goshnar-s-spite", "goshnar-s-greed", "goshnar-s-hatred", "goshnar-s-cruelty", "goshnar-s-megalomania"],
     rewards: ["bag-you-desire"], rewardDescription: "1× Bag You Desire — uma vez por personagem."
@@ -123,10 +123,11 @@ Object.assign(QUEST_DEFS, {
     id: "primal-ordeal", name: "Primal Ordeal", level: 400, questType: "boss", playable: false,
     boss: "the-primal-menace", bossSprite: "the-primal-menace",
     description: "Acompanhe o hazard da conta e os marcos da Primal Ordeal. Selecionar um hazard menor não reduz o progresso.",
-    rewards: ["primal-bag"], rewardDescription: "Hazard 6: montaria Noxious Ripptor. Hazard 12: 4× Primal Bag. Marcos por conta."
+    rewards: ["primal-bag"], mountRewards: ["noxious-ripptor"],
+    rewardDescription: "Hazard 6: montaria Noxious Ripptor (resgate aqui). Hazard 12: 4× Primal Bag. Marcos por conta."
   },
   "bloodrotten-quest": {
-    id: "bloodrotten-quest", name: "The Blood Rotten Quest", level: 600, questType: "boss", worldQuest: true, playable: false,
+    id: "bloodrotten-quest", name: "The Blood Rotten Quest", level: 600, questType: "boss", playable: false,
     boss: "bakragore", bossSprite: "bakragore",
     description: "Derrote Murcion (Jaded Roots), Vemiath (Darklight Core), Chagorz (Gloom Pillars), Ichgahal (Putrefactory) e, por último, Bakragore — acessado pelo lobby de World Boss (até 5 jogadores). Progresso por personagem.",
     objectives: ["murcion", "vemiath", "chagorz", "ichgahal", "bakragore"],

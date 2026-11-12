@@ -171,7 +171,18 @@ function openQuestsModal() {
 
 /* ---- Quest detail modal ---- */
 
+function questMountCardHtml(id) {
+  const m = (typeof APP_MOUNT !== "undefined" && APP_MOUNT[id]) || {};
+  const name = m.nome || id.replace(/-/g, " ");
+  return `<div class="quest-reward-detail-card quest-mount-card" data-mount="${id}">
+    <img src="assets/appearance/mount/${id}.base.png" width="28" height="28" style="image-rendering:pixelated" alt="">
+    <span class="quest-reward-name">${name}</span>
+    <span class="quest-reward-stats tiny dim">Montaria · Hazard 6</span>
+  </div>`;
+}
+
 function questRewardDetailHtml(q) {
+  const mounts = (q.mountRewards || []).map(questMountCardHtml).join("");
   return (q.rewards || []).map((slug) => {
     const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items ? GAMEDATA.items[slug] : null;
     const name = it ? it.n : slug.replace(/-/g, " ");
@@ -189,7 +200,7 @@ function questRewardDetailHtml(q) {
       <span class="quest-reward-name">${name}</span>
       ${stats ? `<span class="quest-reward-stats tiny dim">${stats}</span>` : ""}
     </div>`;
-  }).join("");
+  }).join("") + mounts;
 }
 
 function questMonsterListHtml(q) {
@@ -213,6 +224,15 @@ function renderBossQuestDetail(q, ui) {
   }).join("");
   const hazard = q.id === "primal-ordeal" && typeof gnompronaHazardUnlock === "function"
     ? gnompronaHazardUnlock(p) : 0;
+  const mountId = (q.mountRewards || [])[0];
+  const mountOwned = mountId && typeof ownsMount === "function" && ownsMount(p, mountId);
+  const mountClaim = mountId
+    ? (mountOwned
+      ? `<span class="tiny" style="color:#9ce84a">✓ Montaria resgatada — disponível em toda a conta.</span>`
+      : hazard >= 6
+        ? `<button class="sm primary quest-action" id="boss-quest-mount-claim">RESGATAR MONTARIA</button>`
+        : `<span class="tiny dim">A montaria desbloqueia no Hazard 6 (${Math.min(6, hazard)}/6).</span>`)
+    : "";
   const progress = q.id === "primal-ordeal"
     ? `<div class="shop-row">Hazard ativo: <b>${typeof gnompronaHazardActive === "function" ? gnompronaHazardActive(p) : 0}</b></div>
        <div class="shop-row">Maior hazard desbloqueado: <b>${hazard}</b></div>
@@ -223,10 +243,19 @@ function renderBossQuestDetail(q, ui) {
     <section class="quest-detail-panel"><div class="hunt-best-title">PROGRESSO REGISTRADO</div>${progress}</section>
     <section class="quest-detail-panel"><div class="hunt-best-title">RECOMPENSAS</div><p>${q.rewardDescription}</p>
     <div class="quest-rewards-grid">${questRewardDetailHtml(q)}</div>
-    <div class="tiny dim">${q.id === "primal-ordeal" ? "Os marcos são concedidos pelo sistema de hazard da conta." : q.id === "bloodrotten-quest" ? "Entregue no Reward Chest ao derrotar Bakragore — uma vez por personagem." : "O resgate dedicado desta quest ainda não está disponível."}</div></section>
+    ${mountClaim ? `<div class="quest-mount-claim" style="margin-top:8px">${mountClaim}</div>` : ""}
+    <div class="tiny dim">${q.id === "primal-ordeal" ? "Primal Bags são concedidas automaticamente no Hazard 12; a montaria é resgatada aqui." : q.id === "bloodrotten-quest" ? "Entregue no Reward Chest ao derrotar Bakragore — uma vez por personagem." : "O resgate dedicado desta quest ainda não está disponível."}</div></section>
     <button class="sm" id="boss-quest-back">Voltar</button></div>`;
   $("#boss-quest-close").onclick = () => { ui.modal.classList.remove("show"); ui.body.classList.remove("quest-detail-shell"); };
   $("#boss-quest-back").onclick = openQuestsModal;
+  const mountBtn = $("#boss-quest-mount-claim");
+  if (mountBtn && mountId) mountBtn.onclick = () => {
+    if (typeof grantMissionReward !== "function") return;
+    grantMissionReward(p, { accountMount: mountId });
+    if (typeof addLog === "function") addLog("level", "Montaria <b>Noxious Ripptor</b> resgatada!");
+    if (typeof toast === "function") toast("Montaria resgatada: Noxious Ripptor!", "level");
+    openQuestDetail(q.id);
+  };
 }
 
 function openQuestDetail(questId) {

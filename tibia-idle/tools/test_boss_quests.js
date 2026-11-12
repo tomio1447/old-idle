@@ -17,19 +17,13 @@ function setup() {
     vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), ctx, { filename: file });
   return { ctx, body: node("#modal-body") };
 }
-test("Bosses Quests contains two progress quests, Bloodrotten lives in World Quests", () => {
+test("Bosses Quests contains three progress quests, separate from playable lobbies", () => {
   const { ctx, body } = setup(); ctx.openQuestsModal();
-  const bossSection = body.innerHTML.split("BOSSES QUESTS")[1];
-  for (const id of ["soulwar-quest", "primal-ordeal"]) {
-    assert.ok(bossSection.includes(`data-quest="${id}"`));
+  const section = body.innerHTML.split("BOSSES QUESTS")[1];
+  for (const id of ["soulwar-quest", "primal-ordeal", "bloodrotten-quest"]) {
+    assert.ok(section.includes(`data-quest="${id}"`));
     assert.equal(ctx.QUEST_DEFS[id].playable, false);
   }
-  /* The Blood Rotten Quest pertence à seção WORLD QUESTS (worldQuest:
-   * true no QUEST_DEFS) — concluída ao derrotar Bakragore no world boss. */
-  const worldSection = body.innerHTML.split("WORLD QUESTS")[1].split("BOSSES QUESTS")[0];
-  assert.ok(worldSection.includes(`data-quest="bloodrotten-quest"`));
-  assert.equal(ctx.QUEST_DEFS["bloodrotten-quest"].playable, false);
-  assert.equal(ctx.QUEST_DEFS["bloodrotten-quest"].worldQuest, true);
   assert.ok(body.innerHTML.includes("WORLD QUESTS"));
   assert.ok(body.innerHTML.includes("PARTY QUESTS"));
 });
@@ -47,4 +41,14 @@ test("boss quest details show recorded victories or account hazard, without crea
   assert.ok(body.innerHTML.includes("12/12"));
   assert.ok(body.innerHTML.includes("6/6"));
   assert.ok(body.innerHTML.includes("Hazard ativo: <b>4</b>"));
+  /* Hazard 12 mockado → a montaria aparece como reward resgatavel. */
+  assert.ok(body.innerHTML.includes('data-mount="noxious-ripptor"'));
+  assert.ok(body.innerHTML.includes("RESGATAR MONTARIA"));
+});
+
+test("noxious ripptor mount is claimed via the quest modal, not auto-granted", () => {
+  const questSource = fs.readFileSync(path.join(js, "questdata.js"), "utf8");
+  const bossSource = fs.readFileSync(path.join(js, "bosstiary.js"), "utf8");
+  assert.ok(questSource.includes('mountRewards: ["noxious-ripptor"]'));
+  assert.ok(!bossSource.includes('accountMount: "noxious-ripptor"'));
 });
