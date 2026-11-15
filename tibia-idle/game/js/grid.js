@@ -205,7 +205,7 @@ function dirTo(from, to) {
 /* Celulas fixas bloqueadas pelo mapa da hunt (paredes/agua do HUNTMAPS).
  * Cacheado no combate — o mapa nao muda durante a luta. */
 function mapBlockKeys(c) {
-  if (!c._mapBlockKeys) {
+  if (!Array.isArray(c._mapBlockKeys)) {
     const keys = [];
     if (c.huntMap && typeof huntMapBlocked === "function")
       for (let y = 0; y < c.huntMap.rows.length; y++)
@@ -221,7 +221,11 @@ function mapBlockKeys(c) {
  * churn de GC e aparecia como hitches periódicos em mapas grandes — copiar
  * um Map pré-montado (`new Map(base)`) é ordens de magnitude mais barato. */
 function mapBlockMap(c) {
-  if (!c._mapBlockMap) {
+  /* instanceof e não truthy: o checkpoint da instância serializa Map como
+   * {} (persistActiveInstance faz JSON.parse(JSON.stringify(c))) — um {}
+   * restaurado do save passava no !c._mapBlockMap e new Map({}) explodia
+   * o loop a cada frame. */
+  if (!(c._mapBlockMap instanceof Map)) {
     const m = new Map();
     for (const k of mapBlockKeys(c)) m.set(k, true);
     c._mapBlockMap = m;

@@ -116,6 +116,7 @@ function persistActiveInstance() {
       // o acumulado da sessão no analyser.
       if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf"||
          key==="_authorityDescriptor"||key==="_formationReservations"||
+         key==="_mapBlockKeys"||key==="_mapBlockMap"||
          key==="damageTrack"||key==="takenTrack")return undefined;
       if(key==="target")return value&&value.id?{__targetId:String(value.id)}:null;
       return typeof value==="function"?undefined:value;
