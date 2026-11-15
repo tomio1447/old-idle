@@ -499,6 +499,8 @@ function accountAuthorityVisualState(){
       const activeId=typeof sessionCharId==="function"?String(sessionCharId()||""):"";
       const isSelf=kind==="player"&&(!activeId||id===activeId||
         (typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id));
+      // PvP: marca o char realmente pilotado — os demais da conta são IA.
+      if(isSelf)visual.self=1;
       const cfgSrc=isSelf&&liveP&&liveP.config?liveP:(isSelf&&typeof G!=="undefined"&&G&&G.p&&G.p.config?G.p:null);
       if(isSelf&&cfgSrc&&cfgSrc.config&&Array.isArray(cfgSrc.config.combo))visual.combo=cfgSrc.config.combo;
       if(isSelf&&cfgSrc&&cfgSrc.stances&&typeof cfgSrc.stances==="object")visual.stances=cfgSrc.stances;
@@ -560,8 +562,17 @@ function accountAuthorityVisualState(){
     }
     return out;
   };
-  const players=Array.isArray(combat.players)&&combat.players.length?combat.players:(combat.player?[combat.player]:[]);
+  let players=Array.isArray(combat.players)&&combat.players.length?combat.players:(combat.player?[combat.player]:[]);
+  // Batalha PvP: a instância tem os chars das duas guilds — a aba só envia
+  // os da própria conta (o servidor descarta os demais e limita a 8).
+  const pvpAccId=combat.pvpBattle&&typeof sessionAccount==="function"&&sessionAccount()?Number(sessionAccount().id):0;
+  if(pvpAccId)players=players.filter((ent)=>Number(ent&&(ent.accountId||(ent.p&&ent.p.accountId)))===pvpAccId);
   const out={players:collect(players,8,"player"),mobs:collect(combat.mobs,64,"mob")};
+  // Clique num inimigo: alvo do time inteiro (vai no char pilotado — self).
+  if(pvpAccId&&out.players.length&&combat._pvpTeamTarget!==undefined){
+    const selfV=out.players.find((v)=>v.self)||out.players[0];
+    selfV.teamTarget=combat._pvpTeamTarget?String(combat._pvpTeamTarget):"";
+  }
   if(combat._scarlettPendingDir){
     const intent={dir:String(combat._scarlettPendingDir)};
     const pressAuth=Number(combat._scarlettPendingPressAuth);
@@ -1734,6 +1745,12 @@ async function accountStartSyncNow(token,generation){
     if(type==="instance"){
       if(data.holderId&&data.holderId===ACCOUNT_LEASE_PAGE_HOLDER)return;
       if(Number(data.version)<=Number(ACCOUNT_INSTANCE.version)&&data.status===ACCOUNT_INSTANCE.status)return;
+      // Batalha PvP: cada tick do roster publica um "instance" para TODAS as
+      // contas da guerra — um GET do estado inteiro por evento ×15 contas
+      // derrubava servidor e aba ("combate travado"). O tick próprio do
+      // cliente já devolve o estado; eventos sem source:"tick" (start/resume,
+      // checkpoint, término) seguem normais.
+      if(data.source==="tick"&&typeof G!=="undefined"&&G&&G.combat&&G.combat.pvpBattle)return;
       const matchesCurrent=!!(data.id&&String(data.id)===String(ACCOUNT_INSTANCE.id));
       accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,
         {event:Object.assign({},data,{matchesCurrent})}));});return;
@@ -1756,12 +1773,13 @@ async function accountStartSyncNow(token,generation){
     }
     if(type==="world-boss"){accountSyncDispatch("world-boss",data);return;}
     if(type==="quest"){accountSyncDispatch("quest",data);return;}
+    if(type==="pvp"){accountSyncDispatch("pvp",data);return;}
     if(type==="announce"){
       try{window.dispatchEvent(new CustomEvent("tibia-idle-announce",{detail:data}));}catch(e){}
       return;
     }
   };
-  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","snapshot-required","sync-expired","maintenance","world-boss","quest","announce"])
+  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","snapshot-required","sync-expired","maintenance","world-boss","quest","announce","pvp"])
     source.addEventListener(type,(event)=>receive(type,event));
   const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
     ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};
@@ -2164,6 +2182,14 @@ function accountApplySharedInventory(shared) {
       if (at > (Number(p.staminaAt) || 0)) p.staminaAt = at;
       if (typeof updateStaminaDisplay === "function") { try { updateStaminaDisplay(); } catch (e) {} }
     }
+  }
+  /* Prey é DA CONTA: todos os personagens recebem os mesmos slots/seleções/
+   * wildcards. Cópia (não referência): o objeto shared pode ser substituído
+   * por um /api/me novo — o espelho no char precisa ser independente. Se um
+   * save está pendente (reroll/seleção local ainda não persistido), não
+   * sobrescreve com o espelho do servidor. */
+  if (!ACCOUNT_SAVE_PENDING && shared.prey && typeof shared.prey === "object" && !Array.isArray(shared.prey)) {
+    try { p.prey = JSON.parse(JSON.stringify(shared.prey)); } catch (e) {}
   }
   p._sharedInv = 1;
   // Reward Chest é DA CONTA: ao aplicar o shared (troca de personagem,
@@ -2737,6 +2763,13 @@ async function storeBuyBless(token) {
     }
   }
   return r.data || { ok: false, msg: "Falha na compra" };
+}
+/* Imbuement via Tibia Coins: o servidor debita 30/60/90 TC por tier; com o
+ * débito confirmado o cliente aplica o imbue (sem materiais/gold, 100%). */
+async function storeBuyImbuement(token, tier) {
+  const r = await _api("POST", "/api/store/imbuement", { token, tier });
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  return r.data || { ok: false, msg: "Falha ao comprar imbuement" };
 }
 
 /* ------------------------------ PARTY (multiplayer) ------------------------------

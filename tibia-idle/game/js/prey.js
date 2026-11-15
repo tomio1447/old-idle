@@ -323,13 +323,19 @@ function preyLootChance(p, slug) {
 
 /* Tick do timer: a duração é wall-clock (`until = Date.now() + 2h`).
  * Não subtrai dt do timestamp — isso drenava o dobro enquanto caçava. */
-function preyTick(p, dt) {
+function preyTick(p, dt, opts) {
   ensurePrey(p);
   const agora = Date.now();
+  // paused (templo/treiners): o relógio de 2h congela — a expiração
+  // desliza junto com o tempo real, então a prey só decai caçando.
+  const paused = !!(opts && opts.paused);
   for (const slot of p.prey.slots) {
     const s = slot.selected;
     if (!s) continue;
-    if (s.until <= agora) slot.selected = null;
+    if (paused) {
+      const u = Number(s.until);
+      if (Number.isFinite(u) && dt > 0) s.until = u + dt;
+    } else if (s.until <= agora) slot.selected = null;
   }
 }
 

@@ -49,7 +49,7 @@ function openWheelPlannerModal(startVocation) {
   body.classList.remove(
     "hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
     "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell",
-    "ranking-modal-shell", "chard-modal-shell"
+    "ranking-modal-shell", "chard-modal-shell", "imb-modal-shell"
   );
   body.classList.add("hunts-modal-shell");
 

@@ -95,7 +95,7 @@ must(plunder > 80 && plunder < 400, "plunder@12 ~11% — ficou " + plunder);
 const catalog = { console }; catalog.window = catalog; vm.createContext(catalog);
 for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js", "core.js",
   "accessorydata.js", "supply-stash-data.js", "supplydata.js", "supplies.js", "yasir-prices.js", "hardcore-library.js",
-  "magma-bubble.js", "gnomprona.js", "azzilon-castle.js", "bloodrotten.js"]) {
+  "magma-bubble.js", "gnomprona.js", "azzilon-castle.js", "bloodrotten.js", "glooth-cave.js"]) {
   vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), catalog, { filename: file });
   if (file === "weapons.js") vm.runInContext("fundirWeaponData()", catalog);
 }

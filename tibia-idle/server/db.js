@@ -102,6 +102,9 @@ function JsonStore() {
   this.guildTasks = Array.isArray(guildData && guildData.tasks) ? guildData.tasks : [];
   this.guildLog = Array.isArray(guildData && guildData.log) ? guildData.log : [];
   this.guildRequests = Array.isArray(guildData && guildData.requests) ? guildData.requests : [];
+  // PvP guild-vs-guild: batalhas agendadas + roster sorteado (mesmo arquivo)
+  this.pvpBattles = Array.isArray(guildData && guildData.pvpBattles) ? guildData.pvpBattles : [];
+  this.pvpBattleRoster = Array.isArray(guildData && guildData.pvpRoster) ? guildData.pvpRoster : [];
   // market (ofertas + stats + histórico) persiste em data/market.json
   const marketData = this._load("market.json", null);
   if (marketData && typeof marketData === "object") {
@@ -637,12 +640,13 @@ JsonStore.prototype.expireAllLeases = function () {
  * já foram persistidos no último tick/checkpoint, então não há perda além do
  * progresso do downtime (que ninguém jogou). O cliente vê status "ended" +
  * terminalReason no próximo GET e volta ao templo sem travar. */
-JsonStore.prototype.endAllInstances = function (reason) {
+JsonStore.prototype.endAllInstances = function (reason, keepInstanceIds) {
   const nowIso=new Date().toISOString();
   const clean=String(reason||"server-restart").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"server-restart";
+  const keep=new Set((keepInstanceIds||[]).map(String));
   let count=0;
   for(const row of this.instances||[]){
-    if(row.status!=="active")continue;
+    if(row.status!=="active"||keep.has(String(row.instance_id)))continue;
     row.version=Number(row.version)+1;
     row.status="ended";
     row.terminal_reason=clean;
@@ -653,6 +657,15 @@ JsonStore.prototype.endAllInstances = function (reason) {
   }
   if(count)this._saveRuntime(false,true);
   return count;
+};
+/* Retomada de batalha PvP após restart: grava o estado ajustado e reinicia o
+ * cursor do worker em `now` (o downtime não é simulado). */
+JsonStore.prototype.instancePvpResume = function (accountId, instanceId, state, now) {
+  const row=(this.instances||[]).find((r)=>Number(r.account_id)===Number(accountId));
+  if(!row||row.status!=="active"||String(row.instance_id)!==String(instanceId))return {ok:false,error:"INSTANCE_NOT_ACTIVE"};
+  const iso=new Date(Number(now)||Date.now()).toISOString();
+  row.state=state;row.version=Number(row.version)+1;row.saved_at=iso;row.worker_cursor_at=iso;row.updated_at=iso;
+  this._saveRuntime(false,true);return {ok:true};
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins, email) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
@@ -2105,6 +2118,7 @@ JsonStore.prototype._guildSave = function () {
         guilds: this.guilds || [], members: this.guildMembers || [],
         invites: this.guildInvites || [], tasks: this.guildTasks || [],
         log: this.guildLog || [], requests: this.guildRequests || [],
+        pvpBattles: this.pvpBattles || [], pvpRoster: this.pvpBattleRoster || [],
       }, null, 1));
   } catch (e) { /* não bloqueia o jogo */ }
 };
@@ -2519,6 +2533,148 @@ JsonStore.prototype.guildRequestsClearAccount = function (accountId) {
   this.guildRequests = (this.guildRequests || []).filter((r) =>
     Number(r.account_id) !== Number(accountId));
   this._guildSave();
+};
+
+/* ------------------- PvP guild-vs-guild (JsonStore) ------------------- */
+const PVP_ACTIVE_STATUSES = new Set(["pending", "accepted", "prep", "live"]);
+JsonStore.prototype._pvpStakeCol = function (type) { return type === "coins" ? "coins" : "balance"; };
+JsonStore.prototype.pvpBattleGet = function (id) {
+  return (this.pvpBattles || []).find((b) => Number(b.id) === Number(id)) || null;
+};
+JsonStore.prototype.pvpBattlesActive = function () {
+  return (this.pvpBattles || []).filter((b) => PVP_ACTIVE_STATUSES.has(String(b.status)));
+};
+JsonStore.prototype.pvpBattlesForGuild = function (guildId, limit) {
+  const list = (this.pvpBattles || [])
+    .filter((b) => Number(b.challenger_guild_id) === Number(guildId) ||
+                  Number(b.challenged_guild_id) === Number(guildId))
+    .sort((a, b) => (Number(b.created_at) || 0) - (Number(a.created_at) || 0));
+  return limit ? list.slice(0, limit) : list;
+};
+/* Histórico individual: batalhas encerradas em que a conta foi sorteada
+ * (independe da guild atual). */
+JsonStore.prototype.pvpBattlesForAccount = function (accountId, limit) {
+  const ids = new Set((this.pvpBattleRoster || [])
+    .filter((r) => Number(r.account_id) === Number(accountId)).map((r) => Number(r.battle_id)));
+  const list = (this.pvpBattles || []).filter((b) => ids.has(Number(b.id)) && String(b.status) === "finished")
+    .sort((a, b) => Number(b.id) - Number(a.id));
+  return limit ? list.slice(0, limit) : list;
+};
+JsonStore.prototype.pvpBattleLastCreate = function (guildId) {
+  return (this.pvpBattles || [])
+    .filter((b) => Number(b.challenger_guild_id) === Number(guildId))
+    .reduce((m, b) => Math.max(m, Number(b.created_at) || 0), 0);
+};
+JsonStore.prototype._pvpGuildBusy = function (guildId, excludeId) {
+  return (this.pvpBattles || []).find((b) =>
+    Number(b.id) !== Number(excludeId) && PVP_ACTIVE_STATUSES.has(String(b.status)) &&
+    (Number(b.challenger_guild_id) === Number(guildId) ||
+     Number(b.challenged_guild_id) === Number(guildId))) || null;
+};
+JsonStore.prototype.pvpLobbyCreate = function (opts) {
+  const o = opts || {}, g1 = this.guildById(o.challengerGuildId), g2 = this.guildById(o.challengedGuildId);
+  if (!g1 || !g2) return { ok: false, error: "GUILD_NOT_FOUND" };
+  if (this._pvpGuildBusy(g1.id) || this._pvpGuildBusy(g2.id)) return { ok: false, error: "PVP_GUILD_BUSY" };
+  const col = this._pvpStakeCol(o.stakeType), amt = Math.max(0, Math.floor(Number(o.stakeAmount) || 0));
+  if (Number(g1[col]) < amt) return { ok: false, error: "STAKE_LOW" };
+  g1[col] = Number(g1[col]) - amt;
+  const id = (this.pvpBattles || []).reduce((m, b) => Math.max(m, Number(b.id) || 0), 0) + 1;
+  const rec = { id, challenger_guild_id: Number(g1.id), challenged_guild_id: Number(g2.id),
+    created_by: Number(o.createdBy), map: String(o.map), team_size: Number(o.teamSize),
+    stake_type: col === "coins" ? "coins" : "gold", stake_amount: amt, status: "pending",
+    scheduled_at: Number(o.scheduledAt), prepared_at: 0, started_at: 0, finished_at: 0,
+    winner_guild_id: null, draw: 0, overtime: 0, scores: null, result: null,
+    host_account_id: null, instance_id: null, created_at: Date.now(), quick: o.quick ? 1 : 0 };
+  (this.pvpBattles = this.pvpBattles || []).push(rec);
+  this.guildLogAdd(null, { guild_id: g1.id, account_id: Number(o.createdBy), char_name: o.charName || "",
+    category: "pvp", detail: `Desafio PvP #${id} vs ${g2.name} (${amt} ${rec.stake_type})`,
+    gold_delta: col === "balance" ? -amt : 0, points_delta: 0, coins_delta: col === "coins" ? -amt : 0 });
+  this._guildSave();
+  return { ok: true, id };
+};
+JsonStore.prototype.pvpBattleUpdate = function (id, fields) {
+  const b = this.pvpBattleGet(id); if (!b) return { ok: false, error: "NOT_FOUND" };
+  Object.assign(b, fields || {}); this._guildSave(); return { ok: true };
+};
+JsonStore.prototype._pvpStakeMove = function (guildId, col, delta) {
+  const g = this.guildById(guildId); if (!g) return false;
+  if (delta < 0 && Number(g[col]) < -delta) return false;
+  g[col] = Number(g[col]) + delta; return true;
+};
+JsonStore.prototype.pvpBattleAccept = function (battleId, guildId, charName) {
+  const b = this.pvpBattleGet(battleId);
+  if (!b || String(b.status) !== "pending" || Number(b.challenged_guild_id) !== Number(guildId))
+    return { ok: false, error: "INVALID_STATE" };
+  const col = this._pvpStakeCol(b.stake_type);
+  if (!this._pvpStakeMove(guildId, col, -Number(b.stake_amount))) return { ok: false, error: "STAKE_LOW" };
+  b.status = "accepted";
+  this.guildLogAdd(null, { guild_id: Number(guildId), account_id: 0, char_name: charName || "",
+    category: "pvp", detail: `Desafio PvP #${b.id} aceito (${b.stake_amount} ${b.stake_type})`,
+    gold_delta: col === "balance" ? -b.stake_amount : 0, points_delta: 0,
+    coins_delta: col === "coins" ? -b.stake_amount : 0 });
+  this._guildSave(); return { ok: true };
+};
+JsonStore.prototype._pvpRefund = function (b, team) {
+  const col = this._pvpStakeCol(b.stake_type);
+  const gid = team === "challenged" ? b.challenged_guild_id : b.challenger_guild_id;
+  this._pvpStakeMove(gid, col, Number(b.stake_amount));
+};
+JsonStore.prototype.pvpBattleDecline = function (battleId, guildId) {
+  const b = this.pvpBattleGet(battleId);
+  if (!b || String(b.status) !== "pending" || Number(b.challenged_guild_id) !== Number(guildId))
+    return { ok: false, error: "INVALID_STATE" };
+  this._pvpRefund(b, "challenger"); b.status = "declined"; b.finished_at = Date.now();
+  this._guildSave(); return { ok: true };
+};
+JsonStore.prototype.pvpBattleCancel = function (battleId) {
+  const b = this.pvpBattleGet(battleId);
+  if (!b || !["pending", "accepted"].includes(String(b.status))) return { ok: false, error: "INVALID_STATE" };
+  this._pvpRefund(b, "challenger");
+  if (String(b.status) === "accepted") this._pvpRefund(b, "challenged");
+  b.status = "cancelled"; b.finished_at = Date.now(); this._guildSave(); return { ok: true };
+};
+JsonStore.prototype.pvpBattleForfeit = function (battleId, loserGuildId, charName) {
+  const b = this.pvpBattleGet(battleId);
+  if (!b || !["accepted", "prep", "live"].includes(String(b.status))) return { ok: false, error: "INVALID_STATE" };
+  const winner = Number(b.challenger_guild_id) === Number(loserGuildId) ? b.challenged_guild_id : b.challenger_guild_id;
+  this._pvpRefund(b, "challenger"); this._pvpRefund(b, "challenged");
+  const col = this._pvpStakeCol(b.stake_type), pot = Number(b.stake_amount) * 2;
+  const fee = Math.floor(pot * 0.10), net = pot - fee;
+  this._pvpStakeMove(winner, col, net);
+  b.status = "finished"; b.winner_guild_id = winner; b.finished_at = Date.now();
+  b.result = JSON.stringify({ forfeit: Number(loserGuildId), rewards: { winnerGuild: winner, net, fee } });
+  this.guildLogAdd(null, { guild_id: Number(winner), account_id: 0, char_name: charName || "",
+    category: "pvp", detail: `Vitória PvP #${b.id} por desistência (pote ${net})`,
+    gold_delta: col === "balance" ? net : 0, points_delta: 0, coins_delta: col === "coins" ? net : 0 });
+  this._guildSave(); return { ok: true, winner };
+};
+JsonStore.prototype.pvpRosterReplace = function (battleId, rows) {
+  this.pvpBattleRoster = (this.pvpBattleRoster || []).filter((r) => Number(r.battle_id) !== Number(battleId));
+  for (const r of rows || []) this.pvpBattleRoster.push({ battle_id: Number(battleId),
+    team: Number(r.team), account_id: Number(r.account_id), char_ids: JSON.stringify(r.char_ids || r.charIds || []),
+    leader: r.leader ? 1 : 0, online: r.online ? 1 : 0, kills: 0, deaths: 0, damage: 0 });
+  this._guildSave(); return { ok: true };
+};
+JsonStore.prototype.pvpRosterGet = function (battleId) {
+  return (this.pvpBattleRoster || []).filter((r) => Number(r.battle_id) === Number(battleId)).map((r) => {
+    let ids = r.char_ids; if (typeof ids === "string") { try { ids = JSON.parse(ids); } catch (e) { ids = []; } }
+    return { battle_id: Number(r.battle_id), team: Number(r.team), account_id: Number(r.account_id),
+      char_ids: Array.isArray(ids) ? ids : [], leader: !!r.leader, online: !!r.online,
+      kills: Number(r.kills) || 0, deaths: Number(r.deaths) || 0, damage: Number(r.damage) || 0 };
+  });
+};
+JsonStore.prototype.accountAddInsignias = function (accountId, n) {
+  const acc = (this.accounts || []).find((a) => Number(a.id) === Number(accountId));
+  if (!acc) return false;
+  acc.pvp_insignias = Math.max(0, (Number(acc.pvp_insignias) || 0) + Math.floor(Number(n) || 0));
+  return true;
+};
+JsonStore.prototype.pvpStakeCredit = function (guildId, type, amount) {
+  const g = this.guildById(guildId); if (!g) return { ok: false, error: "NOT_FOUND" };
+  const col = this._pvpStakeCol(type), amt = Math.max(0, Math.floor(Number(amount) || 0));
+  g[col] = (Number(g[col]) || 0) + amt;
+  this._guildSave();
+  return { ok: true, value: g[col] };
 };
 
 /* Wrapper MySQL (mysql2/promise) — mesma API do JsonStore */
@@ -3325,14 +3481,34 @@ async function MysqlStore() {
       const result=await this.run("DELETE FROM account_leases");
       return result.affectedRows||0;
     },
-    async endAllInstances(reason){
+    async endAllInstances(reason,keepInstanceIds){
       const clean=String(reason||"server-restart").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"server-restart";
+      const keep=(keepInstanceIds||[]).map(String);
       const result=await this.run(
         "UPDATE account_instances SET status='ended', terminal_reason=?, ended_at=NOW(), "+
-        "worker_cursor_at=NOW(), version=version+1, updated_at=NOW() WHERE status='active'",[clean]);
+        "worker_cursor_at=NOW(), version=version+1, updated_at=NOW() WHERE status='active'"+
+        (keep.length?" AND instance_id NOT IN ("+keep.map(()=>"?").join(",")+")":""),[clean].concat(keep));
       return result.affectedRows||0;
     },
-    async leaseAcquire(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
+    async instancePvpResume(accountId,instanceId,state,now){
+      const at=new Date(Number(now)||Date.now());
+      const result=await this.run(
+        "UPDATE account_instances SET state=?, version=version+1, saved_at=?, worker_cursor_at=?, updated_at=? "+
+        "WHERE account_id=? AND instance_id=? AND status='active'",
+        [state,at,at,at,Number(accountId),String(instanceId)]);
+      return {ok:(result.affectedRows||0)>0};
+    },
+    /* Worker/tick de instância compartilhada (PvP/World Boss) segura gap
+     * locks em account_leases: o INSERT do lease de outra conta pode cair em
+     * deadlock (40001). A transação é idempotente — repete até 3x. */
+    async leaseAcquire(...args){
+      for(let attempt=0;;attempt++){
+        try{return await this._leaseAcquireOnce(...args);}
+        catch(error){if(!(error&&error.code==="ER_LOCK_DEADLOCK")||attempt>=2)throw error;
+          await new Promise((r)=>setTimeout(r,25+Math.floor(Math.random()*50)));}
+      }
+    },
+    async _leaseAcquireOnce(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
       const conn=await pool.getConnection(),lockName="idle-lease-"+Number(accountId);
       try{
         const [locks]=await conn.query("SELECT GET_LOCK(?,5) AS acquired",[lockName]);
@@ -3393,6 +3569,15 @@ async function MysqlStore() {
     },
     async instanceGet(accountId){
       const rows=await this.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
+      return rows[0]||null;
+    },
+    // Mesma linha sem o blob `state` (pode ter ~5MB em batalhas PvP) —
+    // para checagens de rota que só precisam de metadados.
+    async instanceGetHead(accountId){
+      const rows=await this.query(
+        `SELECT account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,party_version,
+           active_character_id,saved_at,started_at,worker_cursor_at,worker_total_ms,ended_at,terminal_reason
+           FROM account_instances WHERE account_id=?`,[Number(accountId)]);
       return rows[0]||null;
     },
     async instanceGetByParty(partyId){
@@ -3579,22 +3764,38 @@ async function MysqlStore() {
     async instanceAuthorityTick(accountId,expectedVersion,now,maxStep,advanceState,lease,opts){
       const conn=await pool.getConnection();
       const leaseAcc=(opts&&opts.leaseAccountId!=null)?opts.leaseAccountId:accountId;
+      // Batalha PvP compartilhada: `opts.hotAuth` mantém o descritor vivo em
+      // memória. Cada request deixa de ler/gravar ~5MB — SELECT leve sem o
+      // blob, avanço in-place e persist do blob só a cada PVP_AUTH_PERSIST_MS
+      // (ou no fim). `version` só sobe nas escritas reais: drift de versão
+      // sinaliza escrita externa (patch/checkpoint) e força recarga.
+      const hotApi=opts&&opts.hotAuth;
       try{
         await conn.beginTransaction();
         if(!await lockValidLease(conn,leaseAcc,lease)){
           await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};
         }
-        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        /* Caminho quente: SEM FOR UPDATE — a serialização já é o mutex
+         * in-process do caller (a lock segurada durante o avanço afogava
+         * o pool com ~35 req/s na mesma row). Drift externo segue por
+         * `version` (recarga) + CAS no persist. */
+        const [rows]=await conn.query(hotApi
+          ?`SELECT account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,party_version,active_character_id,saved_at,started_at,worker_cursor_at,worker_total_ms,ended_at,terminal_reason FROM account_instances WHERE account_id=?`
+          :"SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
         const row=rows[0];if(!row||row.status!=="active"){
           await conn.rollback();return {ok:false,error:"INSTANCE_NOT_ACTIVE"};
         }
         if(expectedVersion!==null&&expectedVersion!==undefined&&Number(row.version)!==Number(expectedVersion)){
+          // Resposta de resync precisa do estado — busca quente ou blob.
+          if(hotApi){const h=await hotApi.get(row,conn);row.state=h?h.descriptor:null;}
           await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
         }
         const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
         const elapsed=Math.min(Math.max(0,now-cursor),Math.max(100,Number(maxStep)||10000));
-        if(elapsed<50){await conn.commit();return {ok:true,instance:row,characters:[],elapsed:0};}
-        const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        const hot=hotApi?await hotApi.get(row,conn):null;
+        if(elapsed<50){await conn.commit();return {ok:true,
+          instance:hot?Object.assign({},row,{state:hot.descriptor}):row,characters:[],elapsed:0};}
+        const advanced=advanceState(hot?hot.descriptor:row.state,elapsed,now,hot||undefined),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         next.state=await syncBlessWallets(conn,next.state);
         const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
         // Inventário da conta: no tick TERMINAL, extrai bag/lootPouch/depot dos
@@ -3664,6 +3865,45 @@ async function MysqlStore() {
             sd.gold=gold;
             await conn.query("UPDATE characters SET data=? WHERE id=?",[JSON.stringify(sd),Number(sib.id)]);
           }
+        }
+        if(hot){
+          /* Caminho quente: grava o blob só a cada hotApi.persistMs (ou no
+           * fim) — os ~5MB deixam de circular a cada tick de cada cliente.
+           * Entre persists só o cursor avança (sem bump de version: o cliente
+           * deixa de tomar VERSION_CONFLICT a cada tick alheio). */
+          const persistMs=Number(hotApi.persistMs)||4000;
+          const persist=!!next.terminalReason||(now-(Number(hot.savedAt)||0))>=persistMs;
+          if(persist){
+            const str=typeof next.state==="string"?next.state:JSON.stringify(next.state);
+            /* CAS por version: sem FOR UPDATE, uma escrita externa (checkpoint,
+             * patch) podia commitar entre a leitura da head e este UPDATE.
+             * Se alguém bumpou a versão, devolvemos conflito — o tick seguinte
+             * recarrega o descritor pelo drift detect. */
+            const [upd]=await conn.query(
+              `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
+                 terminal_reason=?,ended_at=? WHERE account_id=? AND version=?`,
+              [str,new Date(now),new Date(now),next.terminalReason?"ended":"active",next.terminalReason||null,
+               next.terminalReason?new Date(now):null,Number(accountId),Number(row.version)]);
+            if(!upd.affectedRows){
+              if(typeof hotApi.drop==="function")hotApi.drop(row.instance_id);
+              await conn.rollback();
+              return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
+            }
+            hot.rowVersion=Number(row.version)+1;hot.savedAt=now;
+          }else{
+            await conn.query("UPDATE account_instances SET worker_cursor_at=? WHERE account_id=?",
+              [new Date(now),Number(accountId)]);
+          }
+          if(next.terminalReason&&typeof hotApi.drop==="function")hotApi.drop(row.instance_id);
+          const saved=Object.assign({},row,{version:persist?Number(row.version)+1:Number(row.version),
+            status:next.terminalReason?"ended":"active",terminal_reason:next.terminalReason||null,
+            worker_cursor_at:new Date(now),saved_at:new Date(Number(hot.savedAt)||now),
+            ended_at:next.terminalReason?new Date(now):row.ended_at,
+            state:hot.descriptor});
+          const ids=(next.characters||[]).map((p)=>Number(p.id));let characters=[];
+          if(ids.length){const marks=ids.map(()=>"?").join(",");[characters]=await conn.query(
+            `SELECT * FROM characters WHERE id IN (${marks})`,ids);}
+          await conn.commit();return {ok:true,instance:saved,characters,elapsed,terminalReason:next.terminalReason||null};
         }
         await conn.query(
           `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
@@ -4384,6 +4624,9 @@ async function MysqlStore() {
 
     // ---- GUILD POINTS / SHOP / CAIXA / HISTÓRICO ----
     async guildLogAdd(exec, entry) {
+      // Controllers chamam guildLogAdd(null, entry) — mesmo padrão do
+      // JsonStore. Sem o fallback, exec.query em null quebrava o settle PvP.
+      exec = exec || this;
       await exec.query(
         `INSERT INTO guild_log (guild_id,account_id,char_name,category,detail,gold_delta,points_delta,coins_delta)
          VALUES (?,?,?,?,?,?,?,?)`,
@@ -4616,6 +4859,219 @@ async function MysqlStore() {
     async guildApplyBonuses(guildId) {
       await guildBonusToChars(pool, guildId);
     },
+    /* ------------------- PvP guild-vs-guild (MySQL) ------------------- */
+    async pvpBattleGet(id) {
+      const rows = await this.query("SELECT * FROM pvp_battles WHERE id=?", [Number(id)]);
+      return rows[0] || null;
+    },
+    async pvpBattlesActive() {
+      return this.query(
+        "SELECT * FROM pvp_battles WHERE status IN ('pending','accepted','prep','live')");
+    },
+    async pvpBattlesForGuild(guildId, limit) {
+      const lim = Math.max(1, Math.min(500, Number(limit) || 100));
+      return this.query(
+        `SELECT * FROM pvp_battles WHERE challenger_guild_id=? OR challenged_guild_id=?
+         ORDER BY id DESC LIMIT ${lim}`, [Number(guildId), Number(guildId)]);
+    },
+    async pvpBattlesForAccount(accountId, limit) {
+      const lim = Math.max(1, Math.min(500, Number(limit) || 100));
+      return this.query(
+        `SELECT b.* FROM pvp_battles b JOIN pvp_battle_roster r ON r.battle_id=b.id
+         WHERE r.account_id=? AND b.status='finished' ORDER BY b.id DESC LIMIT ${lim}`, [Number(accountId)]);
+    },
+    async pvpBattleLastCreate(guildId) {
+      const rows = await this.query(
+        "SELECT UNIX_TIMESTAMP(MAX(created_at))*1000 ts FROM pvp_battles WHERE challenger_guild_id=?",
+        [Number(guildId)]);
+      return Number(rows[0] && rows[0].ts) || 0;
+    },
+    async pvpLobbyCreate(opts) {
+      const o = opts || {}, conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [busy] = await conn.query(
+          `SELECT id FROM pvp_battles
+           WHERE status IN ('pending','accepted','prep','live')
+             AND (challenger_guild_id IN (?,?) OR challenged_guild_id IN (?,?)) LIMIT 1`,
+          [o.challengerGuildId, o.challengedGuildId, o.challengerGuildId, o.challengedGuildId]);
+        if (busy.length) { await conn.rollback(); return { ok: false, error: "PVP_GUILD_BUSY" }; }
+        const col = o.stakeType === "coins" ? "coins" : "balance";
+        const amt = Math.max(0, Math.floor(Number(o.stakeAmount) || 0));
+        const [u] = await conn.query(
+          `UPDATE guilds SET ${col}=${col}-? WHERE id=? AND ${col}>=?`,
+          [amt, Number(o.challengerGuildId), amt]);
+        if (!u.affectedRows) { await conn.rollback(); return { ok: false, error: "STAKE_LOW" }; }
+        const [ins] = await conn.query(
+          `INSERT INTO pvp_battles (challenger_guild_id,challenged_guild_id,created_by,map,team_size,
+             stake_type,stake_amount,status,scheduled_at,quick)
+           VALUES (?,?,?,?,?,?,?,'pending',?,?)`,
+          [Number(o.challengerGuildId), Number(o.challengedGuildId), Number(o.createdBy),
+           String(o.map), Number(o.teamSize), col === "coins" ? "coins" : "gold", amt,
+           Number(o.scheduledAt), o.quick ? 1 : 0]);
+        await this.guildLogAdd(conn, { guild_id: Number(o.challengerGuildId),
+          account_id: Number(o.createdBy), char_name: o.charName || "", category: "pvp",
+          detail: `Desafio PvP #${ins.insertId} (${amt} ${col === "coins" ? "coins" : "gold"})`,
+          gold_delta: col === "balance" ? -amt : 0, points_delta: 0,
+          coins_delta: col === "coins" ? -amt : 0 });
+        await conn.commit();
+        return { ok: true, id: ins.insertId };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async pvpBattleUpdate(id, fields) {
+      const f = fields || {}, cols = [], vals = [];
+      for (const k of ["status", "scheduled_at", "prepared_at", "started_at", "finished_at", "winner_guild_id",
+        "draw", "overtime", "scores", "result", "host_account_id", "instance_id"]) {
+        if (f[k] !== undefined) { cols.push(k + "=?"); vals.push(f[k]); }
+      }
+      if (!cols.length) return { ok: false, error: "NO_FIELDS" };
+      vals.push(Number(id));
+      await this.run(`UPDATE pvp_battles SET ${cols.join(",")} WHERE id=?`, vals);
+      return { ok: true };
+    },
+    async pvpBattleAccept(battleId, guildId, charName) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.query(
+          "SELECT * FROM pvp_battles WHERE id=? FOR UPDATE", [Number(battleId)]);
+        const b = rows[0];
+        if (!b || String(b.status) !== "pending" || Number(b.challenged_guild_id) !== Number(guildId)) {
+          await conn.rollback(); return { ok: false, error: "INVALID_STATE" };
+        }
+        const col = b.stake_type === "coins" ? "coins" : "balance";
+        const [u] = await conn.query(
+          `UPDATE guilds SET ${col}=${col}-? WHERE id=? AND ${col}>=?`,
+          [Number(b.stake_amount), Number(guildId), Number(b.stake_amount)]);
+        if (!u.affectedRows) { await conn.rollback(); return { ok: false, error: "STAKE_LOW" }; }
+        await conn.query("UPDATE pvp_battles SET status='accepted' WHERE id=?", [Number(battleId)]);
+        await this.guildLogAdd(conn, { guild_id: Number(guildId), account_id: 0,
+          char_name: charName || "", category: "pvp",
+          detail: `Desafio PvP #${battleId} aceito (${b.stake_amount} ${b.stake_type})`,
+          gold_delta: col === "balance" ? -Number(b.stake_amount) : 0, points_delta: 0,
+          coins_delta: col === "coins" ? -Number(b.stake_amount) : 0 });
+        await conn.commit();
+        return { ok: true };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async pvpBattleDecline(battleId, guildId) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.query(
+          "SELECT * FROM pvp_battles WHERE id=? FOR UPDATE", [Number(battleId)]);
+        const b = rows[0];
+        if (!b || String(b.status) !== "pending" || Number(b.challenged_guild_id) !== Number(guildId)) {
+          await conn.rollback(); return { ok: false, error: "INVALID_STATE" };
+        }
+        const col = b.stake_type === "coins" ? "coins" : "balance";
+        await conn.query(`UPDATE guilds SET ${col}=${col}+? WHERE id=?`,
+          [Number(b.stake_amount), Number(b.challenger_guild_id)]);
+        await conn.query(
+          "UPDATE pvp_battles SET status='declined', finished_at=? WHERE id=?",
+          [Date.now(), Number(battleId)]);
+        await conn.commit();
+        return { ok: true };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async pvpBattleCancel(battleId) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.query(
+          "SELECT * FROM pvp_battles WHERE id=? FOR UPDATE", [Number(battleId)]);
+        const b = rows[0];
+        if (!b || !["pending", "accepted"].includes(String(b.status))) {
+          await conn.rollback(); return { ok: false, error: "INVALID_STATE" };
+        }
+        const col = b.stake_type === "coins" ? "coins" : "balance";
+        await conn.query(`UPDATE guilds SET ${col}=${col}+? WHERE id=?`,
+          [Number(b.stake_amount), Number(b.challenger_guild_id)]);
+        if (String(b.status) === "accepted") {
+          await conn.query(`UPDATE guilds SET ${col}=${col}+? WHERE id=?`,
+            [Number(b.stake_amount), Number(b.challenged_guild_id)]);
+        }
+        await conn.query(
+          "UPDATE pvp_battles SET status='cancelled', finished_at=? WHERE id=?",
+          [Date.now(), Number(battleId)]);
+        await conn.commit();
+        return { ok: true };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async pvpBattleForfeit(battleId, loserGuildId, charName) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.query(
+          "SELECT * FROM pvp_battles WHERE id=? FOR UPDATE", [Number(battleId)]);
+        const b = rows[0];
+        if (!b || !["accepted", "prep", "live"].includes(String(b.status))) {
+          await conn.rollback(); return { ok: false, error: "INVALID_STATE" };
+        }
+        const winner = Number(b.challenger_guild_id) === Number(loserGuildId)
+          ? Number(b.challenged_guild_id) : Number(b.challenger_guild_id);
+        const col = b.stake_type === "coins" ? "coins" : "balance";
+        const pot = Number(b.stake_amount) * 2, fee = Math.floor(pot * 0.10), net = pot - fee;
+        await conn.query(`UPDATE guilds SET ${col}=${col}+? WHERE id=?`, [net, winner]);
+        await conn.query(
+          `UPDATE pvp_battles SET status='finished', winner_guild_id=?, finished_at=?,
+             result=? WHERE id=?`,
+          [winner, Date.now(),
+           JSON.stringify({ forfeit: Number(loserGuildId), rewards: { winnerGuild: winner, net, fee } }),
+           Number(battleId)]);
+        await this.guildLogAdd(conn, { guild_id: winner, account_id: 0, char_name: charName || "",
+          category: "pvp", detail: `Vitória PvP #${battleId} por desistência (pote ${net})`,
+          gold_delta: col === "balance" ? net : 0, points_delta: 0,
+          coins_delta: col === "coins" ? net : 0 });
+        await conn.commit();
+        return { ok: true, winner };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async pvpRosterReplace(battleId, rows) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query("DELETE FROM pvp_battle_roster WHERE battle_id=?", [Number(battleId)]);
+        for (const r of rows || []) {
+          await conn.query(
+            `INSERT INTO pvp_battle_roster (battle_id,team,account_id,char_ids,leader,online)
+             VALUES (?,?,?,?,?,?)`,
+            [Number(battleId), Number(r.team), Number(r.account_id),
+             JSON.stringify(r.char_ids || r.charIds || []), r.leader ? 1 : 0, r.online ? 1 : 0]);
+        }
+        await conn.commit();
+        return { ok: true };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async pvpRosterGet(battleId) {
+      const rows = await this.query("SELECT * FROM pvp_battle_roster WHERE battle_id=?",
+        [Number(battleId)]);
+      return rows.map((r) => {
+        let ids = r.char_ids; if (typeof ids === "string") { try { ids = JSON.parse(ids); } catch (e) { ids = []; } }
+        return { battle_id: Number(r.battle_id), team: Number(r.team), account_id: Number(r.account_id),
+          char_ids: Array.isArray(ids) ? ids : [], leader: !!r.leader, online: !!r.online,
+          kills: Number(r.kills) || 0, deaths: Number(r.deaths) || 0, damage: Number(r.damage) || 0 };
+      });
+    },
+    async accountAddInsignias(accountId, n) {
+      await this.run("UPDATE accounts SET pvp_insignias=GREATEST(0,pvp_insignias+?) WHERE id=?",
+        [Math.floor(Number(n) || 0), Number(accountId)]);
+      return true;
+    },
+    async pvpStakeCredit(guildId, type, amount) {
+      const col = type === "coins" ? "coins" : "balance";
+      const amt = Math.max(0, Math.floor(Number(amount) || 0));
+      await this.run(`UPDATE guilds SET ${col}=${col}+? WHERE id=?`, [amt, Number(guildId)]);
+      const rows = await this.query(`SELECT ${col} v FROM guilds WHERE id=?`, [Number(guildId)]);
+      return { ok: true, value: rows[0] ? Number(rows[0].v) : 0 };
+    },
+
     async guildClearBonusForAccount(accountId) {
       await this.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus','$.guildTempBonus') WHERE account_id=?",
         [Number(accountId)]);
@@ -4983,7 +5439,7 @@ async function ensureSchema(pool) {
     instance_id CHAR(64) NOT NULL,
     version BIGINT UNSIGNED NOT NULL DEFAULT 1,
     status ENUM('active','ended') NOT NULL DEFAULT 'active',
-    kind ENUM('hunt','boss','quest') NOT NULL,
+    kind ENUM('hunt','boss','quest','pvp') NOT NULL,
     hunt_id VARCHAR(64) DEFAULT NULL,
     boss_id VARCHAR(64) DEFAULT NULL,
     instance_mode VARCHAR(24) NOT NULL DEFAULT 'non-pvp',
@@ -5008,7 +5464,7 @@ async function ensureSchema(pool) {
     "ADD COLUMN worker_total_ms BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER worker_cursor_at",
   ]){try{await pool.query("ALTER TABLE account_instances "+col);}catch(e){/* já existe */}}
   // kind: 'quest' entrou depois do schema inicial — alarga o enum nas VMs antigas.
-  try{await pool.query("ALTER TABLE account_instances MODIFY kind ENUM('hunt','boss','quest') NOT NULL");}catch(e){}
+  try{await pool.query("ALTER TABLE account_instances MODIFY kind ENUM('hunt','boss','quest','pvp') NOT NULL");}catch(e){}
   try{await pool.query("UPDATE account_instances SET worker_cursor_at=saved_at WHERE worker_cursor_at IS NULL");}catch(e){}
   await pool.query(`CREATE TABLE IF NOT EXISTS snapshot_history (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -5218,6 +5674,55 @@ async function ensureSchema(pool) {
   ) ENGINE=InnoDB`);
   try { await pool.query("ALTER TABLE guild_log ADD COLUMN coins_delta BIGINT NOT NULL DEFAULT 0"); }
   catch (e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE guild_log MODIFY COLUMN category ENUM('donation','purchase','pvp') NOT NULL"); }
+  catch (e) { /* já existe */ }
+  // Única migração do enum: inclui 'quest' (a versão antiga sem 'quest'
+  // rodava depois e truncava instâncias de quest para '').
+  try { await pool.query("ALTER TABLE account_instances MODIFY COLUMN kind ENUM('hunt','boss','quest','pvp') NOT NULL"); }
+  catch (e) { /* já existe */ }
+
+  // PvP guild-vs-guild: lobbies agendados, convites, rosters e histórico.
+  await pool.query(`CREATE TABLE IF NOT EXISTS pvp_battles (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    challenger_guild_id INT UNSIGNED NOT NULL,
+    challenged_guild_id INT UNSIGNED NOT NULL,
+    created_by INT UNSIGNED NOT NULL,
+    map VARCHAR(24) NOT NULL,
+    team_size TINYINT UNSIGNED NOT NULL,
+    stake_type ENUM('gold','coins') NOT NULL DEFAULT 'gold',
+    stake_amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    status ENUM('pending','accepted','declined','cancelled','prep','live','finished') NOT NULL DEFAULT 'pending',
+    scheduled_at BIGINT UNSIGNED NOT NULL,
+    prepared_at BIGINT UNSIGNED NULL,
+    started_at BIGINT UNSIGNED NULL,
+    finished_at BIGINT UNSIGNED NULL,
+    winner_guild_id INT UNSIGNED NULL,
+    draw TINYINT(1) NOT NULL DEFAULT 0,
+    overtime TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    scores VARCHAR(64) NULL,
+    result MEDIUMTEXT NULL,
+    host_account_id INT UNSIGNED NULL,
+    instance_id VARCHAR(64) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pvp_status (status, scheduled_at),
+    INDEX idx_pvp_guilds (challenger_guild_id, challenged_guild_id)
+  ) ENGINE=InnoDB`);
+  // Início rápido (test server): batalha começa 1 min após o aceite.
+  try { await pool.query("ALTER TABLE pvp_battles ADD COLUMN quick TINYINT(1) NOT NULL DEFAULT 0"); }
+  catch (e) { /* já existe */ }
+  await pool.query(`CREATE TABLE IF NOT EXISTS pvp_battle_roster (
+    battle_id INT UNSIGNED NOT NULL,
+    team TINYINT UNSIGNED NOT NULL,
+    account_id INT UNSIGNED NOT NULL,
+    char_ids VARCHAR(400) NOT NULL DEFAULT '[]',
+    leader TINYINT(1) NOT NULL DEFAULT 0,
+    online TINYINT(1) NOT NULL DEFAULT 0,
+    kills INT UNSIGNED NOT NULL DEFAULT 0,
+    deaths INT UNSIGNED NOT NULL DEFAULT 0,
+    damage BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (battle_id, account_id),
+    INDEX idx_pvp_roster_acc (account_id)
+  ) ENGINE=InnoDB`);
 
   // Migração das parties anteriores ao modelo account-owned. A conta do
   // líder vira a dona; em legado inconsistente, mantém-se a party mais antiga.

@@ -4,6 +4,52 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-06 — Prey por conta, proteção no templo/treiners e PvP fluido
+
+### Mudanças
+
+- **Prey agora é DA CONTA** — slots, criaturas selecionadas, bônus
+  (exp/dano/defesa/loot) e wildcards passam a ser compartilhados entre
+  **todos os personagens da conta**, como stamina e inventário. O estado
+  mora em `accounts.shared_inventory.prey`; qualquer personagem que
+  hidratar recebe o mesmo objeto (`applySharedToPlayer`), e rerolls,
+  seleções e uso de wildcards feitos em um char valem para os demais
+  (`extractSharedFromPlayer`/`mergeSharedFromPlayer` persistem de volta).
+  Migração automática: o primeiro personagem com prey já preenchida
+  semeia o estado compartilhado da conta.
+- **Templo e treiners protegem cargas e timers** — enquanto o personagem
+  está na cidade (templo) ou nos treiners/dummies, **itens não perdem
+  cargas** (soft boots, time rings etc.), **imbuements não perdem tempo**
+  (eles já só decaem por tempo de combate) e **o relógio de 2h da prey
+  congela** — a expiração desliza junto, então a prey só gasta tempo
+  caçando de verdade.
+- **PvP: opção 3v3** no modal de criação de batalha (3 contas por time,
+  ~12–15 personagens) além de 5/10/15/20/50/100; **zoom da arena maior**
+  (FOV 15×11, estilo Tibia clássico).
+- **PvP: início rápido de teste em 3s** (somente TEST_SERVER).
+
+### Correções de performance/estabilidade (PvP)
+
+- **Servidor destravado**: o tick autoritativo segurava `FOR UPDATE` na
+  mesma linha por ~35 req/s e afogava o pool do MySQL (menus travavam em
+  "Carregando"). Agora o avanço é serializado por mutex em processo com
+  persistência por compare-and-swap de `version` — menus voltam a
+  responder em ms.
+- **Chars remotos não "teleportam" mais**: merges descartados por
+  `version` (só bumpava a cada ~4s com o hot-persistence) congelavam os
+  personagens simulados; em batalha PvP o dedupe é dispensado (requests já
+  são ordenadas na fila da conta), respostas duplicadas mantêm a
+  interpolação e deslocamentos de até 4 SQMs deslizam em vez de saltar.
+- **Render mais leve**: cache de sprites de texto (nomes/floaters/falas),
+  janela de células visíveis no tilemap (FOV+margem em vez do mapa inteiro),
+  cache de `maxStats` e da ocupação do grid.
+- **Modal "ASSUMIR O CONTROLE"**: logar numa conta já em batalha PvP não
+  trava mais numa tela escura — aparece aviso e botão para tomar o lease.
+- **Regressão de mapa preto corrigida** (cache offscreen do chão
+  removido; o culling por janela visível permanece).
+
+---
+
 ## 2026-11-05 — Buraco nas paredes corrigido, telas com cara da cidade
 
 ### Correções

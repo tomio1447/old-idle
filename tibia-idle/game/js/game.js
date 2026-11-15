@@ -85,6 +85,10 @@ function combatSessionParticipants(c) {
  * a aba oculta, em vez de teleportar a party para a cidade. */
 function persistActiveInstance() {
   const c=G.combat;
+  // Batalha PvP: a autoridade compartilhada é a fonte de verdade. Espelhar 40
+  // personagens das duas guilds no localStorage estourava a quota (e
+  // gravava chars rivais no roster local da conta).
+  if(c&&c.pvpBattle)return null;
   if(!c||c.instanceFinished||c.bossDefeated){clearInstanceSession(c&&c.bossDefeated?"boss-defeated":"finished");return null;}
   const savedAt=Date.now(),participants=combatSessionParticipants(c);
   if(c.huntMap&&typeof mapBlockKeys==="function"){
@@ -232,6 +236,9 @@ function resumeIdleInstance(session){
     if(member&&member.p){G.p=normalizePlayer(member.p);G.p.id=member.id||G.p.id;}
     const boss=session.kind==="boss"&&typeof BOSS_DEFS!=="undefined"?BOSS_DEFS[session.bossId]:null;
     let hunt=boss?bossArenaDefinition(boss):GAMEDATA.hunts[session.huntId];
+    // Batalha PvP de guild: arena virtual a partir do mapa de guerra da instância.
+    const pvpArena=session.kind==="pvp"&&typeof pvpArenaHunt==="function"?pvpArenaHunt(session):null;
+    if(session.kind==="pvp")hunt=pvpArena;
     // Quest: criar um hunt definition virtual a partir do QUEST_DEFS
     let questDef=null;
     if(session.kind==="quest"&&typeof QUEST_DEFS!=="undefined"){
@@ -248,7 +255,8 @@ function resumeIdleInstance(session){
         };
       }
     }
-    if((session.kind==="boss"&&!boss)||(session.kind==="hunt"&&!hunt)||(session.kind==="quest"&&!hunt)){
+    if((session.kind==="boss"&&!boss)||(session.kind==="hunt"&&!hunt)||(session.kind==="quest"&&!hunt)||
+       (session.kind==="pvp"&&!hunt)){
       clearInstanceSession();resolve({resumed:false,ended:true});return;
     }
     G.p.hunt=session.kind==="hunt"?session.huntId:null;
@@ -260,11 +268,11 @@ function resumeIdleInstance(session){
     const build=()=>{
       if(done)return;done=true;if(watchdog)clearTimeout(watchdog);
       try{
-        const fresh=boss?newBossCombat(G.p,boss):newCombat(G.p,session.huntId,session.instanceMode,
-          questDef?{hunt:hunt}:undefined);
+        const fresh=boss?newBossCombat(G.p,boss):pvpArena?newCombat(G.p,null,"pvp",{hunt:pvpArena,skipParty:true}):
+          newCombat(G.p,session.huntId,session.instanceMode,questDef?{hunt:hunt}:undefined);
         if(typeof markHuntMapReady==="function")markHuntMapReady();
         else G.huntMapReady=true;
-        if(!boss&&!session.state&&!questDef){
+        if(!boss&&!session.state&&!questDef&&!pvpArena){
           spawnWave(fresh,G.p);
           for(const pending of fresh.pendingSpawns||[])pending.startedAt=session.savedAt;
         }
@@ -291,7 +299,7 @@ function resumeIdleInstance(session){
           reason:session.authority&&session.authority.terminalReason||null}:
           advanceIdleInstance(elapsed,startAt,{silent:true});
         if(G.combat){
-          if(!(boss&&boss.worldBoss))persistActiveInstance();
+          if(!(boss&&boss.worldBoss)&&!pvpArena)persistActiveInstance();
           G.inCity=false;
         }
         resolve({resumed:!!G.combat,ended:result.ended,elapsed});
@@ -2451,7 +2459,7 @@ function openBossesCatalogModal() {
   body.classList.remove(
     "hunts-modal-shell", "boss-modal-shell", "reward-modal-shell",
     "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
-    "lootcfg-modal-shell"
+    "lootcfg-modal-shell", "imb-modal-shell"
   );
   body.classList.add("bosses-modal-shell");
   body.innerHTML = `<div class="panel-title bosses-modal-title">
@@ -4950,7 +4958,12 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     if(incomingBossId)return false;
     if(incomingHuntId&&incomingHuntId!==localHuntId)return false;
   }
-  if(!terminalReason&&Number.isFinite(incomingVersion)&&incomingVersion>0&&
+  /* Guerra de guild: o row `version` só bumpa no persist quente (~4s) — se o
+   * dedupe por versão valesse aqui, só 1 merge a cada 4s entraria e os chars
+   * remotos congelariam entre "teleportes". Requests de tick são serializadas
+   * pela fila da conta (ordem garantida), então a batalha pode sempre mesclar. */
+  const dedupeByVersion=!previous.pvpBattle;
+  if(!terminalReason&&dedupeByVersion&&Number.isFinite(incomingVersion)&&incomingVersion>0&&
      incomingVersion<=ONLINE_AUTH_APPLIED_VERSION&&
      (!ONLINE_AUTH_APPLIED_INSTANCE||!instanceId||instanceId===ONLINE_AUTH_APPLIED_INSTANCE))
     return false;
@@ -4988,6 +5001,43 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     if(catalog)ent.def=catalog;
     return ent;
   };
+  /* Batalha PvP: só o char pilotado (self) mantém predição local. Todos os
+   * demais são simulados pela autoridade do servidor compartilhada —
+   * preservar a posição local congelava cada um na primeira pose vista e
+   * os dois times viam mapas diferentes (a "dessincronia"). Aqui a célula
+   * autoritativa vence e o passo é interpolado suavemente. */
+  const pvpApplyRemoteCell=(local,visual)=>{
+    const ncx=Number(local.cx),ncy=Number(local.cy);
+    // walkGoal é client-only: restos de um merge antigo arrastariam o char
+    // remoto por um trajeto que a autoridade não conhece.
+    local.walkGoal=null;
+    if(!Number.isFinite(ncx)||!Number.isFinite(ncy))return;
+    const s=typeof cellToScreen==="function"?cellToScreen(ncx,ncy):{x:local.x,y:local.y};
+    const ocx=Number(visual.cx),ocy=Number(visual.cy);
+    const moved=Number.isFinite(ocx)&&Number.isFinite(ocy)&&(ncx!==ocx||ncy!==ocy);
+    const jump=moved?Math.max(Math.abs(ncx-ocx),Math.abs(ncy-ocy)):0;
+    if(!moved){
+      // Mesma célula (resposta stale/sem avanço): se já desliza para ESTA
+      // célula, mantém a interpolação — o snap aqui era o micro-teleporte.
+      if(local.moving&&local.tx===s.x&&local.ty===s.y)return;
+      local.x=s.x;local.y=s.y;local.sx=s.x;local.sy=s.y;local.tx=s.x;local.ty=s.y;
+      local.moving=false;local.stepT=0;return;
+    }
+    if(jump>4){
+      // Teleporte real (respawn na safezone): encaixa na célula.
+      local.x=s.x;local.y=s.y;local.sx=s.x;local.sy=s.y;local.tx=s.x;local.ty=s.y;
+      local.moving=false;local.stepT=0;return;
+    }
+    /* Até 4 células: desliza. Sob carga a autoridade avança vários passos
+     * entre merges — o corte a >2 transformava marcha rápida em teleporte.
+     * A duração escala com a distância para não "voar" pela tela. */
+    local.sx=Number.isFinite(Number(visual.x))?Number(visual.x):s.x;
+    local.sy=Number.isFinite(Number(visual.y))?Number(visual.y):s.y;
+    local.tx=s.x;local.ty=s.y;
+    const base=Math.max(120,Math.min(450,Number(local.stepDur)||280));
+    local.stepDur=Math.min(1000,base*jump);
+    local.stepT=0;local.moving=true;
+  };
   const mergeEntity=(local,remote,isPlayer)=>{
     if(!local)return hydrateMobDef(remote);
     // ID reciclado: cadáver (hp 0) virando spawn novo, OU a mesma slot
@@ -4997,6 +5047,10 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
        String(local.slug||"")!==String(remote&&remote.slug||"")))
       return hydrateMobDef(Object.assign({},remote));
     const visual={};for(const key of visualKeys)if(local[key]!==undefined)visual[key]=local[key];
+    // PvP: só o char pilotado preserva a posição local (predição).
+    const pvpRemoteEnt=isPlayer&&!!(previous&&previous.pvpBattle)&&
+      entityId(local)!==localActiveId&&
+      entityId(local)!==String(typeof sessionCharId==="function"?sessionCharId()||"":"");
     const playerRef=isPlayer&&local.p&&typeof local.p==="object"?local.p:null;
     const localDef=local.def;
     // HP anterior do player para a garantia de dano visível (sync de dano):
@@ -5099,6 +5153,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
       for(const key of Object.keys(playerVisual))playerRef[key]=playerVisual[key];
       if(typeof rewardChestEnsureShape==="function")rewardChestEnsureShape(playerRef);
       if(typeof renderRewardButton==="function")renderRewardButton(playerRef);}
+    if(pvpRemoteEnt){pvpApplyRemoteCell(local,visual);return local;}
     for(const key of Object.keys(visual))local[key]=visual[key];
     return local;
   };
@@ -5203,6 +5258,13 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
   }
   if(Array.isArray(previous.players)){previous.players.splice(0,previous.players.length,...reconciledPlayers);}
   else previous.players=reconciledPlayers;
+  // Guerra: carimba o time no `p` — a outfit colore pela equipe (azul/vermelho).
+  if(previous.pvpBattle){
+    for(const ent of reconciledPlayers)
+      if(ent&&ent.p)ent.p._pvpTeam=Number(ent.pvpTeam!==undefined?ent.pvpTeam:ent.team)||0;
+    if(previous.player&&previous.player.p)
+      previous.player.p._pvpTeam=Number(previous.player.pvpTeam!==undefined?previous.player.pvpTeam:previous.player.team)||0;
+  }
   // Garantia de dano visível (bug "animação de área aparece mas o personagem
   // não sofre dano"): se o snapshot reduziu o HP de um player e NÃO há evento
   // taken para ele neste lote (perdido por dedupe de versão / 409 / rede),
@@ -5727,8 +5789,8 @@ function loop(ts) {
       G.p.staminaAt = Date.now();
     }
     regenInCity(G.p, dt);
-    // Soft boots / time rings: duração só com item EQUIPado (Canary stopduration).
-    if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
+    // Templo é zona protegida: itens NÃO perdem cargas (soft boots/time
+    // rings congelam) e imbuements/prey não decaem fora de combate.
     tickManaTrain(G.p, dt);
     // caminhada: ao chegar num NPC, abre o dialogo dele
     const reached = G.walker.update(dt);
@@ -5765,9 +5827,12 @@ function loop(ts) {
       for (const member of G.training.members) if (member.p && !member.p.remoteTraining) saveCharacterToRoster(member.p);
     save();
   }
-  // Prey: o timer de 2h decrementa enquanto o personagem está caçando
+  // Prey: o timer de 2h decrementa enquanto o personagem está caçando;
+  // no templo/treiners (sem combate) o relógio congela.
   if (G.combat && typeof preyTick === "function") {
     preyTick(G.p, dt);
+  } else if (G.p && typeof preyTick === "function") {
+    preyTick(G.p, dt, { paused: true });
   }
 }
 
@@ -6082,6 +6147,8 @@ function bindControls() {
     if (G.combat) {
       const { mx, my } = canvasPos(e);
       const cell = typeof canvasToCombatCell === "function" ? canvasToCombatCell(mx, my, cv.width, cv.height, G.combat) : null;
+      // Batalha PvP: clique num inimigo define o alvo do time inteiro.
+      if (G.combat.pvpBattle && cell && typeof pvpHandleCombatClick === "function" && pvpHandleCombatClick(cell)) return;
       if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p) && G.combat.questId !== "annihilator") return;
       if (cell && G.combat.player) G.combat.player.walkGoal = cell;
       return;

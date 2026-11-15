@@ -54,6 +54,9 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   equipFromContainerAuth, unequipFromContainerAuth, depotActionAuth } = require("./authoritative_engine");
 const { forgeCanFuse, forgeFuseAuth } = require("./forge");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
+const { createPvpController, PVP_MAPS, pvpMapLocal, pvpRectCenter, pvpApplyBattlePreset,
+  pvpFilterVisualState, pvpResumeLiveOnBoot, pvpAuthCacheGet, pvpAuthCacheSet,
+  pvpAuthCacheDrop, pvpAuthSerialize, PVP_AUTH_PERSIST_MS } = require("./pvp");
 const { createQuestController, QUEST_DEFS } = require("./quest_controller");
 // Inventário DA CONTA (bag/lootPouch/depot/reward chest compartilhados entre
 // os personagens). Pure module — db.js persiste accounts.shared_inventory.
@@ -315,7 +318,7 @@ function sendSyncExpired(res,reason){
   res.end(`event: sync-expired\ndata: ${JSON.stringify({reason:reason||"ticket-invalid"})}\n\n`);
 }
 function send(res, code, obj) {
-  const body = JSON.stringify(obj),headers=Object.assign(hardenedHeaders(res),{
+  const body = (obj&&typeof obj.__raw==="string")?obj.__raw:JSON.stringify(obj),headers=Object.assign(hardenedHeaders(res),{
     "Content-Type": "application/json; charset=utf-8","Content-Length": Buffer.byteLength(body),
     "Access-Control-Allow-Headers": "Content-Type, Authorization","Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
@@ -1858,6 +1861,10 @@ async function checkpointTraining(db, body) {
   for (const id of ids) {
     const resolved = await resolveInstanceRow(db, acc, id);
     if (resolved.error) return resolved.error;
+    // Conta na arena PvP: o treino fica pausado (o último checkpoint da
+    // transição para a batalha não é um conflito).
+    if (resolved.pvp)
+      return { code: 200, body: { ok: true, pvp: true, paused: true, characters: [], advances: [] } };
     if (resolved.row && resolved.row.status === "active")
       return { code: 409, body: { ok: false, msg: "Encerre a hunt antes de treinar." } };
   }
@@ -2001,9 +2008,45 @@ async function savePartyCharacters(db,body){
     characters:result.characters.map(charSummaryWithGold(acc))}};
 }
 
-function instanceSummary(row,includeState){
+/* Batalha PvP: o snapshot tem 40 chars completos (×3: authority, members e
+ * state.players ≈ 5MB). Para o browser: a autoridade vira um stub (só o que
+ * o cliente lê) e chars de OUTRAS contas perdem dados que não aparecem em
+ * combate. A cópia gravada no banco continua íntegra. */
+const PVP_CLIENT_HEAVY_KEYS=["missions","missionsDone","charmsPagos","bestiary","bosstiary","kills","_guildKillsMark",
+  "deathLog","bosses","_partyOnline","_partyInvites","log","achievements","depot","rewardChest","rewardChestBundles",
+  "wardrobe","forgeHistory","quests","helperPresets","itemInstances","bag","lootPouch","lootConfig","supplyStash",
+  "depotNotification","exaltationBox","dummies","prey","hazardKills","playtime","_sharedInv","_accountCosmetics",
+  "trainingExercise","soulWarTaints","forge","_forgeMeta","_forgeBase","_pouchBase"];
+function pvpSlimClientState(state,viewerAccountId){
+  if(!state||typeof state!=="object")return state;
+  // NÃO muta `state`: com o descritor quente em memória (hotAuth), o objeto
+  // recebido É a autoridade viva — trocar `state.authority` pelo stub ou
+  // enxugar members[].p in-place destruiria a simulação e os demais viewers.
+  const out=Object.assign({},state);
+  const auth=state.authority;
+  if(auth&&typeof auth==="object")out.authority={ended:!!auth.ended,terminalReason:auth.terminalReason||null,
+    clock:Number(auth.clock)||0,pvpSlim:true};
+  // members[].p rival: só filtro por conta no cliente (pvpIsOwnEnt) — id/nome
+  // bastam. O char próprio continua completo (resume usa member.p → G.p).
+  const slimMember=(ent)=>{
+    if(!ent||!ent.p||Number(ent.p.accountId)===Number(viewerAccountId))return ent;
+    return Object.assign({},ent,{p:{id:ent.p.id,accountId:ent.p.accountId,name:ent.p.name,
+      hp:ent.p.hp,mp:ent.p.mp,pvpSlim:true}});
+  };
+  const slim=(ent)=>{
+    if(!ent||!ent.p||Number(ent.p.accountId)===Number(viewerAccountId))return ent;
+    const p=Object.assign({},ent.p);for(const k of PVP_CLIENT_HEAVY_KEYS)delete p[k];
+    return Object.assign({},ent,{p});
+  };
+  if(Array.isArray(state.members))out.members=state.members.map(slimMember);
+  if(state.state&&Array.isArray(state.state.players))
+    out.state=Object.assign({},state.state,{players:state.state.players.map(slim)});
+  return out;
+}
+function instanceSummary(row,includeState,viewerAccountId){
   if(!row)return null;let state=null;
   if(includeState&&row.state){try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){state=null;}}
+  if(state&&viewerAccountId&&String(row.kind||"")==="pvp")state=pvpSlimClientState(state,viewerAccountId);
   return {id:row.instance_id,version:Number(row.version)||0,status:row.status,ownerAccountId:Number(row.account_id)||null,kind:row.kind,
     huntId:row.hunt_id||null,bossId:row.boss_id||null,instanceMode:row.instance_mode,
     partyId:row.party_id?Number(row.party_id):null,partyVersion:row.party_version?Number(row.party_version):null,
@@ -2026,6 +2069,21 @@ async function resolveInstanceRow(db,acc,charId){
   if(Number.isSafeInteger(id)&&id>0){character=await db.findCharacter(id);
     if(!character||Number(character.account_id)!==Number(acc.id))return {error:{code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}}};
     party=await db.partyFindByCharacter(id);
+  }
+  // Batalha PvP compartilhada tem prioridade máxima — participantes da guerra
+  // montam a instância-âncora do host enquanto ela estiver ativa.
+  const pvpCtrl=typeof global.__PVP!=="undefined"?global.__PVP:null;
+  const pvpShared=pvpCtrl&&typeof pvpCtrl.sharedForAccount==="function"
+    ?pvpCtrl.sharedForAccount(acc.id):null;
+  if(pvpShared&&pvpShared.instanceId){
+    // Cabeçalho sem o blob (~5MB): a guerra resolve a rota por metadados —
+    // o estado vem do descritor quente no tick, não do row.
+    const sharedRow=await (db.instanceGetHead||db.instanceGet).call(db,pvpShared.ownerAccountId);
+    if(sharedRow&&["active","checkpointed"].includes(sharedRow.status)
+      &&String(sharedRow.instance_id)===String(pvpShared.instanceId))
+      return {row:sharedRow,character,party,shared:Number(sharedRow.account_id)!==Number(acc.id),pvp:true};
+    // instância sumiu: o tick do controlador aborta a batalha (reembolso) —
+    // não limpar liveByBattle aqui ou o abort nunca roda.
   }
   // World Boss compartilhado tem prioridade sobre party/hunt — JOIN da warzone.
   const wb=typeof global.__WORLD_BOSS!=="undefined"&&global.__WORLD_BOSS
@@ -2073,6 +2131,15 @@ async function publishInstanceForRow(db,row,data){
       ?global.__WORLD_BOSS.getEventByOwner(row.account_id):null;
     if(wbEvent&&wbEvent.joins)for(const [accountId] of wbEvent.joins)accounts.add(Number(accountId));
   }
+  // Roster de batalha PvP: todas as contas sorteadas recebem o estado.
+  if(typeof global.__PVP!=="undefined"&&global.__PVP){
+    const pvpBattle=typeof global.__PVP.battleForAccount==="function"
+      ?await global.__PVP.battleForAccount(db,row.account_id):null;
+    if(pvpBattle&&typeof db.pvpRosterGet==="function"){
+      const pvpRoster=await db.pvpRosterGet(pvpBattle.id);
+      for(const r of pvpRoster||[])accounts.add(Number(r.account_id));
+    }
+  }
   for(const accountId of accounts)publishSync(accountId,"instance",data);
 }
 async function loadInstance(db,token,charId){
@@ -2080,11 +2147,18 @@ async function loadInstance(db,token,charId){
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
   const row=resolved.row;
+  // Guerra: a rota usa cabeçalho sem blob — o estado vem do descritor quente
+  // (ou do blob completo quando ainda não há cache, ex.: pré-primeiro tick).
+  if(row&&resolved.pvp&&row.state===undefined){
+    const hot=pvpAuthCacheGet(row.instance_id);
+    if(hot)row.state=hot.descriptor;
+    else{const full=await db.instanceGet(row.account_id);if(full)row.state=full.state;}
+  }
   if(!row||row.status!=="active")return {code:200,body:{ok:true,instance:null,lastStatus:row?row.status:null,
     terminalReason:row&&row.terminal_reason||null}};
-  const summary=instanceSummary(row,true);
+  const summary=instanceSummary(row,true,acc.id);
   if(!summary.state)return {code:500,body:{ok:false,error:"INSTANCE_STATE_INVALID",msg:"Snapshot da instância está corrompido"}};
-  if((resolved.party||resolved.worldBoss)&&resolved.character&&summary.state.members&&
+  if((resolved.party||resolved.worldBoss||resolved.pvp)&&resolved.character&&summary.state.members&&
      summary.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
     summary.state.activeCharacterId=String(resolved.character.id);
   return {code:200,body:{ok:true,instance:summary}};
@@ -2095,6 +2169,14 @@ async function prepareInstanceState(db,acc,input){
   const kind=input.kind==="boss"?"boss":input.kind==="hunt"?"hunt":input.kind==="quest"?"quest":null;
   const idPattern=/^[a-z0-9][a-z0-9_-]{0,63}$/;
   const huntId=input.huntId?String(input.huntId):null,bossId=input.bossId?String(input.bossId):null;
+  // Lock de preparo PvP: contas sorteadas para a guerra ficam na área de
+  // treino e não abrem hunts, bosses nem quests até a batalha acabar.
+  if(typeof global.__PVP!=="undefined"&&global.__PVP&&typeof global.__PVP.lockedAccount==="function"){
+    try{const pvpLock=await global.__PVP.lockedAccount(db,acc.id);
+      if(pvpLock)return {error:{code:409,body:{ok:false,error:"PVP_LOCKED",
+        msg:"Personagem em preparo de batalha PvP — aguarde na área de treino.",battleId:pvpLock.battleId}}};
+    }catch(e){/* lock é best-effort */}
+  }
   if(!kind||(kind==="hunt"&&!idPattern.test(huntId||""))||(kind==="boss"&&!idPattern.test(bossId||""))
     ||(kind==="quest"&&!idPattern.test(bossId||"")))
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_KIND",msg:"Hunt/boss inválido"}}};
@@ -2549,6 +2631,155 @@ async function createWorldBossSharedInstance(db,event){
   console.log("[world-boss] shared instance",String(instanceId).slice(0,12),"host="+hostAccountId,"chars="+members.length);
   return {ok:true,instanceId,ownerAccountId:hostAccountId,instance:saved.instance};
 }
+/* Instância compartilhada de batalha PvP guild-vs-guild: todos os chars das
+ * parties sorteadas entram na mesma autoridade, cada um em sua safezone. */
+function pvpMapBlockedCells(map){
+  try{
+    if(!_wbTileFlags){
+      const sandbox={window:{}};sandbox.window=sandbox;vm.createContext(sandbox);
+      vm.runInContext(fs.readFileSync(path.join(STATIC_DIR,"js","tileflags.js"),"utf8"),sandbox);
+      _wbTileFlags=sandbox.TILEFLAGS||{};
+    }
+    const OTBM=require(path.join(STATIC_DIR,"js","otbm.js"));
+    const bytes=fs.readFileSync(path.join(STATIC_DIR,"maps",map.otbm+".otbm"));
+    let parsed=OTBM.read(bytes,{z:map.otbmFloor});
+    const mapData=OTBM.huntMapFromOtbm(parsed,_wbTileFlags),blocked={};
+    for(let y=0;y<mapData.rows.length;y++)for(let x=0;x<mapData.rows[y].length;x++){
+      const legend=mapData.leg[mapData.rows[y][x]];
+      if(!legend||legend.bloc||mapData.footprintBlocked&&mapData.footprintBlocked[x+":"+y])
+        blocked[x+":"+y]=true;
+    }
+    return blocked;
+  }catch(error){console.error("[pvp] map collision",error&&error.message);return null;}
+}
+async function createPvpSharedInstance(db,battle,roster){
+  const map=PVP_MAPS[String(battle.map)];
+  if(!map)return {ok:false,error:"PVP_MAP"};
+  const g1=typeof db.guildById==="function"?await db.guildById(battle.challenger_guild_id):null;
+  const g2=typeof db.guildById==="function"?await db.guildById(battle.challenged_guild_id):null;
+  const local=pvpMapLocal(map),gridW=local.gridW,gridH=local.gridH;
+  const szByTeam={1:local.sz1,2:local.sz2};
+  const blockedCells=pvpMapBlockedCells(map);
+  const blocked=(cx,cy)=>!!(blockedCells&&blockedCells[cx+":"+cy]);
+  const cellInRect=(cx,cy,r)=>cx>=r.x1&&cx<=r.x2&&cy>=r.y1&&cy<=r.y2;
+  const freeIn=(rect,taken)=>{
+    for(let x=rect.x1;x<=rect.x2;x++)for(let y=rect.y1;y<=rect.y2;y++){
+      if(!blocked(x,y)&&!taken.has(x+":"+y))return {cx:x,cy:y};
+    }
+    return null;
+  };
+  const members=[],players=[],taken=new Set(),stats={};
+  const hostAccountId=Number(
+    (roster.find((r)=>Number(r.account_id)===Number(battle.created_by))||roster[0]).account_id);
+  for(const r of roster){
+    const team=Number(r.team)===2?2:1,rect=szByTeam[team];
+    for(const cid of r.char_ids||[]){
+      const character=await db.findCharacter(cid);
+      if(!character)continue;
+      let data=character.data;
+      if(typeof data==="string"){try{data=JSON.parse(data);}catch(e){data={};}}
+      data=data&&typeof data==="object"?cloneJson(data):{};
+      data.id=String(character.id);
+      data.name=character.name||data.name;
+      data.voc=character.voc||data.voc;
+      data.level=Math.max(1,Number(character.level)||Number(data.level)||1);
+      const ownerAcc=await db.findAccountById(character.account_id);
+      data.gold=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.gold)||0));
+      data.accountId=Number(character.account_id);
+      pvpApplyBattlePreset(data);
+      // Servidor de teste: mages entram na guerra com ML 80 — os clones
+      // tinham ML baixo p/ boa parte do combo e ficavam sem castar.
+      if(TEST_SERVER&&/(sorcerer|druid)/i.test(String(data.voc||"")))data.ml=80;
+      const max=maxStats(data);
+      data.hp=max.hp;data.mp=max.mp;
+      let cell=freeIn(rect,taken);
+      if(!cell){ // sz cheia: expande em anel ao redor do centro
+        const cx=Math.round((rect.x1+rect.x2)/2),cy=Math.round((rect.y1+rect.y2)/2);
+        outer:for(let d=1;d<12;d++)for(let ox=-d;ox<=d;ox++)for(let oy=-d;oy<=d;oy++){
+          if(Math.max(Math.abs(ox),Math.abs(oy))!==d)continue;
+          const x=cx+ox,y=cy+oy;
+          if(x>=0&&y>=0&&x<gridW&&y<gridH&&!blocked(x,y)&&!taken.has(x+":"+y)){cell={cx:x,cy:y};break outer;}
+        }
+      }
+      if(!cell)cell=pvpRectCenter(rect);
+      taken.add(cell.cx+":"+cell.cy);
+      members.push({id:String(character.id),p:data,hp:data.hp,mp:data.mp,
+        accountId:Number(character.account_id),pvpTeam:team,team:team,
+        partyKey:"pvpb:"+battle.id+":"+team});
+      players.push({
+        id:String(character.id),p:data,hp:data.hp,mp:data.mp,accountId:Number(character.account_id),
+        pvpTeam:team,team:team,partyKey:"pvpb:"+battle.id+":"+team,
+        cx:cell.cx,cy:cell.cy,x:(cell.cx+.5)/gridW,y:(cell.cy+.5)/gridH,dir:"n",
+      });
+      stats[String(character.id)]={name:data.name||"Player",team,
+        accountId:Number(character.account_id),kills:0,deaths:0,damage:0};
+    }
+  }
+  if(!members.length)return {ok:false,error:"NO_MEMBERS"};
+  /* Quem designa o alvo do time: o LÍDER da guild (rank "leader") se sorteado
+   * — a IA nunca designa. Sem líder no roster, cai no membro marcado como
+   * "leader" do sorteio (criador do desafio); se nem esse, ninguém designa. */
+  const leaderAccOf=async(team,guildId)=>{
+    const rows=roster.filter((r)=>(Number(r.team)===2?2:1)===team);
+    if(typeof db.guildMembers==="function"){
+      const mems=await db.guildMembers(guildId);
+      const lead=mems.find((m)=>String(m.rank)==="leader"&&
+        rows.some((r)=>Number(r.account_id)===Number(m.account_id)));
+      if(lead)return Number(lead.account_id);
+    }
+    const flagged=rows.find((r)=>!!r.leader);
+    return flagged?Number(flagged.account_id):0;
+  };
+  const endsAt=Date.now()+10*60*1000;
+  const descriptor={
+    v:1,kind:"pvp",huntId:null,bossId:null,instanceMode:"pvp",
+    activeCharacterId:String(members[0].id),members,
+    state:{
+      instanceMode:"pvp",gridW,gridH,
+      blockedCells:blockedCells||undefined,
+      raidEnabled:false,influencedChance:0,fiendishChance:0,players,
+      mobs:[],
+      pvpBattle:{
+        battleId:Number(battle.id),mapId:map.id,mode:map.mode,pz:!!map.pz,
+        fragTarget:Number(map.fragTarget)||0,
+        safezones:{1:szByTeam[1],2:szByTeam[2]},
+        controlZone:local.control||null,dominationMs:{1:0,2:0},
+        teams:{1:{guildId:Number(battle.challenger_guild_id),name:String((g1&&g1.name)||"Desafiante"),targetId:null,
+                  leaderAccountId:await leaderAccOf(1,battle.challenger_guild_id)},
+               2:{guildId:Number(battle.challenged_guild_id),name:String((g2&&g2.name)||"Desafiada"),targetId:null,
+                  leaderAccountId:await leaderAccOf(2,battle.challenged_guild_id)}},
+        scores:{1:0,2:0},
+        endsAt,overtime:0,stats,finished:null,
+      },
+    },
+  };
+  for(const r of roster){
+    try{if(typeof db.instanceEndForced==="function")await db.instanceEndForced(Number(r.account_id),"pvp-start");}
+    catch(e){console.error("[pvp] end hunt",r.account_id,e&&e.message);}
+  }
+  const instanceId=newToken();
+  const initialized=initializeAuthority(descriptor,instanceId,Date.now());
+  const stamp=new Date();
+  const saved=await db.instanceReplaceForced(hostAccountId,instanceId,{
+    kind:"pvp",hunt_id:null,boss_id:null,instance_mode:"pvp",
+    party_id:null,party_version:null,active_character_id:Number(members[0].id),
+    saved_at:stamp,started_at:stamp,
+  },JSON.stringify(initialized));
+  if(!saved||!saved.ok)return {ok:false,error:(saved&&saved.error)||"SAVE_FAILED"};
+  // Semeia o descritor quente: o objeto já está em memória — o primeiro
+  // tick/load não paga o parse de ~5MB.
+  pvpAuthCacheSet(instanceId,{descriptor:initialized,
+    rowVersion:Number(saved.instance&&saved.instance.version)||1,savedAt:Date.now()});
+  try{
+    await publishInstanceForRow(db,saved.instance,{
+      id:saved.instance.instance_id,version:Number(saved.instance.version)||1,
+      status:"active",source:"pvp-battle-create",holderId:"",
+    });
+  }catch(e){/* best-effort */}
+  console.log("[pvp] shared instance",String(instanceId).slice(0,12),
+    "host="+hostAccountId,"chars="+members.length,"map="+map.id);
+  return {ok:true,instanceId,ownerAccountId:hostAccountId,instance:saved.instance};
+}
 async function syncWorldBossShared(db,event){
   if(!event||!event.hostAccountId||!event.instanceId)return;
   const row=await db.instanceGet(event.hostAccountId);
@@ -2592,6 +2823,15 @@ async function saveInstance(db,body){
   if(!Number.isSafeInteger(activeId)||activeId<=0)
     return {code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo inválido"}};
   const active=await db.findCharacter(activeId);
+  // Batalha PvP: a autoridade da instância compartilhada é a fonte de verdade
+  // (tick/worker). Checkpoint do browser só espelha — host e convidados.
+  const pvpShareSave=typeof global.__PVP!=="undefined"&&global.__PVP
+    ?global.__PVP.sharedForAccount(acc.id):null;
+  if(pvpShareSave&&pvpShareSave.instanceId){
+    const pvpRow=await db.instanceGet(pvpShareSave.ownerAccountId);
+    if(pvpRow&&pvpRow.status==="active"&&String(pvpRow.instance_id)===String(pvpShareSave.instanceId))
+      return {code:200,body:{ok:true,shared:true,instance:instanceSummary(pvpRow,false)}};
+  }
   if(active&&Number(active.account_id)===Number(acc.id)){
     const party=await db.partyFindByCharacter(activeId),shared=party&&typeof db.instanceGetByParty==="function"?await db.instanceGetByParty(party.id):null;
     // Boss novo (create, não checkpoint): arena própria, nunca "espelha" a
@@ -2707,7 +2947,10 @@ async function tickInstance(db,body){
   if(expected!==null&&(!Number.isSafeInteger(expected)||expected<1))
     return {code:400,body:{ok:false,error:"INVALID_INSTANCE_VERSION",msg:"Versão inválida"}};
   const resolved=await resolveInstanceRow(db,acc,body.char_id);if(resolved.error)return resolved.error;
-  if(resolved.shared&&resolved.row&&resolved.row.status==="active"&&!resolved.worldBoss){
+  // Batalha PvP: convidados (contas que não hospedam a instância) também
+  // avançam a autoridade com o próprio lease — sem isso o movimento e o
+  // target manual do time rival eram ignorados (snapshot somente leitura).
+  if(resolved.shared&&resolved.row&&resolved.row.status==="active"&&!resolved.worldBoss&&!resolved.pvp){
     const guestLease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()},own=await db.instanceGet(acc.id);
     if(own&&own.status==="active"&&String(own.instance_id)!==String(resolved.row.instance_id))
       await db.instanceEnd(acc.id,own.instance_id,own.version,"joined-shared-party",guestLease);
@@ -2726,23 +2969,31 @@ async function tickInstance(db,body){
         for(const intent of body.visual_state.megaIntents)pushOne(intent);
       }
     }
-    const summary=instanceSummary(resolved.row,true);
+    const summary=instanceSummary(resolved.row,true,acc.id);
     if(summary.state&&resolved.character)summary.state.activeCharacterId=String(resolved.character.id);
     return {code:200,body:{ok:true,shared:true,elapsed:0,terminalReason:null,instance:summary,
       characters:await instanceCharactersForAccount(db,resolved.row,acc.id)}};
   }
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const ownerId=resolved.row?Number(resolved.row.account_id):Number(acc.id);
-  if(resolved.worldBoss&&resolved.shared){
+  if((resolved.worldBoss||resolved.pvp)&&resolved.shared){
     const own=await db.instanceGet(acc.id);
     if(own&&own.status==="active"&&String(own.instance_id)!==String(resolved.row.instance_id))
-      await db.instanceEnd(acc.id,own.instance_id,own.version,"joined-shared-world-boss",lease);
+      await db.instanceEnd(acc.id,own.instance_id,own.version,
+        resolved.pvp?"joined-pvp-battle":"joined-shared-world-boss",lease);
   }
   // A posição visual prevista pelo grid não decide dano/alcance. Ela só é
   // sincronizada no snapshot/eventos para efeitos acompanharem as entidades.
   // Intents de convidados Megalomania entram no tick do líder.
-  const advanceWithVisuals=(state,elapsed,checkpointAt)=>{
+  const advanceWithVisuals=(state,elapsed,checkpointAt,hot)=>{
     let visual=body.visual_state;
+    if(visual&&Array.isArray(visual.players)&&visual.players.length){
+      let pvpAuth=null;
+      // Caminho quente: `state` já é o descritor vivo — sem parse de ~5MB.
+      if(typeof state==="string"){if(state.indexOf('"pvpBattle"')>=0){try{pvpAuth=JSON.parse(state).authority;}catch(_e){}}}
+      else pvpAuth=state&&state.authority;
+      visual=pvpFilterVisualState(pvpAuth,visual,acc.id);
+    }
     if(typeof global.__MEGA_LOBBY!=="undefined"&&global.__MEGA_LOBBY&&
        typeof global.__MEGA_LOBBY.drainIntents==="function"){
       const queued=global.__MEGA_LOBBY.drainIntents(ownerId);
@@ -2764,10 +3015,30 @@ async function tickInstance(db,body){
         if(fresh){auth.blockedCells=fresh;if(state.state)state.state.blockedCells=fresh;}
       }
     }catch(_e){}
-    return advanceAuthorityState(state,elapsed,checkpointAt,visual);
+    return advanceAuthorityState(state,elapsed,checkpointAt,visual,hot?{inPlace:true,rawState:true}:undefined);
   };
-  const result=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceWithVisuals,lease,
-    resolved.worldBoss&&Number(ownerId)!==Number(acc.id)?{leaseAccountId:acc.id}:undefined);
+  const tickOpts={};
+  if((resolved.worldBoss||resolved.pvp)&&Number(ownerId)!==Number(acc.id))tickOpts.leaseAccountId=acc.id;
+  // Batalha PvP: descritor quente em memória (ver hotAuth em instanceAuthorityTick).
+  if(resolved.pvp)tickOpts.hotAuth={persistMs:PVP_AUTH_PERSIST_MS,drop:pvpAuthCacheDrop,
+    get:async(row,conn)=>{
+      let hot=pvpAuthCacheGet(row.instance_id);
+      if(hot&&Number(hot.rowVersion)===Number(row.version))return hot;
+      // Miss ou drift (escrita externa — ammo patch/checkpoint): recarrega.
+      const [s]=await conn.query("SELECT state FROM account_instances WHERE account_id=?",[Number(row.account_id)]);
+      const ser=s[0]?s[0].state:null;
+      if(ser==null)return hot;
+      const descriptor=typeof ser==="string"?JSON.parse(ser):ser;
+      hot={descriptor,rowVersion:Number(row.version),savedAt:Date.now()};
+      pvpAuthCacheSet(row.instance_id,hot);
+      return hot;
+    }};
+  const runTick=()=>db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceWithVisuals,lease,
+    Object.keys(tickOpts).length?tickOpts:undefined);
+  /* Batalha: serialização in-process (mutex por conta-dono), NÃO pela lock
+   * FOR UPDATE da row — ~35 req/s enfileiradas na mesma row esgotavam o
+   * pool de conexões e o servidor inteiro morria em "Carregando". */
+  const result=tickOpts.hotAuth?await pvpAuthSerialize(ownerId,runTick):await runTick();
   if(!result.ok){
     // Tick é idempotente: ausência/terminal entre GET e POST não é falha de
     // transporte e não deve poluir o console com HTTP 410.
@@ -2779,7 +3050,7 @@ async function tickInstance(db,body){
     // Assim o cliente aplica a versão atual imediatamente e o DevTools não
     // fica emitindo 409 enquanto o jogo aparenta estar congelado.
     if(result.error==="INSTANCE_VERSION_CONFLICT"&&result.instance){
-      const current=instanceSummary(result.instance,true);
+      const current=instanceSummary(result.instance,true,acc.id);
       if(resolved.party&&resolved.character&&current.state&&current.state.members&&
          current.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
         current.state.activeCharacterId=String(resolved.character.id);
@@ -2787,14 +3058,19 @@ async function tickInstance(db,body){
         instance:current,characters:[]}};
     }
     return {code:result.error==="LEASE_REQUIRED"?423:409,
-      body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true)}};
+      body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true,acc.id)}};
   }
   if(typeof db.snapshotAdd==="function"&&(result.terminalReason||Number(result.instance.version)%120===0))
     await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,result.instance.version,
       result.terminalReason||"tick",result.instance,!!result.terminalReason);
-  await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
-    status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",holderId:String(body.holder_id||""),
-    characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
+  // Guerra: publish por tick é desperdício — clientes em batalha ignoram
+  // eventos source:"tick" (o próprio tick já devolve o estado) e o roster
+  // fora da arena usa o canal pvp. Cada publish custa battleForAccount +
+  // pvpRosterGet + SSE por conta. Só o término notifica.
+  if(!(resolved.pvp&&!result.terminalReason))
+    await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+      status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",holderId:String(body.holder_id||""),
+      characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
   // Terminal de boss fight: publica "character" para TODAS as abas/personagens
   // da conta re-buscarem /api/me — o shared (rewardChest do boss derrotado)
   // é aplicado e o badge "!" do Reward Chest aparece para todos, e o loot do
@@ -2802,14 +3078,36 @@ async function tickInstance(db,body){
   if(result.terminalReason){
     try{publishSync(acc.id,"character",{id:null,saveVersion:0,source:"instance-terminal"});}catch(e){/* opcional */}
   }
-  const responseInstance=instanceSummary(result.instance,true);
-  if((resolved.party||resolved.worldBoss)&&resolved.character&&responseInstance.state&&responseInstance.state.members&&
+  /* Guerra: ~35 req/s de N viewers reconstruíam instanceSummary (~0.5MB
+   * slim) + stringify a cada request — a thread saturava e os menus
+   * ficavam lentos. A resposta por viewer só muda quando o descriptor
+   * avança; requests dentro de ~150ms recebem os mesmos bytes (o cliente
+   * ticka a cada 200ms — a defasagem é menor que um passo de sim). */
+  let pvpRespCache=null,pvpRespKey=null;
+  if(resolved.pvp){
+    const hot=pvpAuthCacheGet(result.instance.instance_id);
+    if(hot){
+      pvpRespCache=hot.respCache||(hot.respCache=new Map());
+      pvpRespKey=String(acc.id);
+      const hitEnt=pvpRespCache.get(pvpRespKey);
+      if(hitEnt&&Date.now()-hitEnt.at<150)return {code:200,body:{__raw:hitEnt.raw}};
+    }
+  }
+  const responseInstance=instanceSummary(result.instance,true,acc.id);
+  if((resolved.party||resolved.worldBoss||resolved.pvp)&&resolved.character&&responseInstance.state&&responseInstance.state.members&&
     responseInstance.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
     responseInstance.state.activeCharacterId=String(resolved.character.id);
-  return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
+  const responseBody={ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
     instance:responseInstance,account:accountPublicView(await ensureAccountWallet(db,acc)),
     characters:(result.characters||[])
-      .filter((character)=>Number(character.account_id)===Number(acc.id)).map(charSummaryWithGold(acc))}};
+      .filter((character)=>Number(character.account_id)===Number(acc.id)).map(charSummaryWithGold(acc))};
+  if(pvpRespCache){
+    const raw=JSON.stringify(responseBody);
+    pvpRespCache.set(pvpRespKey,{at:Date.now(),raw});
+    if(pvpRespCache.size>64)pvpRespCache.clear();
+    return {code:200,body:{__raw:raw}};
+  }
+  return {code:200,body:responseBody};
 }
 
 async function selectInstanceAmmo(db,body){
@@ -3964,6 +4262,13 @@ async function endInstance(db,body){
         return {code:200,body:{ok:true,sharedDetached:true,worldBoss:true,instance:null}};
     }
   }
+  // Participante de batalha PvP: "sair" só desprende — a guerra continua
+  // para os demais e só termina pelo placar/tempo no controlador.
+  if(typeof global.__PVP!=="undefined"&&global.__PVP){
+    const pvpShare=global.__PVP.sharedForAccount(acc.id);
+    if(pvpShare)
+      return {code:200,body:{ok:true,sharedDetached:true,pvp:true,instance:null}};
+  }
   if(resolved.row&&String(resolved.row.instance_id)===id&&resolved.party&&resolved.character&&
      Number(resolved.character.id)!==Number(resolved.party.leader_id))
     return {code:200,body:{ok:true,sharedDetached:true,instance:null}};
@@ -5020,7 +5325,12 @@ async function main() {
   }
   if(process.env.END_INSTANCES_ON_BOOT!=="0"&&typeof db.endAllInstances==="function"){
     try{
-      const ended=await db.endAllInstances("server-restart");
+      // Batalhas PvP ao vivo sobrevivem ao restart (timer estendido pelo downtime).
+      let keepPvp=[];
+      try{keepPvp=await pvpResumeLiveOnBoot(db,Date.now());
+        if(keepPvp.length)console.log("[boot] batalhas PvP retomadas:",keepPvp.length);}
+      catch(e){console.warn("[boot] falha ao retomar PvP:",e&&e.message);}
+      const ended=await db.endAllInstances("server-restart",keepPvp);
       if(ended>0)console.log("[boot] instâncias ativas encerradas (server-restart):",ended);
     }catch(e){console.warn("[boot] falha ao encerrar instâncias do restart:",e&&e.message);}
   }
@@ -5051,7 +5361,12 @@ async function main() {
         const questCtrl=global.__QUEST_CTRL;
         const lobby=typeof questCtrl.findLobbyByInstance==="function"?questCtrl.findLobbyByInstance(current.instance_id):null;
         if(lobby)questCtrl.onSharedEnded(lobby.id,claim.terminalReason).catch((e)=>console.error("[quest] onClaim notify",e&&e.message));
-      }},
+      }
+      // Batalha PvP encerrada pelo engine (placar/tempo): força um tick do
+      // controlador — syncLive lê o resultado e acerta as recompensas.
+      if(claim.terminalReason==="pvp-battle-end"&&global.__PVP)
+        global.__PVP.tick().catch((e)=>console.error("[pvp] settle",e&&e.message));
+      },
   });
 
   const WORLD_BOSS=createWorldBossController({
@@ -5068,6 +5383,30 @@ async function main() {
   });
   global.__WORLD_BOSS=WORLD_BOSS;
   WORLD_BOSS.start();
+
+  /* ---- Guild PvP controller ---- */
+  const PVP=createPvpController({
+    testServer:TEST_SERVER,
+    getDb:()=>db,
+    publishAll:(type,data)=>{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll(type,data);},
+    publishAccount:(accountId,type,data)=>publishSync(accountId,type,data),
+    isOnline:(accountId)=>!!(SYNC_BUS&&SYNC_BUS.clients&&SYNC_BUS.clients.has(Number(accountId))),
+    createSharedInstance:(battle,roster)=>createPvpSharedInstance(db,battle,roster),
+    endSharedInstance:async(host,instanceId,reason)=>{
+      if(host&&typeof db.instanceEndForced==="function")
+        await db.instanceEndForced(Number(host),reason||"pvp-end");
+    },
+    endAccountInstance:async(accountId,reason)=>{
+      const live=await db.instanceGet(Number(accountId));
+      if(!live||live.status!=="active"||typeof db.instanceEndForced!=="function")return;
+      const ended=await db.instanceEndForced(Number(accountId),reason||"pvp-prep");
+      const row=(ended&&ended.instance)||await db.instanceGet(Number(accountId));
+      if(row)await publishInstanceForRow(db,row,{id:row.instance_id,version:Number(row.version)||1,
+        status:"ended",terminalReason:reason||"pvp-prep",source:"pvp-prep",holderId:""});
+    },
+  });
+  global.__PVP=PVP;
+  PVP.start();
 
   /* ---- Quest controller ---- */
   let questTileFlags=null;
@@ -5674,6 +6013,11 @@ async function main() {
         const r = await store.buyBless(db, body);
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/store/imbuement") {
+        const body = await readBody(req);
+        const r = await store.buyImbuement(db, body);
+        return send(res, r.code, r.body);
+      }
       if (req.method === "POST" && url === "/api/store/voucher") {
         const body = await readBody(req);
         const r = await store.redeemVoucher(db, body);
@@ -6153,6 +6497,47 @@ async function main() {
         try{body=await readBody(req);}catch(e){return send(res,400,{ok:false,error:"BAD_JSON"});}
         const auth=await authorizeMaintenance(req,body,db);
         const r=await WORLD_BOSS.forceClose(db,body,auth.ok);
+        return send(res,r.code,r.body);
+      }
+
+      /* -------- Guild PvP battles -------- */
+      if(req.method==="GET"&&url==="/api/pvp/state"){
+        const token=(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+        const q=new URL(req.url,"http://x").searchParams;
+        const acc=await db.findAccountByToken(token||q.get("token")||"");
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        return send(res,200,await PVP.stateFor(db,acc));
+      }
+      if(req.method==="GET"&&url==="/api/pvp/battle"){
+        const token=(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+        const q=new URL(req.url,"http://x").searchParams;
+        const acc=await db.findAccountByToken(token||q.get("token")||"");
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PVP.battleDetail(db,acc,Number(q.get("id"))||0);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pvp/lobby"){
+        const limited=rateLimit(req,"pvp-lobby",10,60000);if(limited)return send(res,limited.code,limited.body);
+        const body=await readBody(req);
+        const acc=await db.findAccountByToken(body&&body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PVP.createLobby(db,acc,body||{});
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pvp/respond"){
+        const limited=rateLimit(req,"pvp-respond",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const body=await readBody(req);
+        const acc=await db.findAccountByToken(body&&body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PVP.respond(db,acc,body||{});
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pvp/cancel"){
+        const limited=rateLimit(req,"pvp-cancel",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const body=await readBody(req);
+        const acc=await db.findAccountByToken(body&&body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PVP.cancel(db,acc,body||{});
         return send(res,r.code,r.body);
       }
 

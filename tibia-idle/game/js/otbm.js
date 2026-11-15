@@ -277,6 +277,10 @@
         x = r.u8(); y = r.u8();
         if (ctx) child = { x: ctx.x + x, y: ctx.y + y, z: ctx.z,
                            cell: cellAt(ctx.z, ctx.x + x, ctx.y + y) };
+      } else if (type === 14) { // HOUSETILE: x/y u8 + houseId u32
+        x = r.u8(); y = r.u8(); r.u32();
+        if (ctx) child = { x: ctx.x + x, y: ctx.y + y, z: ctx.z,
+                           cell: cellAt(ctx.z, ctx.x + x, ctx.y + y) };
       } else if (type === 6) { // ITEM
         item = r.u16();
         if (ctx && ctx.cell) ctx.cell.items.push(item);

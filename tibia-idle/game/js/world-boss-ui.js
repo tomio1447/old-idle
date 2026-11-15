@@ -117,8 +117,10 @@ function wbEnsureDom() {
 
 function wbOverlayEventKey(ev) {
   if (!ev) return null;
-  /* Uma chave por evento/warzone — persiste lobby→countdown→spawn. */
-  return String(ev.warzoneId || ev.bossName || "wb");
+  /* Uma chave por EVENTO (ev.id): dismiss/minimize do lobby anterior não
+   * pode vazar para o próximo — a mesma warzone abre vários lobbies e a
+   * chave por warzoneId deixava o painel escondido pra sempre. */
+  return String(ev.id || ev.warzoneId || ev.bossName || "wb");
 }
 
 function wbSyncMinimizeKey(ev) {
@@ -171,6 +173,13 @@ function wbDismissPanel() {
   const ev = st && st.event;
   wbSyncMinimizeKey(ev);
   if (!ev) return;
+  /* Joined: o painel é a ÚNICA forma de sair do lobby — escondê-lo
+   * trava os botões de hunt sem saída. Minimiza em vez de esconder. */
+  if (st.you && st.you.joined) {
+    WB.panelCollapsed = true;
+    wbRenderPanel();
+    return;
+  }
   WB.panelDismissed = true;
   if (WB.panel) WB.panel.style.display = "none";
 }
@@ -304,6 +313,14 @@ function wbLockedClickInterceptor(e) {
   if (!target) return;
   e.preventDefault();
   e.stopImmediatePropagation();
+  /* WORLD BOSSES também reabre o painel do lobby — escape caso o painel
+   * tenha ficado escondido/minimizado por engano (ex.: dismiss antigo). */
+  if (target.id === "btn-world-bosses") {
+    WB.panelDismissed = false;
+    WB.panelCollapsed = false;
+    wbRenderPanel();
+    return;
+  }
   if (typeof toast === "function") toast(target.getAttribute("title") || "Indisponível no lobby.", "bad");
 }
 
@@ -326,8 +343,15 @@ function wbRenderPanel() {
   }
   wbSyncMinimizeKey(ev);
   if (WB.panelDismissed) {
-    if (WB.panel) WB.panel.style.display = "none";
-    return;
+    /* Joined nunca fica sem painel: sem ele não há como sair do lobby e
+     * os botões de hunt ficam travados. Dismiss vira collapse. */
+    if (joined) {
+      WB.panelDismissed = false;
+      WB.panelCollapsed = true;
+    } else {
+      if (WB.panel) WB.panel.style.display = "none";
+      return;
+    }
   }
   const title = ev.phase === "lobby"
     ? (ev.warzoneName || ev.bossName || "WORLD BOSS").toUpperCase()

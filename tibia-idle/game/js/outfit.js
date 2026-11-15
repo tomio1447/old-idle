@@ -69,13 +69,30 @@ function playerOutfit(p) {
   if (!CLASSIC_OUTFIT_FALLBACK[base]) base = VOC_OUTFIT[p.voc] || "citizen";
   if (!CLASSIC_OUTFIT_FALLBACK[base]) base = "citizen";
   const def = DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
-  const c = (p.outfit && p.outfit.colors) || def;
+  const c = (typeof pvpTeamOutfitColors === "function" && pvpTeamOutfitColors(p)) ||
+    (p.outfit && p.outfit.colors) || def;
   return {
     type: base,
     sex: sex,
     name: base + "-" + sex,
     colors: [c[0] | 0, c[1] | 0, c[2] | 0, c[3] | 0],
   };
+}
+
+/* Guerra de guilds: a outfit inteira sai nas cores do time — azul para o
+ * time 1 e vermelho para o 2, como o placar (head/body/legs/feet, paleta
+ * oficial de 96). Só vale dentro da batalha; o time chega em `p._pvpTeam`
+ * (carimbado no merge do snapshot) ou direto em `p.pvpTeam`. */
+const PVP_TEAM_OUTFIT_COLORS = {
+  1: [11, 87, 68, 87],   // azul: #bfd4ff / #0055bf / #3f6abf / #0055bf
+  2: [18, 94, 75, 94],   // vermelho: #ffbfbf / #bf0000 / #bf3f3f / #bf0000
+};
+function pvpTeamOutfitColors(p) {
+  const c = typeof G !== "undefined" && G && G.combat;
+  if (!c || !c.pvpBattle || !p) return null;
+  const t = Number(p._pvpTeam !== undefined ? p._pvpTeam
+    : (p.pvpTeam !== undefined ? p.pvpTeam : p.team)) || 0;
+  return PVP_TEAM_OUTFIT_COLORS[t] || null;
 }
 
 /* garante que o personagem tenha o campo outfit preenchido */

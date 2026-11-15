@@ -629,7 +629,8 @@ const AppearanceRenderer = {
 
     const o = currentAppearance(p);
     if (!o) return null;
-    const cores = (p.outfit && p.outfit.colors) ||
+    const cores = (typeof pvpTeamOutfitColors === "function" && pvpTeamOutfitColors(p)) ||
+                  (p.outfit && p.outfit.colors) ||
                   DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
     const addons = (p.outfit && p.outfit.addons) || 0;
     const mnt = currentMount(p);

@@ -333,7 +333,6 @@ function guildTimeLeft(until) {
  * + BÔNUS TEMPORÁRIO (24h; 125kk do caixa + 1 insígnia PvP da conta). */
 function guildShopHtml(g, shop, isLeader, tempShop, insignias) {
   const levels = g.bonuses || {};
-  const temp = g.tempBonuses || {};
   const head = `<div class="guild-balance-head">
     <span><b>${Number(g.points) || 0}</b> guild points</span>
     <span>Caixa: <b>${guildGoldFmt(g.balance)}</b></span>
@@ -360,8 +359,16 @@ function guildShopHtml(g, shop, isLeader, tempShop, insignias) {
       ${isLeader && !maxed ? `<button class="sm primary" data-guild-buy="${def.id}"${afford ? "" : " disabled"}>Comprar</button>` : ""}
     </div>`;
   }).join("")}</div>
-  <div class="hunt-cat-title" style="margin-top:10px">Bônus temporário (24h)</div>
-  <div class="guild-shop-list">${(tempShop || []).map((def) => {
+  <div class="hunt-cat-title" style="margin-top:10px">Bônus temporário (24h) — insígnias PvP</div>
+  ${guildTempShopHtml(g, isLeader, tempShop, insignias)}`;
+}
+/* Loja de BOOST por insígnias PvP (24h para a guild toda): custo em caixa
+ * da guild + insígnias da conta do líder. Usada no GUILD SHOP, na aba PVP
+ * da guild e na aba Boosts do modal PVP (atributo data-buy configurável). */
+function guildTempShopHtml(g, isLeader, tempShop, insignias, buyAttr) {
+  const temp = (g && g.tempBonuses) || {};
+  const attr = buyAttr || "data-guild-buy-temp";
+  return `<div class="guild-shop-list">${(tempShop || []).map((def) => {
     const until = Number(temp[def.id]) || 0, active = until > Date.now();
     const afford = (Number(g.balance) || 0) >= def.gold &&
       (Number(insignias) || 0) >= def.insignias;
@@ -373,9 +380,10 @@ function guildShopHtml(g, shop, isLeader, tempShop, insignias) {
       </span>
       ${isLeader ? (active
         ? `<span class="guild-temp-active">ATIVO</span>`
-        : `<button class="sm primary" data-guild-buy-temp="${def.id}"${afford ? "" : " disabled"}>Ativar</button>`) : ""}
+        : `<button class="sm primary" ${attr}="${def.id}"${afford ? "" : " disabled"}>Ativar</button>`) : ""}
     </div>`;
-  }).join("")}</div>`;
+  }).join("") || `<div class="hunt-section-empty">Nenhum boost disponível.</div>`}</div>
+  ${isLeader ? "" : `<div class="tiny dim" style="margin:4px 0">Apenas líderes ativam boosts (caixa da guild + insígnias da própria conta).</div>`}`;
 }
 /* GUILD BALANCE — caixa + doações de gold e Tibia Coins (qualquer
  * membro). Coins ficam reservados a futuras batalhas PvP. */
@@ -516,12 +524,18 @@ async function loadGuildDetail() {
   } else if (GUILD_UI.tab === "shop" && isMember) {
     contentHtml = guildShopHtml(g, shop, isLeader, tempShop, insignias);
   } else if (GUILD_UI.tab === "pvp" && isMember) {
-    contentHtml = `<div class="guild-pvp-locked">
-      <span class="guild-pvp-icon" aria-hidden="true">⚔</span>
-      <span class="nm">PVP DA GUILD</span>
-      <span class="meta">Sistema em desenvolvimento — em breve guerras entre
-        guilds e recompensas em insígnias PvP.</span>
-    </div>`;
+    contentHtml = `<div class="guild-balance-head">
+        <span>Caixa: <b>${guildGoldFmt(g.balance)}</b></span>
+        <span><b>${fmtFull(Number(g.coins) || 0)}</b> Tibia Coins</span>
+        <span><b>${insignias}</b> insígnias PvP (sua conta)</span>
+      </div>
+      <div class="guild-pvp-open">
+        <span class="tiny dim">Guerras entre guilds: desafios, calendário, histórico e placar ao vivo.
+          Cada batalha rende insígnias PvP (vitória 3 · derrota/empate 1).</span>
+        <button class="sm primary" id="guild-open-pvp">Abrir PVP — Guild Wars</button>
+      </div>
+      <div class="hunt-cat-title" style="margin-top:10px">Loja de boost — insígnias PvP (24h para a guild)</div>
+      ${guildTempShopHtml(g, isLeader, tempShop, insignias)}`;
   } else if (GUILD_UI.tab === "balance" && isMember) {
     contentHtml = guildBalanceHtml(g, logTotals, data.accountCoins);
   } else if (GUILD_UI.tab === "history" && isMember) {
@@ -716,6 +730,10 @@ async function loadGuildDetail() {
       if (typeof openPlayerProfile === "function")
         openPlayerProfile(el.dataset.charProfile);
     });
+  });
+  const openPvpBtn = $("#guild-open-pvp");
+  if (openPvpBtn) openPvpBtn.addEventListener("click", () => {
+    if (typeof openPvpModal === "function") openPvpModal();
   });
   $$("#guild-modal-list [data-guild-buy-temp]").forEach((btn) => {
     btn.addEventListener("click", async () => {

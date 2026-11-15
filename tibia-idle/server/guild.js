@@ -480,6 +480,15 @@ async function guildRequestRespond(db, body) {
     msg: `${guild ? guild.name : "Guild"}: novo membro aceito!` } };
 }
 
+/* Bloqueio de troca de guild: com desafio PvP pendente/aceito/em preparo/ao
+ * vivo, ninguém sai nem é expulso (evita esvaziar a guild ou trocar de lado). */
+async function pvpLockError(db, guildId, action) {
+  const b = await require("./pvp").pvpGuildActiveBattle(db, guildId);
+  if (!b) return null;
+  return { code: 409, body: { ok: false, error: "PVP_GUILD_LOCKED", battleId: Number(b.id),
+    msg: `Guild com desafio PvP ativo (#${b.id}) — não é possível ${action} até o fim da batalha.` } };
+}
+
 /* POST /api/guild/leave — líder sai: vice assume; sem vice, o membro mais
  * antigo assume; último membro dissolve a guild. */
 async function guildLeave(db, body) {
@@ -487,6 +496,8 @@ async function guildLeave(db, body) {
   if (auth.error) return auth.error;
   const member = await db.guildMemberByAccount(auth.account.id);
   if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  const lock = await pvpLockError(db, member.guild_id, "sair da guild");
+  if (lock) return lock;
   const r = await db.guildMemberRemove(member.guild_id, auth.account.id);
   return { code: 200, body: Object.assign({ ok: true }, r && r.disbanded
     ? { msg: `Guild ${r.guildName || ""} dissolvida.` } : { msg: "Você saiu da guild." }) };
@@ -506,6 +517,8 @@ async function guildKick(db, body) {
     return { code: 400, body: { ok: false, msg: "Use 'Sair da guild' para se remover." } };
   if (targetRank === "leader" || (rank === "vice" && targetRank !== "member"))
     return { code: 403, body: { ok: false, msg: "Sem permissão para expulsar este membro." } };
+  const lock = await pvpLockError(db, member.guild_id, "expulsar membros");
+  if (lock) return lock;
   await db.guildMemberRemove(member.guild_id, target.account_id);
   return { code: 200, body: { ok: true, msg: "Membro expulso da guild." } };
 }

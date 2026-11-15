@@ -596,6 +596,42 @@ async function buyBless(db, body) {
   } };
 }
 
+/* Imbuement via Tibia Coins: dispensa materiais e gold — o cliente aplica o
+ * imbue com sucesso garantido depois do débito confirmado. */
+const IMBUEMENT_TIER_COINS = { 1: 30, 2: 60, 3: 90 };
+const IMBUEMENT_TIER_NAME = { 1: "Basic", 2: "Intricate", 3: "Powerful" };
+
+async function buyImbuement(db, body) {
+  const acc = await db.findAccountByToken(body && body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const tier = Math.floor(Number(body && body.tier));
+  const price = IMBUEMENT_TIER_COINS[tier];
+  if (!price) return { code: 400, body: { ok: false, msg: "Tier de imbuement inválido" } };
+
+  const coins = Math.max(0, Number(acc.coins) || 0);
+  if (coins < price)
+    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins } };
+
+  if (typeof db.debitCoins === "function") {
+    if (!await db.debitCoins(acc.id, price))
+      return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins } };
+  } else {
+    await db.updateCoins(acc.id, coins - price);
+  }
+  const fresh = typeof db.findAccountById === "function" ? await db.findAccountById(acc.id) : null;
+  const novo = fresh ? Math.max(0, Number(fresh.coins) || 0) : Math.max(0, coins - price);
+  await addLedger(db, {
+    accountId: acc.id, login: acc.login, kind: "spend",
+    delta: -price, coinsAfter: novo, brlCents: 0,
+    ref: "imbuement:tier" + tier,
+    note: "Imbuement " + IMBUEMENT_TIER_NAME[tier] + " via Tibia Coins",
+  });
+  return { code: 200, body: {
+    ok: true, coins: novo, tier, price,
+    msg: "Imbuement " + IMBUEMENT_TIER_NAME[tier] + " adquirido por " + price + " TC.",
+  } };
+}
+
 async function recordGrant(db, acc, amount, after) {
   await addLedger(db, {
     accountId: acc.id, login: acc.login, kind: amount >= 0 ? "grant" : "grant",
@@ -608,4 +644,5 @@ module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
   recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, PREY_PACKS,
   COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE, BLESS_PRICE,
+  buyImbuement, IMBUEMENT_TIER_COINS,
 };

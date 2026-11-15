@@ -628,7 +628,14 @@ function updateGridMovement(c, p, dt, now) {
   const activeAlive = (!c.player.p || c.player.p.hp > 0) && (!p || p.hp > 0);
   if (activeAlive) {
     ensureCell(c.player);
-    repairBlockedMapPosition(c, c.player);
+    // Em batalha o reparo é redundante (autoridade já valida posição) e cada
+    // chamada monta um Map de ocupação — 1x/frame era peso morto de GC.
+    // Throttle: checar a cada ~250ms basta para a rede de segurança.
+    const repairEvery = c.pvpBattle ? 250 : 0;
+    if (!repairEvery || !c._lastSelfRepairAt || now - c._lastSelfRepairAt >= repairEvery) {
+      c._lastSelfRepairAt = now;
+      repairBlockedMapPosition(c, c.player);
+    }
     // O jogador nao esta em MOBSHEETS (usa o catalogo de outfits), entao o
     // ensureCell nao consegue descobrir sozinho o tamanho do ciclo.
     if (typeof walkFrameCount === "function") c.player.walkFrames = walkFrameCount(p);
@@ -646,11 +653,17 @@ function updateGridMovement(c, p, dt, now) {
   if (c.players && c.players.length > 1) {
     for (const e of c.players) {
       if (!e || !e.p || e.p.hp <= 0) continue;
+      /* Guerra de guild: posições dos chars que não são o self vêm da
+       * autoridade compartilhada. Reparos client-side (célula bloqueada no
+       * mapa local, overlap) deslocavam o char a cada frame e o próximo
+       * merge o trazia de volta — o "teleporte" cintilante. */
+      if (c.pvpBattle && e !== c.player) continue;
       ensureCell(e);
       repairBlockedMapPosition(c, e);
     }
   }
-  if(typeof repairOverlappingGridEntities==="function")repairOverlappingGridEntities(c);
+  if(typeof repairOverlappingGridEntities==="function"&&!c.pvpBattle)
+    repairOverlappingGridEntities(c);
 
   // Interpola somente entidade viva; corpse permanece imóvel no SQM da morte.
   if (activeAlive) { advanceStep(c.player, dt); snapIdleToCell(c.player); }
@@ -708,6 +721,10 @@ function updateGridMovement(c, p, dt, now) {
         continue;
       }
       if (ent === c.player) continue;
+      // Guerra de guilds: a autoridade compartilhada move todos os chars que
+      // não são pilotados aqui — a IA local (box/safe/ally) desenharia
+      // posições diferentes em cada viewer.
+      if (c.pvpBattle) continue;
       if (typeof playerAutoWalkOn === "function" && !playerAutoWalkOn(ent.p)) continue;
       const fm = formationMode(c, ent);
       if (fm === "box") {

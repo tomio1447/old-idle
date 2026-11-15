@@ -211,24 +211,39 @@ function sortTileDepthDrawables(list) {
 function drawBlockingTilesInterleaved(ctx, map, W, H, cols, rows, opts) {
   opts = opts || {};
   const tw = W / cols, th = H / rows;
-  const decoAt = {};
-  for (const d of map.deco || []) {
-    if (!tileItemIsBlocking(d[0])) continue;
-    const key = (d[1] | 0) + ":" + (d[2] | 0);
-    (decoAt[key] || (decoAt[key] = [])).push(d);
+  // decoAt é estável por mapa — montar a cada frame realocava centenas de
+  // arrays (GC) com 40 chars em cena. Cacheia no próprio map.
+  let decoAt = map._decoAtBlocking;
+  if (!decoAt) {
+    decoAt = {};
+    for (const d of map.deco || []) {
+      if (!tileItemIsBlocking(d[0])) continue;
+      const key = (d[1] | 0) + ":" + (d[2] | 0);
+      (decoAt[key] || (decoAt[key] = [])).push(d);
+    }
+    map._decoAtBlocking = decoAt;
   }
   const drawables = sortTileDepthDrawables(opts.drawables);
+  const win = opts.win || null;
+  const wx0 = win ? Math.max(0, win.x0 | 0) : 0;
+  const wy0 = win ? Math.max(0, win.y0 | 0) : 0;
+  const wx1 = win ? Math.min(cols - 1, win.x1 | 0) : cols - 1;
+  const wy1 = win ? Math.min(rows - 1, win.y1 | 0) : rows - 1;
   let di = 0;
   const n = drawables.length;
+  // Drawables antes da janela (fora da tela) nunca seriam flushados por
+  // flushCell e travariam o ponteiro — avança sem desenhar.
+  while (di < n && (drawables[di].ty < wy0 ||
+    (drawables[di].ty === wy0 && drawables[di].tx < wx0))) di++;
   const flushCell = function (x, y) {
     while (di < n && drawables[di].ty === y && drawables[di].tx === x) {
       const item = drawables[di++];
       if (typeof item.draw === "function") item.draw();
     }
   };
-  for (let y = 0; y < rows; y++) {
+  for (let y = wy0; y <= wy1 && y < rows; y++) {
     const row = (y < map.rows.length) ? map.rows[y] : null;
-    for (let x = 0; x < cols; x++) {
+    for (let x = wx0; x <= wx1 && x < cols; x++) {
       if (row && x < row.length) {
         const L = map.leg[row[x]];
         if (L && L.g) {
@@ -248,7 +263,9 @@ function drawBlockingTilesInterleaved(ctx, map, W, H, cols, rows, opts) {
       flushCell(x, y);
     }
   }
-  while (di < n) {
+  // Sobras (fora da janela ou além dela): descarta sem desenhar — com win,
+  // entidades fora da tela não precisam paintEntity.
+  if (!win) while (di < n) {
     const item = drawables[di++];
     if (typeof item.draw === "function") item.draw();
   }
@@ -265,14 +282,29 @@ function drawBlockingTilesInterleaved(ctx, map, W, H, cols, rows, opts) {
  * Regra de z-order (igual ao client Tibia): tiles/pisos e decorações andáveis
  * (sofás, gelo, tapetes) ficam ABAIXO das criaturas (o player anda em cima);
  * paredes/pilares (não-andáveis) intercalam por posição de tile com criaturas. */
+/* O chão NÃO é cacheado em offscreen: os sprites de tile carregam lazy e um
+ * offscreen "assado" cedo gravava células pretas para sempre (mapa com
+ * buracos), além de virar um blit de ~2200x1400px por frame — mais caro que
+ * desenhar só a janela. Com opts.win a passada "ground" itera ~500 células
+ * em vez de ~3000 e se cura sozinha quando os sprites terminam de baixar. */
 function drawTileCharMap(ctx, map, W, H, cols, rows, mode, opts) {
   if (mode === undefined) mode = "all";
   opts = opts || null;
   const tw = W / cols, th = H / rows;
+  /* Janela de células visíveis (opts.win {x0,y0,x1,y1}): o FOV de combate é
+   * ~21x13, mas mapas de guerra chegam a 69x43 — iterar o mapa inteiro a
+   * cada frame custava ~10 mil drawImage clipados por segundo. */
+  const win = opts && opts.win ? opts.win : null;
+  const wx0 = win ? Math.max(0, win.x0 | 0) : 0;
+  const wy0 = win ? Math.max(0, win.y0 | 0) : 0;
+  const wx1 = win ? Math.min(cols - 1, win.x1 | 0) : cols - 1;
+  const wy1 = win ? Math.min(rows - 1, win.y1 | 0) : rows - 1;
+  const decoInWin = (d) => !win ||
+    (d[1] >= wx0 - 2 && d[1] <= wx1 + 2 && d[2] >= wy0 - 2 && d[2] <= wy1 + 2);
   const drawCellItems = function (onlyBlocking) {
-    for (let y = 0; y < rows && y < map.rows.length; y++) {
+    for (let y = wy0; y <= wy1 && y < rows && y < map.rows.length; y++) {
       const row = map.rows[y];
-      for (let x = 0; x < cols && x < row.length; x++) {
+      for (let x = wx0; x <= wx1 && x < row.length; x++) {
         const L = map.leg[row[x]];
         if (!L || !L.g) continue;
         const cellBlocking = L.g.some(tileItemIsBlocking);
@@ -287,6 +319,7 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode, opts) {
   };
   const drawDecoItems = function (onlyBlocking) {
     for (const d of map.deco || []) {
+      if (!decoInWin(d)) continue;
       if (tileItemIsBlocking(d[0]) !== onlyBlocking) continue;
       TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw, false, d[1], d[2]);
     }
@@ -295,9 +328,9 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode, opts) {
     ctx.fillStyle = "#060806";
     ctx.fillRect(0, 0, W, H);
     // Primeira passagem: todos os pisos (sempre atrás de tudo).
-    for (let y = 0; y < rows && y < map.rows.length; y++) {
+    for (let y = wy0; y <= wy1 && y < rows && y < map.rows.length; y++) {
       const row = map.rows[y];
-      for (let x = 0; x < cols && x < row.length; x++) {
+      for (let x = wx0; x <= wx1 && x < row.length; x++) {
         const L = map.leg[row[x]];
         if (!L || !L.v || !L.v.length) continue;
         TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw, x, y);

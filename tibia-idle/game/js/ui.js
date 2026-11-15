@@ -1079,7 +1079,7 @@ function openHuntsModal() {
   body.classList.remove(
     "boss-modal-shell", "reward-modal-shell",
     "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
-    "lootcfg-modal-shell"
+    "lootcfg-modal-shell", "imb-modal-shell"
   );
   body.classList.add("hunts-modal-shell");
   body.innerHTML = `<div class="panel-title hunts-modal-title">

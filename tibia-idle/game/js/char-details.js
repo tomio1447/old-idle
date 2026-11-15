@@ -45,7 +45,7 @@ const CHARD_SHELL_CLASSES = [
   "hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
   "reward-modal-shell", "npcs-modal-shell", "npc-modal-shell",
   "cidade-modal-shell", "ranking-modal-shell", "social-modal-shell",
-  "calendar-modal-shell", "lootcfg-modal-shell",
+  "calendar-modal-shell", "lootcfg-modal-shell", "imb-modal-shell",
 ];
 
 /* ------------------------------------------------------------ entrada */

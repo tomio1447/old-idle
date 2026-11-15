@@ -105,8 +105,18 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
     map && map.fovWidth ? map.fovWidth : undefined,
     map && map.fovHeight ? map.fovHeight : undefined);
   const followPlayer = combat && (combat.worldBoss || (combat.boss && combat.boss.worldBoss) ||
-    combat.questId || combat.instanceMode === "quest");
-  const focus = followPlayer ? combat.player : null;
+    combat.questId || combat.instanceMode === "quest" || !!combat.pvpBattle);
+  let focus = followPlayer ? combat.player : null;
+  /* Guerra de guild: os mapas (69x43, 51x52) são maiores que a FOV — com a
+   * câmera travada no centro, as safezones nas bordas e o próprio char ficam
+   * fora da tela. Segue o char vivo da própria conta. */
+  if (combat && combat.pvpBattle && Array.isArray(combat.players) && combat.players.length) {
+    const me = typeof pvpMyAccountId === "function" ? pvpMyAccountId() : 0;
+    const ownAcc = (e) => me && e && e.p &&
+      Number(e.accountId !== undefined ? e.accountId : (e.p && e.p.accountId)) === me;
+    focus = combat.players.find((e) => ownAcc(e) && Number(e.p.hp) > 0) ||
+      combat.players.find(ownAcc) || combat.player;
+  }
   if (focus && Number.isFinite(focus.x) && Number.isFinite(focus.y)) {
     if (view.width > canvasWidth) {
       view.x = Math.max(canvasWidth - view.width,
@@ -206,11 +216,20 @@ function mapBlockKeys(c) {
   return c._mapBlockKeys;
 }
 
+/* Map base das células bloqueadas do mapa: estático por combate. Montar um
+ * Map novo inserindo ~1000 keys a cada buildOccupancy (2x/frame, 60fps) era
+ * churn de GC e aparecia como hitches periódicos em mapas grandes — copiar
+ * um Map pré-montado (`new Map(base)`) é ordens de magnitude mais barato. */
+function mapBlockMap(c) {
+  if (!c._mapBlockMap) {
+    const m = new Map();
+    for (const k of mapBlockKeys(c)) m.set(k, true);
+    c._mapBlockMap = m;
+  }
+  return c._mapBlockMap;
+}
 function buildOccupancy(c, ignorar) {
-  const occ = new Map();
-  /* o mapa entra como ocupacao fixa: spawn, passo, dance e A* passam a
-   * respeitar paredes/agua sem precisar mudar nenhuma chamada. */
-  for (const k of mapBlockKeys(c)) occ.set(k, true);
+  const occ = new Map(mapBlockMap(c));
   if (c.player && c.player !== ignorar && (!c.player.p || c.player.p.hp > 0)) {
     const key = c.player.cx + ":" + c.player.cy;
     if (!occ.has(key)) occ.set(key, c.player); // nunca apaga uma parede

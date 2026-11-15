@@ -80,6 +80,97 @@ function floaterFont(f, s) {
   return spec.replace(/(\d+)px/, (_, n) => hudFontPx(n, scale) + "px") + " Verdana";
 }
 
+/* Rasterização de texto é a operação mais cara do render (~0.2-0.5ms por
+ * strokeText/fillText/measureText). Numa guerra com ~40 chars + floaters +
+ * falas de magia são ~400 ops de texto por frame — estoura o orçamento de
+ * 16ms e o combate fica "lagado" mesmo com o tick do servidor leve. O cache
+ * abaixo rasteriza cada texto UMA vez num canvas offscreen; os frames
+ * seguintes só fazem drawImage (~15µs, GPU). Sem DOM (testes em Node)
+ * retorna null e o caller usa o caminho vetorial original. */
+const TEXT_SPRITE_MAX = 900;
+const TEXT_SPRITE_CACHE = new Map();
+function textSprite(font, fill, strokeStyle, lineWidth, text) {
+  text = String(text == null ? "" : text);
+  if (!text || typeof document === "undefined") return null;
+  const key = font + "\x01" + fill + "\x01" + strokeStyle + "\x01" + lineWidth + "\x01" + text;
+  let spr = TEXT_SPRITE_CACHE.get(key);
+  if (spr) { TEXT_SPRITE_CACHE.delete(key); TEXT_SPRITE_CACHE.set(key, spr); return spr; }
+  const cv = document.createElement("canvas");
+  const c2 = cv.getContext && cv.getContext("2d");
+  if (!c2) return null;
+  c2.font = font;
+  const pad = Math.ceil(lineWidth || 0) + 2;
+  const px = Math.max(4, parseInt((font.match(/(\d+)px/) || [0, 10])[1], 10) || 10);
+  const textW = Math.ceil(c2.measureText(text).width);
+  cv.width = Math.max(1, textW + pad * 2);
+  cv.height = Math.max(1, Math.ceil(px * 1.4) + pad * 2);
+  c2.font = font;
+  c2.textAlign = "left";
+  c2.textBaseline = "alphabetic";
+  c2.lineJoin = "round";
+  const baseY = pad + px;
+  if (strokeStyle && lineWidth > 0) {
+    c2.strokeStyle = strokeStyle;
+    c2.lineWidth = lineWidth;
+    c2.strokeText(text, pad, baseY);
+  }
+  c2.fillStyle = fill || "#fff";
+  c2.fillText(text, pad, baseY);
+  spr = { cv: cv, w: cv.width, h: cv.height, baseY: baseY, textW: textW };
+  TEXT_SPRITE_CACHE.set(key, spr);
+  if (TEXT_SPRITE_CACHE.size > TEXT_SPRITE_MAX) {
+    let drop = TEXT_SPRITE_MAX >> 2;
+    for (const k of TEXT_SPRITE_CACHE.keys()) { TEXT_SPRITE_CACHE.delete(k); if (--drop <= 0) break; }
+  }
+  return spr;
+}
+/* Mesma âncora do fillText original: centro horizontal em cx, baseline em baseY. */
+function drawTextSprite(ctx, spr, cx, baseY) {
+  ctx.drawImage(spr.cv, Math.round(cx - spr.w / 2), Math.round(baseY - spr.baseY));
+}
+const TEXT_WIDTH_CACHE = new Map();
+function textWidthCached(font, text) {
+  const key = font + "\x01" + text;
+  let w = TEXT_WIDTH_CACHE.get(key);
+  if (w != null) return w;
+  if (typeof document === "undefined") return String(text).length * 6;
+  if (!textWidthCached._m) {
+    const _c = document.createElement("canvas");
+    textWidthCached._m = (_c.getContext && _c.getContext("2d")) || false;
+  }
+  if (!textWidthCached._m) return String(text).length * 6;
+  textWidthCached._m.font = font;
+  w = textWidthCached._m.measureText(String(text)).width;
+  if (TEXT_WIDTH_CACHE.size > 400) TEXT_WIDTH_CACHE.clear();
+  TEXT_WIDTH_CACHE.set(key, w);
+  return w;
+}
+/* maxStats percorre equip + wheel + GAMEDATA por chamada; com ~40 chars a
+ * 60fps são ~2400 chamadas/s só para a largura da barra. O máximo só muda
+ * com level/equip — TTL de 0.5s é invisível e quase zera o custo. */
+const MAXSTATS_TTL = 500;
+const MAXSTATS_CACHE = new WeakMap();
+function maxStatsCached(p) {
+  const now = Date.now();
+  const hit = MAXSTATS_CACHE.get(p);
+  if (hit && now - hit.at < MAXSTATS_TTL) return hit.v;
+  const v = maxStats(p);
+  MAXSTATS_CACHE.set(p, { at: now, v: v });
+  return v;
+}
+/* Sprite de floater cacheado no próprio objeto — invalida quando o texto
+ * muda (merge de combo) ou a escala/fonte muda. */
+function floaterSprite(f, s) {
+  const spec = floaterFont(f, s);
+  if (!f._spr || f._sprText !== f.text || f._sprFont !== spec) {
+    f._spr = textSprite(spec, f.color, "rgba(0,0,0,.85)",
+      (f.kind ? 2 : (f.small ? 1.5 : 2)) * Math.max(1, Number(s) || 1), f.text);
+    f._sprText = f.text;
+    f._sprFont = spec;
+  }
+  return f._spr;
+}
+
 /* O OTClient/Canary desenha outfit na escala nativa do tile: 32 px de arte
  * para 1 SQM. Escalar 1.18x fazia um outfit de 1 tile invadir o tile abaixo
  * e mascarava a âncora real usada pelo client. */
@@ -811,7 +902,11 @@ function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
     if (talkExpired(sp, now)) { dono.speech.splice(i, 1); continue; }
     if (!sp || !sp.text) continue;
     // o grito e maior, como no client
-    ctx.font = hudFont(sp.tipo === TALK.MONSTER_YELL ? 12 : 10, s, true);
+    const fontSpec = hudFont(sp.tipo === TALK.MONSTER_YELL ? 12 : 10, s, true);
+    if (!sp._spr || sp._sprFont !== fontSpec) {
+      sp._spr = textSprite(fontSpec, sp.color, "rgba(0,0,0,.9)", 3 * s, sp.text);
+      sp._sprFont = fontSpec;
+    }
     const max = Math.max(1, Number(sp.max) || 1);
     const lifeLeft = Math.max(0, Math.min(max, Number(sp.life) || 0));
     const p = Math.max(0, Math.min(1, 1 - lifeLeft / max));
@@ -819,11 +914,16 @@ function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
     if (a <= 0.02) { dono.speech.splice(i, 1); continue; }
     const ty = y - 34 * s - (sp.slot || 0) * 13 * s - p * 10 * s;
     ctx.globalAlpha = a;
-    ctx.lineWidth = 3 * s;
-    ctx.strokeStyle = "rgba(0,0,0,.9)";
-    ctx.strokeText(sp.text, x, ty);
-    ctx.fillStyle = sp.color;
-    ctx.fillText(sp.text, x, ty);
+    if (sp._spr) {
+      drawTextSprite(ctx, sp._spr, x, ty);
+    } else {
+      ctx.font = fontSpec;
+      ctx.lineWidth = 3 * s;
+      ctx.strokeStyle = "rgba(0,0,0,.9)";
+      ctx.strokeText(sp.text, x, ty);
+      ctx.fillStyle = sp.color;
+      ctx.fillText(sp.text, x, ty);
+    }
     ctx.globalAlpha = 1;
   }
 }
@@ -949,6 +1049,9 @@ Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color, missile) {
  * legivel em cima de qualquer chao. */
 function drawNameText(ctx, x, y, name, cor, hudScale) {
   const s = Math.max(1, Number(hudScale) || 1);
+  const spr = textSprite(hudFont(9, s, true), cor || "#ffffff", "#000",
+    Math.max(2, 2 * s), name);
+  if (spr) { drawTextSprite(ctx, spr, x, y); return; }
   ctx.font = hudFont(9, s, true);
   ctx.textAlign = "center";
   ctx.lineJoin = "round";
@@ -1130,6 +1233,83 @@ function drawPlayerStatus(ctx, x, yTop, centerY, player, mode, radius) {
     ? Math.max(0, Math.min(1, (player.magicShieldPool || 0) / (player.magicShieldCap || 1))) : 0;
   if (mode === "arcs") drawStatusArcs(ctx, x, centerY, player.name, hpPct, mpPct, radius || 34);
   else drawNameBars(ctx, x, yTop, player.name, hpPct, mpPct, shieldPct);
+}
+
+/* War shield da guerra de guilds (Tibia War System): escudo ao lado do nome,
+ * verde = time do viewer, vermelho = time rival. Vetorial, sem sprite. */
+/* Escudo é vetorial mas custa ~12 path ops por char por frame — numa
+ * guerra são ~480 ops. Só existem 2 cores; pré-renderiza uma vez por
+ * (cor, escala) e o frame vira um drawImage. */
+const WARSHIELD_SPRITES = new Map();
+function paintWarShieldIcon(s, color) {
+  const w = 9 * s, h = 10 * s, pad = 2.5 * s;
+  const cv = document.createElement("canvas");
+  cv.width = Math.ceil(w + pad * 2);
+  cv.height = Math.ceil(h + pad * 2);
+  const ctx = cv.getContext && cv.getContext("2d");
+  if (!ctx) return null;
+  const cx = cv.width / 2, cy = cv.height / 2;
+  const x = cx - w / 2, y = cy - h / 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h * 0.48);
+  ctx.quadraticCurveTo(x + w, y + h * 0.8, cx, y + h);
+  ctx.quadraticCurveTo(x, y + h * 0.8, x, y + h * 0.48);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "rgba(0,0,0,.85)";
+  ctx.lineWidth = Math.max(1, 1.1 * s);
+  ctx.fill();
+  ctx.stroke();
+  // Metade clara superior — leitura da forma do escudo em qualquer fundo.
+  ctx.fillStyle = "rgba(255,255,255,.3)";
+  ctx.beginPath();
+  ctx.moveTo(x + s, y + s);
+  ctx.lineTo(x + w - s, y + s);
+  ctx.lineTo(x + w - s, y + h * 0.44);
+  ctx.lineTo(x + s, y + h * 0.44);
+  ctx.closePath();
+  ctx.fill();
+  return cv;
+}
+function drawWarShieldIcon(ctx, cx, cy, color, hudScale) {
+  const s = Math.max(1, Number(hudScale) || 1);
+  const key = color + "|" + s;
+  let cv = WARSHIELD_SPRITES.get(key);
+  if (cv === undefined) {
+    cv = typeof document !== "undefined" ? paintWarShieldIcon(s, color) : null;
+    WARSHIELD_SPRITES.set(key, cv);
+  }
+  if (cv) {
+    ctx.drawImage(cv, Math.round(cx - cv.width / 2), Math.round(cy - cv.height / 2));
+    return;
+  }
+  const w = 9 * s, h = 10 * s;
+  const x = cx - w / 2, y = cy - h / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h * 0.48);
+  ctx.quadraticCurveTo(x + w, y + h * 0.8, cx, y + h);
+  ctx.quadraticCurveTo(x, y + h * 0.8, x, y + h * 0.48);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "rgba(0,0,0,.85)";
+  ctx.lineWidth = Math.max(1, 1.1 * s);
+  ctx.fill();
+  ctx.stroke();
+  // Metade clara superior — leitura da forma do escudo em qualquer fundo.
+  ctx.fillStyle = "rgba(255,255,255,.3)";
+  ctx.beginPath();
+  ctx.moveTo(x + s, y + s);
+  ctx.lineTo(x + w - s, y + s);
+  ctx.lineTo(x + w - s, y + h * 0.44);
+  ctx.lineTo(x + s, y + h * 0.44);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 /* Tag de PARTY ao lado do nome (como o OTC/Canary): estrela amarela no
@@ -1831,12 +2011,18 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = floaterFont(f, hudS);
-    ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * hudS;
-    ctx.strokeStyle = "rgba(0,0,0,.85)";
-    ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
-    ctx.fillStyle = f.color;
-    ctx.fillText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    const spr = floaterSprite(f, hudS);
+    if (spr) {
+      const fx = (f.x + f.vx * p * 60) * W, fy = (f.y + f.vy * p * 22) * H;
+      ctx.drawImage(spr.cv, Math.round(fx - spr.w / 2), Math.round(fy - spr.baseY));
+    } else {
+      ctx.font = floaterFont(f, hudS);
+      ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * hudS;
+      ctx.strokeStyle = "rgba(0,0,0,.85)";
+      ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    }
     ctx.globalAlpha = 1;
   }
 };
@@ -2068,12 +2254,18 @@ Renderer.prototype.drawAcademy = function(training, player, dt) {
     const p = 1 - f.life / f.max;
     const alpha = floaterAlpha(p);
     ctx.globalAlpha = alpha;
-    ctx.font = floaterFont(f, hudS);
-    ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * hudS;
-    ctx.strokeStyle = "rgba(0,0,0,.85)";
-    ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
-    ctx.fillStyle = f.color;
-    ctx.fillText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    const spr = floaterSprite(f, hudS);
+    if (spr) {
+      const fx = (f.x + f.vx * p * 60) * W, fy = (f.y + f.vy * p * 22) * H;
+      ctx.drawImage(spr.cv, Math.round(fx - spr.w / 2), Math.round(fy - spr.baseY));
+    } else {
+      ctx.font = floaterFont(f, hudS);
+      ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * hudS;
+      ctx.strokeStyle = "rgba(0,0,0,.85)";
+      ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    }
     ctx.globalAlpha = 1;
   }
   ctx.restore();
@@ -2268,6 +2460,23 @@ Renderer.prototype.draw = function (combat, player, dt) {
       : { x: 0, y: 0, width: canvasW, height: canvasH };
   const W = view.width, H = view.height;
 
+  /* Janela de células visíveis no mapa: o FOV é ~21x13, mas mapas de guerra
+   * chegam a 69x43 — sem isso, drawTileCharMap desenhava o mundo inteiro a
+   * cada frame (milhares de drawImage jogados fora pelo clip). Margem de 3
+   * células cobre outfits 2x2 e labels que invadem bordas. */
+  let cellWin = null;
+  if (combat && combat.huntMap && gridW > 0 && gridH > 0) {
+    const tw = W / gridW, th = H / gridH;
+    if (tw > 0 && th > 0) {
+      cellWin = {
+        x0: Math.max(0, Math.floor(-view.x / tw) - 3),
+        y0: Math.max(0, Math.floor(-view.y / th) - 3),
+        x1: Math.min(gridW - 1, Math.ceil((canvasW - view.x) / tw) + 3),
+        y1: Math.min(gridH - 1, Math.ceil((canvasH - view.y) / th) + 3),
+      };
+    }
+  }
+
   // Fala/FX envelhecem mesmo fora do FOV ou com entidade sem draw neste frame.
   this.ageCombatSpeech(combat, dt);
 
@@ -2293,7 +2502,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     /* mapa fechado com tiles oficiais (HUNTMAPS) — paredes reais.
      * Só o CHÃO aqui; paredes/pilares/objetos são desenhados DEPOIS das
      * criaturas (abaixo) para sobreporem monstros como no client. */
-    drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "ground");
+    drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "ground",
+      { win: cellWin });
   } else if (scene === "sewer") {
     drawRookgaardSewer(ctx, W, H);
   } else if (hunt && combat.huntId === "spiders") {
@@ -2371,7 +2581,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const frame = ent.moving ? (ent.frame || 1) : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(e.p, Date.now()) : 0);
       img = OutfitRenderer.forPlayer(e.p, ent.dir || "e", frame);
       name = e.p.name;
-      const mx = maxStats(e.p);
+      const mx = maxStatsCached(e.p);
       hpPct = Math.max(0, e.p.hp / (mx.hp || 1));
       mpPct = Math.max(0, (e.p.mp || 0) / (mx.mp || 1));
       shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(e.p, Date.now()))
@@ -2424,6 +2634,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
       Number.isFinite(ent.cx) ? (ent.cx | 0) : Math.floor((ent.x || 0) * gridW)));
     const ty = Math.max(0, Math.min(gridH - 1,
       Number.isFinite(ent.cy) ? (ent.cy | 0) : Math.floor((ent.y || 0) * gridH)));
+    // Fora da janela visível: pula até o paintEntity (outfit, maxStats,
+    // sprite lookup) — numa guerra ~metade dos 40 chars está fora do FOV.
+    if (cellWin && (tx < cellWin.x0 || tx > cellWin.x1 ||
+                    ty < cellWin.y0 || ty > cellWin.y1)) continue;
     depthDrawables.push({
       tx: tx, ty: ty, footY: e.footY, order: kindOrder[e.kind] || 0,
       draw: () => paintEntity(e),
@@ -2432,7 +2646,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
 
   if (combat && combat.huntMap && typeof drawTileCharMap === "function") {
     drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects",
-      { drawables: depthDrawables });
+      { drawables: depthDrawables, win: cellWin });
   } else {
     for (const d of (typeof sortTileDepthDrawables === "function"
       ? sortTileDepthDrawables(depthDrawables) : depthDrawables)) {
@@ -2593,6 +2807,13 @@ Renderer.prototype.draw = function (combat, player, dt) {
         drawWikiIcon(ctx, "expose-weakness", iconX, iconY, iconSize);
     } else {
       drawNameBars(ctx, nameX, nameY, info.name, info.hpPct, info.mpPct, info.shieldPct, barY, barX, hudS);
+      // War shield (Tibia War System): verde no próprio time, vermelho no rival.
+      const warSide = typeof pvpWarSide === "function" ? pvpWarSide(info.ent) : null;
+      if (warSide) {
+        const nameW = textWidthCached(hudFont(9, hudS, true), String(info.name || ""));
+        drawWarShieldIcon(ctx, nameX - nameW / 2 - 6.5 * hudS, nameY - 4.2 * hudS,
+          warSide === "ally" ? "#37c837" : "#d8372b", hudS);
+      }
     }
     if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
     else if (info.e.kind === 'player') {
@@ -2617,8 +2838,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const elapsed = f.max - f.life;
     const tf = f.max;
     const p = elapsed / tf;
-    ctx.font = floaterFont(f, floaterHud);
-    const textW = ctx.measureText(f.text).width;
+    const spr = floaterSprite(f, floaterHud);
+    const textW = spr ? spr.textW
+      : (ctx.font = floaterFont(f, floaterHud), ctx.measureText(f.text).width);
     const scale = (typeof tibiaScale !== 'undefined') ? tibiaScale(W) : (typeof tilePx !== 'undefined' ? tilePx(W)/32 : 1);
     const baseX = f.x * W;
     const baseY = f.y * H;
@@ -2636,11 +2858,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
       alpha = 0.95;
     }
     ctx.globalAlpha = alpha;
-    ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * floaterHud;
-    ctx.strokeStyle = "rgba(0,0,0,.85)";
-    ctx.strokeText(f.text, fx, fy);
-    ctx.fillStyle = f.color;
-    ctx.fillText(f.text, fx, fy);
+    if (spr) {
+      ctx.drawImage(spr.cv, Math.round(fx + textW / 2 - spr.w / 2), Math.round(fy - spr.baseY));
+    } else {
+      ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * floaterHud;
+      ctx.strokeStyle = "rgba(0,0,0,.85)";
+      ctx.strokeText(f.text, fx, fy);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, fx, fy);
+    }
     ctx.globalAlpha = 1;
   }
   ctx.textAlign = "center";

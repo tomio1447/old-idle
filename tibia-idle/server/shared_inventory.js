@@ -108,6 +108,10 @@ function normalizeSharedInventory(s) {
   s.dust = Math.min(s.dust, s.dustLimit);
   s.slivers = Math.max(0, Math.floor(Number(s.slivers) || 0));
   s.exaltedCores = Math.max(0, Math.floor(Number(s.exaltedCores) || 0));
+  /* Prey é DA CONTA (slots/seleções/wildcards compartilhados entre todos
+   * os personagens). null = ainda não migrado — o primeiro personagem
+   * com p.prey preenchido semeia o estado compartilhado no apply. */
+  s.prey = (s.prey && typeof s.prey === "object" && !Array.isArray(s.prey)) ? s.prey : null;
   return s;
 }
 
@@ -230,6 +234,12 @@ function applySharedToPlayer(p, shared) {
   // mudanças externas (venda em outra aba/personagem) não são revertidas e
   // o loot da instância não ressuscita itens já vendidos.
   p._pouchBase = Object.assign({}, shared.lootPouch);
+  /* Prey DA CONTA: referência ao mesmo objeto — mutações (reroll, select,
+   * tick) num personagem valem para todos. Se a conta ainda não tem prey
+   * compartilhada, o prey do próprio personagem vira a semente (migração
+   * lazy — o primeiro char hidratado leva o estado para a conta). */
+  if (shared.prey) p.prey = shared.prey;
+  else if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
   applySharedStamina(p, shared);
   p._sharedInv = 1;
   return p;
@@ -371,6 +381,7 @@ function extractSharedFromPlayer(p, shared) {
     .filter((i) => i && typeof i === "object" && !String(i.loc || "").startsWith("equip:"))
     .map((i) => Object.assign({}, i));
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
+  if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
   extractSharedStamina(p, shared);
   p.bag = {};
   p.lootPouch = {};
@@ -427,6 +438,7 @@ function mergeSharedFromPlayer(p, shared, opts) {
   }
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
   forgeResourcesDelta(shared, p, true);
+  if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
   extractSharedStamina(p, shared);
   return normalizeSharedInventory(shared);
 }

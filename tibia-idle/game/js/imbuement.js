@@ -46,6 +46,10 @@ const IMB_CATEGORIA = {
 
 const IMB_TIER_NOME = ["Basic", "Intricate", "Powerful"];
 
+/* Preco por tier quando o imbue e adquirido via Tibia Coins (30/60/90 TC).
+ * Espelha IMBUEMENT_TIER_COINS do server/store.js — o servidor e quem debita. */
+const IMB_TIER_COINS = { 1: 30, 2: 60, 3: 90 };
+
 /* Duracao oficial: bases[1].duration segundos (72000 = 20h) */
 const IMB_DURACAO_MS = (typeof IMBDATA !== "undefined"
   ? IMBDATA.bases[1].duration : 72000) * 1000;
@@ -277,7 +281,9 @@ function imbCusto(key, tier, protection) {
 }
 
 /* ---------- aplicar ---------- */
-function imbAdd(p, slot, key, tier, protection) {
+/* Validacoes comuns aos dois caminhos (gold+materiais e Tibia Coins):
+ * equipado, slot de imbue, categoria permitida, capacidade e duplicidade. */
+function imbPrecheck(p, slot, key, tier) {
   const e = p.equip[slot];
   if (!e) return { ok: false, msg: "Nada equipado nesse slot." };
   const max = imbSlotsOf(e.item);
@@ -296,6 +302,22 @@ function imbAdd(p, slot, key, tier, protection) {
     return og && og.cat === g.cat;
   }))
     return { ok: false, msg: "Já existe um imbuement desta categoria no item." };
+  return { ok: true, e: e, g: g, lista: lista };
+}
+
+/* Grava o imbuement no item (instId quando houver) — mesmo rest/bonus. */
+function imbApplySlot(p, slot, key, tier) {
+  const e = p.equip[slot];
+  const instId = e && e.instId ? e.instId : null;
+  const lista = imbOf(p, slot);
+  p.imbuements = p.imbuements || {};
+  p.imbuements[imbStoreKey(slot, instId)] =
+    lista.concat([{ key: key, tier: tier, rest: IMB_DURACAO_MS }]);
+}
+
+function imbAdd(p, slot, key, tier, protection) {
+  const pre = imbPrecheck(p, slot, key, tier);
+  if (!pre.ok) return pre;
   if (!imbHaveMats(p, key, tier))
     return { ok: false, msg: "Faltam materiais na loot pouch." };
   const custo = imbCusto(key, tier, protection);
@@ -313,12 +335,19 @@ function imbAdd(p, slot, key, tier, protection) {
              msg: "A imbuiação FALHOU! Os materiais e o gold foram perdidos (" +
                   custo.pct + "% de chance)." };
 
-  const instId = e.instId || null;
-  const nova = lista.concat([{ key: key, tier: tier, rest: IMB_DURACAO_MS }]);
-  p.imbuements = p.imbuements || {};
-  p.imbuements[imbStoreKey(slot, instId)] = nova;
-  return { ok: true, msg: `${g.name} ${IMB_TIER_NOME[tier - 1]} aplicado!`,
+  imbApplySlot(p, slot, key, tier);
+  return { ok: true, msg: `${pre.g.name} ${IMB_TIER_NOME[tier - 1]} aplicado!`,
            cost: custo.price };
+}
+
+/* Via Tibia Coins: sem materiais, sem gold e sucesso garantido — o debito
+ * dos coins ja foi feito pelo servidor (storeBuyImbuement) antes daqui. */
+function imbAddTc(p, slot, key, tier) {
+  const pre = imbPrecheck(p, slot, key, tier);
+  if (!pre.ok) return pre;
+  imbApplySlot(p, slot, key, tier);
+  return { ok: true,
+           msg: `${pre.g.name} ${IMB_TIER_NOME[tier - 1]} aplicado via Tibia Coins!` };
 }
 
 /* Remover custa 15000 gp (removecost oficial) */

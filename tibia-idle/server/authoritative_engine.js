@@ -498,6 +498,7 @@ try{
   for(const f of ["lion-sanctum.js","rotworm-darashia.js","elder-wyrm-darashia.js",
     "lions-rock-darashia.js","dl-darashia.js","feast-of-souls.js","scarlett-boss.js",
     "hyaena-lairs.js","wyrm-lb.js","medusa-tower-ph.js","carniphilas-ph.js",
+    "glooth-cave.js","jade-roots.js",
     "asura-palace.js","azzilon-castle.js","arbaziloth.js","magma-bubble.js",
     "sugar-daddy.js","sugar-mommy.js","gnomprona.js","bloodrotten.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
@@ -582,6 +583,10 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "prison-2":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker"],cat:"hard",pack:10,packMin:6,packMax:10},
   "prison-3":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker","plaguesmith","juggernaut"],cat:"hard",pack:10,packMin:6,packMax:10},
   "salamander-cave":{monsters:["emerald-damselfly","marsh-stalker","swampling","salamander"],cat:"aventureiro",pack:4},
+  "glooth-cave":{monsters:["glooth-bandit","glooth-brigand"],cat:"mid",pack:12,packMin:6,packMax:12,
+    spawnWeights:{"glooth-bandit":50,"glooth-brigand":50}},
+  "jade-roots":{monsters:["bloated-man-maggot","mycobiontic-beetle","sopping-corpus"],cat:"hardcore",pack:12,packMin:8,packMax:12,
+    spawnWeights:{"bloated-man-maggot":25,"mycobiontic-beetle":50,"sopping-corpus":25}},
   "falcon-bastion":{monsters:["falcon-knight","falcon-paladin"],cat:"hard",pack:7,packMin:6,packMax:8,
     bossMobs:["grand-commander-soeren","preceptor-lazare","grand-chaplain-gaunder","grand-canon-dominus"],
     spawnWeights:{"falcon-knight":48,"falcon-paladin":48,
@@ -898,6 +903,8 @@ function packOpportunity(auth,item,living){
 function authorityPlayerTarget(auth,item,living){
   const list=(living||auth.mobs||[]).filter((mob)=>mob&&mob.hp>0);
   if(!list.length)return null;
+  // Batalha PvP: alvo manual do time primeiro, senão menor HP máximo.
+  if(auth&&auth.pvpBattle){const t=pvpBattleTarget(auth,item,list);if(t)return t;}
   if(auth.hatred&&auth.hatred.active){
     const hateful=list.find((mob)=>mob.slug==="hateful-soul");
     const summon=hateful||list.find((mob)=>mob.hatredSummon);
@@ -975,6 +982,7 @@ function normalizeVisualState(raw,auth){
       // da posição visível para o melee não ficar preso no spawn antigo.
       item.cx=Math.max(0,Math.min(gw-1,Number.isFinite(cx)?Math.round(cx):Math.floor(x*gw)));
       item.cy=Math.max(0,Math.min(gh-1,Number.isFinite(cy)?Math.round(cy):Math.floor(y*gh)));
+      if(input.self)item.self=1; // PvP: char realmente pilotado do cliente
       if(input.combo)item.combo=sanitizeCombo(input.combo);
       if(input.stances&&typeof input.stances==="object")item.stances=input.stances;
       if(typeof input.autoWalk==="boolean")item.autoWalk=input.autoWalk;
@@ -986,6 +994,8 @@ function normalizeVisualState(raw,auth){
       if(Number.isFinite(wdx)&&Number.isFinite(wdy)&&(wdx||wdy)){
         item.walkIntent={dx:Math.max(-1,Math.min(1,Math.round(wdx))),dy:Math.max(-1,Math.min(1,Math.round(wdy)))};
       }
+      if(input.teamTarget!==undefined)
+        item.teamTarget=input.teamTarget===null||input.teamTarget===""?null:String(input.teamTarget).slice(0,64);
       if(input.challenge&&typeof input.challenge==="object"){
         const hunt=String(input.challenge.huntMode||"");
         item.challenge={
@@ -1057,6 +1067,8 @@ function snapAuthorityEntityToCell(auth,ent){
 }
 function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(raw,auth),players=new Map(visual.players.map((v)=>[v.id,v])),
   mobs=new Map(visual.mobs.map((v)=>[v.id,v]));
+  // Cliente antigo sem flag `self`: o primeiro char da conta é o pilotado.
+  if(auth&&auth.pvpBattle&&visual.players.length&&!visual.players.some((v)=>v.self))visual.players[0].self=1;
   const applyPose=(ent,pos)=>{
     if(!ent||!pos)return;
     if(Number.isFinite(Number(pos.cx)))ent.cx=pos.cx;
@@ -1067,6 +1079,30 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
   };
   for(const item of auth.players||[]){const pos=players.get(String(item.id));if(pos){
     const combo=pos.combo,stances=pos.stances,challenge=pos.challenge;
+    /* Batalha PvP: só o char CONTROLADO (self) é pilotado. Auxiliares da
+     * mesma conta viram IA do servidor — a pose que o cliente ecoa chega
+     * atrasada um tick e regrediria o passo da IA. Só o alvo do time
+     * passa (o clique pode cair em qualquer char da conta). */
+    if(auth.pvpBattle&&!pos.self){
+      if(pos.teamTarget!==undefined){
+        const team=pvpBattleTeamOf(item);
+        const leaderAcc=team&&auth.pvpBattle.teams&&auth.pvpBattle.teams[team]?
+          Number(auth.pvpBattle.teams[team].leaderAccountId)||0:0;
+        const acc=Number(item.accountId||(item.p&&item.p.accountId))||0;
+        if(team&&leaderAcc&&acc===leaderAcc){
+          const tgt=pos.teamTarget?String(pos.teamTarget):null;
+          if(!tgt)auth.pvpBattle.teams[team].targetId=null;
+          else{
+            const ent=(auth.players||[]).find((o)=>o&&String(o.id)===tgt&&o.p&&
+              o.p.hp>0&&!o.downUntil&&pvpBattleTeamOf(o)&&pvpBattleTeamOf(o)!==team);
+            if(ent&&chebyshevCells(entityGridCell(item,auth),entityGridCell(ent,auth))<=PVP_BATTLE_TARGET_RANGE)
+              auth.pvpBattle.teams[team].targetId=tgt;
+          }
+        }
+      }
+      continue;
+    }
+    if(auth.pvpBattle)item._pvpDrivenAt=Number(auth.clock)||Date.now();
     applyPose(item,pos);
     if(combo){
       item.p=item.p||{};item.p.config=item.p.config||{};
@@ -1074,10 +1110,30 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     }
     if(stances){item.p=item.p||{};item.p.stances=sanitizeStances(stances,item.p);}
     if(typeof pos.autoWalk==="boolean"){item.p=item.p||{};item.p.config=item.p.config||{};
-      if(accountIsVip(item.p))item.p.config.autoWalk=pos.autoWalk;
+      if(accountIsVip(item.p)||auth.pvpBattle)item.p.config.autoWalk=pos.autoWalk;
       else item.p.config.autoWalk=true;
     }
-    if(pos.walkIntent&&accountIsVip(item.p))item.walkIntent=pos.walkIntent;else delete item.walkIntent;
+    if(pos.walkIntent&&(accountIsVip(item.p)||auth.pvpBattle))item.walkIntent=pos.walkIntent;else delete item.walkIntent;
+    // Clique em inimigo: target manual compartilhado pelo time inteiro.
+    // Só o LÍDER da guild designa — IA e demais membros não escrevem targetId.
+    if(pos.teamTarget!==undefined&&auth.pvpBattle){
+      const team=pvpBattleTeamOf(item);
+      const leaderAcc=team&&auth.pvpBattle.teams&&auth.pvpBattle.teams[team]?
+        Number(auth.pvpBattle.teams[team].leaderAccountId)||0:0;
+      const acc=Number(item.accountId||(item.p&&item.p.accountId))||0;
+      if(team&&leaderAcc&&acc===leaderAcc){
+        const tgt=pos.teamTarget?String(pos.teamTarget):null;
+        if(!tgt)auth.pvpBattle.teams[team].targetId=null;
+        else{
+          // Range de designação (11 sqm do char do líder) + alvo hostil vivo:
+          // id inválido/morto/aliado/longe NÃO sobrescreve o alvo válido.
+          const ent=(auth.players||[]).find((o)=>o&&String(o.id)===tgt&&o.p&&
+            o.p.hp>0&&!o.downUntil&&pvpBattleTeamOf(o)&&pvpBattleTeamOf(o)!==team);
+          if(ent&&chebyshevCells(entityGridCell(item,auth),entityGridCell(ent,auth))<=PVP_BATTLE_TARGET_RANGE)
+            auth.pvpBattle.teams[team].targetId=tgt;
+        }
+      }
+    }
     if(challenge){item.p=item.p||{};item.p.config=item.p.config||{};
       item.p.config.exetaRes=!!challenge.res;item.p.config.exetaAmpRes=!!challenge.amp;
       const mode=challenge.huntMode||(challenge.box?"box":"");
@@ -2861,7 +2917,16 @@ function nextComboSpell(auth,item,p,now,primary,living){
     return null;
   }
   if(config.spellAttack===false)return null;
-  const list=playerSpellList(p).filter(usable);
+  // Na guerra, magia respeita o alcance do spell (sem combo não havia gate e
+  // a magia atravessava o mapa inteiro).
+  const pvpReach=(s)=>{
+    if(!auth||!auth.pvpBattle||!s||!primary)return true;
+    const meta=SPELL_TARGET[String(s.id||"")]||{},areaName=spellAreaName(s);
+    if(meta.self||(areaName&&spellAreaFromCaster(areaName,s)))return true;
+    if(!(s.needTarget||meta.needTarget||(Number(s.range)>1&&!areaName)))return true;
+    return chebyshevCells(entityGridCell(item,auth),entityGridCell(primary,auth))<=Math.max(1,spellReach(s));
+  };
+  const list=playerSpellList(p).filter((s)=>usable(s)&&pvpReach(s));
   if(!list.length)return null;
   let best=null,bestScore=-1;
   for(const s of list){
@@ -4403,6 +4468,10 @@ function canPlayerDamagePlayer(auth,attacker,victim){
   if(!(victim.p.hp>0)||victim.downUntil)return false;
   if(!isPvpInstance(auth))return false;
   if(playersAreAllies(attacker,victim))return false;
+  // Safezones de batalha em modo PZ (Ankrahmun): dentro de QUALQUER sz
+  // ninguém ataca nem é atacado. Em Venore (invasion) o combate é livre.
+  if(auth.pvpBattle&&auth.pvpBattle.pz&&
+     (pvpBattleInAnySafezone(auth,attacker)||pvpBattleInAnySafezone(auth,victim)))return false;
   return true;
 }
 function livingHostilePlayers(auth,attacker){
@@ -4418,10 +4487,19 @@ function playerCombatProxy(item){
     def:{name:(item.p&&item.p.name)||"Player",race:"blood"},
     greedImmune:false,qteImmune:false
   };
+  /* Batalha de guild: ataques/spells/runas chegam pelo proxy. O HP é exposto
+   * na escala "sem redução" (hp/0.65): o código genérico faz max(0,hp-dmg)
+   * e decide a letalidade certo; o setter converte de volta = dano ×0.65.
+   * (Reduzir depois do clamp deixava o alvo eternamente com 1 HP.) */
+  const inBattle=()=>!!(proxy._auth&&proxy._auth.pvpBattle);
   Object.defineProperty(proxy,"hp",{
-    get(){return Math.max(0,Number(item.p&&item.p.hp)||0);},
+    get(){const hp=Math.max(0,Number(item.p&&item.p.hp)||0);return inBattle()?hp/PVP_BATTLE_DMG_MUL:hp;},
     set(v){
-      const next=Math.max(0,Number(v)||0),prev=Math.max(0,Number(item.p&&item.p.hp)||0);
+      const prev=Math.max(0,Number(item.p&&item.p.hp)||0),raw=Math.max(0,Number(v)||0);
+      let next=raw;
+      if(inBattle())next=raw<=0?0:Math.min(prev,Math.max(0,Math.round(raw*PVP_BATTLE_DMG_MUL)));
+      // credita dano/kill/frag (antes só o caminho direto applyPlayerPvpDamage contava).
+      const battle=inBattle()&&next<prev;
       item.p.hp=next;
       if(proxy._auth&&next<prev)proxy._auth.lastDamageSource="player-raid";
       if(next<=0&&prev>0){
@@ -4435,10 +4513,14 @@ function playerCombatProxy(item){
             permadead:!!item.permadead,screen:true,pvp:true,ts:at});
         }
       }
+      if(battle){
+        if(prev>next)item.p._lastHitBy=(proxy._attacker&&proxy._attacker.p&&proxy._attacker.p.name)||"Player";
+        pvpBattleCredit(proxy._auth,proxy._attacker,item,prev-next);
+      }
     },
     configurable:true
   });
-  Object.defineProperty(proxy,"maxHp",{get(){return maxStats(item.p).hp;},configurable:true});
+  Object.defineProperty(proxy,"maxHp",{get(){const m=maxStats(item.p).hp;return inBattle()?m/PVP_BATTLE_DMG_MUL:m;},configurable:true});
   return proxy;
 }
 function combatLivingFor(auth,attacker){
@@ -4462,8 +4544,11 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
   const element=el||"physical";
   if(element==="physical")dmg=mitigateIncoming(auth,dmg,victim.p);
   dmg=absorbIncomingDamage(auth,victim,victim.p,dmg,now,pos,element,null);
+  // Batalha de guild: dano PvP reduzido em 35% (regra do warzone).
+  if(auth.pvpBattle)dmg=Math.max(0,Math.floor(dmg*PVP_BATTLE_DMG_MUL));
   if(dmg>0)victim.p._lastHitBy=(attacker&&attacker.p&&attacker.p.name)||"Player";
   victim.p.hp=Math.max(0,(Number(victim.p.hp)||0)-dmg);
+  if(auth.pvpBattle)pvpBattleCredit(auth,attacker,victim,dmg);
   auth.lastDamageSource="player-raid";
   auth.events=auth.events||[];
   auth.events.push({t:"taken",dmg,x:pos.x,y:pos.y,targetId:String(victim.id),
@@ -4473,6 +4558,293 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
       permadead:!!victim.permadead,screen:true,pvp:true,ts:now});}
   return dmg;
 }
+/* ===================== GUILD PvP BATTLE =====================
+ * auth.pvpBattle: instância compartilhada de guerra guild-vs-guild.
+ * Dois times (1/2) com safezones PZ próprias. Mapas "frags" (Ankrahmun:
+ * alvo 100 frags) e "control" (Venore: segundos de domínio da área de
+ * controle). Fim do tempo: maior placar vence, empate sem prorrogação.
+ * Dano jogador→jogador reduzido em 35%, sem perda de XP/loot — a aposta
+ * da guild é a penalidade. Morto renasce na própria sz em ~10s. */
+const PVP_BATTLE_DMG_MUL=0.65;
+/* Alcance máximo de runa na guerra (runes.json não tem campo range). */
+const PVP_BATTLE_RUNE_RANGE=7;
+/* O líder só designa alvo a até 11 sqm do próprio char (meia FOV). */
+const PVP_BATTLE_TARGET_RANGE=11;
+/* Formação: o time acompanha o líder a até 5 sqm. */
+const PVP_BATTLE_FOLLOW_RANGE=5;
+const PVP_BATTLE_RESPAWN_MS=10000;
+function pvpBattleCellInRect(cx,cy,rect){
+  return !!(rect&&cx>=rect.x1&&cx<=rect.x2&&cy>=rect.y1&&cy<=rect.y2);
+}
+function pvpBattleTeamOf(ent){
+  const t=Number(ent&&(ent.pvpTeam!==undefined?ent.pvpTeam:ent.team));
+  return t===1||t===2?t:0;
+}
+/* Retângulo da sz do PRÓPRIO time (1/2) ou do time inimigo. */
+function pvpBattleSz(auth,team){
+  const pb=auth&&auth.pvpBattle,sz=pb&&pb.safezones;
+  return sz?sz[team===2?2:1]:null;
+}
+function pvpBattleInSafezone(auth,ent,which){
+  const pb=auth&&auth.pvpBattle;if(!pb)return false;
+  const cell=entityGridCell(ent,auth),t=pvpBattleTeamOf(ent);
+  const rect=which==="enemy"?pvpBattleSz(auth,t===1?2:1):pvpBattleSz(auth,t);
+  return pvpBattleCellInRect(cell.cx,cell.cy,rect);
+}
+function pvpBattleInAnySafezone(auth,ent){
+  const pb=auth&&auth.pvpBattle;if(!pb)return false;
+  const cell=entityGridCell(ent,auth);
+  return pvpBattleCellInRect(cell.cx,cell.cy,pb.safezones&&pb.safezones[1])||
+    pvpBattleCellInRect(cell.cx,cell.cy,pb.safezones&&pb.safezones[2]);
+}
+function pvpBattleStat(auth,ent){
+  const pb=auth&&auth.pvpBattle;if(!pb||!ent)return null;
+  pb.stats=pb.stats||{};const id=String(ent.id);
+  return pb.stats[id]||(pb.stats[id]={name:(ent.p&&ent.p.name)||"Player",
+    team:pvpBattleTeamOf(ent),accountId:Number(ent.accountId||(ent.p&&ent.p.accountId))||0,
+    kills:0,deaths:0,damage:0});
+}
+/* Placar por frags: kill → +1 no score do time do killer. Invasão:
+ * pontos acumulam no tick (pvpBattleTick). */
+function pvpBattleCredit(auth,attacker,victim,dmg){
+  const pb=auth&&auth.pvpBattle;if(!pb||pb.finished)return;
+  const sa=pvpBattleStat(auth,attacker);if(sa)sa.damage+=Math.max(0,Math.floor(dmg));
+  if(victim&&victim.p&&victim.p.hp<=0){
+    const sv=pvpBattleStat(auth,victim);if(sv)sv.deaths++;
+    if(sa)sa.kills++;
+    if(String(pb.mode)==="frags"){
+      const t=sa?Number(sa.team):0;
+      if(t===1||t===2){
+        pb.scores=pb.scores||{1:0,2:0};pb.scores[t]=(Number(pb.scores[t])||0)+1;
+        auth.events=auth.events||[];
+        auth.events.push({t:"pvp-score",team:t,scores:Object.assign({},pb.scores),
+          screen:true,ts:Number(auth.clock)||Date.now()});
+        const target=Math.max(1,Number(pb.fragTarget)||100);
+        if(pb.scores[t]>=target)pb.finished={winnerTeam:t,reason:"frags",at:Number(auth.clock)||Date.now()};
+      }
+    }
+  }
+}
+/* Target de combate: prioriza o alvo manual do time (clique no inimigo),
+ * senão o inimigo vivo com menor HP máximo (regra da IA de batalha). */
+function pvpBattleTarget(auth,item,living){
+  const pb=auth&&auth.pvpBattle;if(!pb)return null;
+  const list=(living||[]).filter((t)=>t&&t.hp>0&&t._playerEnt);
+  if(!list.length)return null;
+  const t=pvpBattleTeamOf(item);
+  const wanted=t?String((pb.teams&&pb.teams[t]&&pb.teams[t].targetId)||""):"";
+  if(wanted){const forced=list.find((x)=>String(x.id)===wanted);if(forced)return forced;}
+  return list.slice().sort((a,b)=>(Number(a.maxHp)||1)-(Number(b.maxHp)||1))[0];
+}
+/* Distância de aproximação na guerra por vocação: knight/monk SEMPRE melee
+ * (1 sqm); paladin/druid/sorcerer lutam a 3 sqm do alvo. Vocação fora da
+ * lista cai na menor entre o alcance da arma e o das magias configuradas. */
+function pvpApproachRange(p){
+  const base=CanaryVocation.baseVocName(p&&p.voc);
+  if(base==="knight"||base==="monk")return 1;
+  if(base==="paladin"||base==="druid"||base==="sorcerer")return 3;
+  const weapon=playerAttackRangeSQM(p);let reach=weapon;
+  for(const s of playerSpellList(p)){
+    if(!s||Number(s.lvl||0)>Number(p&&p.level||1))continue;
+    const r=Math.max(1,spellReach(s));if(r<reach)reach=r;
+  }
+  return Math.max(1,reach);
+}
+/* Char "âncora" do time: o char PILOTADO da conta líder da guild (é o
+ * humano que dita o avanço da formação — sem ele o time orbitava um char
+ * parado na safezone). Sem pilotado vivo, cai no primeiro vivo da conta.
+ * Retorna null quando o item é o próprio âncora — ele não segue ninguém. */
+function pvpBattleLeaderChar(auth,item){
+  const pb=auth&&auth.pvpBattle,t=pvpBattleTeamOf(item);
+  const acc=t&&pb&&pb.teams&&pb.teams[t]?Number(pb.teams[t].leaderAccountId)||0:0;
+  if(!acc)return null;
+  const now=Number(auth.clock)||Date.now();
+  const cand=(auth.players||[]).filter((o)=>o&&o.p&&o.p.hp>0&&!o.downUntil&&
+    pvpBattleTeamOf(o)===t&&
+    Number(o.accountId!==undefined?o.accountId:(o.p&&o.p.accountId))===acc);
+  const leader=cand.find((o)=>(Number(o._pvpDrivenAt)||0)>now-5000)||cand[0]||null;
+  return leader&&leader!==item?leader:null;
+}
+/* Célula livre e alcançável no anel de até 5 sqm do líder. Cada seguidor
+ * mira a célula mais próxima de si — o time se espalha em anel em vez de
+ * fazer fila atrás da mesma célula do líder (deadlock em corredor). */
+/* Célula livre e alcançável no anel do líder. `pref` é o raio preferido da
+ * vocação (melee 1 = colado no líder, ranged 3 = segunda linha); anéis
+ * vizinhos até 5 sqm servem de transbordo quando o preferido lota. Cada
+ * seguidor mira a célula mais próxima de si no raio certo — o time se
+ * espalha em vez de fazer fila atrás da mesma célula (deadlock em corredor). */
+function pvpFollowCell(auth,item,lc,pref){
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  const field=pvpDistanceField(auth,lc.cx,lc.cy);
+  const taken=new Set();
+  for(const o of auth.players||[]){
+    if(!o||o===item||!o.p||o.p.hp<=0||o.downUntil)continue;
+    const c=entityGridCell(o,auth);taken.add(c.cx+":"+c.cy);
+  }
+  const here=entityGridCell(item,auth),R=PVP_BATTLE_FOLLOW_RANGE;
+  const want=Math.max(1,Math.min(R,Number(pref)||R));
+  const sz1=pvpBattleSz(auth,1),sz2=pvpBattleSz(auth,2);
+  let best=null,bestScore=Infinity;
+  for(let dx=-R;dx<=R;dx++)for(let dy=-R;dy<=R;dy++){
+    const d=Math.max(Math.abs(dx),Math.abs(dy));if(d<1||d>R)continue;
+    const cx=lc.cx+dx,cy=lc.cy+dy;
+    if(cx<0||cy<0||cx>=w||cy>=h||authorityCellBlocked(auth,cx,cy))continue;
+    if(field[cx+cy*w]<0||taken.has(cx+":"+cy))continue;
+    // Safezone inimiga é inalcançável (o passo é bloqueado); dentro de
+    // qualquer sz não se luta em mapa PZ — prefere célula de fora.
+    if(pvpBattleStepBlocked(auth,item,cx,cy))continue;
+    let score=(Math.abs(cx-here.cx)+Math.abs(cy-here.cy))*10+Math.abs(d-want)*100;
+    if((sz1&&pvpBattleCellInRect(cx,cy,sz1))||(sz2&&pvpBattleCellInRect(cx,cy,sz2)))score+=500;
+    if(score<bestScore){bestScore=score;best={cx,cy};}
+  }
+  return best;
+}
+/* Goal de movimento do jogador automático na guerra. Regras:
+ * 1) Alvo designado pelo líder (teams[t].targetId) = PUSH: o time inteiro
+ *    avança naquele alvo — melee a 1 sqm, ranged a 3 — sem formação nem
+ *    gate de engajamento.
+ * 2) Sem alvo chamado: seguidor só engaja hostis a até 5+alcance do líder
+ *    (melee 6, ranged 8). Alvo mais longe = segura a linha.
+ * 3) Sem alvo ao alcance: o seguidor ocupa o anel da própria vocação em
+ *    volta do líder — knight/monk a 1 sqm, ranged a 3 (`pvpFollowCell`). */
+function pvpBattleGoal(auth,item){
+  const pb=auth&&auth.pvpBattle;if(!pb||pb.finished)return null;
+  const leader=pvpBattleLeaderChar(auth,item);
+  const alcance=pvpApproachRange(item.p);
+  const myTeam=pvpBattleTeamOf(item);
+  // O time da guerra decide a hostilidade — mesmo sem partyKey o aliado
+  // nunca vira alvo de combate do próprio time.
+  let hostiles=livingHostilePlayers(auth,item).filter((o)=>pvpBattleTeamOf(o)!==myTeam);
+  // Dentro da PZ ninguém é "atacável": sem isso a IA nunca saía da safezone
+  // (Ankrahmun começava parado). Marcha até o inimigo vivo mais adequado.
+  if(!hostiles.length){
+    const t=pvpBattleTeamOf(item);
+    hostiles=(auth.players||[]).filter((o)=>o&&o!==item&&o.p&&o.p.hp>0&&!o.downUntil&&
+      pvpBattleTeamOf(o)&&pvpBattleTeamOf(o)!==t);
+  }
+  // Controle (Venore): a IA disputa a zona — vai até ela e, lá dentro, só
+  // persegue inimigos que também estejam na zona (não abandona o domínio).
+  const zone=String(pb.mode)==="control"&&pb.controlZone;
+  if(zone){
+    const here=entityGridCell(item,auth);
+    if(!pvpBattleCellInRect(here.cx,here.cy,zone))
+      return {cx:Math.round((zone.x1+zone.x2)/2),cy:Math.round((zone.y1+zone.y2)/2),td:0,zone:true};
+    hostiles=hostiles.filter((h)=>{const c=entityGridCell(h,auth);return pvpBattleCellInRect(c.cx,c.cy,zone);});
+  }
+  if(!hostiles.length)return null;
+  const target=pvpBattleTarget(auth,item,hostiles.map((h)=>playerCombatProxy(h)));
+  const ent=target&&target._playerEnt?target._playerEnt:null;
+  if(!ent)return null;
+  const here=entityGridCell(item,auth),to=entityGridCell(ent,auth);
+  const t=pvpBattleTeamOf(item);
+  const wanted=String((pb.teams&&pb.teams[t]&&pb.teams[t].targetId)||"");
+  // 1) Alvo chamado pelo líder: todo o time avança junto naquele alvo.
+  if(wanted&&String(ent.id)===wanted)
+    return chebyshevCells(here,to)===alcance?null:{cx:to.cx,cy:to.cy,td:alcance,push:true};
+  if(leader){
+    const lc=entityGridCell(leader,auth);
+    const inSz=pvpBattleInAnySafezone(auth,item);
+    // 2) Engajamento limitado pela formação: seguidor só persegue alvo
+    // dentro do raio do líder (melee: até 6, ranged: até 8). Dentro de
+    // safezone nunca engaja — precisa sair p/ lutar.
+    if(!inSz&&chebyshevCells(to,lc)<=PVP_BATTLE_FOLLOW_RANGE+alcance)
+      return chebyshevCells(here,to)===alcance?null:{cx:to.cx,cy:to.cy,td:alcance};
+    // 3) Sem alvo ao alcance: ocupa o anel da vocação em volta do líder
+    // (EK/monk a 1 sqm, ranged a 3). Quem está em sz sai marchando.
+    const pref=Math.min(alcance,PVP_BATTLE_FOLLOW_RANGE);
+    if(inSz||chebyshevCells(here,lc)>pref){
+      const cell=pvpFollowCell(auth,item,lc,pref);
+      if(cell)return {cx:cell.cx,cy:cell.cy,td:0,follow:true};
+      return {cx:lc.cx,cy:lc.cy,td:pref,follow:true};
+    }
+    return null; // em formação, ninguém ao alcance — segura a linha
+  }
+  // Sem âncora viva: perseguição livre no alvo resolvido.
+  return chebyshevCells(here,to)===alcance?null:{cx:to.cx,cy:to.cy,td:alcance};
+}
+/* Respawn da batalha: célula livre dentro da própria safezone. */
+function pvpBattleRespawn(auth,item,now){
+  const pb=auth&&auth.pvpBattle;if(!pb)return;
+  const t=pvpBattleTeamOf(item),rect=pvpBattleSz(auth,t);
+  const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+  let cell=null;
+  if(rect){
+    const cx=Math.round((rect.x1+rect.x2)/2),cy=Math.round((rect.y1+rect.y2)/2);
+    cell=claimSpawnCell(auth,cx,cy);
+    if(pvpBattleCellInRect(cell.cx,cell.cy,rect)===false){
+      // varre a sz atrás de uma célula livre
+      outer:for(let x=rect.x1;x<=rect.x2;x++)for(let y=rect.y1;y<=rect.y2;y++){
+        if(authorityCellBlocked(auth,x,y))continue;
+        const taken=(auth.players||[]).some((o)=>o!==item&&o.p&&o.p.hp>0&&o.cx===x&&o.cy===y);
+        if(!taken){cell={cx:x,cy:y};break outer;}
+      }
+    }
+  }
+  cell=cell||claimSpawnCell(auth,gw>>1,gh>>1);
+  item.cx=cell.cx;item.cy=cell.cy;item.x=(cell.cx+.5)/gw;item.y=(cell.cy+.5)/gh;
+  item.sx=item.x;item.sy=item.y;item.walkAcc=0;
+  auth.events=auth.events||[];
+  auth.events.push({t:"pvp-respawn",targetId:String(item.id),x:item.x,y:item.y,
+    screen:true,ts:Number(now)||Number(auth.clock)||Date.now()});
+}
+/* Contagem de chars vivos por time dentro da área de controle. */
+function pvpBattleControlCounts(auth){
+  const pb=auth&&auth.pvpBattle,zone=pb&&pb.controlZone,out={1:0,2:0};
+  if(!zone)return out;
+  for(const item of auth.players||[]){
+    if(!item||!item.p||item.p.hp<=0||item.downUntil)continue;
+    const t=pvpBattleTeamOf(item);if(!t)continue;
+    const cell=entityGridCell(item,auth);
+    if(pvpBattleCellInRect(cell.cx,cell.cy,zone))out[t]++;
+  }
+  return out;
+}
+/* Tick por step (200ms): domínio da área de controle e timer principal. */
+function pvpBattleTick(auth,now,dt){
+  const pb=auth&&auth.pvpBattle;if(!pb||auth.ended)return;
+  // Resultado decidido (por frag ou timer) → encerra a instância.
+  if(pb.finished){auth.ended=true;auth.terminalReason="pvp-battle-end";return;}
+  dt=Math.max(1,Number(dt)||AUTH_STEP_MS);
+  // Controle (Venore): domina quem tem mais chars vivos na zona; o placar
+  // é o total de segundos de domínio (zona disputada/vazia não conta).
+  if(String(pb.mode)==="control"&&pb.controlZone){
+    const c=pvpBattleControlCounts(auth);
+    const holder=c[1]>c[2]?1:c[2]>c[1]?2:0;
+    pb.dominationMs=pb.dominationMs||{1:0,2:0};pb.scores=pb.scores||{1:0,2:0};
+    if(holder){
+      pb.dominationMs[holder]=(Number(pb.dominationMs[holder])||0)+dt;
+      const secs=Math.floor(pb.dominationMs[holder]/1000);
+      if(secs!==Number(pb.scores[holder])){
+        pb.scores[holder]=secs;
+        auth.events=auth.events||[];
+        auth.events.push({t:"pvp-score",team:holder,scores:Object.assign({},pb.scores),
+          screen:true,ts:now});
+      }
+    }
+    if(holder!==(Number(pb.holder)||0)){
+      pb.holder=holder;
+      auth.events=auth.events||[];
+      auth.events.push({t:"pvp-control",holder,counts:c,screen:true,ts:now});
+    }
+  }
+  // Fim dos 10min: maior placar vence; empate = resultado empatado (as
+  // apostas são devolvidas pelo controlador) — sem prorrogação.
+  const endsAt=Number(pb.endsAt)||0;
+  if(endsAt&&now>=endsAt){
+    const s1=Number(pb.scores&&pb.scores[1])||0,s2=Number(pb.scores&&pb.scores[2])||0;
+    pb.finished=s1!==s2?{winnerTeam:s1>s2?1:2,reason:"time",at:now}:{draw:true,reason:"time-draw",at:now};
+  }
+}
+/* Passo bloqueado se o destino está dentro da sz inimiga (só em mapas PZ). */
+function pvpBattleStepBlocked(auth,ent,nx,ny){
+  const pb=auth&&auth.pvpBattle;
+  if(!pb||!pb.pz||!ent||!ent.p)return false;
+  const t=pvpBattleTeamOf(ent);if(!t)return false;
+  const enemy=pvpBattleSz(auth,t===1?2:1);
+  return pvpBattleCellInRect(nx,ny,enemy);
+}
+/* ===================== FIM GUILD PvP BATTLE ===================== */
+
 /* Stamina: regenera pelo RELÓGIO — `staminaAt` marca a última contagem.
  * Treino ativo = 1s/s (1min → +1min); fora de caça/treino (templo, offline)
  * = 0,5s/s (2min → +1min). Em caça a stamina só drena (tick da instância). */
@@ -6257,12 +6629,15 @@ function authMarkPlayerDeath(auth,item,now,opts){
   if(opts.permadead||(authIsBossFight(auth)&&!authIsWorldBoss(auth))){
     item.permadead=true;
     item.downUntil=ts+365*86400000;
+  }else if(auth&&auth.pvpBattle){
+    // Respawn rápido na safezone do time (sem permadeath em batalha).
+    item.downUntil=ts+PVP_BATTLE_RESPAWN_MS;
   }else{
     item.downUntil=ts+playerReviveDelay(item.p,ts);
   }
   if(!item.downedAt)item.downedAt=ts;
   if(!item.deathPos)item.deathPos={x:item.x,y:item.y,dir:item.dir||"e"};
-  if(!wasDown){
+  if(!wasDown&&!(auth&&auth.pvpBattle)){
     recordAuthSessionDeath(auth,item);
     // Histórico de mortes (aba Deaths do cliente): campo protegido no save,
     // só o motor escreve. Cap em 20 entradas, mais novas primeiro.
@@ -6940,7 +7315,7 @@ function fullWipe(auth){
     for(const item of auth.players){const max=maxStats(item.p);item.p.hp=max.hp;item.p.mp=max.mp;item.p.blessed=true;item.downUntil=0;item.permadead=false;}
     auth.events.push({t:"store-bless",accountId:Number(blessItem.accountId)||0,screen:true,ts:auth.clock});
     auth.wipes++;auth.mobs=[];spawnHuntWave(auth,auth.clock,{force:true});return;}
-  const pvp=auth.instanceMode==="pvp";if(pvp)for(const item of auth.players){const loss=applyPvpLoss(item.p,auth.lastDamageSource||"monster");if(loss&&item.p&&Array.isArray(item.p.deathLog)&&item.p.deathLog[0])item.p.deathLog[0].lost=loss;}
+  const pvp=auth.instanceMode==="pvp"&&!auth.pvpBattle;if(pvp)for(const item of auth.players){const loss=applyPvpLoss(item.p,auth.lastDamageSource||"monster");if(loss&&item.p&&Array.isArray(item.p.deathLog)&&item.p.deathLog[0])item.p.deathLog[0].lost=loss;}
   const byPlayer={};let cost=0;
   for(const item of auth.players||[]){
     if(!item||!item.p)continue;
@@ -6985,11 +7360,12 @@ function authorityOccupancy(auth,ignore){
   for(const mob of auth.mobs||[])if(mob&&mob.hp>0)mark(mob);
   return used;
 }
-function authorityStepFree(auth,occ,cx,cy,dir){
+function authorityStepFree(auth,occ,cx,cy,dir,ent){
   const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30,nx=cx+dir.dx,ny=cy+dir.dy;
   if(nx<0||ny<0||nx>=w||ny>=h||occ.has(nx+":"+ny)||authorityCellBlocked(auth,nx,ny))return false;
   if(dir.diag&&(occ.has(nx+":"+cy)||occ.has(cx+":"+ny)||
     authorityCellBlocked(auth,nx,cy)||authorityCellBlocked(auth,cx,ny)))return false;
+  if(pvpBattleStepBlocked(auth,ent,nx,ny))return false;
   return true;
 }
 function authorityStepToward(auth,occ,from,gx,gy){
@@ -7001,8 +7377,66 @@ function authorityStepToward(auth,occ,from,gx,gy){
   if(sx&&sy)cand.push({dx:sx,dy:sy,diag:true});
   if(sx){cand.push({dx:sx,dy:1,diag:true});cand.push({dx:sx,dy:-1,diag:true});}
   if(sy){cand.push({dx:1,dy:sy,diag:true});cand.push({dx:-1,dy:sy,diag:true});}
-  for(const dir of cand)if(authorityStepFree(auth,occ,cell.cx,cell.cy,dir))return dir;
+  for(const dir of cand)if(authorityStepFree(auth,occ,cell.cx,cell.cy,dir,from))return dir;
   return null;
+}
+/* Batalha PvP: mapas de guerra têm corredores — o passo guloso travava o
+ * time contra as paredes. Campo de distância BFS (8 direções, sem cortar
+ * quina) a partir do destino, cacheado por mapa+destino: 40 chars andando
+ * custam um BFS por destino distinto, não um A* por passo. */
+const PVP_FIELD_CACHE=new Map();
+function pvpDistanceField(auth,gx,gy){
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30,pb=auth.pvpBattle||{};
+  if(auth._pvpBlkSig===undefined)auth._pvpBlkSig=auth.blockedCells?Object.keys(auth.blockedCells).length:0;
+  const key=String(pb.mapId||"")+":"+w+"x"+h+":"+auth._pvpBlkSig+":"+gx+":"+gy;
+  let field=PVP_FIELD_CACHE.get(key);
+  if(field)return field;
+  field=new Int32Array(w*h).fill(-1);
+  if(gx>=0&&gy>=0&&gx<w&&gy<h){
+    const q=[gx+gy*w];field[q[0]]=0;
+    for(let i=0;i<q.length;i++){
+      const idx=q[i],cx=idx%w,cy=(idx-cx)/w,d=field[idx]+1;
+      for(const dir of AUTH_STEP_DIRS){
+        const nx=cx+dir.dx,ny=cy+dir.dy;
+        if(nx<0||ny<0||nx>=w||ny>=h)continue;
+        const n=nx+ny*w;if(field[n]>=0||authorityCellBlocked(auth,nx,ny))continue;
+        if(dir.diag&&(authorityCellBlocked(auth,nx,cy)||authorityCellBlocked(auth,cx,ny)))continue;
+        field[n]=d;q.push(n);
+      }
+    }
+  }
+  if(PVP_FIELD_CACHE.size>=256)PVP_FIELD_CACHE.delete(PVP_FIELD_CACHE.keys().next().value);
+  PVP_FIELD_CACHE.set(key,field);
+  return field;
+}
+function pvpStepToward(auth,occ,ent,gx,gy){
+  const w=Number(auth.gridW)||30,field=pvpDistanceField(auth,gx,gy),c=entityGridCell(ent,auth);
+  const here=field[c.cx+c.cy*w];
+  if(here<0)return authorityStepToward(auth,occ,ent,gx,gy);
+  let best=null,bestD=here,side=null;
+  for(const dir of AUTH_STEP_DIRS){
+    const nx=c.cx+dir.dx,ny=c.cy+dir.dy,d=nx>=0&&ny>=0&&nx<w?field[nx+ny*w]:-1;
+    if(d<0||d>here||!authorityStepFree(auth,occ,c.cx,c.cy,dir,ent))continue;
+    if(d<bestD||(d===bestD&&best&&best.diag&&!dir.diag)){best=dir;bestD=d;}
+    else if(d===here&&!side)side=dir;
+  }
+  // Aliado ocupando o corredor: anda de lado na mesma distância para contornar.
+  return best||side;
+}
+/* Posicionamento no anel do alvo: quando o char está mais perto do que a
+ * distância da vocação, escolhe o passo livre que mais se aproxima de td —
+ * inclusive lateral/diagonal. O recuo "reto" de authorityStepAway travava
+ * no crowd e deixava RP/druid preso no melee. */
+function pvpStepToRange(auth,occ,ent,gx,gy,td){
+  const c=entityGridCell(ent,auth);
+  let best=null,bestD=-1;
+  for(const dir of AUTH_STEP_DIRS){
+    const nx=c.cx+dir.dx,ny=c.cy+dir.dy,d=Math.max(Math.abs(nx-gx),Math.abs(ny-gy));
+    if(d<1||d>td)continue;
+    if(!authorityStepFree(auth,occ,c.cx,c.cy,dir,ent))continue;
+    if(d>bestD){best=dir;bestD=d;}
+  }
+  return best||authorityStepAway(auth,occ,ent,{cx:gx,cy:gy});
 }
 function authorityApplyStep(auth,ent,dir,occ){
   const cell=entityGridCell(ent,auth),nx=cell.cx+dir.dx,ny=cell.cy+dir.dy,w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
@@ -7208,7 +7642,7 @@ function authorityStepAway(auth,occ,from,awayFrom){
   const cell=entityGridCell(from,auth),other=entityGridCell(awayFrom,auth);
   const dx=Math.sign(cell.cx-other.cx)||1,dy=Math.sign(cell.cy-other.cy)||0;
   const cand=[{dx,dy,diag:!!(dx&&dy)},{dx,dy:0,diag:false},{dx:0,dy,diag:false}];
-  for(const dir of cand)if((dir.dx||dir.dy)&&authorityStepFree(auth,occ,cell.cx,cell.cy,dir))return dir;
+  for(const dir of cand)if((dir.dx||dir.dy)&&authorityStepFree(auth,occ,cell.cx,cell.cy,dir,from))return dir;
   return null;
 }
 /* Perseguição Canary dentro do tick de 1s: monstros rápidos dão mais SQMs
@@ -7225,24 +7659,36 @@ function advanceAuthorityMovement(auth,now,opts){
     ent.walkAcc+=dt;
     ent.walkStepsWindow=ent.walkStepsWindow&&typeof ent.walkStepsWindow==="object"?ent.walkStepsWindow:{at:0,n:0};
     if(now-ent.walkStepsWindow.at>=1000){ent.walkStepsWindow={at:now,n:0};}
+    // Guerra: o bot anda no mesmo ritmo do char pilotado (até 5 sqm/s);
+    // fora de PvP a janela de 1 sqm/s continua (stagger da hunt).
+    const stepCap=auth.pvpBattle?5:1;
     let steps=0;
-    while(ent.walkAcc>=80&&steps<1&&ent.walkStepsWindow.n<1){
+    while(ent.walkAcc>=80&&steps<stepCap&&ent.walkStepsWindow.n<stepCap){
       const here=entityGridCell(ent,auth),d=chebyshevCells(here,{cx:gx,cy:gy});
       let dir=null;
-      if(d>td)dir=authorityStepToward(auth,occ,ent,gx,gy);
-      else if(d<td)dir=authorityStepAway(auth,occ,ent,{cx:gx,cy:gy});
+      if(d>td)dir=auth.pvpBattle&&isPlayer?pvpStepToward(auth,occ,ent,gx,gy):authorityStepToward(auth,occ,ent,gx,gy);
+      else if(d<td)dir=auth.pvpBattle&&isPlayer?pvpStepToRange(auth,occ,ent,gx,gy,td):authorityStepAway(auth,occ,ent,{cx:gx,cy:gy});
       const nearby=d<=1,dur=authorityStepDuration(authoritySpeedPts(ent,isPlayer,now),!!(dir&&dir.diag),nearby);
       if(!dir){ent.walkAcc=Math.min(ent.walkAcc,dur);break;}
       if(ent.walkAcc<dur)break;
       authorityApplyStep(auth,ent,dir,occ);ent.walkAcc-=dur;steps++;ent.walkStepsWindow.n++;
     }
   };
-  if(!(opts&&opts.freezePlayers))for(const item of livingPlayers){
-    // Manual SQM/WASD exige VIP; sem VIP a autoridade força AUTO.
-    if(item.p&&!accountIsVip(item.p)){
+  for(const item of livingPlayers){
+    /* freezePlayers: fora de PvP congela todos os players (a pose do
+     * cliente é a fonte do movimento). Na guerra só congela quem veio
+     * marcado `self` — os demais são IA autoritativa e seguem andando. */
+    if(opts&&opts.freezePlayers&&
+       (!auth.pvpBattle||(opts.pvpFrozenIds&&opts.pvpFrozenIds.has(String(item.id)))))continue;
+    // Manual SQM/WASD exige VIP; sem VIP a autoridade força AUTO. Em batalha
+    // PvP de guild o controle manual é livre — jogadores movem o personagem.
+    if(!auth.pvpBattle&&item.p&&!accountIsVip(item.p)){
       item.p.config=item.p.config||{};item.p.config.autoWalk=true;delete item.walkIntent;
     }
-    const auto=!(item.p&&item.p.config)||item.p.config.autoWalk!==false;
+    // Batalha PvP: char sem cliente pilotando há 5s (offline) é IA — anda
+    // sozinho mesmo que o preset salvo seja manual (autoWalk:false).
+    const pvpAi=!!auth.pvpBattle&&!((Number(item._pvpDrivenAt)||0)>(Number(auth.clock)||now)-5000);
+    const auto=pvpAi||!(item.p&&item.p.config)||item.p.config.autoWalk!==false;
     if(!auto){
       const intent=item.walkIntent,dir=intent&&AUTH_STEP_DIRS.find((d)=>d.dx===intent.dx&&d.dy===intent.dy);
       if(dir){
@@ -7250,14 +7696,15 @@ function advanceAuthorityMovement(auth,now,opts){
         item.walkAcc=Number(item.walkAcc)||0;item.walkAcc+=dt;
         const here=entityGridCell(item,auth);
         const dur=authorityStepDuration(authoritySpeedPts(item,true,now),!!dir.diag,false);
-        if(authorityStepFree(auth,occ,here.cx,here.cy,dir)&&item.walkAcc>=dur){
+        if(authorityStepFree(auth,occ,here.cx,here.cy,dir,item)&&item.walkAcc>=dur){
           authorityApplyStep(auth,item,dir,occ);item.walkAcc-=dur;
         }else item.walkAcc=Math.min(item.walkAcc,dur);
       }
       continue;
     }
     const mode=huntModeOf(auth,item);
-    if(mode==="box"||mode==="safe"){
+    // Formações de hunt (box/safe) não existem na guerra: o goal PvP decide.
+    if(!auth.pvpBattle&&(mode==="box"||mode==="safe")){
       const alvo=pickFormationCell(auth,item,now,mode==="box"?boxTargetCell:safeTargetCell);
       if(alvo){
         const here=entityGridCell(item,auth);
@@ -7278,10 +7725,21 @@ function advanceAuthorityMovement(auth,now,opts){
       }
       continue;
     }
-    const goal=authorityPlayerTarget(auth,item,livingMobs)||densestPackTarget(auth,item,livingMobs)||livingMobs.slice().sort((a,b)=>authorityVisualDistance(item,a,auth)-authorityVisualDistance(item,b,auth))[0];
+    const goal=auth.pvpBattle?pvpBattleGoal(auth,item)
+      :(authorityPlayerTarget(auth,item,livingMobs)||densestPackTarget(auth,item,livingMobs)
+        ||livingMobs.slice().sort((a,b)=>authorityVisualDistance(item,a,auth)-authorityVisualDistance(item,b,auth))[0]);
     if(!goal)continue;
     const alcance=playerAttackRangeSQM(item.p);
     const here=entityGridCell(item,auth),to=entityGridCell(goal,auth),dist=chebyshevCells(here,to);
+    // Zona de controle: anda até o centro (alcance de ataque não importa).
+    if(goal.zone){if(dist>0)walkToward(item,to.cx,to.cy,0,true);continue;}
+    if(auth.pvpBattle){
+      // Guerra: goal.td explícito vence (anel td=0 = pisar NA célula livre;
+      // `0||alcance` colapsava p/ 1 e o bot congelava 1 sqm antes do anel).
+      const td=Number.isFinite(Number(goal.td))?Number(goal.td):alcance;
+      if(goal.follow?dist>td:dist!==td)walkToward(item,to.cx,to.cy,td,true);
+      continue;
+    }
     if(mode==="kiting"&&alcance>1){
       const querido=Math.max(1,Math.min(alcance,Number(item.p.config&&item.p.config.kiteDistance)||3));
       if(dist!==querido)walkToward(item,to.cx,to.cy,querido,true);
@@ -7463,6 +7921,11 @@ function monsterThinkYell(auth,mob,now){
 }
 function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
   if(!runeUsable(p,id,now)||!primary||primary.hp<=0)return false;
+  // Guerra de guild: a runa respeita alcance — sem o gate ela acertava o
+  // alvo do outro lado do mapa.
+  if(auth&&auth.pvpBattle&&
+    chebyshevCells(entityGridCell(item,auth),entityGridCell(primary,auth))>PVP_BATTLE_RUNE_RANGE)
+    return false;
   const rd=RUNEDATA[id];if(!rd||!consumeSupply(auth,p,id))return false;
   const cd=Number(rd.cd||rd.gcd||2000);
   p._runeCd=now+cd;p._offensiveCd=now+2000;p._lastRuneId=id;p._groupCd=p._groupCd||{};
@@ -7553,6 +8016,8 @@ function step(auth,now,opts){if(auth.ended)return;
         item.downUntil=now+365*86400000;
       }else{
         const max=maxStats(p);p.hp=max.hp;p.mp=max.mp;item.downUntil=0;p.conditions={};
+        // Batalha PvP: revive dentro da própria safezone, não no local da morte.
+        if(auth.pvpBattle)pvpBattleRespawn(auth,item,now);
       }
     }
     if(p.hp>0&&!item.downUntil)usePotion(auth,p);
@@ -7591,7 +8056,15 @@ function step(auth,now,opts){if(auth.ended)return;
       item.attackAcc-=interval;
       forgeNoteCombatAction(auth,item,p,now,{offensive:true});
       let acted=false;
-      const s=nextComboSpell(auth,item,p,now,primaryTarget,living);
+      // Guerra de guild: mago sempre prioriza Sudden Death no alvo — burst
+      // antes das magias do combo/fallback. tryUseRune já valida carga,
+      // vocação indireta (nível/ml), CDs e o alcance PvP (<=7 sqm).
+      if(auth.pvpBattle){
+        const bv=CanaryVocation.baseVocName(p.voc);
+        if(bv==="sorcerer"||bv==="druid")
+          acted=tryUseRune(auth,item,p,now,"sudden-death-rune",primaryTarget,living,visualTs);
+      }
+      const s=acted?null:nextComboSpell(auth,item,p,now,primaryTarget,living);
       if(s&&s.rune){
         acted=tryUseRune(auth,item,p,now,s.id,primaryTarget,living,visualTs);
       }else if(s){
@@ -7741,7 +8214,9 @@ function step(auth,now,opts){if(auth.ended)return;
       }
 
       // ATAQUE BÁSICO: independente do group CD de magia/runa (Tibia auto-attack).
-      if(!acted){
+      // Na guerra a arma NÃO para quando sai spell/runa — melee (knight/monk)
+      // e distance (RP) ficam ativos no alvo, como no Tibia real.
+      if(!acted||auth.pvpBattle){
         // ALCANCE DO MELEE: ataque básico corpo-a-corpo (range 1) NÃO pode
         // acertar de longe — o personagem anda até o alvo antes de bater.
         // Sem este gate o knight derrubava mobs do outro lado da sala.
@@ -7990,10 +8465,12 @@ function step(auth,now,opts){if(auth.ended)return;
     }
   }
 
-  if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
+  // Batalha PvP não usa fullWipe — respawn contínuo até o fim do timer.
+  if(!auth.pvpBattle&&auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
+  if(auth.pvpBattle)pvpBattleTick(auth,now,opts&&opts.dt);
   if(auth.ended&&auth.bloodrotten)bloodrottenTick(auth,now);
   if(!auth.ended)for(const mob of auth.mobs||[])if(mob.hp>0)monsterThinkYell(auth,mob,now);
-  if(!auth.ended)advanceAuthorityMovement(auth,now,{freezePlayers:!!(opts&&opts.freezeVisual)});
+  if(!auth.ended)advanceAuthorityMovement(auth,now,{freezePlayers:!!(opts&&opts.freezeVisual),pvpFrozenIds:opts&&opts.pvpFrozenIds});
   // Wave clear: agenda AUTH_WAVE_CLEAR_RESPAWN_MS (4s) até o monstro nascer.
   // Em T-2s (AUTH_WAVE_TELEPORT_LEAD_MS) enfileira pendingSpawns / blink.
   // Também separa kill e makeMob×pack em respostas distintas e evita o custo
@@ -8111,10 +8588,16 @@ function initializeAuthority(descriptor,instanceId,now){
   const players=(descriptor.members||[]).map((m)=>{const id=String(m.id),old=oldPlayers.find((ent)=>String(ent&&ent.id)===id)||{};
     const item={id,p:canonicalPlayer(m),attackAcc:0,downUntil:0,accountId:m.accountId||(m.p&&m.p.accountId)};
     item.p.accountId=item.accountId;item.p.vipUntil=Math.max(0,Number(item.p.vipUntil)||0);
+    // Batalha PvP: time/friendly-fire key sobrevivem à reidratação.
+    if(m.pvpTeam!==undefined||m.team!==undefined)item.pvpTeam=Number(m.pvpTeam!==undefined?m.pvpTeam:m.team);
+    if(m.partyKey!==undefined&&m.partyKey!==null)item.partyKey=String(m.partyKey);
+    if(old.pvpTeam!==undefined)item.pvpTeam=Number(old.pvpTeam);
+    if(old.partyKey!==undefined&&old.partyKey!==null)item.partyKey=String(old.partyKey);
     for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)item[key]=old[key];return item;});
   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",
     worldBoss:!!(descriptor.worldBoss||combat.worldBoss||/^world-boss-wz[123]$/.test(String(descriptor.bossId||""))),
+    pvpBattle:combat.pvpBattle?clone(combat.pvpBattle):null,
     /* Bakragore's Burden (Rotten Blood world boss): soma das taints
      * contribuídas no lobby — o tick escala summons e HP do boss. */
     bakragoreBurden:Math.max(0,Math.floor(Number(combat.bakragoreBurden)||0)),
@@ -8286,18 +8769,37 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   // Checkpoints trazem state.hunt fresco do cliente: reidrata a def de
   // hunts OTBM em instâncias criadas antes do auth.hunt* existir.
   captureAuthHuntDef(auth,descriptor.state&&descriptor.state.hunt);
-  descriptor.members=auth.players.map((item)=>({id:item.id,p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp}));descriptor.activeCharacterId=descriptor.activeCharacterId||auth.players[0]&&auth.players[0].id;
+  /* Guerra (~40 chars × ~47KB de p): clonar p a cada 200ms custava ~100ms
+   * por tick. members[].p só precisa estar razoavelmente fresco para o
+   * resume/roster — refresh a cada 5s de auth.clock; hp/mp seguem por tick
+   * no topo. Em hunts normais o clone continua a cada materialização. */
+  const pvp=!!auth.pvpBattle;
+  const oldMembers=pvp&&Array.isArray(descriptor.members)?descriptor.members:null;
+  const refreshMembersP=!pvp||(auth.clock-(Number(descriptor._pvpMembersAt)||0)>=5000);
+  if(pvp&&refreshMembersP)descriptor._pvpMembersAt=auth.clock;
+  descriptor.members=auth.players.map((item)=>{
+    const prev=oldMembers?oldMembers.find((x)=>String(x.id)===String(item.id)):null;
+    const m=(prev&&prev.p&&!refreshMembersP)?prev.p:clonePlayerState(item.p);
+    return {id:item.id,p:m,hp:item.p.hp,mp:item.p.mp};});
+  descriptor.activeCharacterId=descriptor.activeCharacterId||auth.players[0]&&auth.players[0].id;
   descriptor.state=descriptor.state||{};
   if(auth.questWaves)descriptor.state.questWaves=Object.assign({},auth.questWaves,{spawnCells:(auth.questWaves.spawnCells||[]).map((cell)=>({x:cell.x,y:cell.y}))});
   const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
-  descriptor.state.players=auth.players.map((item)=>stripStaleVisualStep(Object.assign({},
-    oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},entityVisual(item),
-    {id:item.id,p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp,
+  /* Idem para state.players[].p (render): refresh a cada 1s — hp/mp e a
+   * posição já saem por tick; outfit/conditions atrasam no máximo 1s. */
+  const refreshPlayersP=!pvp||(auth.clock-(Number(descriptor.state._pvpPAt)||0)>=1000);
+  if(pvp&&refreshPlayersP)descriptor.state._pvpPAt=auth.clock;
+  descriptor.state.players=auth.players.map((item)=>{const prev=oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id};
+    return stripStaleVisualStep(Object.assign({},
+    prev,entityVisual(item),
+    {id:item.id,p:(pvp&&!refreshPlayersP&&prev.p)?prev.p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp,
+      pvpTeam:item.pvpTeam!==undefined?item.pvpTeam:item.team,
+      partyKey:item.partyKey!==undefined?item.partyKey:null,
       reviveAt:item.permadead?0:(item.downUntil||0),
       permadead:!!item.permadead,
       downedAt:item.downedAt||0,
       deathPos:item.deathPos||((item.p.hp<=0||item.downUntil||item.permadead)
-        ?{x:item.x,y:item.y,dir:item.dir||"e"}:null)})));
+        ?{x:item.x,y:item.y,dir:item.dir||"e"}:null)}));});
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
   descriptor.state.mobs=auth.mobs.map((m)=>{
     const prev=oldMobs.find((x)=>String(x.id)===String(m.id));
@@ -8330,6 +8832,19 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   else descriptor.state.greed=null;
+  // Placar/informações da batalha de guild para o scoreboard do cliente.
+  descriptor.state.pvpBattle=auth.pvpBattle?{
+    battleId:auth.pvpBattle.battleId,mapId:auth.pvpBattle.mapId,
+    mode:auth.pvpBattle.mode,pz:!!auth.pvpBattle.pz,
+    fragTarget:Number(auth.pvpBattle.fragTarget)||0,
+    scores:Object.assign({},auth.pvpBattle.scores||{}),
+    endsAt:Number(auth.pvpBattle.endsAt)||0,
+    overtime:Number(auth.pvpBattle.overtime)||0,
+    safezones:auth.pvpBattle.safezones?JSON.parse(JSON.stringify(auth.pvpBattle.safezones)):null,
+    controlZone:auth.pvpBattle.controlZone?Object.assign({},auth.pvpBattle.controlZone):null,
+    holder:Number(auth.pvpBattle.holder)||0,
+    teams:auth.pvpBattle.teams?JSON.parse(JSON.stringify(auth.pvpBattle.teams)):null,
+    finished:auth.pvpBattle.finished||null}:null;
   descriptor.state.hatred=auth.hatred?{active:!!auth.hatred.active,counters:Object.assign({},auth.hatred.counters||{}),
     nextActivationAt:Number(auth.hatred.nextActivationAt)||0,
     nextCounterAt:Number(auth.hatred.nextCounterAt)||0}:null;
@@ -8449,7 +8964,8 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   auth.events=[];
   descriptor.savedAt=auth.clock;return descriptor;
 }
-function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let descriptor=typeof serialized==="string"?JSON.parse(serialized):clone(serialized);
+function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState,opts){let descriptor=typeof serialized==="string"?JSON.parse(serialized):
+  (opts&&opts.inPlace?serialized:clone(serialized));
   const auth=descriptor.authority;if(!auth)return null;
   // Reata wallets de gold por conta após JSON.parse (defineProperty não serializa).
   for(const item of auth.players||[]){
@@ -8498,11 +9014,26 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
   // perseguida, sem alterar fórmulas de dano, HP, loot ou recompensas.
   const visual=syncAuthorityVisualState(auth,visualState);
   const freezeVisual=!!((visual.players&&visual.players.length)||(visual.mobs&&visual.mobs.length));
+  /* Guerra: o freeze só vale p/ chars que vieram com `self` no visual (o
+   * char que o cliente pilota — a pose local vence). Os demais são IA do
+   * servidor e precisam se mover; congelar todos a cada tick deixava os
+   * bots eternamente parados na safezone. */
+  const pvpFrozenIds=auth.pvpBattle
+    ?new Set((visual.players||[]).filter((v)=>v&&v.self).map((v)=>String(v.id))):null;
   const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);
   const requested=Math.floor(total/AUTH_STEP_MS),steps=Math.min(250000,requested);auth.carryMs=total-steps*AUTH_STEP_MS;
-  for(let i=0;i<steps;i++){auth.clock+=AUTH_STEP_MS;step(auth,auth.clock,{freezeVisual,dt:AUTH_STEP_MS});if(auth.ended){auth.carryMs=0;break;}}
-  auth.clock=Math.max(auth.clock,Number(checkpointAt)||auth.clock);descriptor=materializeAuthority(descriptor);
-  return {state:JSON.stringify(descriptor),characters:auth.players.map((item)=>{
+  for(let i=0;i<steps;i++){auth.clock+=AUTH_STEP_MS;step(auth,auth.clock,{freezeVisual,dt:AUTH_STEP_MS,pvpFrozenIds});if(auth.ended){auth.carryMs=0;break;}}
+  auth.clock=Math.max(auth.clock,Number(checkpointAt)||auth.clock);
+  // Batalha PvP: 40 chars gravados a CADA tick de cada cliente travavam o
+  // combate. Persiste a cada 60s e no fim (sem XP/loot na guerra; o estado
+  // completo segue na autoridade, inclusive após restart).
+  let saveChars=true;
+  if(auth.pvpBattle&&!auth.ended){
+    const last=Number(auth._pvpCharSaveAt)||0;
+    if(last&&auth.clock-last<60000)saveChars=false;else auth._pvpCharSaveAt=auth.clock;
+  }
+  descriptor=materializeAuthority(descriptor);
+  return {state:opts&&opts.rawState?descriptor:JSON.stringify(descriptor),characters:!saveChars?[]:auth.players.map((item)=>{
     // Guild tasks: delta de kills desde a última projeção persistida. A
     // marca (_guildKillsMark) vive dentro de p — serializa no mesmo
     // checkpoint que os próprios kills, então nunca conta duas vezes.
@@ -8533,6 +9064,10 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   rewardChestEnsure,rewardChestAdd,rewardChestClaimOne,rewardChestClaimBundle,rewardChestClaimAll,
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
+  pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
+  pvpBattleLeaderChar,
+  pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,
+  canPlayerDamagePlayer,livingHostilePlayers,playersAreAllies,applyPlayerPvpDamage,
   CURRENCY_GOLD,
   shareAccountGoldWallets,sharePartyCapacity,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,destroyAuthBagItem,setAuthAutoSupplyStash,setAuthLootConfig,
   authItemNeedsBagInstance,authSyncBagCountsFromInstances,

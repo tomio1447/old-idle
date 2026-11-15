@@ -1618,7 +1618,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.npc-modal-shell,
 .modal-bg .modal.cidade-modal-shell,
 .modal-bg .modal.guild-modal-shell,
-.modal-bg .modal.ranking-modal-shell { width:min(920px,calc(100vw - 32px)); }
+.modal-bg .modal.ranking-modal-shell,
+.modal-bg .modal.imb-modal-shell { width:min(920px,calc(100vw - 32px)); }
 .modal-bg .modal.depot-modal-shell { width:min(720px,calc(100vw - 32px)); }
 .depot-modal-shell .depot-modal-content { max-height:70vh; overflow:auto; padding:12px; }
 .depot-modal-shell .depot-help { margin-bottom:10px; }
@@ -1928,7 +1929,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.calendar-modal-shell .panel-title,
 .modal-bg .modal.social-modal-shell .panel-title,
 .modal-bg .modal.chard-modal-shell .panel-title,
-.modal-bg .modal.lootcfg-modal-shell .panel-title {
+.modal-bg .modal.lootcfg-modal-shell .panel-title,
+.modal-bg .modal.imb-modal-shell .panel-title {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 1px,rgba(0,0,0,.05) 1px 3px),#454543;
   border-bottom:2px solid #181818;
 }
@@ -1949,7 +1951,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.calendar-modal-shell .panel-body,
 .modal-bg .modal.social-modal-shell .panel-body,
 .modal-bg .modal.chard-modal-shell .panel-body,
-.modal-bg .modal.lootcfg-modal-shell .panel-body {
+.modal-bg .modal.lootcfg-modal-shell .panel-body,
+.modal-bg .modal.imb-modal-shell .panel-body {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 1px,rgba(0,0,0,.04) 1px 4px),#393937;
 }
 
@@ -4831,6 +4834,9 @@ a:hover { color: #aab6f7; }
 .helper-equip-pick-list .helper-equip-empty-icon { margin-right: 0; }
 .party-analyser-tabs{display:flex;gap:4px;flex-wrap:wrap;padding:4px 0 8px}.pa-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.pa-grid>div{background:#171719;border:1px solid #3f3f43;padding:7px;color:#aaa}.pa-grid b{display:block;color:#ffe680;font-size:14px}.pa-grid small{color:#75caff}.pa-table{width:100%;border-collapse:collapse;font-size:11px}.pa-table th{color:#ffe680;text-align:left;background:#191919}.pa-table td,.pa-table th{padding:5px;border-bottom:1px solid #333}.pa-line{display:flex;gap:7px;align-items:center;padding:3px;border-bottom:1px solid #303034}.pa-line span{flex:1}.pa-list-title{color:#ffe680;margin-bottom:5px}
 .imb-slot-grid{display:flex;gap:5px;flex-wrap:wrap}.imb-modal-slot{width:38px;height:38px;border:1px solid #a88a38;background:#151510;display:flex;align-items:center;justify-content:center;position:relative}.imb-modal-slot.vazio{border-style:dashed;border-color:#59554a;background:#10100e}.imb-modal-slot.expirado{opacity:.45;border-color:#9b3d32}.imb-modal-slot .imb-remove{position:absolute;right:-5px;top:-6px;padding:0;width:14px;height:14px;font-size:10px;border-radius:50%;color:#ffaaa0;background:#401b18}
+.imb-modal-shell .imb-modal-content{max-height:72vh;overflow-y:auto}
+.imb-tc-btn{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:4px}
+.imb-tc-btn .coin-gif{width:14px;height:14px;vertical-align:middle}
 .party-outfit-preview { width:32px;height:32px;overflow:hidden;display:flex;align-items:center;justify-content:center; }
 .party-outfit-preview canvas,.party-outfit-preview img { max-width:32px;max-height:32px;image-rendering:pixelated; }
 .outfit-color-editor { display:flex; gap:10px; align-items:flex-start; }
@@ -5702,3 +5708,215 @@ body.quest-lobby-open #party-panel { display:none !important; }
 .account-character-card:hover { border-color: #8a7a40 #4b493e #4b493e #8a7a40; }
 .account-character-empty { color: #a89f88; border-color: #4b493e; }
 .creator-look-editor { background: #1a1915; border-color: #414037; }
+
+/* =============================== PVP =====================================
+ * Botão da topbar, modal estilo cidade, contador de preparo e placar. */
+.pvp-btn-icon,
+.pvp-cd-skull,
+.pvp-title-ic {
+  display: inline-block; width: 18px; height: 18px; vertical-align: -3px;
+  background: center/contain no-repeat
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%23e02c2c" stroke="%23740000" stroke-width=".6" d="M8 1C4.7 1 2 3.6 2 6.9c0 1.8.9 3.3 2.2 4.2V13l1.1-.9.9 1.2.9-1.4.9 1.4.9-1.2 1.1.9v-1.9c1.3-.9 2.2-2.4 2.2-4.2C14 3.6 11.3 1 8 1z"/><circle fill="%23120000" cx="5.6" cy="6.6" r="1.4"/><circle fill="%23120000" cx="10.4" cy="6.6" r="1.4"/><path fill="%23120000" d="M7.2 9.4h1.6l-.8 1.8z"/></svg>');
+}
+#btn-pvp { color: #ff9d9d; }
+#btn-pvp:hover { border-color: #a33535; }
+
+.pvp-modal-shell .pvp-body { padding: 10px 14px; min-height: 300px; }
+.pvp-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.pvp-tab {
+  flex: 1; padding: 7px 4px; font: 700 12px/1 "Trebuchet MS",sans-serif;
+  color: #c8bfa8; background: #1c1a16; border: 1px solid #4b493e; cursor: pointer;
+}
+.pvp-tab.on { color: #ffe680; background: #33291c; border-color: #8a7a40; }
+.pvp-myguild {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  padding: 8px 10px; background: #201d17; border: 1px solid #4b493e;
+}
+.pvp-myguild-info { display: flex; flex-direction: column; }
+.pvp-myguild-info b { color: #ffe680; }
+.pvp-myguild-info span { font-size: 11px; color: #a89f88; }
+.pvp-gicon { width: 34px; height: 34px; image-rendering: pixelated; border: 1px solid #4b493e; }
+.pvp-warn { margin-left: auto; color: #ff9d9d; font-size: 11px; }
+.pvp-sec-title { display: block; margin: 12px 0 6px; font-weight: 700; color: #d8cfa8; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.pvp-glist, .pvp-blist { display: flex; flex-direction: column; gap: 6px; }
+.pvp-grow, .pvp-brow {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 8px 10px; color: #d8d0bc; background: #201d17;
+  border: 1px solid #4b493e; cursor: pointer; width: 100%;
+}
+.pvp-grow:hover:not(:disabled), .pvp-brow:hover { border-color: #8a7a40; background: #26221a; }
+.pvp-grow:disabled { opacity: .55; cursor: default; }
+.pvp-grow-name { font-weight: 700; color: #ffe680; }
+.pvp-grow-meta { font-size: 11px; color: #a89f88; }
+.pvp-grow-go { margin-left: auto; color: #9fd08a; font-weight: 700; font-size: 12px; }
+.pvp-brow { flex-wrap: wrap; }
+.pvp-brow b { color: #ffe680; }
+.pvp-bmeta { font-size: 11px; color: #a89f88; }
+.pvp-badge {
+  padding: 2px 6px; font-size: 10px; font-weight: 700; letter-spacing: .4px;
+  border: 1px solid #4b493e; color: #c8bfa8; background: #1c1a16; white-space: nowrap;
+}
+.pvp-st-pend { color: #ffd24d; border-color: #8a7a40; }
+.pvp-st-ok { color: #9fd08a; border-color: #4d7a3f; }
+.pvp-st-prep { color: #7fc4ff; border-color: #3d6d9e; }
+.pvp-st-live { color: #ff6b6b; border-color: #a33535; animation: pvp-pulse 1.2s infinite; }
+.pvp-st-done { color: #a89f88; }
+.pvp-st-off { color: #7a7668; }
+.pvp-win { color: #7ee06a; border-color: #4d7a3f; }
+.pvp-loss { color: #ff6b6b; border-color: #a33535; }
+.pvp-tie { color: #ffd24d; border-color: #8a7a40; }
+@keyframes pvp-pulse { 50% { box-shadow: 0 0 8px #a33535; } }
+/* Notificação do botão PVP (convites, batalhas, histórico, sorteio). */
+#btn-pvp { position: relative; }
+#btn-pvp .pvp-notify {
+  position: absolute; top: -6px; right: -6px; min-width: 14px; height: 14px; padding: 0 3px;
+  border-radius: 7px; background: #d11f1f; color: #fff; border: 1px solid #ffd0d0;
+  font: 700 10px/12px "Trebuchet MS", sans-serif; text-align: center; visibility: hidden;
+  pointer-events: none; box-shadow: 0 0 6px rgba(255, 60, 60, .9); z-index: 2;
+}
+#btn-pvp.pvp-alert {
+  border-color: #ff4a4a !important; color: #ffd6d6;
+  animation: pvp-btn-glow 1.3s ease-in-out infinite;
+}
+@keyframes pvp-btn-glow {
+  0%, 100% { box-shadow: 0 0 3px rgba(255, 60, 60, .55), inset 0 0 3px rgba(255, 60, 60, .25); }
+  50% { box-shadow: 0 0 12px rgba(255, 60, 60, .95), inset 0 0 6px rgba(255, 60, 60, .45); }
+}
+.pvp-invite { cursor: default; }
+.pvp-invite-btns { margin-left: auto; display: flex; gap: 6px; }
+.pvp-ineligible { margin-top: 10px; color: #a89f88; font-size: 12px; }
+.pvp-ineligible summary { cursor: pointer; }
+.pvp-irow { display: flex; align-items: center; gap: 8px; padding: 4px 2px; }
+.pvp-irow .pvp-gicon { width: 20px; height: 20px; }
+.pvp-note { margin-top: 10px; font-size: 11px; color: #a89f88; }
+.pvp-empty { padding: 24px 10px; text-align: center; color: #a89f88; }
+.pvp-loading { padding: 40px; text-align: center; color: #a89f88; }
+
+/* Lobby de desafio */
+.pvp-lobby { position: relative; }
+.pvp-lobby::before {
+  content: ""; position: absolute; inset: 0; opacity: .14; pointer-events: none;
+  background: var(--pvp-bg, none) center/cover no-repeat;
+}
+.pvp-lobby > * { position: relative; }
+.pvp-lobby-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pvp-back { background: #1c1a16; border: 1px solid #4b493e; color: #c8bfa8; padding: 5px 10px; cursor: pointer; }
+.pvp-back:hover { border-color: #8a7a40; }
+.pvp-lobby-grid { display: grid; grid-template-columns: 1fr 240px; gap: 14px; }
+.pvp-lobby-form { display: flex; flex-direction: column; gap: 4px; }
+.pvp-lb { margin-top: 8px; font-size: 11px; font-weight: 700; color: #d8cfa8; text-transform: uppercase; letter-spacing: .4px; }
+.pvp-rival { display: flex; align-items: center; gap: 8px; padding: 8px; background: #1c1a16; border: 1px solid #4b493e; }
+.pvp-rival b { color: #ffe680; }
+.pvp-rival span { font-size: 11px; color: #a89f88; }
+.pvp-wager { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pvp-coin { width: 16px; height: 16px; image-rendering: pixelated; vertical-align: middle; margin-right: 4px; }
+.pvp-cur { display: inline-flex; align-items: center; }
+.pvp-wallet { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; font-size: 11px; color: #a89f88; }
+.pvp-wallet b { color: #ffe680; }
+.pvp-wager input {
+  width: 130px; padding: 6px; background: #14120e; color: #ffe680;
+  border: 1px solid #4b493e; font: 700 13px "Trebuchet MS",sans-serif;
+}
+.pvp-cur, .pvp-map, .pvp-size {
+  background: #1c1a16; border: 1px solid #4b493e; color: #c8bfa8;
+  padding: 6px 10px; cursor: pointer; font-size: 12px;
+}
+.pvp-cur.on, .pvp-size.on { color: #ffe680; border-color: #8a7a40; background: #33291c; }
+.pvp-maps { display: flex; gap: 8px; }
+.pvp-map { flex: 1; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.pvp-map img { width: 100%; height: 74px; object-fit: cover; border: 1px solid #4b493e; }
+.pvp-map span { font-weight: 700; color: #ffe680; font-size: 12px; }
+.pvp-map em { font-style: normal; font-size: 10px; color: #a89f88; }
+.pvp-map.on { border-color: #a33535; box-shadow: 0 0 8px #a33535 inset; }
+.pvp-sizes { display: flex; gap: 6px; flex-wrap: wrap; }
+#pvp-start {
+  padding: 6px; background: #14120e; color: #ffe680; border: 1px solid #4b493e;
+  font: 13px "Trebuchet MS",sans-serif;
+}
+.pvp-fee { margin-top: 8px; font-size: 11px; color: #a89f88; }
+.pvp-lobby-actions { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
+.pvp-create { padding: 8px 18px; font-weight: 700; }
+.pvp-quick { padding: 8px 14px; font-weight: 700; border-color: #c9a227 !important; color: #ffe680 !important; }
+.pvp-err { color: #ff9d9d; font-size: 12px; }
+.pvp-lobby-preview img { width: 100%; border: 1px solid #4b493e; display: block; }
+.pvp-lobby-cap { text-align: center; font-size: 11px; color: #a89f88; padding: 4px; }
+
+/* Detalhe/resultado da batalha */
+.pvp-info-grid { display: flex; flex-direction: column; gap: 12px; }
+.pvp-vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: stretch; }
+.pvp-side { padding: 10px; background: #1c1a16; border: 1px solid #4b493e; text-align: center; }
+.pvp-side b { display: block; color: #ffe680; margin-bottom: 6px; }
+.pvp-score { display: block; font: 700 26px/1 "Trebuchet MS",sans-serif; color: #ffe680; }
+.pvp-x { align-self: center; font-weight: 700; color: #a33535; font-size: 18px; }
+.pvp-team { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.pvp-team span { padding: 2px 6px; font-size: 10px; background: #14120e; border: 1px solid #4b493e; color: #c8bfa8; }
+.pvp-info-col { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #d8d0bc; }
+.pvp-table { width: 100%; border-collapse: collapse; font-size: 12px; color: #d8d0bc; }
+.pvp-table th { text-align: left; color: #d8cfa8; border-bottom: 1px solid #4b493e; padding: 4px 6px; font-size: 11px; text-transform: uppercase; }
+.pvp-table td { padding: 4px 6px; border-bottom: 1px solid #2a2820; }
+
+/* Contador de preparo na HUD */
+#pvp-countdown {
+  position: fixed; top: 46px; left: 50%; transform: translateX(-50%); z-index: 60;
+  display: none; align-items: center; gap: 7px; padding: 7px 14px;
+  background: linear-gradient(180deg, #3a1414, #241010); color: #ffb0b0;
+  border: 1px solid #a33535; font: 700 13px "Trebuchet MS",sans-serif;
+  cursor: pointer; animation: pvp-pulse 1.6s infinite;
+}
+#pvp-countdown b { color: #ff6b6b; font-size: 18px; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+#pvp-countdown .pvp-cd-label { color: #ffd6d6; letter-spacing: 1px; }
+#pvp-countdown .pvp-cd-sub { font: 400 10px "Trebuchet MS",sans-serif; color: #c99; }
+#pvp-countdown.pvp-cd-soon { border-color: #ff4a4a; animation: pvp-btn-glow .8s ease-in-out infinite; }
+#pvp-countdown.pvp-cd-soon b { color: #fff; }
+
+/* Modal "assumir o controle" — conta em batalha com o lease em outra sessão */
+#pvp-takeover {
+  position: fixed; inset: 0; z-index: 90; display: flex;
+  align-items: center; justify-content: center;
+  background: rgba(8, 5, 4, .62);
+}
+.pvp-tk-box {
+  width: min(360px, 90vw); text-align: center; padding: 18px 20px 16px;
+  background: linear-gradient(180deg, #2a1512, #1a0e0c);
+  border: 1px solid #a33535; box-shadow: 0 8px 40px rgba(0, 0, 0, .65);
+  font-family: "Trebuchet MS", sans-serif;
+}
+.pvp-tk-live {
+  display: inline-block; color: #ff6b6b; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; border: 1px solid #a33535; padding: 0 5px;
+  animation: pvp-pulse 1.6s infinite;
+}
+.pvp-tk-title { margin-top: 8px; color: #ffe680; font-weight: 700; font-size: 15px; letter-spacing: 1px; }
+.pvp-tk-text { margin: 8px 0 14px; color: #c9bfa8; font-size: 12px; line-height: 1.45; }
+.pvp-tk-btn {
+  width: 100%; padding: 9px 0; cursor: pointer; font: 700 13px "Trebuchet MS", sans-serif;
+  letter-spacing: 1px; color: #fff; background: linear-gradient(180deg, #b23a2e, #7c221a);
+  border: 1px solid #ff6b6b; border-radius: 3px;
+}
+.pvp-tk-btn:hover:not(:disabled) { filter: brightness(1.15); }
+.pvp-tk-btn:disabled { opacity: .6; cursor: wait; }
+
+/* Placar dentro da instância */
+#pvp-scoreboard {
+  position: fixed; top: 46px; left: 50%; transform: translateX(-50%); z-index: 55;
+  display: none; min-width: 230px; text-align: center; padding: 6px 14px;
+  background: rgba(16,12,10,.92); border: 1px solid #a33535; color: #d8d0bc;
+  font-family: "Trebuchet MS",sans-serif;
+}
+.pvp-sb-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; }
+.pvp-sb-row b { font-size: 20px; color: #ffe680; }
+.pvp-sb-row em { font-style: normal; color: #a33535; font-weight: 700; }
+.pvp-sb-t1, .pvp-sb-t2 { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.pvp-sb-t1 { color: #7fc4ff; }
+.pvp-sb-t2 { color: #ff9d9d; }
+.pvp-sb-sub { font-size: 10px; color: #a89f88; margin-top: 2px; }
+.pvp-sb-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+.pvp-sb-head b { color: #fff; font-size: 14px; letter-spacing: 1px; }
+.pvp-sb-live { color: #ff6b6b; font-size: 9px; font-weight: 700; letter-spacing: 1px; border: 1px solid #a33535; padding: 0 5px; }
+.pvp-sb-bar { height: 4px; margin: 4px 0 2px; background: #8c2b2b; }
+.pvp-sb-bar i { display: block; height: 100%; background: #3d7fd6; }
+.pvp-cal-day { grid-column: 1 / -1; margin: 6px 0 2px; color: #e8d4a2; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.pvp-boost-head { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 8px; font-size: 12px; color: #d8d0bc; }
+.pvp-boost-head b { color: #ffe680; }
+.pvp-forfeit { border-color: #a33535 !important; color: #ffb0b0 !important; }
+.guild-pvp-open { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 6px 0 4px; }

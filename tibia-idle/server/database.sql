@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS account_instances (
   instance_id        CHAR(64) NOT NULL,
   version            BIGINT UNSIGNED NOT NULL DEFAULT 1,
   status             ENUM('active','ended') NOT NULL DEFAULT 'active',
-  kind               ENUM('hunt','boss') NOT NULL,
+  kind               ENUM('hunt','boss','quest','pvp') NOT NULL,
   hunt_id            VARCHAR(64) DEFAULT NULL,
   boss_id            VARCHAR(64) DEFAULT NULL,
   instance_mode      VARCHAR(24) NOT NULL DEFAULT 'non-pvp',

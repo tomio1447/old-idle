@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=depot-city-v3">
+  <link rel="stylesheet" href="css/layout.css?v=pvp-wars-v9">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-voc-v1">
@@ -256,6 +256,9 @@
     <button class="sm" id="btn-cyclo"><img src="assets/item/spellbook-of-ancient-arcana.png?v=guild-v1" alt="" class="topbar-btn-icon" width="18" height="18"> <span data-i18n="btn.cyclo">Cyclopedia</span></button>
     <button class="sm topbar-sys-btn" id="btn-guild" title="Guilds — clãs por conta com tasks diárias" data-i18n-title="title.guild">
       <span class="topbar-btn-icon guild-btn-icon" aria-hidden="true"></span><span class="topbar-btn-label">Guild</span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-pvp" title="PvP — Guerras agendadas entre guilds (requer guild)">
+      <span class="topbar-btn-icon pvp-btn-icon" aria-hidden="true"></span><span class="topbar-btn-label">PVP</span>
     </button>
     <button class="sm primary" id="btn-city" data-i18n-title="btn.city">🏛 <span data-i18n="btn.city">Ir para a cidade</span></button>
     <button class="sm topbar-sys-btn" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
@@ -623,7 +626,7 @@
      por isso carrega depois de todos os *data.js e antes dos consumidores -->
 <script src="js/spelldata_1525.js?v=monk-chain-flood-v1"></script>
 <script src="js/tiledata.js"></script>
-<script src="js/tileflags.js?v=bloodrotten-assets-v1"></script>
+<script src="js/tileflags.js?v=pvp-assets-v1"></script>
 <script src="js/imbuementdata.js"></script>
 <script src="js/wandshootdata.js?v=basic-fx-v1"></script>
 <script src="js/patch_clientfx.js?v=diamond-ethereal-missile-v1"></script>
@@ -663,11 +666,11 @@
 <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
 <script src="js/walker.js"></script>
 <script src="js/tileanimdata.js?v=ebb-and-flow-v1"></script>
-<script src="js/tilepatterndata.js?v=bloodrotten-assets-v2"></script>
+<script src="js/tilepatterndata.js?v=pvp-assets-v1"></script>
 <script src="js/tilemap.js?v=wall-depth-v1"></script>
 <script src="js/effectdata.js?v=block-hit-fix-v1"></script>
 <script src="js/icondata.js?v=rotten-rooted-v1"></script>
-<script src="js/render.js?v=pirat-colors-v1"></script>
+<script src="js/render.js?v=pvp-wars-v9"></script>
 <script src="js/city-render.js?v=wall-depth-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
@@ -711,7 +714,7 @@
 <script src="js/announce.js?v=gm-panel-v1"></script>
 <script src="js/daily-boost.js?v=daily-boost-v2"></script>
 <script src="js/player-profile.js?v=guild-req-tab-v1"></script>
-<script src="js/account-client.js?v=inventory-sync-order-v1"></script>
+<script src="js/account-client.js?v=pvp-wars-v9"></script>
 <script src="js/chat.js?v=social-v2"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js?v=market-tc-item-v1"></script>
@@ -728,9 +731,10 @@
 <script src="js/city-ui.js?v=depot-city-v2"></script>
 <script src="js/cosmetic-npcs.js?v=cosmetic-npcs-v2"></script>
 <script src="js/calendar.js?v=calendar-v1"></script>
-<script src="js/guild-ui.js?v=guild-vip30-v1"></script>
-<script src="js/preload.js?v=pirat-colors-v1"></script>
-<script src="js/game.js?v=bakragore-worldboss-v2"></script>
+<script src="js/guild-ui.js?v=pvp-wars-v9"></script>
+<script src="js/pvp-ui.js?v=pvp-wars-v9"></script>
+<script src="js/preload.js?v=pvp-wars-v9"></script>
+<script src="js/game.js?v=pvp-wars-v9"></script>
 <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v1"></script>
 <script src="js/feast-of-souls.js?v=paleworm-fov-v1"></script>
@@ -768,6 +772,8 @@
 <script src="js/dl-darashia.js?v=dl-darashia-v1"></script>
 <script src="js/wyrm-lb.js?v=wyrm-lb-v1"></script>
 <script src="js/medusa-tower-ph.js?v=medusa-tower-ph-v1"></script>
+<script src="js/glooth-cave.js?v=glooth-cave-v1"></script>
+<script src="js/jade-roots.js?v=jade-roots-v1"></script>
 <script src="js/carniphilas-ph.js?v=carniphilas-ph-v1"></script>
 <script src="js/asura-palace.js?v=asura-palace-v1"></script>
 <script src="js/mitmah-vanguard.js?v=mitmah-vanguard-v1"></script>
@@ -797,13 +803,13 @@
 <script src="js/umbral-creation.js?v=tooltip-v1"></script>
 <script src="js/doctor-marrow.js?v=marrow-outfit-v1"></script>
 <script src="js/bloodrotten.js?v=bakragore-burden-v1"></script>
-<script src="js/world-boss-ui.js?v=bakragore-burden-v1"></script>
+<script src="js/world-boss-ui.js?v=wb-lobby-lock-fix-v1"></script>
 <script src="js/megalomania-lobby.js?v=world-boss-char-select-v1"></script>
 <script src="js/pale-worm-lobby.js?v=world-boss-raids-v1"></script>
 <script src="js/social.js?v=social-city-v1"></script>
 <script src="js/world-bosses-modal.js?v=bakragore-worldboss-v1"></script>
 <script src="js/questdata.js?v=bakragore-quest-v2"></script>
-<script src="js/quest-ui.js?v=primal-mount-claim-v1"></script>
+<script src="js/quest-ui.js?v=primal-mount-claim-v2"></script>
 <script src="js/wheel-data.js?v=wheel-data-monk-v1"></script>
 <script src="js/wheel-planner.js?v=wheel-planner-active-v1"></script>
 <script src="js/wheel-modal.js?v=wheel-real-v1"></script>

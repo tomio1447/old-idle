@@ -57,7 +57,7 @@ function questPrepareModal(shell) {
   body.classList.remove("hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
     "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
     "mega-lobby-char-shell", "world-boss-detail-shell", "quests-modal-shell", "quest-detail-shell",
-    "quest-lobby-shell", "quest-reward-shell", "forge-modal-shell");
+    "quest-lobby-shell", "quest-reward-shell", "forge-modal-shell", "imb-modal-shell");
   body.classList.add(shell);
   modal.classList.add("show");
   return { modal, body };
@@ -171,11 +171,24 @@ function openQuestsModal() {
 
 /* ---- Quest detail modal ---- */
 
+/* Sheets de montaria: N cols x 4 linhas (direcoes), celula cw x ch.
+ * Linha 2 = sul, col 0 = pose parada — mesmo recorte do renderer. */
+function questMountFrameHtml(id, size) {
+  const m = (typeof APP_MOUNT !== "undefined" && APP_MOUNT[id]) || {};
+  const cw = m.cw || 64, ch = m.ch || 64;
+  const cols = m.cols || 9, rows = m.rows || 4;
+  const sz = size || 48;
+  const scale = sz / Math.max(cw, ch);
+  const bgW = cw * cols * scale, bgH = ch * rows * scale;
+  const bgY = -2 * ch * scale;
+  return `<div class="quest-outfit-frame" style="width:${sz}px;height:${sz}px;background:url('assets/appearance/mount/${id}.base.png') 0px ${bgY}px / ${bgW}px ${bgH}px no-repeat;image-rendering:pixelated" title="${id}"></div>`;
+}
+
 function questMountCardHtml(id) {
   const m = (typeof APP_MOUNT !== "undefined" && APP_MOUNT[id]) || {};
   const name = m.nome || id.replace(/-/g, " ");
   return `<div class="quest-reward-detail-card quest-mount-card" data-mount="${id}">
-    <img src="assets/appearance/mount/${id}.base.png" width="28" height="28" style="image-rendering:pixelated" alt="">
+    ${questMountFrameHtml(id, 36)}
     <span class="quest-reward-name">${name}</span>
     <span class="quest-reward-stats tiny dim">Montaria · Hazard 6</span>
   </div>`;

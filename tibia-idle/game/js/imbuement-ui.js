@@ -59,15 +59,16 @@ function imbSlotLabel(slot) {
 function renderImbueModal(p) {
   const eqs = imbEquipables(p);
   if (!eqs.length) {
-    return `<div class="panel-title">Imbuement</div>
-      <div class="panel-body">
-        <p class="small dim">Nenhum equipamento com slot de imbuement.
-        Itens com <b>imbSlots</b> (armas fortes, elmos e armaduras de
-        nivel 25+) podem ser imbuídos aqui.</p>
-        <div class="row" style="justify-content:flex-end">
-          <button class="sm" id="imb-close">Fechar</button>
-        </div>
-      </div>`;
+    return `<div class="panel-title cidade-modal-title">
+      <img src="assets/ui/imbuement-machine.png" class="cidade-btn-icon" style="width:20px;height:20px" alt="">
+      Imbuement <span class="spacer"></span>
+      <button class="sm" id="imb-close">Fechar</button>
+    </div>
+    <div class="panel-body">
+      <p class="small dim">Nenhum equipamento com slot de imbuement.
+      Itens com <b>imbSlots</b> (armas fortes, elmos e armaduras de
+      nivel 25+) podem ser imbuídos aqui.</p>
+    </div>`;
   }
   if (!eqs.some((e) => e.slot === IMB_UI.slot)) IMB_UI.slot = eqs[0].slot;
   const cur = eqs.find((e) => e.slot === IMB_UI.slot);
@@ -151,6 +152,9 @@ function renderImbueModal(p) {
         <span class="${ok ? "" : "txt-red"}">${have}/${m.count}</span></div>`;
     }
     const faltaGold = p.gold < cd.price;
+    const tcPrice = (typeof IMB_TIER_COINS !== "undefined" && IMB_TIER_COINS[t]) || 0;
+    const tcHave = typeof accountCoins === "function" ? accountCoins() : 0;
+    const tcOk = imbPrecheck(p, IMB_UI.slot, IMB_UI.key, t).ok && tcHave >= tcPrice;
     right = `
       <div class="row" style="gap:8px;align-items:center">
         ${imbIconeHtml(g.icon, 40)}
@@ -172,29 +176,45 @@ function renderImbueModal(p) {
       <button class="primary wide" id="imb-apply"
         ${!pode || faltaGold ? "disabled" : ""}>Imbuir</button>
       ${!pode ? `<div class="tiny txt-red">Faltam materiais na loot pouch.</div>` : ""}
-      ${faltaGold ? `<div class="tiny txt-red">Gold insuficiente.</div>` : ""}`;
+      ${faltaGold ? `<div class="tiny txt-red">Gold insuficiente.</div>` : ""}
+      <button class="wide imb-tc-btn" id="imb-tc-apply" ${tcOk ? "" : "disabled"}>
+        <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif" alt=""> Imbuir via TC — ${tcPrice} coins
+      </button>
+      <div class="tiny dim">Via TC: sem materiais e sem gold, sucesso garantido.</div>
+      ${tcHave < tcPrice ? `<div class="tiny txt-red">Tibia Coins insuficientes (${fmtFull(tcHave)} TC).</div>` : ""}`;
   }
 
-  return `<div class="panel-title">
-      <img src="assets/ui/imbuement-machine.png" style="width:20px;height:20px" alt="">
-      Imbuement <span class="spacer"></span><span class="tiny dim">até 20h em combate</span>
-    </div>
-    <div class="imb-grid">
-      <div class="imb-col-left">${left}</div>
-      <div class="imb-col-center">${center}</div>
-      <div class="imb-col-right">${right}</div>
-    </div>
-    <div class="row" style="justify-content:flex-end;margin-top:6px">
+  return `<div class="panel-title cidade-modal-title">
+      <img src="assets/ui/imbuement-machine.png" class="cidade-btn-icon" style="width:20px;height:20px" alt="">
+      Imbuement <span class="tiny dim">até 20h em combate</span>
+      <span class="spacer"></span>
       <button class="sm" id="imb-close">Fechar</button>
+    </div>
+    <div class="panel-body imb-modal-content">
+      <div class="imb-grid">
+        <div class="imb-col-left">${left}</div>
+        <div class="imb-col-center">${center}</div>
+        <div class="imb-col-right">${right}</div>
+      </div>
     </div>`;
 }
 
 function openImbueModal() {
   if (!G.p) return;
-  $("#modal").classList.add("wide");
-  $("#modal-body").innerHTML = renderImbueModal(G.p);
-  $("#modal").classList.add("show");
+  const modal = $("#modal"), body = $("#modal-body");
+  if (typeof clearCityModalShells === "function") clearCityModalShells(body);
+  else if (body) body.classList.remove("imb-modal-shell", "cidade-modal-shell");
+  if (body) body.classList.add("imb-modal-shell", "cidade-modal-shell");
+  modal.classList.remove("wide");
+  body.innerHTML = renderImbueModal(G.p);
+  modal.classList.add("show");
   bindImbueModal();
+}
+
+function closeImbueModal() {
+  $("#modal").classList.remove("show", "wide");
+  if (typeof clearCityModalShells === "function") clearCityModalShells($("#modal-body"));
+  else $("#modal-body").classList.remove("imb-modal-shell", "cidade-modal-shell");
 }
 
 function bindImbueModal() {
@@ -233,7 +253,46 @@ function bindImbueModal() {
     if (typeof renderAll === "function") renderAll();
     openImbueModal();
   });
+  const tcApply = body.querySelector("#imb-tc-apply");
+  if (tcApply) tcApply.addEventListener("click", () => {
+    imbApplyViaTc(tcApply);
+  });
   const close = body.querySelector("#imb-close");
-  if (close) close.addEventListener("click", () =>
-    $("#modal").classList.remove("show", "wide"));
+  if (close) close.addEventListener("click", () => closeImbueModal());
+}
+
+/* Imbue via Tibia Coins: online o servidor debita (30/60/90 por tier);
+ * offline debita o saldo local da conta. Sem materiais/gold, 100%. */
+async function imbApplyViaTc(btn) {
+  if (!G.p || !btn || btn.dataset.busy === "1") return;
+  const tier = IMB_UI.tier;
+  const price = (typeof IMB_TIER_COINS !== "undefined" && IMB_TIER_COINS[tier]) || 0;
+  const fail = (msg) => {
+    if (typeof toast === "function") toast(msg, "err");
+    openImbueModal();
+  };
+  const pre = imbPrecheck(G.p, IMB_UI.slot, IMB_UI.key, tier);
+  if (!pre.ok) return fail(pre.msg || "Imbuement indisponível.");
+  btn.dataset.busy = "1";
+  btn.disabled = true;
+  try {
+    const token = typeof sessionToken === "function" ? sessionToken() : "";
+    const online = token && typeof accountApiConfigured === "function" &&
+      accountApiConfigured() && typeof storeBuyImbuement === "function";
+    if (online) {
+      const r = await storeBuyImbuement(token, tier);
+      if (!r || !r.ok) return fail((r && r.msg) || "Falha ao debitar Tibia Coins.");
+    } else {
+      if (typeof accountCoins !== "function" || accountCoins() < price)
+        return fail("Tibia Coins insuficientes.");
+      accountSpendCoins(price);
+      if (typeof renderCoinBalance === "function") renderCoinBalance();
+    }
+    const r = imbAddTc(G.p, IMB_UI.slot, IMB_UI.key, tier);
+    if (typeof toast === "function") toast(r.msg, r.ok ? "ok" : "err");
+    if (typeof renderAll === "function") renderAll();
+    openImbueModal();
+  } finally {
+    btn.dataset.busy = "";
+  }
 }

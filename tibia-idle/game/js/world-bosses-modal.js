@@ -115,7 +115,7 @@ function worldBossesCard(wz) {
 function worldBossPrepareModal(shell) {
   const modal = $("#modal"), body = $("#modal-body");
   if (!modal || !body) return null;
-  body.classList.remove("hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell", "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell", "mega-lobby-char-shell", "world-boss-detail-shell");
+  body.classList.remove("hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell", "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell", "mega-lobby-char-shell", "world-boss-detail-shell", "imb-modal-shell");
   body.classList.add(shell);
   modal.classList.add("show");
   return { modal, body };
