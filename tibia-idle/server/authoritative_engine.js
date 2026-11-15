@@ -28,6 +28,15 @@ const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"
 const BLOODROTTEN_DATA=require("../game/js/bloodrotten.js");
 MONSTERS["pillar-of-dark-energy"]=BLOODROTTEN_DATA.pillar;
 BLOODROTTEN_DATA.registerBagLoot(MONSTERS);
+// Putrefactory: o Canary publica o Sopping Carcass com loot vazio e sem os
+// drops de mar/2025 — mesma correção aplicada ao catálogo do cliente.
+require("../game/js/putrefactory.js").registerLoot(MONSTERS);
+// Darklight Core: drops muito raros ausentes do dump Canary (crystalline
+// armor / white gem / dwarven ring) — mesma correção do cliente.
+require("../game/js/darklight-core.js").registerLoot(MONSTERS);
+// Gloom Pillars: drops oficiais ausentes do dump Canary (might ring /
+// ultimate mana potion / lightning legs / green gem).
+require("../game/js/gloom-pillars.js").registerLoot(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -498,7 +507,8 @@ try{
   for(const f of ["lion-sanctum.js","rotworm-darashia.js","elder-wyrm-darashia.js",
     "lions-rock-darashia.js","dl-darashia.js","feast-of-souls.js","scarlett-boss.js",
     "hyaena-lairs.js","wyrm-lb.js","medusa-tower-ph.js","carniphilas-ph.js",
-    "glooth-cave.js","jade-roots.js",
+    "glooth-cave.js","buster-darashia.js","jade-roots.js","putrefactory.js",
+    "darklight-core.js","gloom-pillars.js",
     "asura-palace.js","azzilon-castle.js","arbaziloth.js","magma-bubble.js",
     "sugar-daddy.js","sugar-mommy.js","gnomprona.js","bloodrotten.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
@@ -585,8 +595,15 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "salamander-cave":{monsters:["emerald-damselfly","marsh-stalker","swampling","salamander"],cat:"aventureiro",pack:4},
   "glooth-cave":{monsters:["glooth-bandit","glooth-brigand"],cat:"mid",pack:12,packMin:6,packMax:12,
     spawnWeights:{"glooth-bandit":50,"glooth-brigand":50}},
+  "buster-darashia":{monsters:["burster-spectre"],cat:"mid",pack:8,packMin:5,packMax:8},
   "jade-roots":{monsters:["bloated-man-maggot","mycobiontic-beetle","sopping-corpus"],cat:"hardcore",pack:12,packMin:8,packMax:12,
     spawnWeights:{"bloated-man-maggot":25,"mycobiontic-beetle":50,"sopping-corpus":25}},
+  "putrefactory":{monsters:["meandering-mushroom","oozing-carcass","rotten-man-maggot","sopping-carcass"],cat:"hardcore",pack:12,packMin:8,packMax:12,
+    spawnWeights:{"meandering-mushroom":25,"oozing-carcass":25,"rotten-man-maggot":25,"sopping-carcass":25}},
+  "darklight-core":{monsters:["darklight-matter","darklight-source","darklight-striker","walking-pillar"],cat:"hardcore",pack:12,packMin:8,packMax:12,
+    spawnWeights:{"darklight-matter":25,"darklight-source":25,"darklight-striker":25,"walking-pillar":25}},
+  "gloom-pillars":{monsters:["converter","darklight-construct","darklight-emitter","wandering-pillar"],cat:"hardcore",pack:12,packMin:8,packMax:12,
+    spawnWeights:{"converter":25,"darklight-construct":25,"darklight-emitter":25,"wandering-pillar":25}},
   "falcon-bastion":{monsters:["falcon-knight","falcon-paladin"],cat:"hard",pack:7,packMin:6,packMax:8,
     bossMobs:["grand-commander-soeren","preceptor-lazare","grand-chaplain-gaunder","grand-canon-dominus"],
     spawnWeights:{"falcon-knight":48,"falcon-paladin":48,
