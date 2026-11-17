@@ -2,10 +2,10 @@
  *
  * BOSS SIMPLES (sem transformações): o jogador pediu apenas o 1º estágio
  * da luta oficial — sem Urmahlullu the Tamed/Immaculate, sem Wildness e
- * sem Wisdom of Urmahlullu. Matar o Weakened com 500.000 HP já entrega o
+ * sem Wisdom of Urmahlullu. Matar o Weakened com 150.000 HP já entrega o
  * loot completo do monstro base (MONSTERDATA, tabela oficial do Canary).
  *
- * Stats: hp 500.000 a pedido do jogador (Canary/Wiki: 100–150k); o resto
+ * Stats: hp 150.000 a pedido do jogador (Canary/Wiki: 100–150k); o resto
  * (exp 55000, dano 1100, armor/defense 84, skills de fogo e o golpe
  * "urmahlulluring") vem direto do monsterdata importado do Canary.
  *
@@ -37,7 +37,7 @@ const URMAHLULLU_ROOM = {
 
 const URMAHLULLU_STATS = {
   name: "Urmahlullu the Weakened",
-  hp: 500000,
+  hp: 150000,
   exp: 55000,
   damage: 1100,
   armor: 84,

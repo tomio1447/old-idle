@@ -221,8 +221,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = MIMAR_HAFF
   GAMEDATA.hunts["mimar-haffar-room"] = {
     name: MIMAR_HAFFAR_ROOM.name,
     hidden: true,
-    level: 400,
-    minLevel: 400,
+    level: 800,
+    minLevel: 800,
     monsters: ["mimar-haffar"],
     color: "#8a6a2a",
     scene: "palace",

@@ -1,6 +1,6 @@
 /* Regressão: Urmahlullu the Weakened — boss simples de Kilmaresh, 150+.
  *
- * Sem transformações: o def usa o primeiro estágio com 500.000 HP (a
+ * Sem transformações: o def usa o primeiro estágio com 150.000 HP (a
  * pedido do jogador; Canary/Wiki: 100–150k) e o loot completo do monstro
  * base (MONSTERDATA, tabela oficial do Canary).
  *
@@ -40,7 +40,7 @@ const COOLDOWN_20H = 20 * 60 * 60 * 1000;
 /* ---------------- BOSS_DEFS ---------------- */
 const b = ctx.BOSS_DEFS[BOSS_ID];
 must(b, "boss sem BOSS_DEFS");
-must(b.hp === 500000, "hp deve ser 500000 (1º estágio, pedido do jogador)");
+must(b.hp === 150000, "hp deve ser 150000 (1º estágio, pedido do jogador)");
 must(b.exp === 55000 && b.damage === 1100 && b.armor === 84 && b.defense === 84,
   "stats divergentes do Canary (exp 55000 / dano 1100 / armor 84 / def 84)");
 must(b.baseMonster === BOSS_ID && b.sprite === BOSS_ID, "sem baseMonster/sprite");
@@ -227,4 +227,4 @@ must(hm.mob.length === 1 && hm.mob[0].x === 14 && hm.mob[0].y === 6,
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
 must(html.includes("js/urmahlullu.js?v="), "urmahlullu.js não carregado no index");
 
-console.log("ok: Urmahlullu the Weakened — boss 150+ (500k HP, cooldown 20h), sala urmahlullu_room 29×22, loot oficial Canary completo (3 partes Yasir + 3 quest items sell 0)");
+console.log("ok: Urmahlullu the Weakened — boss 150+ (150k HP, cooldown 20h), sala urmahlullu_room 29×22, loot oficial Canary completo (3 partes Yasir + 3 quest items sell 0)");

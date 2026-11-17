@@ -57,6 +57,9 @@ require("../game/js/book-world.js").registerMonsters(MONSTERS);
 // Sir Leonard (Book World, 150+): boss final da Book World Quest do
 // update 15.10, ausente do dump Canary — ficha oficial no patch.
 require("../game/js/sir-leonard.js").registerMonsters(MONSTERS);
+/* Norcferatus Fortress (update 15.10): 7 criaturas ausentes do dump
+ * Canary — fichas oficiais registradas no MONSTERS. */
+require("../game/js/norcferatus-fortress.js").registerMonsters(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -537,7 +540,7 @@ try{
     // sobrescritos pelo valor calculado do Canary.
     "urmahlullu.js","bashmuul-issavi.js","true-asuras.js","mimar-haffar.js",
     "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
-    "book-world.js","sir-leonard.js"]){
+    "book-world.js","sir-leonard.js","norcferatus-fortress.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -640,6 +643,11 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "urmahlullu-the-weakened-room":{monsters:["urmahlullu-the-weakened"]},
   "mimar-haffar-room":{monsters:["mimar-haffar"]},
   "sir-leonard-room":{monsters:["sir-leonard"]},
+  "norcferatus-fortress":{monsters:["dworc-shadowstalker","gloom-maw","norcferatu-heartless","norcferatu-nightweaver","orclops-bloodbreaker"],
+    cat:"hard",pack:10,packMin:8,packMax:10,respawnMs:8000,
+    extraSpawn:{slug:"varg",chance:0.03},
+    spawnWeights:{"dworc-shadowstalker":20,"gloom-maw":20,"norcferatu-heartless":20,"norcferatu-nightweaver":20,"orclops-bloodbreaker":20}},
+  "vladrukh-room":{monsters:["vladrukh"]},
   "maior-domus-room":{monsters:["maior-domus"]},
   "moonstone-castle":{monsters:["moonsilver-custodian","moonstone-miner"],cat:"hard",pack:14,packMin:6,packMax:14,
     spawnWeights:{"moonsilver-custodian":50,"moonstone-miner":50}},
@@ -7149,6 +7157,9 @@ function captureAuthHuntDef(auth,hunt){
   if(Number(hunt.pack)>0)auth.huntPack=Number(hunt.pack);
   if(hunt.cat)auth.huntCat=String(hunt.cat);
   if(hunt.gnomprona)auth.huntGnomprona=true;
+  if(Number(hunt.respawnMs)>0)auth.huntRespawnMs=Number(hunt.respawnMs);
+  if(hunt.extraSpawn&&hunt.extraSpawn.slug&&Number(hunt.extraSpawn.chance)>0)
+    auth.huntExtraSpawn={slug:String(hunt.extraSpawn.slug),chance:Number(hunt.extraSpawn.chance)};
 }
 function authHuntDef(auth){
   if(!auth)return null;
@@ -7163,6 +7174,9 @@ function authHuntDef(auth){
   if(Number(auth.huntPack)>0)out.pack=Number(auth.huntPack);
   if(auth.huntCat)out.cat=String(auth.huntCat);
   if(auth.huntGnomprona)out.gnomprona=true;
+  if(Number(auth.huntRespawnMs)>0)out.respawnMs=Number(auth.huntRespawnMs);
+  if(auth.huntExtraSpawn&&auth.huntExtraSpawn.slug)
+    out.extraSpawn={slug:String(auth.huntExtraSpawn.slug),chance:Number(auth.huntExtraSpawn.chance)||0};
   return (out.monsters||out.spawnWeights||out.packMin)?out:null;
 }
 /* Hazard level (Gnomprona): a instância usa o MENOR hazard efetivo entre
@@ -7274,6 +7288,21 @@ function spawnHuntWave(auth,now,opts){
       m.hazard=Math.max(0,Math.min(12,Number(auth.hazardLevel)));
     occupied.add(id);
     auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
+  }
+  /* Norcferatus Fortress (hunt.extraSpawn): a cada onda há chance% de 1
+   * monstro EXTRA além do pack (Varg) — nunca substitui um regular.
+   * Mesma regra do cliente (combat.spawnWave). */
+  const extra=hunt&&hunt.extraSpawn;
+  if(extra&&extra.slug&&monsterDef(extra.slug)&&
+     random(auth)<Math.max(0,Math.min(1,Number(extra.chance)||0))){
+    const id="srv-extra-"+auth.wave;
+    if(!occupied.has(id)){
+      const m=makeMob(auth,extra.slug,false,id,null,count);
+      if(m){
+        occupied.add(id);
+        auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
+      }
+    }
   }
 }
 /* ---- Quest wave spawners ---- */
@@ -8546,7 +8575,12 @@ function step(auth,now,opts){if(auth.ended)return;
   if(!auth.ended&&auth.kind==="hunt"){
     const empty=!auth.mobs.length&&!(auth.pendingSpawns&&auth.pendingSpawns.length);
     if(empty){
-      if(dead.length)auth._nextWaveAt=stepTs+AUTH_WAVE_CLEAR_RESPAWN_MS;
+      if(dead.length){
+        // Norcferatus Fortress respawna em 8s (hunt.respawnMs); as demais
+        // hunts seguem o 4s padrão.
+        const hdef=authHuntDef(auth);
+        auth._nextWaveAt=stepTs+(Math.max(0,Number(hdef&&hdef.respawnMs)||0)||AUTH_WAVE_CLEAR_RESPAWN_MS);
+      }
       else if(auth._nextWaveAt){
         if(stepTs>=auth._nextWaveAt-AUTH_WAVE_TELEPORT_LEAD_MS){
           auth._nextWaveAt=0;spawnHuntWave(auth,stepTs);

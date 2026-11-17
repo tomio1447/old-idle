@@ -1936,7 +1936,8 @@ const BOSS_DEFS = {
     hp: 660000, exp: 15000000, damage: 3000, armor: 135, defense: 135, cooldown: 0, loot: [],
     requirement: { level: 600, text: "Entra pelo lobby do World Boss (nível 600+)" },
   },
-  "vladrukh":          { id: "vladrukh", name: "Vladrukh", title: "EM BREVE", unavailable: true, sprite: "vladrukh" },
+  /* "vladrukh": definido em norcferatus-fortress.js (boss real da Bloody
+   * Tusks Quest — antes era placeholder "EM BREVE"). */
 };
 window.BOSS_DEFS = BOSS_DEFS;
 
@@ -2199,7 +2200,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 400+",
     minLevel: 400,
-    ids: ["arbaziloth", "magma-bubble", "the-primal-menace", "mimar-haffar"],
+    ids: ["arbaziloth", "magma-bubble", "the-primal-menace", "vladrukh"],
   },
   {
     title: "SOULWAR 400+",
@@ -2220,7 +2221,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 800+",
     minLevel: 800,
-    ids: ["maior-domus"],
+    ids: ["mimar-haffar", "maior-domus"],
   },
 ];
 

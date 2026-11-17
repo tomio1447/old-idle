@@ -4,6 +4,38 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-17 (v2) — Norcferatus Fortress, Vladrukh e Bloody Tusks Quest
+
+### Novo conteúdo
+
+- **Norcferatus Fortress (400+, hunt)** — a fortaleza dos vampiros do
+  update 15.10: Dworc Shadowstalker, Gloom Maw, Norcferatu Heartless,
+  Norcferatu Nightweaver e Orclops Bloodbreaker (pack 8–10, **respawn
+  de 8 em 8 segundos**). Mecânica própria: a cada respawn há **3% de
+  chance de nascer 1 Varg extra** além do pack. Loot completo com os
+  creature products do update — Blood Amulet, Norcferatu Talisman,
+  Chain Leash, Piece of Frozen Night, Heart Amphora, Pot of Orcish
+  Warpaint, Spiked Gorget/Bracers, Blood Hood, Orcish Toothbrush,
+  Bone Fibula, Bloodshot Giant Eye, Ritual Bone Knife, Bone Rattle e
+  Greater Garlic Necklace (10k no Haroun).
+- **Vladrukh (400+, boss)** — o lorde Norcferatu: 390.000 HP, sala
+  própria na câmara sul da fortaleza, cooldown de 20h. Loot com
+  **Blood Sceptre** (178k no Yasir), Greater Proficiency Catalyst,
+  Blood Preservation, catalisadores de proficiência e poções supreme/
+  ultimate em quantidade.
+- **Bloody Tusks Quest (400+)** — Missão 1: derrotar **5 Vargs** na
+  Norcferatus Fortress libera o acesso ao Vladrukh; Missão 2:
+  derrotá-lo concede a **montaria Gloom Maw** (resgate único por
+  conta).
+
+### Ajustes
+
+- **Urmahlullu the Weakened** — HP reduzido de 500k para **150k**.
+- **Mimar Haffar** — movido para a seção **BOSSES 800+** (o requisito
+  oficial já era nível 800 + Doctor Marrow + Make Believe M1).
+
+---
+
 ## 2026-11-17 — Book World, Sir Leonard, Make Believe Quest e 8 novas hunts/bosses
 
 ### Novo conteúdo

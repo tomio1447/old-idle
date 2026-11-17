@@ -545,8 +545,18 @@ function spawnWave(c, p) {
   // Conta também os que estão "piscando" (fila de spawn) para não encher a
   // arena além do pack enquanto a animação de teleporte roda. A condição
   // le a fila a cada iteracao (naFila cresce a cada push).
-  while (c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0) < pack) {
-    const slug = pickHuntMonsterSlug(c.hunt);
+  // Norcferatus Fortress (hunt.extraSpawn): a cada onda há chance% de 1
+  // monstro EXTRA (Varg) além do pack — nunca substitui um regular. O
+  // mesmo roll existe na autoridade (spawnHuntWave) para manter paridade.
+  const extraSlug = (c.hunt && c.hunt.extraSpawn && c.hunt.extraSpawn.slug &&
+      Math.random() < Math.max(0, Math.min(1, Number(c.hunt.extraSpawn.chance) || 0)))
+    ? String(c.hunt.extraSpawn.slug) : null;
+  const wantTotal = pack + (extraSlug ? 1 : 0);
+  while (c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0) < wantTotal) {
+    const filled = c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0);
+    const slug = (extraSlug && filled === wantTotal - 1)
+      ? extraSlug
+      : pickHuntMonsterSlug(c.hunt);
     const base = GAMEDATA.monsters[slug] || (typeof MONSTERDATA !== "undefined" && MONSTERDATA[slug]);
     if (!base) break;
     const fiendish = Math.random() < (c.fiendishChance || FIENDISH_BASE_CHANCE);
@@ -5526,7 +5536,8 @@ function combatTick(c, p, dt, now) {
   // Wave clear: agenda o blink/respawn da próxima onda (evita spawnWave /
   // occupancy no frame do kill+loot+XP).
   if (!alive.length && !(c.pendingSpawns && c.pendingSpawns.length) && !c.boss)
-    c._nextWaveAt = (c._tickNow || now || Date.now()) + WAVE_CLEAR_RESPAWN_MS;
+    c._nextWaveAt = (c._tickNow || now || Date.now()) +
+      (Math.max(0, Number(c.hunt && c.hunt.respawnMs) || 0) || WAVE_CLEAR_RESPAWN_MS);
   if (typeof greedBossAfterDeaths === "function") greedBossAfterDeaths(c);
 
   // auto sell / equip periodicos sao chamados pelo game loop

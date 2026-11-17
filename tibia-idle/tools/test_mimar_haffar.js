@@ -74,9 +74,9 @@ must(hu.otbmSpawn && hu.otbmSpawn.x === 1023 && hu.otbmSpawn.y === 1034 && hu.ot
 must(hu.otbmMobBounds && hu.otbmMobBounds.x === 1023 && hu.otbmMobBounds.y === 1026 &&
      hu.otbmMobBounds.z === 7 && hu.otbmMobBounds.w === 1 && hu.otbmMobBounds.h === 1,
   "bossspawn errado (esperado {1023,1026,7})");
-must(hu.minLevel === 400 && hu.monsters[0] === BOSS_ID, "hunt com nível/monstro errados");
+must(hu.minLevel === 800 && hu.monsters[0] === BOSS_ID, "hunt com nível/monstro errados");
 
-/* ---------------- seção BOSSES 400+ no modal (game.js) ---------------- */
+/* ---------------- seção BOSSES 800+ no modal (game.js) ---------------- */
 const gameSrc = fs.readFileSync(path.join(js, "game.js"), "utf8");
 const start = gameSrc.indexOf("const BOSS_MODAL_SECTIONS");
 const fnEnd = gameSrc.indexOf("function renderBosses", start);
@@ -89,8 +89,8 @@ vm.createContext(secCtx);
 vm.runInContext(decl.slice(0, end + 3), secCtx);
 const sections = vm.runInContext("BOSS_MODAL_SECTIONS", secCtx);
 const sec = sections.find((s) => (s.ids || []).includes(BOSS_ID));
-must(sec && sec.minLevel === 400 && sec.title === "BOSSES 400+",
-  "boss fora da seção BOSSES 400+");
+must(sec && sec.minLevel === 800 && sec.title === "BOSSES 800+",
+  "boss fora da seção BOSSES 800+");
 
 /* ---------------- loot: todo item tem catálogo + sprite + preço oficial --- */
 /* Novos: figurine 2,8M Yasir; dragon figurine 45k e moonstone 13k
@@ -228,4 +228,4 @@ must(hm.mob.length === 1 && hm.mob[0].x === 14 && hm.mob[0].y === 11,
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
 must(html.includes("js/mimar-haffar.js?v="), "mimar-haffar.js não carregado no index");
 
-console.log("ok: Mimar Haffar — boss 400+ (460k HP, cooldown 20h), sala minis_radiant 29×26, loot oficial completo (figurine Yasir 2,8M + moonsilver/quest items sell 0)");
+console.log("ok: Mimar Haffar — boss 800+ (460k HP, cooldown 20h), sala minis_radiant 29×26, loot oficial completo (figurine Yasir 2,8M + moonsilver/quest items sell 0)");
