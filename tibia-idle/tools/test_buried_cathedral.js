@@ -186,9 +186,9 @@ must(grounded(1066, 997) && grounded(1075, 1006) && grounded(1075, 997) && groun
   const targets = [...src.matchAll(/monster: "([a-z-]+)", target: (\d+)/g)];
   const total = targets.reduce((a, t) => a + Number(t[2]), 0);
   must(total === 250 && targets.length === 4, "missão deveria somar 250 kills em 4 tasks: " + total);
-  const uiSrc = fs.readFileSync(path.join(js, "ui.js"), "utf8");
-  must(uiSrc.includes('"HUNTS 250+"') && uiSrc.includes('"buried-cathedral"'),
-    "ui.js sem buried-cathedral na seção HUNTS 250+");
+  const secSrc = fs.readFileSync(path.join(js, "hunt-sections.js"), "utf8");
+  must(secSrc.includes('"HUNTS 250+"') && secSrc.includes('"buried-cathedral"'),
+    "hunt-sections.js sem buried-cathedral na seção HUNTS 250+");
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   must(html.includes("buried-cathedral.js?v=buried-cathedral-v1") &&
     html.includes("js/ui.js?v="),

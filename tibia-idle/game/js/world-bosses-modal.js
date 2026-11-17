@@ -1,28 +1,31 @@
 "use strict";
 
-const WORLD_BOSS_TEST_HP = 2500;
-
+/* HPs oficiais (dump Canary/TibiaWiki) — a constante de teste de 2500
+ * foi removida a pedido. Phosphorus mantém 10.000 de teste até o valor
+ * oficial ser divulgado. */
 const WARZONES = [
-  { id: "wz1", name: "The Deathstrike", title: "Warzone 1", sprite: "deathstrike", hp: WORLD_BOSS_TEST_HP,
+  { id: "wz1", name: "The Deathstrike", title: "Warzone 1", sprite: "deathstrike", hp: 200000,
     description: "A máquina de guerra gnome sofreu uma falha catastrófica. O Deathstrike agora esmaga tudo o que se move nas profundezas de Gnomebase Alpha." },
-  { id: "wz2", name: "Gnomevil", title: "Warzone 2", sprite: "gnomevil", hp: WORLD_BOSS_TEST_HP,
+  { id: "wz2", name: "Gnomevil", title: "Warzone 2", sprite: "gnomevil", hp: 250000,
     description: "Gnomevil, o demônio corrompido que assola a Warzone 2. Sua fúria é lendária e apenas guerreiros unidos conseguem contê-lo." },
-  { id: "wz3", name: "The Abyssador", title: "Warzone 3", sprite: "abyssador", hp: WORLD_BOSS_TEST_HP,
+  { id: "wz3", name: "The Abyssador", title: "Warzone 3", sprite: "abyssador", hp: 340000,
     description: "Criatura abissal que habita as profundezas mais escuras. O Abyssador devora a luz e a esperança dos que ousam enfrentá-lo." },
-  { id: "wz4", name: "The Baron from Below", title: "Warzone 4", sprite: "the-baron-from-below", hp: WORLD_BOSS_TEST_HP,
+  { id: "wz4", name: "The Baron from Below", title: "Warzone 4", sprite: "the-baron-from-below", hp: 350000,
     description: "O Barão emergiu das profundezas para conquistar as minhas. Sua força bruta é comparada apenas à sua sede de destruição." },
-  { id: "wz5", name: "The Count of the Core", title: "Warzone 5", sprite: "the-count-of-the-core", hp: WORLD_BOSS_TEST_HP,
+  { id: "wz5", name: "The Count of the Core", title: "Warzone 5", sprite: "the-count-of-the-core", hp: 350000,
     description: "Guardião do núcleo vulcânico, o Conde controla o fogo e a magma. Apenas equipes preparadas sobrevivem ao seu calor." },
-  { id: "wz6", name: "The Duke of the Depths", title: "Warzone 6", sprite: "the-duke-of-the-depths", hp: WORLD_BOSS_TEST_HP,
+  { id: "wz6", name: "The Duke of the Depths", title: "Warzone 6", sprite: "the-duke-of-the-depths", hp: 350000,
     description: "O Duque das Profundezas é a ameaça final das Warzones. Sua derrota exige coordenação perfeita e coragem inabalável." },
-  { id: "devourer", name: "The World Devourer", title: "Heart of Destruction", sprite: "world-devourer", hp: WORLD_BOSS_TEST_HP, maxChars: 5,
+  { id: "devourer", name: "The World Devourer", title: "Heart of Destruction", sprite: "world-devourer", hp: 25000, maxChars: 5,
     description: "O Devorador de Mundos é a personificação da destruição. Esta raid de elite permite até 5 personagens e exige estratégia impecável." },
-  { id: "pale-worm", name: "The Pale Worm", title: "Feast of Souls", sprite: "the-pale-worm", hp: WORLD_BOSS_TEST_HP, maxChars: 5,
+  { id: "pale-worm", name: "The Pale Worm", title: "Feast of Souls", sprite: "the-pale-worm", hp: 420000, maxChars: 5,
     description: "A Verme Pálida se alimenta de almas perdidas no banquete dos mortos. Raid de 5 personagens para os mais corajosos." },
-  { id: "megalomania", name: "Goshnar's Megalomania", title: "Soul War", sprite: "goshnar-s-megalomania-purple", dataMonster: "goshnar-s-megalomania-green", hp: WORLD_BOSS_TEST_HP, maxChars: 5,
+  { id: "megalomania", name: "Goshnar's Megalomania", title: "Soul War", sprite: "goshnar-s-megalomania-purple", dataMonster: "goshnar-s-megalomania-green", hp: 620000, maxChars: 5,
     description: "A Megalomania de Goshnar é a culminância da Soul War. Cinco guerreiros devem enfrentar a encarnação do orgulho absoluto." },
   { id: "bakragore", name: "Bakragore", title: "Rotten Blood", sprite: "bakragore", dataMonster: "bakragore", hp: 660000, maxChars: 5,
     description: "Bakragore, a fusão suprema da Rotten Blood. Lobby de até 5 jogadores (nível 600+): cada membro contribui suas taints pelo modal Bakragore's Burden — mais taints, mais Elder Bloodjaws e mais HP. Derrotá-lo conclui a The Blood Rotten Quest (recompensa 1x por personagem)." },
+  { id: "phosphorus", name: "Phosphorus", title: "Final Radiant", sprite: "phosphorus", dataMonster: "phosphorus", hp: 10000, maxChars: 5,
+    description: "Phosphorus, a entidade radiante do clímax da Make Believe. Lobby de até 5 jogadores (nível 800+): acesso liberado pela Missão 3 da Make Believe Quest — 5000 kills em Radiant Skyhold (além dos kills de Maior Domus e Mimar Haffar)." },
 ];
 window.WORLD_BOSS_DEFS = WARZONES;
 

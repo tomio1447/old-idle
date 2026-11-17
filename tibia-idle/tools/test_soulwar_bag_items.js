@@ -98,6 +98,6 @@ must(engine.ITEMS["pair-of-soulwalkers"] && engine.ITEMS["pair-of-soulwalkers"].
 must(engine.ITEMS["soulshell"], "engine: soulshell ausente");
 
 /* ---------------- index.html (cache-bust do fix) ---------------- */
-must(html.includes("js/soulwar.js?v=soulbag-fix-v1"), "soulwar.js sem cache-bust do fix");
+must(html.includes("js/soulwar.js?v="), "soulwar.js sem cache-bust do fix");
 
 console.log("ok: bag Soul War sem slugs quebrados — pool Canary (soulbastion, pair-of-soulwalkers, soulshell), aliases para depots legados e catálogo/engine completos");

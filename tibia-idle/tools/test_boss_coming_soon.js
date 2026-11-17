@@ -4,7 +4,9 @@ const assert = require("node:assert/strict"), test = require("node:test");
 const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
 const game = path.join(__dirname, "../game");
 const source = fs.readFileSync(path.join(game, "js/game.js"), "utf8");
-const ids = ["the-primal-menace", "magma-bubble", "court-warlock", "maior-domus", "phosphorus", "mitmah-vanguard", "bakragore"];
+// the-primal-menace e bakragore já foram implementados como bosses reais —
+// os demais continuam preview-only (sem hunt).
+const ids = ["magma-bubble", "court-warlock", "maior-domus", "phosphorus", "mitmah-vanguard"];
 const element = { innerHTML: "" }, messages = [];
 const ctx = { BOSS_COOLDOWN: 57600000, MEGA_TEST_BYPASS: false, console, $: () => element, $$: () => [], toast: (message) => messages.push(message),
   bossMobImg: (id) => `<span data-native-sprite="${id}"></span>` };

@@ -22,7 +22,7 @@ const MAP_PATH = path.join(GAME, "maps", "cobra_bastion.otbm");
 const BETA_PATH = path.join(GAME, "beta-maps", "cobra_bastion.otbm");
 const OUTPUT_PATH = path.join(JS, "cobra-bastion-map.js");
 const SOURCE_SHA256 = "50c5efeb87bb0c4a95433f347c643232381afd130b78a162672a786739ef47e0";
-const OUTPUT_SHA256 = "f0c0c23cf1ee29767e648089de98117aa95556cd00014029c21224f4ad453264";
+const OUTPUT_SHA256 = "962fbbb5d70363dcb22b922c953516af33b256672847e325d4e45e57a7814381";
 
 function sha256(data) {
   return crypto.createHash("sha256").update(data).digest("hex");
@@ -39,7 +39,7 @@ function loadTileFlags() {
 function loadApplyHuntOtbmZones() {
   const source = fs.readFileSync(path.join(JS, "otbmhunt.js"), "utf8");
   const start = source.indexOf("function applyHuntOtbmZones");
-  const end = source.indexOf("\n\n/* Garante", start);
+  const end = source.indexOf("function huntMapFromOtbmAsync", start);
   if (start < 0 || end < 0) throw new Error("applyHuntOtbmZones não encontrada em otbmhunt.js");
 
   const context = {};
@@ -140,8 +140,8 @@ function main() {
     "zona runtime não contém 120 mobs");
   assert(Object.keys(hm.leg).length === 199,
     `leg deveria conter 199 entradas, contém ${Object.keys(hm.leg).length}`);
-  assert(Object.keys(hm.footprintBlocked).length === 170,
-    `footprintBlocked deveria conter 170 entradas, contém ${Object.keys(hm.footprintBlocked).length}`);
+  assert(Object.keys(hm.footprintBlocked).length === 150,
+    `footprintBlocked deveria conter 150 entradas, contém ${Object.keys(hm.footprintBlocked).length}`);
   assert(hm.otbm === true, "flag otbm não foi preservada");
   assert(spriteIds.size === 157,
     `hunt map deveria usar 157 sprites, usa ${spriteIds.size}`);

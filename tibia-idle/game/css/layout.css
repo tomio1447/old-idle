@@ -5308,6 +5308,14 @@ body.fullhd .scene-overlay { font-size: 13px; }
 .quest-reward-name { font-size:10px; color:#efe9d6; }
 .quest-reward-stats { font-size:9px; }
 .quest-detail-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:2px; }
+/* Make Believe Quest — caixas de reward + roleta */
+.mb-rewards-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:4px; }
+.mb-reward-box { display:flex; flex-direction:column; align-items:center; gap:5px; text-align:center; }
+.mb-roulette-frame { display:flex; align-items:center; justify-content:center; width:56px; height:56px; background:#1a1a18; border:1px solid #555; border-radius:6px; }
+.mb-roulette-frame img { image-rendering:pixelated; }
+.mb-roulette-win { border-color:#9ce84a !important; box-shadow:0 0 8px rgba(156,232,74,.45); }
+.mb-roulette-name { text-transform:capitalize; min-height:12px; color:#efe9d6; }
+.mb-outfit-granted { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
 .quest-lobby-slots { max-height:300px; overflow-y:auto; }
 /* Reward choice modal */
 .quest-reward-body { display:flex; flex-direction:column; align-items:center; gap:14px; }

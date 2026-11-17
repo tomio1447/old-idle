@@ -22,7 +22,7 @@ const HUNTS = readJson("hunts.json");
 /* Bosses das arenas — espelho das BOSS_MODAL_SECTIONS do cliente (game.js).
  * Mantido aqui porque o servidor é a autoridade do bônus. */
 const DAILY_BOSS_POOL = [
-  "leiden", "tentugly-s-head",
+  "leiden", "tentugly-s-head", "urmahlullu-the-weakened",
   "aftershock", "anomaly", "eradicator", "outburst", "realityquake", "rupture",
   "jaul", "obujos", "tanjis", "brokul",
   "plagueroot", "alptramun", "izcandar-champion-of-summer", "izcandar-champion-of-winter",
@@ -31,6 +31,7 @@ const DAILY_BOSS_POOL = [
   "grand-master-oberon", "ratmiral-blackwhiskers", "the-brainstealer", "drume",
   "the-dread-maiden", "the-fear-feaster", "the-unwelcome", "brain-head",
   "goshnar-s-malice", "goshnar-s-spite", "goshnar-s-greed", "goshnar-s-hatred", "goshnar-s-cruelty",
+  "mimar-haffar", "maior-domus",
 ].filter((slug) => MONSTERS[slug] && MONSTERS[slug].boss);
 
 const DAILY_MONSTER_POOL = (() => {

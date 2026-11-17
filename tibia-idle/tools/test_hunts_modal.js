@@ -30,19 +30,16 @@ must(css.includes("#hunts-modal-list .hunt-modal-card .mobs") &&
 must(ui.includes('class="mobs"') && ui.includes('class="info"') &&
      ui.includes("mobImg(m, 24"),
   "card do modal sem regiões sprites|info ou sprites grandes demais");
-must(ui.includes("Nível recomendado")&&ui.includes("huntStars"),
+must(ui.includes("Nv <b>")&&ui.includes("huntStars"),
   "modal Hunts sem campos Canary (estrelas/nível)");
 must(cityUi.includes("data-open-hunts-catalog")&&!cityUi.includes("Object.keys(GAMEDATA.hunts).map"),
   "NPC de viagens ainda expõe a lista completa 7.4");
 
-const expected=[
- ["HUNTS LEVEL 0–100",["rats","amazon-camp","salamander-cave"]],
- ["HUNTS 100–250",["minotaur-oramond-east"]],
- ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas","buried-cathedral","ingol-terrain","roshamuul","prison-1","prison-2","prison-3","catacombs-oramond"]],
- ["FERUMBRAS ASCENDANT",["ferumbras-way","dt-seal","juggerseal"]],
- ["LIBRARY SESSION 400+",["library-fire","library-energy","library-ice","library-earth"]],
- ["SOULWAR 400+",["dark-thais","rotten-wasteland","claustrophobic-inferno","ebb-and-flow"]],
-];
+// O catálogo de seções mora em hunt-sections.js (compartilhado com o
+// servidor); o modal deve renderizar exatamente as seções/ids declaradas.
+const secCtx={window:{},console};secCtx.window=secCtx;vm.createContext(secCtx);
+vm.runInContext(fs.readFileSync(path.join(js,"hunt-sections.js"),"utf8"),secCtx);
+const expected=secCtx.HUNT_MODAL_SECTIONS.map(s=>[s.title,s.ids]);
 const start=ui.indexOf("const HUNT_MODAL_SECTIONS");
 const end=ui.indexOf("\nfunction openHuntInfoModal",start);
 must(start>=0&&end>start,"bloco HUNT_MODAL_SECTIONS não encontrado");
@@ -54,11 +51,13 @@ hunts["ebb-and-flow"].comingSoon=true;
 hunts.spiders={name:"Aranhas 7.4",level:8,avgExp:5,monsters:["spider"]};
 const ctx={
  GAMEDATA:{hunts},G:{p:{level:1,hunt:null}},
+ HUNT_MODAL_SECTIONS:secCtx.HUNT_MODAL_SECTIONS,
  $(selector){return selector==="#hunts-modal-list"?root:null;},$$(selector){return [];},
  huntRisk(){return {cls:"low",txt:"seguro"};},mobImg(){return "<i></i>";},fmt(n){return String(n);},
  huntStars(){return 1;},huntStarsHtml(){return "★";},bestiaryStage(){return 1;},charmOnRace(){return null;},
  openHuntInfoModal(){},console,
 };
+ctx.window=ctx;
 vm.createContext(ctx);vm.runInContext(ui.slice(start,end),ctx);
 const actual=vm.runInContext("HUNT_MODAL_SECTIONS.map(s=>[s.title,s.ids])",ctx);
 must(JSON.stringify(actual)===JSON.stringify(expected),"sessões/whitelist de hunts divergentes");

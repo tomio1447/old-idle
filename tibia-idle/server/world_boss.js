@@ -12,47 +12,47 @@
 
 const { rewardChestAdd } = require("./authoritative_engine");
 
-const WORLD_BOSS_TEST_HP = 2500;
-
-/* Sprites: bosses clássicos das Warzones (assets/mob/*.png). */
+/* HP oficial (dump Canary/TibiaWiki) — os valores de teste (2500
+ * flat) foram substituídos a pedido. Phosphorus é a exceção: HP de
+ * teste 10.000 até o valor oficial ser divulgado. */
 const WARZONES = [
   {
-    id: "wz1", name: "Warzone 1", bossName: "The Deathstrike", bossHp: WORLD_BOSS_TEST_HP,
+    id: "wz1", name: "Warzone 1", bossName: "The Deathstrike", bossHp: 200000,
     bossSprite: "deathstrike", baseMonster: "deathstrike",
     gridW: 34, gridH: 33, playerSpawn: { x: 16, y: 32 }, bossSpawn: { x: 18, y: 15 },
   },
   {
-    id: "wz2", name: "Warzone 2", bossName: "Gnomevil", bossHp: WORLD_BOSS_TEST_HP,
+    id: "wz2", name: "Warzone 2", bossName: "Gnomevil", bossHp: 250000,
     bossSprite: "gnomevil", baseMonster: "gnomevil",
     gridW: 21, gridH: 23, playerSpawn: { x: 8, y: 2 }, bossSpawn: { x: 10, y: 11 },
   },
   {
-    id: "wz3", name: "Warzone 3", bossName: "The Abyssador", bossHp: WORLD_BOSS_TEST_HP,
+    id: "wz3", name: "Warzone 3", bossName: "The Abyssador", bossHp: 340000,
     bossSprite: "abyssador", baseMonster: "abyssador",
     gridW: 26, gridH: 26, playerSpawn: { x: 13, y: 3 }, bossSpawn: { x: 13, y: 14 },
   },
   {
-    id: "wz4", name: "Warzone 4", bossName: "The Baron from Below", bossHp: WORLD_BOSS_TEST_HP,
+    id: "wz4", name: "Warzone 4", bossName: "The Baron from Below", bossHp: 350000,
     bossSprite: "the-baron-from-below", baseMonster: "the-baron-from-below",
   },
   {
-    id: "wz5", name: "Warzone 5", bossName: "The Count of the Core", bossHp: WORLD_BOSS_TEST_HP,
+    id: "wz5", name: "Warzone 5", bossName: "The Count of the Core", bossHp: 350000,
     bossSprite: "the-count-of-the-core", baseMonster: "the-count-of-the-core",
   },
   {
-    id: "wz6", name: "Warzone 6", bossName: "The Duke of the Depths", bossHp: WORLD_BOSS_TEST_HP,
+    id: "wz6", name: "Warzone 6", bossName: "The Duke of the Depths", bossHp: 350000,
     bossSprite: "the-duke-of-the-depths", baseMonster: "the-duke-of-the-depths",
   },
   {
-    id: "devourer", name: "Heart of Destruction", bossName: "The World Devourer", bossHp: WORLD_BOSS_TEST_HP,
+    id: "devourer", name: "Heart of Destruction", bossName: "The World Devourer", bossHp: 25000,
     bossSprite: "world-devourer", baseMonster: "world-devourer", maxChars: 5,
   },
   {
-    id: "pale-worm", name: "Feast of Souls", bossName: "The Pale Worm", bossHp: WORLD_BOSS_TEST_HP,
+    id: "pale-worm", name: "Feast of Souls", bossName: "The Pale Worm", bossHp: 420000,
     bossSprite: "the-pale-worm", baseMonster: "the-pale-worm", maxChars: 5,
   },
   {
-    id: "megalomania", name: "Soul War", bossName: "Goshnar's Megalomania", bossHp: WORLD_BOSS_TEST_HP,
+    id: "megalomania", name: "Soul War", bossName: "Goshnar's Megalomania", bossHp: 620000,
     bossSprite: "goshnar-s-megalomania-purple", baseMonster: "goshnar-s-megalomania-green", maxChars: 5,
   },
   {
@@ -69,7 +69,31 @@ const WARZONES = [
      * a leste (x 1032, toda bloqueada) para grid cliente==server. */
     otbmBounds: { x: 1009, y: 1016, w: 24, h: 24, z: 7 },
   },
+  {
+    /* Phosphorus — Final Radiant (Make Believe). World boss 800+:
+     * exige kills de Maior Domus + Mimar Haffar (requiresBossKills,
+     * validado no join). HP 10.000 de teste a pedido (oficial "?").
+     * Grid local = mapa final_radiant.otbm inteiro (z=7, origem 0,0;
+     * pontos absolutos do beta 1028,1023/1028,1031 → local 20,8/20,16). */
+    id: "phosphorus", name: "Final Radiant", bossName: "Phosphorus",
+    bossHp: 10000, bossSprite: "phosphorus", baseMonster: "phosphorus",
+    maxChars: 5, minLevel: 800,
+    requiresBossKills: ["maior-domus", "mimar-haffar"],
+    /* Make Believe Quest — Missão 3: 5000 kills em Radiant Skyhold libera
+     * o acesso ao Phosphorus (progress.kills da missão ou missionsDone). */
+    requiresMission: "radiant-skyhold",
+    requiresMissionTarget: 5000,
+    gridW: 39, gridH: 27, playerSpawn: { x: 20, y: 16 }, bossSpawn: { x: 20, y: 8 },
+    otbm: "final_radiant", otbmFloor: 7,
+    otbmBounds: { x: 0, y: 0, w: 39, h: 27, z: 7 },
+  },
 ];
+
+/* Rótulos dos bosses exigidos por requiresBossKills (mensagem de join). */
+const REQUIRED_BOSS_LABELS = {
+  "maior-domus": "Maior Domus",
+  "mimar-haffar": "Mimar Haffar",
+};
 
 /* Taints contribuídas no lobby do Bakragore (Bakragore's Burden). Só vale
  * se o personagem do membro tiver kill registrada no boss filho. */
@@ -125,10 +149,11 @@ function bossIdForWarzone(warzoneId) {
   if (id === "pale-worm") return "the-pale-worm";
   if (id === "megalomania") return "goshnar-s-megalomania";
   if (id === "bakragore") return "bakragore";
+  if (id === "phosphorus") return "phosphorus";
   return /^wz[1-6]$/.test(id) ? "world-boss-" + id : "world-boss-wz1";
 }
 function isWorldBossBossId(id) {
-  return /^world-boss-wz[1-6]$/.test(String(id || "")) || ["world-devourer", "the-pale-worm", "goshnar-s-megalomania", "bakragore"].includes(String(id || ""));
+  return /^world-boss-wz[1-6]$/.test(String(id || "")) || ["world-devourer", "the-pale-worm", "goshnar-s-megalomania", "bakragore", "phosphorus"].includes(String(id || ""));
 }
 function warzoneIdFromBossId(bossId) {
   const id = String(bossId || "");
@@ -136,6 +161,7 @@ function warzoneIdFromBossId(bossId) {
   if (id === "the-pale-worm") return "pale-worm";
   if (id === "goshnar-s-megalomania") return "megalomania";
   if (id === "bakragore") return "bakragore";
+  if (id === "phosphorus") return "phosphorus";
   const m = id.match(/^world-boss-(wz[1-6])$/);
   return m ? m[1] : null;
 }
@@ -806,6 +832,29 @@ function createWorldBossController(opts) {
           msg: `${character.name || "?"} precisa ser nível ${wz.minLevel}+.` } };
       }
       const charBosses = data && data.bosses && typeof data.bosses === "object" ? data.bosses : {};
+      /* Gate oficial (Phosphorus): o personagem precisa ter kill
+       * registrada de cada boss exigido pela warzone. */
+      if (Array.isArray(wz.requiresBossKills) && wz.requiresBossKills.length) {
+        const missing = wz.requiresBossKills.filter((slug) =>
+          !(Number(charBosses[slug] && charBosses[slug].kills) > 0));
+        if (missing.length) {
+          return { code: 403, body: { ok: false, error: "BOSS_KILLS_REQUIRED",
+            msg: `${character.name || "?"} precisa ter derrotado: ` +
+              missing.map((slug) => REQUIRED_BOSS_LABELS[slug] || slug).join(", ") + "." } };
+        }
+      }
+      if (wz.requiresMission) {
+        const mid = wz.requiresMission, target = Number(wz.requiresMissionTarget) || 1;
+        const dm = (data && data.missions) || {};
+        const st = dm[mid] || {};
+        const kills = Number(st.progress && st.progress.kills) || 0;
+        const done = !!((data && data.missionsDone && data.missionsDone[mid]) ||
+          st.completeClaimed || kills >= target);
+        if (!done) {
+          return { code: 403, body: { ok: false, error: "MISSION_REQUIRED",
+            msg: `${character.name || "?"} precisa completar a Missão 3 da Make Believe Quest (${kills}/${target} kills em Radiant Skyhold).` } };
+        }
+      }
       chars.push({
         id: Number(character.id),
         name: String((data && data.name) || character.name || "?"),

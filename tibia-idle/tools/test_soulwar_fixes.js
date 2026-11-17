@@ -88,7 +88,7 @@ const js = path.join(root, "game", "js");
   const srv = fs.readFileSync(path.join(root, "server", "server.js"), "utf8");
   must(srv.includes("/api/instance/open-bag-you-desire") && srv.includes("/api/pouch/open-bag-you-desire"),
     "rotas da Bag You Desire ausentes no server");
-  must(srv.includes("async function openBagYouDesire") && srv.includes('source: "bag-you-desire"'),
+  must(srv.includes("async function openBagYouDesire") && srv.includes('opts.slug||"bag-you-desire"'),
     "handler openBagYouDesire ausente");
   const acc = fs.readFileSync(path.join(js, "account-client.js"), "utf8");
   must(acc.includes("function accountOpenBagYouDesire") &&
@@ -100,7 +100,7 @@ const js = path.join(root, "game", "js");
   must(menu.includes("accountOpenBagYouDesire") && menu.includes("openLocal"),
     "menu Abrir da bag sem caminho online");
   const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
-  must(html.includes("yasir-prices.js?v=autosell-cprices-v1") &&
+  must(html.includes("yasir-prices.js?v=") &&
     html.includes("ui.js?v=") &&
     html.includes("account-client.js?v="),
     "cache-busts do pacote soulwar ausentes no index");

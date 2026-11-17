@@ -90,7 +90,7 @@ for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js
   "core.js", "accessorydata.js", "supply-stash-data.js", "supplydata.js", "supplies.js",
   "yasir-prices.js", "hardcore-library.js", "magma-bubble.js", "gnomprona.js",
   "azzilon-castle.js", "bloodrotten.js", "glooth-cave.js", "buried-cathedral.js",
-  "buster-darashia.js"]) {
+  "buster-darashia.js", "urmahlullu.js", "bashmuul-issavi.js"]) {
   vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), catalog, { filename: file });
   if (file === "weapons.js") vm.runInContext("fundirWeaponData()", catalog);
 }
@@ -110,8 +110,10 @@ for (const slug of lootSlugs) {
 }
 // Preços oficiais confirmados: os mesmos da tabela do Buried Cathedral
 // (TibiaWiki); ectoplasms são itens de quest sem comprador NPC (0).
+// great-spirit-potion: placeholder sell:1 corrigido para 0 por
+// bashmuul-issavi.js — nenhum NPC compra poções de cura/espírito.
 for (const [slug, price] of Object.entries({
-  "platinum-coin": 100, "great-spirit-potion": 1, "protection-amulet": 100,
+  "platinum-coin": 100, "great-spirit-potion": 0, "protection-amulet": 100,
   "life-crystal": 1600, "silver-amulet": 50, "wand-of-voodoo": 4400,
   "wand-of-cosmic-energy": 2000, "dragon-necklace": 100,
   "stone-skin-amulet": 500, "blue-ectoplasm": 0, "glacier-amulet": 1500,

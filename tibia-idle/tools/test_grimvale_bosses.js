@@ -19,6 +19,12 @@ const start = gameSource.indexOf("function bossState("), end = gameSource.indexO
 assert.ok(start >= 0 && end > start);
 vm.runInContext(gameSource.slice(start, end), context);
 context.isMissionComplete = (player, id) => Object.entries(defs.missions[id]).every(([slug, target]) => Number(player.missions && player.missions[id] && player.missions[id].progress[slug]) >= target);
+// missionState/pullAccountMissions vivem antes do bloco bossState no game.js;
+// o modal (bossAccessChecklist) as usa para o checklist das missões.
+vm.runInContext(gameSource.slice(gameSource.indexOf("function pullAccountMissions"),
+  gameSource.indexOf("function missionState")) +
+  gameSource.slice(gameSource.indexOf("function missionState"),
+  gameSource.indexOf("/* Sincroniza o progresso")), context);
 
 test("boss category registers exactly the five named bosses with native Canary stats and independent 16h cooldowns", () => {
   assert.deepEqual(defs.ids, ["black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw"]);
@@ -36,7 +42,9 @@ test("boss category registers exactly the five named bosses with native Canary s
     assert.deepEqual(engine.HUNTS[boss.hunt].monsters, [id]);
     assert.ok(context.MOBSHEETS[id]);
     assert.ok(fs.existsSync(path.join(game, "assets/mob", id + ".png")));
-    assert.equal(JSON.stringify(boss.loot), JSON.stringify(monster.loot));
+    // grimvale-bosses.js concatena 1 silver-token garantido à tabela Canary.
+    assert.equal(JSON.stringify(boss.loot),
+      JSON.stringify(monster.loot.concat({ chance: 100, max: 1, item: "silver-token" })));
     for (const drop of boss.loot) {
       assert.ok(engine.ITEMS[drop.item], "missing loot " + drop.item);
       assert.ok(fs.existsSync(path.join(game, "assets/item", drop.item + ".png")), "missing sprite " + drop.item);

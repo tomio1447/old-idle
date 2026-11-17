@@ -2137,12 +2137,39 @@ function bossAccessChecklist(p, boss) {
   return items;
 }
 
+/* Gate genérico de hunt (hu.requirement) — mesmos campos do requirement
+ * de boss: level, killsRequired (p.bosses[slug].kills), mission/missions
+ * (isMissionComplete ou missionsDone). Usado por startHunt e pelo badge
+ * de cadeado no modal de hunts. */
+function huntRequirementCheck(p, hu) {
+  const req = hu && hu.requirement;
+  if (!req || !p) return { ok: true };
+  if (req.level && (Number(p.level) || 0) < req.level)
+    return { ok: false, reason: req.text || ("Requer nível " + req.level) };
+  if (Array.isArray(req.killsRequired)) {
+    for (const id of req.killsRequired) {
+      const st = p.bosses && p.bosses[id];
+      if (!(st && Number(st.kills) > 0))
+        return { ok: false, reason: req.text || ("Derrotar " + id) };
+    }
+  }
+  const missionOk = (mId) =>
+    !!(p.missionsDone && p.missionsDone[mId]) || isMissionComplete(p, mId);
+  if (req.mission && !missionOk(req.mission))
+    return { ok: false, reason: req.text || "Complete a missão requerida." };
+  if (Array.isArray(req.missions))
+    for (const mId of req.missions)
+      if (!missionOk(mId))
+        return { ok: false, reason: req.text || "Complete a missão requerida." };
+  return { ok: true };
+}
+
 /* Catálogo público de bosses — mesmo padrão do modal de hunts. */
 const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 1–250",
     minLevel: 150,
-    ids: ["leiden", "tentugly-s-head", "black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw", "katex-blood-tongue", "srezz-yellow-eyes", "utua-stone-sting", "yirkas-blue-scales", "sugar-daddy", "sugar-mommy"],
+    ids: ["leiden", "tentugly-s-head", "black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw", "katex-blood-tongue", "srezz-yellow-eyes", "utua-stone-sting", "yirkas-blue-scales", "sugar-daddy", "sugar-mommy", "urmahlullu-the-weakened", "sir-leonard"],
   },
   {
     title: "HEART OF DESTRUCTION 150+",
@@ -2172,7 +2199,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 400+",
     minLevel: 400,
-    ids: ["arbaziloth", "magma-bubble", "the-primal-menace"],
+    ids: ["arbaziloth", "magma-bubble", "the-primal-menace", "mimar-haffar"],
   },
   {
     title: "SOULWAR 400+",
@@ -2189,6 +2216,11 @@ const BOSS_MODAL_SECTIONS = [
     title: "BLOODROTTEN 600+",
     minLevel: 600,
     ids: ["murcion", "vemiath", "chagorz", "ichgahal"],
+  },
+  {
+    title: "BOSSES 800+",
+    minLevel: 800,
+    ids: ["maior-domus"],
   },
 ];
 
@@ -2867,6 +2899,10 @@ function startHunt(id, instanceMode, force) {
   if (!force && typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
     toast("Membros de party só podem estar na Cidade ou Área de Treino. O líder escolhe a hunt.", "bad");
     return;
+  }
+  if (!force && hu.requirement) {
+    const chk = huntRequirementCheck(G.p, hu);
+    if (!chk.ok) { toast(chk.reason, "bad"); return; }
   }
   if (!instanceMode) { openInstanceModal(id); return; }
   // Online: sem lease a caçada congela (sem ticks de autoridade) e parece

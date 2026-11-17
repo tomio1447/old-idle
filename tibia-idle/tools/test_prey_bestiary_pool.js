@@ -75,8 +75,8 @@ must(lista.every(preyIsEligibleSlug), "reroll só elegíveis");
 must(!lista.some((s) => MONSTERDATA[s] && MONSTERDATA[s].boss), "reroll sem bosses");
 
 const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
-must(html.includes("js/prey.js?v=prey-bestiary-v1"), "cache-bust prey.js");
-must(html.includes("js/prey-ui.js?v=prey-bestiary-v1"), "cache-bust prey-ui.js");
+must(html.includes("js/prey.js?v="), "cache-bust prey.js");
+must(html.includes("js/prey-ui.js?v="), "cache-bust prey-ui.js");
 
 console.log("OK: prey pool Canary — total=%d pool=%d bosses=%d exclusive=%d",
   total, pool.length, bosses.length, exclusive.length);

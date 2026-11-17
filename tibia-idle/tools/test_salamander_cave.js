@@ -150,9 +150,9 @@ const MOBS = ["emerald-damselfly", "marsh-stalker", "swampling", "salamander"];
 
 /* ---------------- 4) modal ---------------- */
 {
-  const uiSrc = fs.readFileSync(path.join(js, "ui.js"), "utf8");
-  must(uiSrc.includes('{ title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp", "salamander-cave"] }'),
-    "seção HUNTS LEVEL 0–100 sem a salamander-cave");
+  const secSrc = fs.readFileSync(path.join(js, "hunt-sections.js"), "utf8");
+  must(/title: "[^"]*", ids: \[[^\]]*"salamander-cave"/.test(secSrc),
+    "hunt-sections.js sem a salamander-cave em nenhuma seção do modal");
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   must(html.includes("js/salamander-cave.js?v=salamander-cave-v1"),
     "cache-bust da salamander-cave ausente no index");

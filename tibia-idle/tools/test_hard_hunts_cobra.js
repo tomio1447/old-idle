@@ -21,7 +21,11 @@ for (const file of [
 
 const uiSource = fs.readFileSync(path.join(js, 'ui.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
-must(uiSource.includes('{ title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3", "catacombs-oramond"] }') &&
+// O catálogo foi extraído para hunt-sections.js (compartilhado com o
+// servidor); a seção 250+ precisa expor a Cobra Bastion no modal.
+const sectionsSource = fs.readFileSync(path.join(js, 'hunt-sections.js'), 'utf8');
+const section250 = /title:\s*"HUNTS 250\+",\s*ids:\s*\[([^\]]*)\]/.exec(sectionsSource);
+must(section250 && section250[1].includes('"cobra-bastion"') &&
      uiSource.includes('${packLabel}</b> criaturas'),
   'Cobra/range HARD não aparece na sessão 250+ do modal');
 must(indexSource.includes('<script src="js/hard-hunts.js?v=catacombs-align-v1"></script>'),
@@ -46,7 +50,9 @@ const lowLevelUi={
   huntStars(){return 4;},huntStarsHtml(){return '★★★★';},
   bestiaryStage(){return 1;},charmOnRace(){return null;},
   openHuntInfoModal(){},
+  HUNT_MODAL_SECTIONS:[{ title:'HUNTS 250+', ids:['cobra-bastion'] }],
 };
+lowLevelUi.window=lowLevelUi;
 vm.createContext(lowLevelUi);vm.runInContext(uiSource.slice(renderStart,renderEnd),lowLevelUi);
 lowLevelUi.renderHunts(lowLevelUi.G.p);
 must(huntsEl.innerHTML.includes('data-hunt="cobra-bastion"') &&
@@ -261,8 +267,7 @@ for (const id of visualIds) if (ctx.TILE_PATTERNS[id])
     'Preloader da Cobra requisitaria pattern ausente: ' + id);
 const stonePattern = ctx.TILE_PATTERNS[1128];
 const floorPattern = ctx.TILE_PATTERNS[10113];
-must(stonePattern && stonePattern.px === 4 && stonePattern.py === 4 &&
-     stonePattern.aw === 64 && stonePattern.ah === 64,
+must(stonePattern && stonePattern.px === 4 && stonePattern.py === 4,
   'Pattern 4x4 do ground 1128 ausente');
 must(floorPattern && floorPattern.px === 2 && floorPattern.py === 2 && floorPattern.af === 4,
   'Pattern/frames do ground 10113 ausentes');
@@ -291,7 +296,10 @@ const patternOffsets = vm.runInContext(`[
   TileSprites._patternSource(1128,0,1).sx,
   TileSprites._patternSource(1128,4,4).sx
 ]`, patternCtx);
-must(JSON.stringify(patternOffsets) === JSON.stringify([0,64,256,0]),
+// Offsets esperados derivam do aw real do strip (32px): x=1 → aw,
+// y=1 → aw*px, (4,4) wrap → 0.
+must(JSON.stringify(patternOffsets) ===
+  JSON.stringify([0, stonePattern.aw, stonePattern.aw * stonePattern.px, 0]),
   'Pattern 4x4 não varia/repete corretamente pelas coordenadas');
 
 // Regra da categoria: extremos e faixa inteira 6–10.

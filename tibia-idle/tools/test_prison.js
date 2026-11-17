@@ -159,10 +159,10 @@ const PRISON_LOOT = [
 
 /* ---------------- 5) modal + index ---------------- */
 {
-  const uiSrc = fs.readFileSync(path.join(js, "ui.js"), "utf8");
+  const uiSrc = fs.readFileSync(path.join(js, "hunt-sections.js"), "utf8");
   must(uiSrc.includes('"HUNTS 250+"') &&
     ["prison-1", "prison-2", "prison-3"].every((id) => uiSrc.includes('"' + id + '"')),
-    "ui.js sem os 3 andares da prison na seção HUNTS 250+");
+    "hunt-sections.js sem os 3 andares da prison na seção HUNTS 250+");
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   must(html.includes("js/prison.js?v=prison-v1") && /js\/ui\.js\?v=/.test(html),
     "cache-busts da prison ausentes no index");

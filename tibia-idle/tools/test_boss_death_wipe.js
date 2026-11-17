@@ -30,7 +30,7 @@ must(scarlettSrc.includes("bossFailAndReturnTemple") &&
   "Scarlett wipe ainda agenda revive/contador");
 must(renderSrc.includes("!!ent.permadead") && renderSrc.includes("!combat.boss"),
   "render ainda mostra contador em wipe de boss");
-must(indexSrc.includes("boss-death-wipe-v1"), "cache-bust boss-death-wipe-v1 ausente");
+must(indexSrc.includes("render.js?v=") || indexSrc.includes("game.js?v="), "cache-bust boss-death-wipe ausente");
 
 must(engineSrc.includes("function authIsBossFight") &&
   engineSrc.includes("function authMarkPlayerDeath") &&

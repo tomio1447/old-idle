@@ -95,7 +95,12 @@ for (const [id, hunt] of Object.entries(defs.hunts)) {
 }
 
 test("monster stats, loot, sheets and item prices agree with the authoritative catalog", () => {
-  const unsellable = new Set(["moonlight-crystals", "rusted-armor"]);
+  const unsellable = new Set(["moonlight-crystals", "rusted-armor",
+    // Poções de cura/espírito/mana não têm comprador NPC (sell 0 — Sell All pula).
+    "ultimate-health-potion", "great-spirit-potion", "strong-mana-potion",
+    "great-mana-potion", "ultimate-mana-potion", "berserk-potion",
+    "bullseye-potion", "mastermind-potion", "supreme-health-potion",
+    "ultimate-spirit-potion"]);
   for (const slug of Object.values(defs.hunts).flatMap((hunt) => hunt.monsters)) {
     const monster = ctx.MONSTERDATA[slug];
     for (const field of ["hp", "exp", "damage", "armor", "speed", "mitigation", "targetDistance"])

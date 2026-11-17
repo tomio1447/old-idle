@@ -124,9 +124,9 @@ for (const id of usedIds) {
   const targets = [...src.matchAll(/monster: "([a-z-]+)", target: (\d+)/g)];
   const total = targets.reduce((a, t) => a + Number(t[2]), 0);
   must(total === 250 && targets.length === 3, "missão deveria somar 250 kills em 3 tasks: " + total);
-  const uiSrc = fs.readFileSync(path.join(js, "ui.js"), "utf8");
+  const uiSrc = fs.readFileSync(path.join(js, "hunt-sections.js"), "utf8");
   must(uiSrc.includes('"HUNTS 250+"') && uiSrc.includes('"roshamuul"'),
-    "ui.js sem roshamuul na seção HUNTS 250+");
+    "hunt-sections.js sem roshamuul na seção HUNTS 250+");
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   must(html.includes("roshamuul.js?v=roshamuul-v1") && html.includes("js/ui.js?v="),
     "cache-busts do Roshamuul ausentes no index");

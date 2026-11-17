@@ -16,12 +16,12 @@ function must(cond, msg) {
 }
 
 const indexHtml = fs.readFileSync(path.join(game, "index.html"), "utf8");
-must(indexHtml.includes("js/npc-shops.js?v=enpa-lvl-sort-v1"), "index carrega npc-shops cache-bust");
-must(indexHtml.includes("city-ui.js?v=npc-shop-meta-v1"), "city-ui cache-bust");
-must(indexHtml.includes("i18n.js?v=npc-shop-meta-v1"), "i18n cache-bust");
-must(indexHtml.includes("cyclopedia.js?v=npc-sprites-canary-v1"), "cyclopedia cache-bust");
-must(indexHtml.includes("city.js?v=npc-sprites-canary-v1"), "city cache-bust");
-must(indexHtml.includes("layout.css?v=npc-shop-meta-v1"), "layout cache-bust");
+must(indexHtml.includes("js/npc-shops.js?v="), "index carrega npc-shops cache-bust");
+must(indexHtml.includes("city-ui.js?v="), "city-ui cache-bust");
+must(indexHtml.includes("i18n.js?v="), "i18n cache-bust");
+must(indexHtml.includes("cyclopedia.js?v="), "cyclopedia cache-bust");
+must(indexHtml.includes("city.js?v="), "city cache-bust");
+must(indexHtml.includes("layout.css?v="), "layout cache-bust");
 must(indexHtml.includes('id="btn-npcs"'), "botão NPCS abaixo de Bosses");
 must(indexHtml.includes('id="btn-cidade"'), "botão CIDADE entre Bosses e NPCS");
 must(

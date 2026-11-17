@@ -95,10 +95,11 @@ function questOutfitImgSrc(base, sexo) {
 function questOutfitFrameHtml(base, sexo, size) {
   const src = questOutfitImgSrc(base, sexo);
   const sz = size || 48;
-  // Appearance data: cw/ch = frame size. Sheet = 3 cols x 4 rows.
-  // South idle = col 1, row 2 → bgX = -1*cw, bgY = -2*ch
-  // We scale: sheet is 3*cw wide, 4*ch tall → bgSize = 3*sz wide, 4*sz tall
-  const bgW = sz * 3;
+  // Appearance data: cw/ch = frame size. Sheet = N cols x 4 rows
+  // (col 1 = idle, row 2 = south). N varia por outfit (3 legado, 9 novas).
+  const meta = (typeof APP_OUTFIT !== "undefined" && APP_OUTFIT[base + "-" + sexo]) || {};
+  const cols = Number(meta.cols) || 3;
+  const bgW = sz * cols;
   const bgH = sz * 4;
   const bgX = -1 * sz;
   const bgY = -2 * sz;
@@ -277,6 +278,7 @@ function openQuestDetail(questId) {
   if (!q) return;
   const ui = questPrepareModal("quest-detail-shell");
   if (!ui) return;
+  if (typeof q.renderDetail === "function") return q.renderDetail(q, ui);
   if (q.questType === "boss") return renderBossQuestDetail(q, ui);
   ui.body.innerHTML = `<div class="panel-title">${questBossImg(q.bossSprite || q.boss, 24)} ${q.name} — <span class="dim" style="font-weight:normal">Level ${q.level}+</span>
     <span style="flex:1"></span><button class="sm" id="quest-detail-close">✕</button></div>

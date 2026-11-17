@@ -14,8 +14,8 @@ must(!html.includes('id="hunt-info"') && !html.includes("Caçada atual") &&
   "Caçada atual não foi substituída/cache-bustada pelos analytics laterais");
 must(html.includes("otc-live-badge") && html.includes("data-otc-session-reset"),
   "header LIVE + reset sessão");
-must(html.includes("js/analyzers.js?v=hunt-analyser-death-v1") &&
-  html.includes("css/layout.css?v=hunt-analyser-death-v1") &&
+must(html.includes("js/analyzers.js?v=") &&
+  html.includes("css/layout.css?v=") &&
   html.includes("js/combat.js?v=") &&
   html.includes("js/game.js?v="),
   "cache-bust hunt analyser death/loot");

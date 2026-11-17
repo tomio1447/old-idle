@@ -27,6 +27,9 @@
       if (def.n && !items[slug].n) items[slug].n = def.n;
       if (def.cid && items[slug].cid == null) items[slug].cid = def.cid;
       if (def.w != null && items[slug].w == null) items[slug].w = def.w;
+      if (def.af != null) {
+        items[slug].af = def.af; items[slug].aw = def.aw; items[slug].ah = def.ah;
+      }
     }
   };
 

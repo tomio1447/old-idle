@@ -9,11 +9,12 @@ function read(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
 const wb = require(path.join(root, "server", "world_boss.js"));
 const engine = require(path.join(root, "server", "authoritative_engine.js"));
 
-must(wb.WORLD_BOSS_MAX_MEMBERS === 30, "WORLD_BOSS_MAX_MEMBERS != 30");
+must(wb.WORLD_BOSS_MAX_MEMBERS === 20, "WORLD_BOSS_MAX_MEMBERS != 20");
 must(wb.bossIdForWarzone("wz1") === "world-boss-wz1", "bossId wz1");
 must(wb.bossIdForWarzone("wz2") === "world-boss-wz2", "bossId wz2");
 must(wb.bossIdForWarzone("wz3") === "world-boss-wz3", "bossId wz3");
-must(wb.isWorldBossBossId("world-boss-wz1") && !wb.isWorldBossBossId("goshnar-s-megalomania"),
+must(wb.isWorldBossBossId("world-boss-wz1") && wb.isWorldBossBossId("goshnar-s-megalomania") &&
+  wb.isWorldBossBossId("phosphorus") && !wb.isWorldBossBossId("mimar-haffar"),
   "isWorldBossBossId");
 must(wb.warzoneIdFromBossId("world-boss-wz2") === "wz2", "warzoneIdFromBossId");
 
@@ -21,7 +22,7 @@ const serverSrc = read("server/server.js");
 must(serverSrc.includes("createWorldBossSharedInstance") &&
   serverSrc.includes("syncWorldBossShared") &&
   serverSrc.includes("global.__WORLD_BOSS=WORLD_BOSS") &&
-  serverSrc.includes("leaseAccountId:acc.id") &&
+  serverSrc.includes("leaseAccountId=acc.id") &&
   serverSrc.includes("createSharedInstance:(event)=>createWorldBossSharedInstance"),
   "server.js sem wiring da instância compartilhada WB");
 
@@ -46,7 +47,7 @@ must(gameSrc.includes('"world-boss-wz1"') && gameSrc.includes('"world-boss-wz2"'
   gameSrc.includes('"world-boss-wz3"') &&
   !/function onlineAuthorityCombat\(\)\{\s*\/\/ World Boss skeleton/.test(gameSrc) &&
   gameSrc.includes("incomingWb&&!localWb") &&
-  gameSrc.includes("!BOSS_DEFS[id].worldBoss"),
+  gameSrc.includes("b.worldBoss"),
   "game.js sem BOSS_DEFS WB / online ticks / guard SSE");
 
 const combatSrc = read("game/js/combat.js");
@@ -62,7 +63,7 @@ must(uiSrc.includes("wbEnterSharedCombat") && uiSrc.includes("accountLoadInstanc
   "world-boss-ui.js ainda usa combate isolado");
 
 const html = read("game/index.html");
-must(html.includes("world-boss-ui.js?v=wb-shared-v1") && html.includes("game.js?v=") &&
+must(html.includes("world-boss-ui.js?v=") && html.includes("game.js?v=") &&
   html.includes("combat.js?v="),
   "index.html sem cache-bust wb-shared-v1");
 

@@ -69,8 +69,9 @@ must(available >= 12 * 2, "respawn sem área conectada para o pack máximo");
 const sections = ctx.HUNT_MODAL_SECTIONS;
 const sec = sections.find((s) => s.title === "BLOOD ROTTEN 600+");
 must(sec && sec.ids.includes("putrefactory"), "putrefactory ausente do catálogo");
-must(sections.indexOf(sec) === sections.length - 1,
-  "BLOOD ROTTEN 600+ deve ser a última seção");
+must(sections.indexOf(sec) === sections.length - 2 &&
+  sections[sections.length - 1].title === "HUNTS 800+",
+  "BLOOD ROTTEN 600+ deve ser a penúltima seção (HUNTS 800+ é a última)");
 const ui = fs.readFileSync(path.join(js, "ui.js"), "utf8"), huntList = {};
 Object.assign(ctx, { $: () => huntList, $$: () => [], HUNT_UI: { busca: "" },
   huntRisk: () => ({ cls: "high", txt: "600+" }), fmt: String,
@@ -118,7 +119,7 @@ for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js
   "core.js", "accessorydata.js", "supply-stash-data.js", "supplydata.js", "supplies.js",
   "yasir-prices.js", "hardcore-library.js", "magma-bubble.js", "gnomprona.js",
   "azzilon-castle.js", "bloodrotten.js", "glooth-cave.js", "jade-roots.js",
-  "putrefactory.js"]) {
+  "putrefactory.js", "urmahlullu.js", "bashmuul-issavi.js"]) {
   vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), catalog, { filename: file });
   if (file === "weapons.js") vm.runInContext("fundirWeaponData()", catalog);
 }

@@ -37,6 +37,26 @@ require("../game/js/darklight-core.js").registerLoot(MONSTERS);
 // Gloom Pillars: drops oficiais ausentes do dump Canary (might ring /
 // ultimate mana potion / lightning legs / green gem).
 require("../game/js/gloom-pillars.js").registerLoot(MONSTERS);
+// True Asuras - Thalassara (400+): a True Feverbloom Asura é do update
+// Forbidden Gardens (15.30) e não existe no dump Canary — a ficha vem do
+// patch da hunt (stats oficiais tibia.com/TibiaWiki balanceados sobre as
+// outras True Asuras).
+require("../game/js/true-asuras.js").registerMonsters(MONSTERS);
+// Mimar Haffar (Moonstone Crater, 400+): boss novo do update 15.30,
+// ausente do dump Canary — ficha oficial no patch.
+require("../game/js/mimar-haffar.js").registerMonsters(MONSTERS);
+// Moonstone Castle (400+): criaturas de quest do update 15.30,
+// ausentes do dump Canary — fichas oficiais no patch da hunt.
+require("../game/js/moonstone-castle.js").registerMonsters(MONSTERS);
+require("../game/js/radiant-skyhold.js").registerMonsters(MONSTERS);
+// Final Radiant (800+): Maior Domus + Phosphorus (update 15.30).
+require("../game/js/final-radiant.js").registerMonsters(MONSTERS);
+// Book World (150+): 6 Inkborn do update 15.10, ausentes do dump
+// Canary — fichas oficiais no patch da hunt.
+require("../game/js/book-world.js").registerMonsters(MONSTERS);
+// Sir Leonard (Book World, 150+): boss final da Book World Quest do
+// update 15.10, ausente do dump Canary — ficha oficial no patch.
+require("../game/js/sir-leonard.js").registerMonsters(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -46,9 +66,9 @@ function ensureWorldBossMonster(slug,name,hp){
     armor:80,defense:80,attackSpeed:2000,speed:230,loot:[],
   });
 }
-ensureWorldBossMonster("deathstrike","The Deathstrike",2500000);
-ensureWorldBossMonster("gnomevil","Gnomevil",4000000);
-ensureWorldBossMonster("abyssador","The Abyssador",6000000);
+ensureWorldBossMonster("deathstrike","The Deathstrike",200000);
+ensureWorldBossMonster("gnomevil","Gnomevil",250000);
+ensureWorldBossMonster("abyssador","The Abyssador",340000);
 /* Deathstrike, Gnomevil e The Abyssador: 3 major crystalline tokens por
  * participante, sempre. O slug não está no items.json do servidor. */
 const WARZONE_CRYSTAL_TOKEN="major-crystalline-token";
@@ -510,7 +530,14 @@ try{
     "glooth-cave.js","buster-darashia.js","jade-roots.js","putrefactory.js",
     "darklight-core.js","gloom-pillars.js",
     "asura-palace.js","azzilon-castle.js","arbaziloth.js","magma-bubble.js",
-    "sugar-daddy.js","sugar-mommy.js","gnomprona.js","bloodrotten.js"]){
+    "sugar-daddy.js","sugar-mommy.js","gnomprona.js","bloodrotten.js",
+    // Urmahlullu the Weakened (Kilmaresh, 150+): depois dos merges de
+    // weapondata/accessorydata para os sell 0 de itens sem comprador NPC
+    // (tagralt blade, winged boots...) e os fixes de preço não serem
+    // sobrescritos pelo valor calculado do Canary.
+    "urmahlullu.js","bashmuul-issavi.js","true-asuras.js","mimar-haffar.js",
+    "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
+    "book-world.js","sir-leonard.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -610,6 +637,27 @@ const HUNTS=Object.assign(read("hunts.json"),{
       "grand-commander-soeren":1,"preceptor-lazare":1,"grand-chaplain-gaunder":1,"grand-canon-dominus":1}},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
+  "urmahlullu-the-weakened-room":{monsters:["urmahlullu-the-weakened"]},
+  "mimar-haffar-room":{monsters:["mimar-haffar"]},
+  "sir-leonard-room":{monsters:["sir-leonard"]},
+  "maior-domus-room":{monsters:["maior-domus"]},
+  "moonstone-castle":{monsters:["moonsilver-custodian","moonstone-miner"],cat:"hard",pack:14,packMin:6,packMax:14,
+    spawnWeights:{"moonsilver-custodian":50,"moonstone-miner":50}},
+  "radiant-skyhold":{monsters:["radiant-acolyte","radiant-paragon","radiant-warden",
+    "devoted-radiant-acolyte","devoted-radiant-paragon","devoted-radiant-warden"],
+    cat:"hard",pack:10,packMin:8,packMax:10,
+    spawnWeights:{"radiant-acolyte":20,"radiant-paragon":20,"radiant-warden":20,
+      "devoted-radiant-acolyte":13,"devoted-radiant-paragon":13,"devoted-radiant-warden":14}},
+  "book-world":{monsters:["bluebeak","bramble-wyrmling","crusader",
+    "hawk-hopper","headwalker","lion-hydra"],
+    cat:"mid",pack:8,packMin:6,packMax:8,
+    spawnWeights:{"bluebeak":16,"bramble-wyrmling":17,"crusader":17,
+      "hawk-hopper":17,"headwalker":17,"lion-hydra":16}},
+  "bashmuul-issavi":{monsters:["bashmu","juvenile-bashmu"],cat:"hard",pack:10,packMin:8,packMax:10,
+    spawnWeights:{"bashmu":50,"juvenile-bashmu":50}},
+  "true-asuras":{monsters:["true-dawnfire-asura","true-midnight-asura","true-frost-flower-asura","true-feverbloom-asura"],
+    cat:"hard",pack:10,packMin:8,packMax:10,
+    spawnWeights:{"true-dawnfire-asura":25,"true-midnight-asura":25,"true-frost-flower-asura":25,"true-feverbloom-asura":25}},
   "timira-room":{monsters:["timira-the-many-headed"]},
   "library-fire":{monsters:["burning-book","rage-squid","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-energy":{monsters:["energetic-book","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
@@ -5812,6 +5860,9 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
       profXp:profK?profK.xp:0,profSlug:profK?profK.slug:null,profUps:profK?profK.ups:0});
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;
+      // counter "kills": total de abates na hunt (missões estilo
+      // "eliminar N criaturas" — Make Believe: 2500/5000 kills).
+      mission.progress.kills=(Number(mission.progress.kills)||0)+1;
       missionPartyExpReward(item.p,auth.huntId);}}
   auth._lastKillExp=shares[0]?shares[0].exp:0;auth._lastKillShares=shares;
   // Loot: UM crédito por kill no líder (players[0]). Nunca por membro da party.

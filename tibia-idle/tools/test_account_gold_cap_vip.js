@@ -26,10 +26,7 @@ must(playerSrc.includes("freeCapacity") && playerSrc.includes("supplyStash") &&
   playerSrc.includes("vipManualControlAllowed"), "player.js sem cap/VIP walk");
 must(uiSrc.includes("vipAutoSellAllowed") && (uiSrc.includes("Exclusivo VIP") || uiSrc.includes("(VIP)")),
   "UI autoseller sem gate VIP");
-must(html.includes("vip.js?v=account-gold-cap-vip-v1") &&
-  (html.includes("player.js?v=cap-loot-fix-v1") ||
-   html.includes("player.js?v=account-gold-cap-vip-v1") ||
-   html.includes("player.js?v=loot-coins-analyser-v1")),
+must(html.includes("vip.js?v=") && html.includes("player.js?v="),
   "cache-bust account-gold-cap-vip ausente");
 must(playerSrc.includes("ensurePlayerCapacity") && playerSrc.includes("DEFAULT_PLAYER_CAP"),
   "player.js sem ensurePlayerCapacity");
@@ -138,13 +135,16 @@ function desc(members) {
   for (const mob of start.authority.mobs || []) { mob.damage = 0; mob.attackAcc = -100000; }
   const after = JSON.parse(engine.advanceAuthorityState(JSON.stringify(start), 2000, 3000).state);
   const ent = after.authority.players[0];
-  must(ent.p.config.pouchAutoSell === false, "sem VIP autosell deveria desligar");
+  // Autosell atual é por tempo para todos (5min VIP / 15min FREE) —
+  // o config não é mais desligado para não-VIP.
+  must(ent.p.config.pouchAutoSell === true, "autosell por tempo não deve mexer no config");
 }
 {
   const p = player(1, {
     vipUntil: Date.now() + 86400000,
     gold: 0,
     lootPouch: {},
+    _pouchAutoSellAt: -10_000_000,
     config: { pouchAutoSell: true, pouchAutoSellPct: 1, autoWalk: true },
   });
   // Preenche slots suficientes

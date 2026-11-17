@@ -1,4 +1,4 @@
-/* braingrounds-venore.js — Brain Grounds - Venore (hunts 250+).
+/* braingrounds-venore.js — Brain Grounds - Venore (categoria HUNTS 400+).
  * Um "piso" de entrada com 3 sub-andares de dificuldade crescente,
  * todos usando o mesmo mapa otherworld-venore.otbm.
  */
@@ -111,7 +111,7 @@
 
   if (typeof HUNT_MODAL_SECTIONS !== "undefined") {
     const section = HUNT_MODAL_SECTIONS.find((s) =>
-      s.title && s.title.indexOf("250+") !== -1
+      s.title && s.title.indexOf("HUNTS 400+") !== -1
     );
     if (section && section.ids.indexOf("braingrounds-venore") === -1) {
       section.ids.push("braingrounds-venore");

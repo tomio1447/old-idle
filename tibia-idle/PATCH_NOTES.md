@@ -4,6 +4,68 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-17 — Book World, Sir Leonard, Make Believe Quest e 8 novas hunts/bosses
+
+### Novo conteúdo
+
+- **Book World (150+, hunt)** — a biblioteca viva do update 15.10:
+  Bluebeak, Bramble Wyrmling, Crusader, Hawk Hopper, Headwalker e
+  Lion Hydra (respawn 6–8), todos Inkborn com loot oficial — incluindo
+  Paper Boat, Star Ink, Book with a Dragon/Hourglass, Sealing Wax e o
+  novo Cookbook (produto de criatura, vende no Yasir).
+- **Sir Leonard (150+, boss)** — o centauro-menestrel guardião da Book
+  World: sala própria, melee + UE de terra + Death Strike + Bomba
+  Musical, invoca até 5 Crusader Guardians, cooldown 2h. Loot com os
+  raros **Ink Blade/Quill/Claw/Vine/Brush**, Axe e Helmet of Sir
+  Leonard, Gearwheel Chain e Proficiency Catalyst.
+- **Book World Quest (150+)** — Missão 1: derrotar 1.000 monstros em
+  Book World libera o acesso ao Sir Leonard; Missão 2: derrotá-lo
+  concede a **outfit Illuminator com addons 1 e 2** (resgate único por
+  conta).
+- **Urmahlullu the Weakened (150+, boss)** — estágio único de 500k HP
+  com a sala própria e loot completo.
+- **Bashmuul - Issavi (250+)** e **True Asuras - Thalassara (400+)** —
+  novas hunts OTBM com sprites e loot oficiais.
+- **Moonstone Castle (400+, hunt)** — os cavaleiros de pedra-lua da
+  Make Believe, porta de entrada da quest 800+.
+- **Make Believe Quest (800+)** — quest em 4 missões encadeadas:
+  2.500 kills em Moonstone Castle liberam os bosses **Mimar Haffar** e
+  **Maior Domus**; matá-los libera a hunt **Radiant Skyhold (800+)**;
+  5.000 kills lá liberam o World Boss **Phosphorus** (lobby até 5,
+  level 800+). Recompensas finais por conta: outfit **Illuminated
+  Warrior** com addons, montaria **Radiant Nimbus** e sorteio com
+  animação de roleta de **1 arma + 1 equipamento Moonsilver**.
+- **4 hunts OTBM anteriores** também entram neste deploy: **Buster
+  Spectre - Darashia (150+)** e **Putrefactory, Darklight Core e Gloom
+  Pillars (BLOOD ROTTEN 600+)** — a ala da Blood Rotten Quest com
+  Wandering Pillar, Darklight Matter e Basalt.
+- **HP oficial dos World Bosses** — Deathstrike 200k, Gnomevil 250k,
+  Abyssador 340k, Baron/Count/Duke 350k, World Devourer 25k, Pale Worm
+  420k, Goshnar's Megalomania 620k (valores de teste removidos).
+- **Urmahlullu entrou no sorteio de boss do dia** (daily boost).
+
+### Melhorias e correções
+
+- **Cadeado nas hunts com requisito** — o modal de hunts mostra 🔒 com
+  o motivo (nível, boss ou missão pendente) e o jogo bloqueia o início
+  até cumprir.
+- **Contador de kills de missão no servidor** — hunts online agora
+  progridem as missões `kills` no engine autoritativo, em paridade com
+  o contador do cliente.
+- **Gate de Phosphorus por missão** — o join valida a Missão 3 da Make
+  Believe (5.000 kills em Radiant Skyhold) além dos kills de Maior
+  Domus e Mimar Haffar.
+- **Outfit Illuminator masculina corrigida** — a variante estava com a
+  sprite feminina duplicada; agora usa o looktype 1860 correto.
+- **Brain Grounds - Venore** movida para a seção HUNTS 400+.
+- **Cobra Bastion**: ajuste de células bloqueadas no mapa.
+- **Preview de outfit nas quests** respeita o nº de colunas da sheet
+  (corrige frames cortados nas outfits novas).
+- Preços NPC oficiais de **40+ itens novos** (loot de todas as hunts e
+  bosses acima) com paridade cliente/servidor.
+
+---
+
 ## 2026-11-06 — Prey por conta, proteção no templo/treiners e PvP fluido
 
 ### Mudanças

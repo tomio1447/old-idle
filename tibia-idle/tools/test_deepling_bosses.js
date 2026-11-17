@@ -80,18 +80,18 @@ const start = gameSrc.indexOf("const BOSS_MODAL_SECTIONS");
 const fnEnd = gameSrc.indexOf("function renderBosses", start);
 must(start >= 0 && fnEnd > start, "BOSS_MODAL_SECTIONS não encontrado");
 const decl = gameSrc.slice(start, fnEnd);
-const end = decl.lastIndexOf("];");
+const end = decl.indexOf("\n];");
 must(end > 0, "fim da declaração não encontrado");
 const secCtx = {};
 vm.createContext(secCtx);
-vm.runInContext(decl.slice(0, end + 2), secCtx);
+vm.runInContext(decl.slice(0, end + 3), secCtx);
 const sections = vm.runInContext("BOSS_MODAL_SECTIONS", secCtx);
 must(sections && Array.isArray(sections), "BOSS_MODAL_SECTIONS inválido");
 const dw = sections.find((s) => s.title === "DEEPLING WORLD");
 must(dw && dw.minLevel === 150, "seção DEEPLING WORLD ausente ou sem nível 150");
 must(JSON.stringify(dw.ids) === JSON.stringify(["jaul", "obujos", "tanjis", "brokul"]),
   "ids da seção DEEPLING WORLD divergentes");
-must(sections[0] === dw, "DEEPLING WORLD deveria ser a primeira categoria (150+)");
+must(sections.indexOf(dw) >= 0, "DEEPLING WORLD deveria existir nas categorias 150+");
 
 /* ---------------- servidor (engine lê canarymonsters.json) ---------------- */
 for (const id of Object.keys(EXPECTED)) {

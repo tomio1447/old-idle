@@ -1030,8 +1030,12 @@ function renderHunts(p) {
     const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
     const starsHtml = typeof huntStarsHtml === "function"
       ? huntStarsHtml(stars) : `★${stars}`;
+    const locked = !hu.comingSoon && hu.requirement &&
+      typeof huntRequirementCheck === "function" && !huntRequirementCheck(p, hu).ok;
     const aviso = hu.comingSoon
       ? `<div class="tiny" style="color:#e8d24a">Em breve — missão Fear 15× já ativa</div>`
+      : locked
+        ? `<div class="tiny" style="color:#ff9a6a">🔒 ${hu.requirement.text || "Requisito pendente"}</div>`
       : (risk.cls === "high"
         ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "");
     const mobs = (hu.monsters || []).slice(0, 3).map((m) => {

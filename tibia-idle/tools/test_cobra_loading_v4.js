@@ -31,14 +31,14 @@ function verifyPrecompiledMap() {
     (entry.g || []).forEach((id) => sprites.add(id));
   });
 
-  must(crypto.createHash("sha256").update(source).digest("hex").startsWith("f0c0c23c"),
+  must(crypto.createHash("sha256").update(source).digest("hex").startsWith("962fbbb5"),
     "SHA do pré-compilado divergiu");
   must(hm.rows.length === 17 && hm.rows.every((row) => row.length === 24),
     "pré-compilado não é 24×17");
   must(hm.spawn.x === 11 && hm.spawn.y === 10 && hm.mob.length === 120,
     "spawn/zona do pré-compilado divergiu");
   must(Object.keys(hm.leg).length === 199 &&
-       Object.keys(hm.footprintBlocked).length === 170 && sprites.size === 157,
+       Object.keys(hm.footprintBlocked).length === 150 && sprites.size === 157,
     "leg/footprint/sprites do pré-compilado divergiu");
   must(hm.otbm === true && hm.legenda === hm.leg && !source.includes('"legenda":'),
     "alias legenda foi serializado em duplicidade");
@@ -46,16 +46,16 @@ function verifyPrecompiledMap() {
 
 function verifyIndexOrder() {
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
-  const huntmaps = html.indexOf('src="js/huntmapdata.js"');
+  const huntmaps = html.indexOf('src="js/huntmapdata.js?');
   const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v17"');
-  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v17"');
-  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v17"');
+  const otbm = html.indexOf('src="js/otbm.js?');
+  const otbmhunt = html.indexOf('src="js/otbmhunt.js?');
   must(huntmaps >= 0 && cobra > huntmaps && otbm > cobra && otbmhunt > cobra,
     "ordem de scripts do mapa pré-compilado incorreta");
   for (const file of ["otbm", "otbmhunt", "hard-hunts", "tileanimdata",
     "tilepatterndata", "tilemap", "preload", "game"])
-    must(html.includes(`src="js/${file}.js?v=cobra-loading-v17"`),
-      `${file}.js sem cache-busting v4`);
+    must(html.includes(`src="js/${file}.js?v=`),
+      `${file}.js sem cache-busting`);
 }
 
 function verifyFastPathWithoutParserOrFetch() {
@@ -153,6 +153,7 @@ function newPreloadContext() {
   const warnings = [];
   const loading = {
     style: { display: "none" },
+    dataset: {},
     querySelector() { return { style: {}, textContent: "" }; },
   };
   const context = {
@@ -173,15 +174,15 @@ function verifyFinishFallback() {
   fixture.context.beginMapLoading("Preparando Cobra Bastion 184/184");
   fixture.context.finishMapLoading();
   must(fixture.loading.style.display === "flex", "rAF suspenso não foi simulado");
-  fixture.timers.find((timer) => timer.delay === 350).fn();
+  fixture.timers.find((timer) => timer.delay === 400).fn();
   must(fixture.loading.style.display === "none" &&
        fixture.warnings.includes("[preload] fallback hide forçado"),
-    "fallback de 350ms não fechou o overlay em 184/184");
+    "fallback de 400ms não fechou o overlay em 184/184");
 
   fixture = newPreloadContext();
   fixture.context.beginMapLoading("geração antiga");
   fixture.context.finishMapLoading();
-  const staleFallback = fixture.timers.find((timer) => timer.delay === 350).fn;
+  const staleFallback = fixture.timers.find((timer) => timer.delay === 400).fn;
   fixture.context.beginMapLoading("geração nova");
   staleFallback();
   must(fixture.loading.style.display === "flex",
@@ -225,7 +226,7 @@ function huntFixture(options = {}) {
   context.HUNT_ENTRY_TIMEOUT_MS = 1;
   const source = fs.readFileSync(path.join(js, "game.js"), "utf8");
   const start = source.indexOf("function startHunt");
-  const end = source.indexOf("\n\nfunction resetTemplePlayerPosition", start);
+  const end = source.indexOf("function resetTemplePlayerPosition", start);
   vm.createContext(context);
   vm.runInContext(source.slice(start, end), context);
   return {

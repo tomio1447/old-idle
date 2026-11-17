@@ -76,7 +76,7 @@ must(asgLegacy.ok, "assign após normalize de array legado");
 must(C.resolveCharmId("Enflame") === "enflame", "resolveCharmId por nome");
 must((C.CYCLO_ABAS || []).some((a) => a.id === "cidade" && a.secao), "seção CIDADE");
 must((C.CYCLO_ABAS || []).filter((a) => a.cityAction).map((a) => a.cityAction).join(",")
-  === "market,reward,forge,depot,imbuements,enpa,gnomally", "CIDADE city actions");
+  === "market,reward,forge,depot,imbuements,enpa,gnomally,tibianus", "CIDADE city actions");
 
 
 /* ── bosstiary ── */
@@ -111,14 +111,13 @@ must(typeof engine.bestiaryKill === "function", "bestiaryKill server");
 const ui = fs.readFileSync(path.join(js, "ui.js"), "utf8");
 const cycloUi = fs.readFileSync(path.join(js, "cyclopedia-ui.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
-must(ui.includes("huntStarsHtml") && ui.includes("Nível recomendado"),
+must(ui.includes("huntStarsHtml") && ui.includes("Nv <b>"),
   "modal Hunts sem campos Canary");
 must(cycloUi.includes("renderCycloHunts") && cycloUi.includes("charmIconHtml"),
   "aba Hunts/Charms OTC ausente");
 must(html.includes("layout.css?v="), "layout cache-bust");
 must(html.includes("ui.js?v="), "ui cache-bust");
-must(html.includes("cyclopedia.js?v=npc-buttons-v1"), "cache-bust cyclopedia");
-must(html.includes("cyclopedia-ui.js?v=npc-buttons-v1"), "cache-bust cyclopedia-ui");
-must(html.includes("layout.css?v=npc-buttons-v1"), "cache-bust layout CIDADE");
+must(html.includes("cyclopedia.js?v="), "cache-bust cyclopedia");
+must(html.includes("cyclopedia-ui.js?v="), "cache-bust cyclopedia-ui");
 
 console.log("OK: charms Canary (pontos/assign/ícones), bosstiary kills, hunts fields.");

@@ -10,6 +10,7 @@ const requested = [];
 const label = {textContent:''}, fill = {style:{}};
 const loading = {
   style:{display:'none'},
+  dataset:{},
   querySelector(selector){ return selector === '.gl-text' ? label : fill; },
 };
 function FakeImage() {}
@@ -40,7 +41,8 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
     'assets/tiles/1.png','assets/tiles/1_pattern.png',
     'assets/tiles/2.png','assets/tiles/2_anim.png',
     'assets/mob/rat.png','assets/mob/rat.idle.png',
-  ]) must(requested.includes(asset), 'asset do mapa não foi pré-carregado: ' + asset);
+  ]) must(requested.some((r) => r === asset || r.startsWith(asset + '?')),
+    'asset do mapa não foi pré-carregado: ' + asset);
   must(fill.style.width === '100%', 'barra de loading não chegou a 100%');
   ctx.finishMapLoading();
   must(loading.style.display === 'none', 'overlay não fecha após dois frames');
@@ -73,7 +75,7 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   // Mesmo se o carregador OTBM jamais chamar done(), o watchdog da própria
   // transição precisa criar o combate e fechar o overlay.
   const huntStart = gameSrc.indexOf('function startHunt');
-  const huntEnd = gameSrc.indexOf('\n\nfunction resetTemplePlayerPosition', huntStart);
+  const huntEnd = gameSrc.indexOf('function resetTemplePlayerPosition', huntStart);
   const watchdogs = [];
   const huntCtx = {
     console:{warn(){}}, GAMEDATA:{hunts:{'cobra-bastion':{
@@ -169,12 +171,13 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   const html = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
   for (const script of ['otbm','otbmhunt','hard-hunts','tileanimdata',
     'tilepatterndata','tilemap','preload','game'])
-    must(html.includes(`js/${script}.js?v=cobra-loading-v17`),
+    must(html.includes(`js/${script}.js?v=`),
       'script crítico sem cache-busting: ' + script);
   const reward = fs.readFileSync(path.join(js, 'reward-chest.js'), 'utf8');
   const forgeUi = fs.readFileSync(path.join(js, 'forge-ui.js'), 'utf8');
   const depotPng = fs.readFileSync(path.join(game, 'assets', 'item', 'depot-item-3497.png'));
-  must(html.includes('assets/item/depot-item-3497.png') && forgeUi.includes('depot-item-3497.png'),
+  const cityUi = fs.readFileSync(path.join(js, 'city-ui.js'), 'utf8');
+  must(cityUi.includes('assets/item/depot-item-3497.png') && forgeUi.includes('depot-item-3497.png'),
     'botão Depot não usa o item 3497');
   must(depotPng.readUInt32BE(16) === 27 && depotPng.readUInt32BE(20) === 25,
     'sprite oficial 3497 inválida');
