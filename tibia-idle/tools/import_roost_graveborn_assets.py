@@ -71,6 +71,13 @@ MOBS_LOOKTYPE = {
     "avatar-of-balance": 1823,
     # Bright Crystal — objeto hostil estático (sprite 4x1 do lote 15.20).
     "bright-crystal": 1902,
+    # Bone Overlord — summons (looktypes estimados do lote livre 15.20;
+    # 1883 = dragão espectral, 1886/1903/1904/1905 = bestas espectrais).
+    "enthralled-dragon": 1883,
+    "myzareths-spirit": 1886,
+    "zharvorins-spirit": 1903,
+    "elyraxs-spirit": 1904,
+    "scariths-spirit": 1905,
 }
 
 # Bosses "lookItem": a entidade oficial aparece como objeto (cid). O sheet
@@ -87,6 +94,16 @@ MOBS_LOOKITEM = {
     # The Gravedigger — Bonelord Totem (objectID oficial 51192 do wikitext;
     # invocável x2, todos os dmg mods 0% → hazard invulnerável).
     "bonelord-totem": 51192,
+    # Bone Overlord — objectIDs oficiais do wikitext: soulcages 52546
+    # (as 4 usam o mesmo objeto), bone-barrier 6972, wraithfire 52441.
+    # An Eye sem objectID público → bonelord-eye 5898 (aproximação).
+    "zharvorins-soulcage": 52546,
+    "myzareths-soulcage": 52546,
+    "scariths-soulcage": 52546,
+    "elyraxs-soulcage": 52546,
+    "an-eye": 5898,
+    "bone-barrier": 6972,
+    "wraithfire": 52441,
 }
 
 # NPC Dragon Ancestor Spirit — dragão espírito (looktype 1899).

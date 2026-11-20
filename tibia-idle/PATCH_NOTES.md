@@ -65,8 +65,35 @@ Histórico de alterações do jogo, mais recentes primeiro.
   `lookItem 51192` **invulneráveis** (todos os dmg mods 0% →
   `damageTakenMul 0` no funil) que fazem área de morte; cooldown oficial
   resetável com Shrunken Head.
-- **Bonelord's Phylactery** — race 2771, `lookItem 52831`, exp
-  1.000.000, 850k hp; earth 110% (fraco). Batalha máx. oficial 900s.
+- **Bonelord's Phylactery / Bone Overlord** — race 2771,
+  `lookItem 52831`, exp 1.000.000, 850k hp; earth 110% (fraco).
+  Batalha máx. oficial 900s. Sala `bonelords_phylactery.otbm`
+  (boss {1026,1025}, player {1026,1035}). Encontro oficial em
+  **2 fases** (`tickBoneOverlord` + `boneOverlordBossInit/BossTick/
+  Cleanup`):
+  - **Fase 1** — 4 **Soulcages** (`objectID 52546`, hp oficial 120.000
+    cada, **pool compartilhado**: dano em qualquer uma drena todas —
+    propagado por delta de sync, nunca min() das vivas) + 4 **dragon
+    Spirits imunes a todo dano** (Zharvorin/rooted, Myzareth/feared,
+    Scarith/drunk, Elyrax/slowed — Energy Missile 450+ e Bleed
+    Explosion 800+ oficiais); espírito a ≤2 sqm da sua cage **cura o
+    pool** (~5.000/turno oficial) e teleporta à cage quando o pool
+    cai abaixo de 50%. Resistências oficiais das cages: Zharvorin
+    fraco Death+Physical, Myzareth fraco Energy, Scarith fraco Ice
+    (mitigation 3.45 oficial), Elyrax fraco Death+Holy + Holy Chain
+    1600+.
+  - **Fase 2** — pool zerado → a **Phylactery entra** junto de **4
+    Enthralled Dragons** ao sul (atravessam Fire/Energy/Poison —
+    resist 100% oficial; life drain vital). Até 4 de cada invocável,
+    como pedido.
+  - **Gazes** durante toda a luta (~20s): *An Eye* (fuse 5s → 30% maxHP
+    agony raio 2), *Wraithfire* (15% hp atual + campo 52441), *Mana
+    Drain* (5% maxMP ×5), *Curse* (4 explosões físicas), *Bone Barrier*
+    (4 barreiras objectID 6972 hp 10.000 ao redor do jogador —
+    simplificação documentada do teleport à sala lateral).
+  - Looktypes dos summons são **estimados** do lote livre 15.20
+    (dragão 1883; espíritos 1886/1903/1904/1905) — o appearances.dat
+    não traz nomes.
 - Cooldown **20h** em todos; gates `enforced` + `killsRequired`
   sequencial (boss modal "ROOST OF THE GRAVEBORN 450+").
 

@@ -352,6 +352,72 @@ must(engSrc.includes("tickGravedigger") && engSrc.includes("gdTotem"),
 must(engSrc.includes("agMul===0") && combatSrc.includes("mul === 0"),
   "funnels sem o caso damageTakenMul===0 (totem seria matável)");
 
+/* -------- Bone Overlord / Bonelord's Phylactery: encontro em 2 fases -------- */
+const BO_CAGES = ["zharvorins-soulcage", "myzareths-soulcage",
+  "scariths-soulcage", "elyraxs-soulcage"];
+const BO_SPIRITS = ["zharvorins-spirit", "myzareths-spirit",
+  "scariths-spirit", "elyraxs-spirit"];
+const BO_ALL = [...BO_CAGES, ...BO_SPIRITS, "enthralled-dragon",
+  "an-eye", "bone-barrier", "wraithfire"];
+for (const s of BO_ALL) {
+  must(M[s], s + " ausente do ROOST_MONSTERS");
+  must(E.MONSTERS[s], "engine: " + s + " ausente do MONSTERS");
+  must(ctx.MOBSHEETS[s] &&
+    fs.existsSync(path.join(game, "assets", "mob", s + ".png")),
+    s + " sheet ausente");
+  must(caCtx.CREATURE_ANCHORS[s], s + " âncora ausente");
+}
+/* soulcages: objectID oficial 52546, pool compartilhado, resistências */
+for (const s of BO_CAGES) {
+  must(M[s].lookItem === 52546 && M[s].hp === roost.BO_CAGE_POOL &&
+    M[s].exp === 0, s + " ficha divergente (objectID 52546 oficial)");
+}
+must(M["zharvorins-soulcage"].resist.death === -50 &&
+  M["myzareths-soulcage"].resist.energy === -50 &&
+  M["scariths-soulcage"].resist.ice === -50 &&
+  M["elyraxs-soulcage"].resist.holy === -50 &&
+  M["elyraxs-soulcage"].resist.death === -50 &&
+  M["elyraxs-soulcage"].skills.some((k) => k.el === "holy" && k.min === 1600),
+  "resistências/skills das soulcages divergentes do oficial");
+must(M["scariths-soulcage"].mitigation === 3.45,
+  "scariths-soulcage sem mitigation 3.45 oficial");
+/* espíritos: imunes a todo dano (oficial), condição por corner */
+must(BO_SPIRITS.every((s) => M[s].damageTakenMul === 0 && M[s].exp === 0),
+  "dragon spirits devem ser imunes a todo dano (oficial)");
+must(M["zharvorins-spirit"].boCond === "rooted" &&
+  M["myzareths-spirit"].boCond === "feared" &&
+  M["scariths-spirit"].boCond === "drunk" &&
+  M["elyraxs-spirit"].boCond === "slowed",
+  "condições dos spirits divergentes");
+must(BO_SPIRITS.every((s) => M[s].skills.some((k) =>
+  k.el === "energy" && k.min === 450) && M[s].skills.some((k) =>
+  k.el === "physical" && k.min === 800)),
+  "spirits sem Energy Missile 450+/Bleed Explosion 800+ oficiais");
+/* summons da fase 2 + objetos dos gazes */
+must(M["enthralled-dragon"].looktype === 1883 &&
+  M["enthralled-dragon"].resist.fire === 100 &&
+  M["enthralled-dragon"].resist.energy === 100 &&
+  M["enthralled-dragon"].resist.earth === 100,
+  "enthralled-dragon divergente (oficial: atravessa Fire/Energy/Poison)");
+must(M["an-eye"].lookItem === 5898 && M["an-eye"].damageTakenMul === 0,
+  "an-eye divergente");
+must(M["bone-barrier"].lookItem === 6972 && M["bone-barrier"].hp === 10000,
+  "bone-barrier divergente (objectID 6972, hp 10.000 oficiais)");
+must(M["wraithfire"].lookItem === 52441 && M["wraithfire"].damageTakenMul === 0,
+  "wraithfire divergente (itemid 52441 oficial)");
+must(roost.BO_CAGE_POOL === 120000 && roost.BO_CAGE_SPAWNS.length === 4 &&
+  roost.BO_DRAGON_SPAWNS.length === 4 && roost.BO_GAZE_MS > 0,
+  "constantes do bone-overlord divergentes");
+must(combatSrc.includes("boneOverlordBossInit") &&
+  combatSrc.includes("boneOverlordBossTick"),
+  "cliente combat.js sem hooks do bone-overlord");
+must(roostSrc.includes("boneOverlordBossTick") && roostSrc.includes("boMakeMob"),
+  "roost module sem mecânica do bone-overlord");
+must(engSrc.includes("tickBoneOverlord") && engSrc.includes("boSpirit") &&
+  engSrc.includes("_boSyncHp"), "engine sem tickBoneOverlord/pool delta");
+must(fs.readFileSync(path.join(js, "game.js"), "utf8")
+  .includes("boneOverlordBossCleanup"), "game.js sem cleanup do bone-overlord");
+
 /* ---------------- engine ---------------- */
 for (const slug of BOSSES) {
   must(E.MONSTERS[slug], "engine: " + slug + " ausente do MONSTERS");
@@ -685,6 +751,68 @@ must(html.indexOf("js/make-believe-quest.js") < html.indexOf("js/roost-graveborn
     "cap de totens divergente: " + totems.length);
   /* invulnerável oficial: damageTakenMul 0 zera qualquer dano no funnel. */
   must(totems.every((m) => m.speed === 0), "totem deve ser estático");
+}
+
+/* -------- Bone Overlord: simulação autoritativa das 2 fases -------- */
+{
+  const bmap = OTBM.read(fs.readFileSync(
+    path.join(game, "maps", "bonelords_phylactery.otbm")).buffer.slice(0), { z: 7 });
+  const min = bmap.sourceBounds;
+  const L = (ax, ay) => ({ cx: ax - min.minX, cy: ay - min.minY });
+  const bcell = L(1026, 1025), pcell = L(1026, 1035);   // coords oficiais
+  const lvl = 500;
+  const player = { id: "1", name: "T", voc: "knight", level: lvl,
+    exp: engine.expForLevel(lvl), hp: 400000, mp: 20000, gold: 0,
+    skills: { sword: 120 }, ml: 20, equip: {}, supplies: {}, lootPouch: {},
+    kills: {}, bosses: {}, config: {} };
+  const desc = { v: 1, savedAt: 1000, kind: "boss", huntId: null,
+    bossId: "bonelords-phylactery", instanceMode: "boss",
+    activeCharacterId: "1", members: [{ id: "1", p: player }],
+    state: { players: [{ id: "1", p: player, cx: pcell.cx, cy: pcell.cy, x: .5, y: .5 }],
+      mobs: [{ id: "boss-1", slug: "bonelords-phylactery", boss: true,
+        cx: bcell.cx, cy: bcell.cy, x: .5, y: .5 }], events: [] } };
+  let auth = engine.initializeAuthority(desc, "d".repeat(64), 1000);
+  const adv = (ms) => JSON.parse(engine.advanceAuthorityState(
+    JSON.stringify(auth), ms, Number(auth.authority.clock) + ms).state);
+  auth = adv(7000);
+  must(auth.authority.bo, "bo não inicializado no bind do boss");
+  const silence = () => { for (const m of auth.authority.mobs) {
+    m.damage = 0; m.attackSpeed = Number.MAX_SAFE_INTEGER; m.attackAcc = 0;
+    m.skills = []; } };
+  const refill = () => { for (const it of auth.authority.players) it.p.hp = engine.maxStats(it.p).hp; };
+  silence(); refill();
+  const cages = () => auth.authority.mobs.filter((m) => m.boCage);
+  const spirits = () => auth.authority.mobs.filter((m) => m.boSpirit);
+  must(cages().length === 4 && spirits().length === 4,
+    "deve abrir com 4 soulcages + 4 dragon spirits");
+  must(!auth.authority.mobs.some((m) => m.boss),
+    "a Phylactery deve ficar retida na fase 1");
+  must(auth.authority.bo.cagePool === 120000,
+    "cagePool deve iniciar em 120000");
+  must(spirits().every((s) => s.def.damageTakenMul === 0),
+    "spirits devem ser invulneráveis");
+  /* pool compartilhado: dano em UMA cage drena todas. */
+  cages()[0].hp = 60000; auth = adv(300); silence(); refill();
+  const pool = auth.authority.bo.cagePool;
+  must(pool < 120000 && cages().every((m) => !(m.hp > 0) || m.hp === pool),
+    "dano numa cage deve drenar o pool compartilhado");
+  /* pool zerado → fase 2: Phylactery + 4 Enthralled Dragons. */
+  for (const m of cages()) m.hp = 1;
+  auth = adv(300);
+  must(auth.authority.bo.cagePool === 0,
+    "pool deve zerar (delta propagado): " + auth.authority.bo.cagePool);
+  auth = adv(500); silence(); refill();
+  must(auth.authority.mobs.some((m) => m.boss && m.hp > 0),
+    "Phylactery deve entrar quando o pool zera");
+  must(auth.authority.mobs.filter((m) => m.boDragon && m.hp > 0).length === 4,
+    "deve invocar 4 Enthralled Dragons");
+  must(spirits().every((s) => !(s.hp > 0)),
+    "spirits devem sair com as cages destruídas");
+  /* matar a Phylactery credita o boss e encerra a cadeia. */
+  for (const m of auth.authority.mobs) if (m.boss) m.hp = 0;
+  auth = adv(3000);
+  must(auth.authority.bossDefeated === true,
+    "matar a Phylactery deve creditar bonelords-phylactery");
 }
 
 console.log("OK — Roost of the Graveborn Quest 450+: 5 bossrooms OTBM " +

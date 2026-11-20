@@ -564,6 +564,154 @@ const BONELORD_TOTEM = {
   loot: [], grupo: "quests",
 };
 
+/* ── Bone Overlord / Bonelord's Phylactery — encontro oficial ─────────
+ * Fonte: wikitext da quest (Spoiler). A sala abre com 4 Soulcages
+ * (objectID oficial 52546) ligadas a 4 dragon Spirits; as cages têm HP
+ * pool COMPARTILHADO (dano em qualquer uma drena o pool; espírito perto
+ * da sua cage cura +5000/turno e teleporta à cage quando o pool baixa).
+ * Spirits são IMUNES (damageTakenMul 0) e aplicam a condição da sua cage.
+ * Pool zerado → Bonelord's Phylactery (o boss) + 4 Enthralled Dragons
+ * spawnam ao sul. Durante TODA a luta o Bone Overlord aplica "gazes":
+ * Eye (explode 30% maxHP), Wraithfire (15% hp atual), Mana Drain
+ * (5% maxMP/2s x5), Curse (explode a cada 4s x4), Bone Barrier
+ * (barreiras 10k hp — oficialmente teleporta p/ sala lateral; aqui
+ * barreiras cercam o jogador e devem ser quebradas, simplificação
+ * documentada).
+ * Looktypes: nenhum publicado p/ summons → estimados do lote livre
+ * 15.20 (1883=dragão espectral, 1886/1903/1904/1905=bestas espectrais).
+ * An Eye: hp oficial 0, dmg mods 0%, some em 5s; sprite ≈ bonelord-eye
+ * item 5898. Bone Barrier objectID oficial 6972, hp 10.000. Wraithfire
+ * itemid oficial 52441 (campo de chão). */
+const BO_CAGE_POOL = 120000;     // Elyrax's Soulcage hp oficial 120k (pool compartilhado)
+const BO_GAZE_MS = 20000;        // intervalo entre gazes do overlord
+const BO_EYE_FUSE_MS = 5000;     // oficial: "After 5 seconds, it disappears"
+const BO_EYE_RADIUS = 2;         // 3sqm ball → raio ~2
+const BO_EYE_PCT = 30;           // 20-30% max HP → usamos 30 (teto oficial)
+const BO_WRAITH_PCT = 15;        // 15% hp atual
+const BO_MANA_TICKS = 5, BO_MANA_PCT = 5, BO_MANA_MS = 2000;
+const BO_CURSE_TICKS = 4, BO_CURSE_MS = 4000;
+const BO_CAGE_HEAL = 5000;       // "up to 5,000+ per turn"
+const BO_SPIRIT_LINK_RADIUS = 2; // espírito perto da cage → cura
+const BO_TELEPORT_PCT = 0.5;     // pool <50% → spirit teleporta à cage
+
+const SOULCAGE_BASE = {
+  speed: 0, armor: 0, defense: 0, damage: 0, attackSpeed: 2000,
+  targetDistance: 1, exp: 0, loot: [], grupo: "quests", noAttack: true,
+  imune: ["paralyze", "invisible"], staticAttack: 0,
+  lookItem: 52546, boCage: true,
+};
+const ZHARVORINS_SOULCAGE = Object.assign({}, SOULCAGE_BASE, {
+  name: "Zharvorin's Soulcage", hp: BO_CAGE_POOL,
+  resist: { death: -50, physical: -50 },           // oficial: weak Death+Physical
+  boCond: "rooted", boCorner: "ne",
+});
+const MYZARETHS_SOULCAGE = Object.assign({}, SOULCAGE_BASE, {
+  name: "Myzareth's Soulcage", hp: BO_CAGE_POOL,
+  resist: { energy: -50 },                          // oficial: weak Energy
+  boCond: "feared", boCorner: "nw",
+});
+const SCARITHS_SOULCAGE = Object.assign({}, SOULCAGE_BASE, {
+  name: "Scarith's Soulcage", hp: BO_CAGE_POOL, mitigation: 3.45, // oficial
+  resist: { ice: -50, earth: 75, fire: 50 },        // oficial: weak Ice; earth 25%/fire 50%
+  boCond: "drunk", boCorner: "sw",
+});
+const ELYRAXS_SOULCAGE = Object.assign({}, SOULCAGE_BASE, {
+  name: "Elyrax's Soulcage", hp: BO_CAGE_POOL,      // hp oficial 120.000
+  resist: { death: -50, holy: -50 },                // oficial: weak Death+Holy
+  boCond: "slowed", boCorner: "se",
+  skills: [{ el: "holy", min: 1600, max: 2200, int: 6000, ch: 25,
+    range: 7, miss: "holy", alvo: 1 }],             // Holy Chain 1600+ oficial
+  noAttack: false,
+});
+
+const SPIRIT_BASE = {
+  speed: 200, armor: 0, defense: 0, damage: 500,
+  element: "death", attackSpeed: 2000, mitigation: 0,
+  damageTakenMul: 0,   // oficial: "dragon Spirits are immune to all damage"
+  targetDistance: 1, staticAttack: 90, exp: 0, loot: [], grupo: "quests",
+  imune: ["paralyze", "invisible"], boSpirit: true,
+  skills: [
+    /* Energy Missile 450+ oficial (3sqm strike). */
+    { el: "energy", min: 450, max: 700, int: 5000, ch: 30, range: 7,
+      miss: "energy", alvo: 1 },
+    /* Bleed Explosion 800+ oficial (3sqm ball self). */
+    { el: "physical", min: 800, max: 1100, int: 8000, ch: 25, radius: 2,
+      fx: "draw-blood", cond: "bleed" },
+  ],
+};
+const ZHARVORINS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
+  name: "Zharvorin's Spirit", looktype: 1903, boCond: "rooted", boCageSlug: "zharvorins-soulcage",
+  skills: SPIRIT_BASE.skills.concat([
+    { el: "earth", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "root", miss: "rooting-effect" }]),
+});
+const MYZARETHS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
+  name: "Myzareth's Spirit", looktype: 1886, boCond: "feared", boCageSlug: "myzareths-soulcage",
+  skills: SPIRIT_BASE.skills.concat([
+    { el: "death", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "fear", miss: "mort-area" }]),
+});
+const SCARITHS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
+  name: "Scarith's Spirit", looktype: 1905, boCond: "drunk", boCageSlug: "scariths-soulcage",
+  skills: SPIRIT_BASE.skills.concat([
+    { el: "ice", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "drunk", miss: "ice-attack" }]),
+});
+const ELYRAXS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
+  name: "Elyrax's Spirit", looktype: 1904, boCond: "slowed", boCageSlug: "elyraxs-soulcage",
+  skills: SPIRIT_BASE.skills.concat([
+    { el: "holy", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "slowed", miss: "holy" }]),
+});
+
+const ENTHRALLED_DRAGON = {
+  name: "Enthralled Dragon",
+  hp: 45000, exp: 0,                          // hp oculto oficialmente → estimado
+  speed: 210, armor: 60, defense: 55,
+  damage: 900, element: "physical", attackSpeed: 2000, mitigation: 0,
+  resist: { fire: 100, energy: 100, earth: 100 }, // oficial: walksthrough Fire/Energy/Poison
+  skills: [
+    /* "vital to equip life drain protection" (wiki) → melee + dreno. */
+    { el: "lifedrain", min: 600, max: 1000, int: 4000, ch: 35, range: 1,
+      fx: "magic-red" },
+    { el: "fire", min: 400, max: 700, int: 6000, ch: 25, radius: 2,
+      fx: "fire-area", miss: "fire" },
+  ],
+  looktype: 1883, targetDistance: 1, staticAttack: 90,
+  imune: ["paralyze", "invisible"],
+  loot: [], grupo: "quests", boDragon: true,
+};
+const AN_EYE = {
+  name: "An Eye", hp: 1, exp: 0,
+  speed: 0, armor: 0, defense: 0, damage: 0, attackSpeed: 2000,
+  damageTakenMul: 0,                          // oficial: dmg mods 0%
+  targetDistance: 1, staticAttack: 0, noAttack: true,
+  lookItem: 5898, boEye: true,               // ≈ bonelord eye 5898
+  imune: ["paralyze", "invisible"], loot: [], grupo: "quests",
+};
+const BONE_BARRIER = {
+  name: "Bone Barrier", hp: 10000, exp: 0,    // hp oficial 10.000
+  speed: 0, armor: 0, defense: 0, damage: 0, attackSpeed: 2000,
+  targetDistance: 1, staticAttack: 0, noAttack: true,
+  lookItem: 6972, boBarrier: true,           // objectID oficial 6972
+  imune: ["paralyze", "invisible"], loot: [], grupo: "quests",
+};
+const WRAITHFIRE = {
+  name: "Wraithfire", hp: 1, exp: 0,
+  speed: 0, armor: 0, defense: 0, damage: 0, attackSpeed: 2000,
+  damageTakenMul: 0, targetDistance: 1, staticAttack: 0, noAttack: true,
+  lookItem: 52441, boField: true,            // itemid oficial 52441
+  imune: ["paralyze", "invisible"], loot: [], grupo: "quests",
+};
+
+/* Offsets das 4 cages vs bossspawn {1026,1025} — cantos da sala
+ * (oficial: NE/NW/SW/SE). */
+const BO_CAGE_SPAWNS = [
+  { slug: "zharvorins-soulcage", spirit: "zharvorins-spirit", dx: +8, dy: -5 },
+  { slug: "myzareths-soulcage", spirit: "myzareths-spirit", dx: -12, dy: -5 },
+  { slug: "scariths-soulcage", spirit: "scariths-spirit", dx: -12, dy: +12 },
+  { slug: "elyraxs-soulcage", spirit: "elyraxs-spirit", dx: +8, dy: +12 },
+];
+const BO_DRAGON_SPAWNS = [           // "spawn south of the room"
+  { dx: 0, dy: +12 }, { dx: +2, dy: +12 }, { dx: -2, dy: +12 }, { dx: +4, dy: +12 },
+];
+
 const ROOST_MONSTERS = {
   "adventurer-group": ADVENTURER_GROUP,
   "fiona-firstdream": FIONA_FIRSTDREAM,
@@ -585,6 +733,18 @@ const ROOST_MONSTERS = {
   "ice-crawler": ICE_CRAWLER,
   "the-gravedigger": THE_GRAVEDIGGER,
   "bonelord-totem": BONELORD_TOTEM,
+  "zharvorins-soulcage": ZHARVORINS_SOULCAGE,
+  "myzareths-soulcage": MYZARETHS_SOULCAGE,
+  "scariths-soulcage": SCARITHS_SOULCAGE,
+  "elyraxs-soulcage": ELYRAXS_SOULCAGE,
+  "zharvorins-spirit": ZHARVORINS_SPIRIT,
+  "myzareths-spirit": MYZARETHS_SPIRIT,
+  "scariths-spirit": SCARITHS_SPIRIT,
+  "elyraxs-spirit": ELYRAXS_SPIRIT,
+  "enthralled-dragon": ENTHRALLED_DRAGON,
+  "an-eye": AN_EYE,
+  "bone-barrier": BONE_BARRIER,
+  "wraithfire": WRAITHFIRE,
   "bonelords-phylactery": BONELORDS_PHYLACTERY,
 };
 
@@ -600,7 +760,7 @@ const ROOST_ROOMS = {
   "the-gravedigger": { otbm: "gravedigger",
     spawn: { x: 1023, y: 1035, z: 7 }, boss: { x: 1023, y: 1029, z: 7 } },
   "bonelords-phylactery": { otbm: "bonelords_phylactery",
-    spawn: { x: 1023, y: 1037, z: 7 }, boss: { x: 1025, y: 1033, z: 7 } },
+    spawn: { x: 1026, y: 1035, z: 7 }, boss: { x: 1026, y: 1025, z: 7 } },
 };
 
 const ROOST_BOSS_META = [
@@ -1219,6 +1379,182 @@ function gravediggerBossTick(c, now) {
 }
 function gravediggerBossCleanup(c) { if (c && c.gd) delete c.gd; }
 
+/* ── Bone Overlord / Bonelord's Phylactery — encontro em 2 fases
+ * (cliente; espelho de tickBoneOverlord no authoritative_engine.js) ── */
+function boneOverlordFight(c) { return !!(c && c.boss && c.boss.id === "bonelords-phylactery"); }
+function boMakeMob(c, slug, cx, cy, flags) {
+  const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+    GAMEDATA.monsters[slug];
+  if (!def) return null;
+  const cell = agFreeCell(c, cx, cy); if (!cell) return null;
+  const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+    : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+  const hp = Math.max(1, Number(def.hp) || 1);
+  const mob = Object.assign({ slug, def, hp, maxHp: hp,
+    atkCd: 400 + Math.random() * 1200,
+    id: "bo-" + slug + "-" + Date.now().toString(36) + "-" +
+      Math.random().toString(36).slice(2, 7),
+    cx: cell.x, cy: cell.y, x: pos.x, y: pos.y, sx: pos.x, sy: pos.y,
+    dir: "w", moving: false, attackAnim: 0,
+    speed: def.speed ? .000055 : 0, spawnAt: Date.now() }, flags || {});
+  c.mobs = c.mobs || []; c.mobs.unshift(mob);
+  c.events = c.events || [];
+  c.events.push({ t: "spawn", slug, x: mob.x, y: mob.y, targetId: mob.id, screen: true });
+  return mob;
+}
+function boDamagePlayer(c, p, dmg, el, sx, sy, fx) {
+  const hit = Math.max(1, Math.round(dmg));
+  p.hp = Math.max(0, (p.hp || 0) - hit);
+  c.events.push({ t: "taken", dmg: hit, x: c.player.x, y: c.player.y,
+    targetId: "player", sx: sx, sy: sy, el: el || "agony", fx: fx || "draw-blood",
+    screen: true });
+}
+function boneOverlordBossInit(c, player) {
+  if (!boneOverlordFight(c)) return c;
+  const boss = (c.mobs || []).find((m) => m && m.boss);
+  if (!boss) return c;
+  c.bo = { pendingBoss: boss, cagePool: BO_CAGE_POOL, eyes: [],
+    manaDrain: null, curse: null, gazeAt: Date.now() + BO_GAZE_MS, teleported: {} };
+  c.mobs = c.mobs.filter((m) => m !== boss);
+  const bx = Number(boss.cx) || 0, by = Number(boss.cy) || 0;
+  for (const s of BO_CAGE_SPAWNS) {
+    const cage = boMakeMob(c, s.slug, bx + s.dx, by + s.dy, { boCage: s.slug });
+    if (cage) boMakeMob(c, s.spirit, bx + s.dx + 1, by + s.dy + 1,
+      { boSpirit: s.slug, boCageSlug: s.slug });
+  }
+  if (typeof addLog === "function")
+    addLog("info", "Destrua as 4 <b>Soulcages</b> (pool compartilhado) — afaste os Spirits das cages ou elas curam!");
+  return c;
+}
+function boneOverlordBossTick(c, now) {
+  const st = c && c.bo; if (!st || c.ended) return true;
+  const mobs = c.mobs || [];
+  const p = (c.player && c.player.p) || c.player;
+  /* Pool compartilhado AUTORITATIVO: dano em qualquer cage drena o
+   * pool (delta desde o último sync — min() das vivas ressuscitaria o
+   * pool quando uma cage morre isolada). Espelho do servidor. */
+  const cages = mobs.filter((m) => m.boCage);
+  const live = cages.filter((m) => m.hp > 0);
+  if (live.length) {
+    for (const m of live) {
+      const prev = Number(m._boSyncHp);
+      if (Number.isFinite(prev) && prev > m.hp)
+        st.cagePool = Math.max(0, st.cagePool - (prev - m.hp));
+    }
+    for (const m of live) { m.hp = st.cagePool; m.maxHp = BO_CAGE_POOL;
+      m._boSyncHp = st.cagePool; }
+    if (st.cagePool <= 0) {
+      for (const m of cages) m.hp = 0;
+      for (const s of mobs) if (s.boSpirit) { s.hp = 0; s._boGone = 1; }
+    } else for (const s of mobs) {
+      /* Espírito perto da sua cage → cura o pool (pool morto não cura). */
+      if (!s.boSpirit || !(s.hp > 0)) continue;
+      const cage = live.find((m) => m.boCage === s.boCageSlug);
+      if (!cage) continue;
+      const d = Math.max(Math.abs(s.cx - cage.cx), Math.abs(s.cy - cage.cy));
+      if (d <= BO_SPIRIT_LINK_RADIUS && st.cagePool < BO_CAGE_POOL) {
+        st.cagePool = Math.min(BO_CAGE_POOL, st.cagePool + BO_CAGE_HEAL / 10);
+        for (const m of live) { m.hp = st.cagePool; m._boSyncHp = st.cagePool; }
+      }
+      /* Pool baixo → espírito teleporta à sua cage. */
+      if (st.cagePool < BO_CAGE_POOL * BO_TELEPORT_PCT &&
+          now - (s._boTpAt || 0) > 30000) {
+        const tc = agFreeCell(c, cage.cx + 1, cage.cy);
+        if (tc && d > 2) {
+          s._boTpAt = now;
+          const pos = typeof cellToScreen === "function" ? cellToScreen(tc.x, tc.y)
+            : { x: (tc.x + .5) / (c.gridW || 30), y: (tc.y + .5) / (c.gridH || 30) };
+          s.cx = tc.x; s.cy = tc.y; s.x = pos.x; s.y = pos.y; s.sx = pos.x; s.sy = pos.y;
+          c.events.push({ t: "effect", x: pos.x, y: pos.y, screen: true, fx: "teleport" });
+        }
+      }
+    }
+  }
+  /* Fase 2: cages destruídas → Phylactery + 4 Enthralled Dragons ao sul. */
+  if (st.pendingBoss && st.cagePool <= 0) {
+    const boss = st.pendingBoss; st.pendingBoss = null;
+    const cell = agFreeCell(c, Number(boss.cx) || 0, Number(boss.cy) || 0);
+    if (cell) {
+      const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+        : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+      boss.cx = cell.x; boss.cy = cell.y;
+      boss.x = pos.x; boss.y = pos.y; boss.sx = pos.x; boss.sy = pos.y;
+    }
+    mobs.unshift(boss);
+    c.events.push({ t: "spawn", slug: boss.slug, x: boss.x, y: boss.y,
+      targetId: boss.id, screen: true });
+    const bx = Number(boss.cx) || 0, by = Number(boss.cy) || 0;
+    for (const d of BO_DRAGON_SPAWNS)
+      boMakeMob(c, "enthralled-dragon", bx + d.dx, by + d.dy, { boDragon: true });
+    if (typeof addLog === "function")
+      addLog("death", "A <b>Phylactery</b> apareceu — e os <b>4 Enthralled Dragons</b> também!");
+  }
+  /* ── Gazes do Bone Overlord (durante toda a luta) ── */
+  if (p && p.hp > 0 && now >= st.gazeAt && (live.length || (mobs.some((m) => m.boss && m.hp > 0)))) {
+    st.gazeAt = now + BO_GAZE_MS;
+    const pick = ["eye", "wraithfire", "manadrain", "curse", "barrier"][
+      Math.floor(Math.random() * 5)];
+    const bx = Number(boss && boss.cx) || 0, by = Number(boss && boss.cy) || 0;
+    if (pick === "eye") {
+      const eye = boMakeMob(c, "an-eye", Number(p.cx) || 0, Number(p.cy) || 0,
+        { boEye: true });
+      if (eye) st.eyes.push({ id: eye.id, explodeAt: now + BO_EYE_FUSE_MS });
+      if (typeof addLog === "function") addLog("death", "<b>AN EYE IS CAST ON YOU!</b>");
+    } else if (pick === "wraithfire") {
+      const max = (typeof maxStats === "function" && maxStats(p).hp) || p.maxHp || p.hp;
+      boDamagePlayer(c, p, (p.hp || 0) * BO_WRAITH_PCT / 100, "agony", null, null, "fire-area");
+      boMakeMob(c, "wraithfire", Number(p.cx) || 0, Number(p.cy) || 0, { boField: true });
+      if (typeof addLog === "function") addLog("death", "<b>THE BONELORD CASTS WRAITHFIRE AT YOU!</b>");
+    } else if (pick === "manadrain") {
+      st.manaDrain = { left: BO_MANA_TICKS, nextAt: now + BO_MANA_MS };
+      if (typeof addLog === "function") addLog("death", "<b>THE BONELORD DRAINS YOU!</b>");
+    } else if (pick === "curse") {
+      st.curse = { left: BO_CURSE_TICKS, nextAt: now + BO_CURSE_MS };
+      if (typeof addLog === "function") addLog("death", "<b>THE BONELORD CURSES YOU!</b>");
+    } else {
+      /* Bone Barrier: cerca o jogador com 4 barreiras (oficialmente
+       * teleporta p/ sala lateral — simplificação documentada). */
+      const px = Number(p.cx) || 0, py = Number(p.cy) || 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+        boMakeMob(c, "bone-barrier", px + dx, py + dy, { boBarrier: true });
+      if (typeof addLog === "function") addLog("death", "<b>THE BONELORD DISPLACES YOU!</b> — quebre as Bone Barriers!");
+    }
+  }
+  /* Eye fuse → explode (30% maxHP agony, raio 2). */
+  for (const e of st.eyes) {
+    if (e.done || now < e.explodeAt) continue;
+    e.done = true;
+    const eye = mobs.find((m) => m.id === e.id);
+    if (eye) eye.hp = 0;
+    if (p && p.hp > 0 && eye &&
+        Math.max(Math.abs((p.cx || 0) - eye.cx), Math.abs((p.cy || 0) - eye.cy)) <= BO_EYE_RADIUS) {
+      const max = (typeof maxStats === "function" && maxStats(p).hp) || p.maxHp || p.hp;
+      boDamagePlayer(c, p, max * BO_EYE_PCT / 100, "agony", eye.x, eye.y, "mist");
+    }
+  }
+  /* Mana Drain DoT: 5% maxMP a cada 2s x5. */
+  if (st.manaDrain && now >= st.manaDrain.nextAt) {
+    const max = (typeof maxStats === "function" && maxStats(p).mp) || p.maxMp || p.mp || 0;
+    const drain = Math.min(Math.max(0, p.mp || 0), Math.round(max * BO_MANA_PCT / 100));
+    p.mp = Math.max(0, (p.mp || 0) - drain);
+    c.events.push({ t: "taken", dmg: drain, x: c.player.x, y: c.player.y,
+      targetId: "player", el: "manadrain", fx: "magic-blue", screen: true });
+    if (--st.manaDrain.left <= 0) st.manaDrain = null;
+    else st.manaDrain.nextAt = now + BO_MANA_MS;
+  }
+  /* Curse: explode a cada 4s x4 (físico, pequeno raio). */
+  if (st.curse && now >= st.curse.nextAt) {
+    if (p && p.hp > 0) boDamagePlayer(c, p, 550, "physical", null, null, "explosion");
+    if (--st.curse.left <= 0) st.curse = null;
+    else st.curse.nextAt = now + BO_CURSE_MS;
+  }
+  /* Campos (wraithfire) expiram em ~5s. */
+  for (const m of mobs)
+    if (m.boField && now - (m.spawnAt || 0) > 5000) m.hp = 0;
+  return true;
+}
+function boneOverlordBossCleanup(c) { if (c && c.bo) delete c.bo; }
+
 const ROOST_DATA = {
   CRYPT_RUNES, CRYPT_WEAPONS, ROOST_ITEMS, ROOST_MONSTERS,
   ROOST_ROOMS, ROOST_MISSION_DEFS, ROOST_QUEST_ID,
@@ -1227,6 +1563,10 @@ const ROOST_DATA = {
   ELD_VENT_SPAWNS, ELD_STAGE_MS, ELD_RESPAWN_MS, ELD_TOTEM_IMMUNE,
   IH_CRAWLER_MAX, IH_SUMMON_MS,
   GD_TOTEM_MAX, GD_SUMMON_MS,
+  BO_CAGE_POOL, BO_CAGE_SPAWNS, BO_DRAGON_SPAWNS, BO_GAZE_MS,
+  BO_EYE_FUSE_MS, BO_EYE_RADIUS, BO_EYE_PCT, BO_WRAITH_PCT,
+  BO_MANA_TICKS, BO_MANA_PCT, BO_MANA_MS, BO_CURSE_TICKS, BO_CURSE_MS,
+  BO_CAGE_HEAL, BO_SPIRIT_LINK_RADIUS, BO_TELEPORT_PCT,
   monsterSlugs: Object.keys(ROOST_MONSTERS),
   roostRollWeapon, roostCanExchange, roostState,
   registerMonsters(monsters) {

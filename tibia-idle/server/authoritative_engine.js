@@ -6586,6 +6586,40 @@ function arenaBossBindMechanics(auth,now){
    * até GD_TOTEM_MAX vivos, um a cada GD_SUMMON_MS. */
   if(auth.bossId==="the-gravedigger"&&!auth.gd)
     auth.gd={nextAt:now+8000};
+  /* Bone Overlord / Bonelord's Phylactery (Roost): a sala abre com 4
+   * Soulcages (pool de HP compartilhado) + 4 dragon Spirits imunes;
+   * o boss (Phylactery) fica retido até o pool zerar — então entra com
+   * 4 Enthralled Dragons. Gazes rolam durante toda a luta. */
+  if(auth.bossId==="bonelords-phylactery"&&!auth.bo){
+    auth.bo={pendingBoss:boss,cagePool:BO_CAGE_POOL,eyes:[],
+      manaDrain:null,curse:null,gazeAt:now+BO_GAZE_MS};
+    auth.mobs=auth.mobs.filter((m)=>m!==boss);
+    const bx=Number(boss.cx)||0,by=Number(boss.cy)||0;
+    const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+    for(const s of BO_CAGE_SPAWNS){
+      const cage=makeMob(auth,s.slug,false);
+      if(cage){
+        cage.boCage=s.slug;cage._boSyncHp=BO_CAGE_POOL;
+        const cell=claimSpawnCell(auth,bx+s.dx,by+s.dy);
+        cage.cx=cell.cx;cage.cy=cell.cy;
+        cage.x=(cage.cx+.5)/w;cage.y=(cage.cy+.5)/h;cage.sx=cage.x;cage.sy=cage.y;
+        cage.speed=0;
+        auth.mobs.unshift(cage);
+        auth.events.push({t:"spawn",slug:cage.slug,x:cage.x,y:cage.y,
+          targetId:String(cage.id),screen:true,ts:now});
+        const sp=makeMob(auth,s.spirit,false);
+        if(sp){
+          sp.boSpirit=s.slug;sp.boCageSlug=s.slug;
+          const sc=claimSpawnCell(auth,bx+s.dx+1,by+s.dy+1);
+          sp.cx=sc.cx;sp.cy=sc.cy;
+          sp.x=(sp.cx+.5)/w;sp.y=(sp.cy+.5)/h;sp.sx=sp.x;sp.sy=sp.y;
+          auth.mobs.unshift(sp);
+          auth.events.push({t:"spawn",slug:sp.slug,x:sp.x,y:sp.y,
+            targetId:String(sp.id),screen:true,ts:now});
+        }
+      }
+    }
+  }
   syncBossImmunityFlags(auth);
   return true;
 }
@@ -6735,6 +6769,159 @@ function tickIceHorror(auth,now){
   }
 }
 
+/* Bone Overlord (Roost): soulcages compartilham pool (BO_CAGE_POOL);
+ * espírito a <=2 sqm da sua cage cura o pool; pool <50% → teleporta à
+ * cage. Pool zerado → Phylactery + 4 Enthralled Dragons entram. Gazes:
+ * eye (30% maxHP), wraithfire (15% hp atual), mana drain (5%x5), curse
+ * (4 explosões), bone barrier (4 barreiras ao redor do jogador).
+ * Espelho do cliente (boneOverlordBossTick em roost-graveborn.js). */
+const BO_CAGE_POOL=120000,BO_GAZE_MS=20000,BO_EYE_FUSE_MS=5000,
+  BO_EYE_RADIUS=2,BO_EYE_PCT=30,BO_WRAITH_PCT=15,
+  BO_MANA_TICKS=5,BO_MANA_PCT=5,BO_MANA_MS=2000,
+  BO_CURSE_TICKS=4,BO_CURSE_MS=4000,
+  BO_CAGE_HEAL=5000,BO_SPIRIT_LINK_RADIUS=2,BO_TELEPORT_PCT=0.5;
+const BO_CAGE_SPAWNS=[
+  {slug:"zharvorins-soulcage",spirit:"zharvorins-spirit",dx:8,dy:-5},
+  {slug:"myzareths-soulcage",spirit:"myzareths-spirit",dx:-12,dy:-5},
+  {slug:"scariths-soulcage",spirit:"scariths-spirit",dx:-12,dy:12},
+  {slug:"elyraxs-soulcage",spirit:"elyraxs-spirit",dx:8,dy:12}];
+const BO_DRAGON_SPAWNS=[[0,12],[2,12],[-2,12],[4,12]];
+function boSpawnMob(auth,slug,cx,cy,now){
+  const m=makeMob(auth,slug,false);if(!m)return null;
+  const cell=claimSpawnCell(auth,cx,cy);
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;m.sx=m.x;m.sy=m.y;
+  if(m.def&&m.def.speed===0)m.speed=0;
+  auth.mobs.unshift(m);
+  auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
+    targetId:String(m.id),screen:true,ts:now});
+  return m;
+}
+function boHitPlayer(auth,item,dmg,el,sx,sy,fx,now){
+  const p=item&&item.p;if(!p||p.hp<=0||item.downUntil)return;
+  const hit=Math.max(1,Math.round(dmg));
+  p.hp=Math.max(0,(Number(p.hp)||0)-hit);
+  const pos=entityPosition(item,.13,.6);
+  auth.events.push({t:"taken",dmg:hit,x:pos.x,y:pos.y,
+    targetId:String(item.id),sx:sx,sy:sy,el:el||"agony",
+    fx:fx||"draw-blood",screen:true,ts:now});
+}
+function tickBoneOverlord(auth,now){
+  const st=auth&&auth.bo;if(!st||auth.ended)return;
+  const mobs=auth.mobs||[];
+  /* Pool compartilhado AUTORITATIVO: o dano em qualquer cage drena o
+   * pool (delta desde o último sync — nunca recomputa por min(), ou a
+   * morte de uma cage ressuscitaria o pool das outras). */
+  const cages=mobs.filter((m)=>m.boCage);
+  const live=cages.filter((m)=>m.hp>0);
+  if(live.length){
+    for(const m of live){
+      const prev=Number(m._boSyncHp);
+      if(Number.isFinite(prev)&&prev>m.hp)
+        st.cagePool=Math.max(0,st.cagePool-(prev-m.hp));
+    }
+    for(const m of live){m.hp=st.cagePool;m.maxHp=BO_CAGE_POOL;
+      m._boSyncHp=st.cagePool;}
+    if(st.cagePool<=0){
+      for(const m of cages)m.hp=0;
+      for(const s of mobs)if(s.boSpirit)s.hp=0;
+    }else for(const s of mobs){
+      if(!s.boSpirit||!(s.hp>0))continue;
+      const cage=live.find((m)=>m.boCage===s.boCageSlug);if(!cage)continue;
+      const d=Math.max(Math.abs(s.cx-cage.cx),Math.abs(s.cy-cage.cy));
+      if(d<=BO_SPIRIT_LINK_RADIUS&&st.cagePool<BO_CAGE_POOL){
+        st.cagePool=Math.min(BO_CAGE_POOL,st.cagePool+BO_CAGE_HEAL/10);
+        for(const m of live){m.hp=st.cagePool;m._boSyncHp=st.cagePool;}
+      }
+      if(st.cagePool<BO_CAGE_POOL*BO_TELEPORT_PCT&&now-(Number(s._boTpAt)||0)>30000&&d>2){
+        const cell=claimSpawnCell(auth,cage.cx+1,cage.cy);
+        s._boTpAt=now;s.cx=cell.cx;s.cy=cell.cy;
+        const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+        s.x=(s.cx+.5)/w;s.y=(s.cy+.5)/h;s.sx=s.x;s.sy=s.y;
+        const pos=entityPosition(s,.5,.5);
+        auth.events.push({t:"effect",x:pos.x,y:pos.y,targetId:String(s.id),
+          fx:"teleport",screen:true,ts:now});
+      }
+    }
+  }
+  if(st.pendingBoss&&st.cagePool<=0){
+    const boss=st.pendingBoss;st.pendingBoss=null;
+    const cell=claimSpawnCell(auth,Number(boss.cx)||0,Number(boss.cy)||0);
+    boss.cx=cell.cx;boss.cy=cell.cy;
+    const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+    boss.x=(boss.cx+.5)/w;boss.y=(boss.cy+.5)/h;boss.sx=boss.x;boss.sy=boss.y;
+    mobs.unshift(boss);
+    auth.events.push({t:"spawn",slug:boss.slug,x:boss.x,y:boss.y,
+      targetId:String(boss.id),screen:true,ts:now});
+    for(const [dx,dy] of BO_DRAGON_SPAWNS){
+      const dr=boSpawnMob(auth,"enthralled-dragon",cell.cx+dx,cell.cy+dy,now);
+      if(dr)dr.boDragon=true;
+    }
+  }
+  const liveBoss=mobs.find((m)=>m.boss&&m.hp>0);
+  const players=(auth.players||[]).filter((it)=>it&&it.p&&it.p.hp>0&&!it.downUntil);
+  if(players.length&&now>=st.gazeAt&&(cages.length||liveBoss)){
+    st.gazeAt=now+BO_GAZE_MS;
+    const item=players[Math.floor(random(auth)*players.length)];
+    const pick=["eye","wraithfire","manadrain","curse","barrier"][
+      Math.floor(random(auth)*5)];
+    const px=Number(item.cx)||0,py=Number(item.cy)||0;
+    if(pick==="eye"){
+      const eye=boSpawnMob(auth,"an-eye",px,py,now);
+      if(eye){eye.boEye=true;st.eyes.push({id:eye.id,explodeAt:now+BO_EYE_FUSE_MS});}
+    }else if(pick==="wraithfire"){
+      boHitPlayer(auth,item,(Number(item.p.hp)||0)*BO_WRAITH_PCT/100,"agony",
+        null,null,"fire-area",now);
+      const f=boSpawnMob(auth,"wraithfire",px,py,now);if(f)f.boField=true;
+    }else if(pick==="manadrain"){
+      st.manaDrain={left:BO_MANA_TICKS,nextAt:now+BO_MANA_MS,targetId:String(item.id)};
+    }else if(pick==="curse"){
+      st.curse={left:BO_CURSE_TICKS,nextAt:now+BO_CURSE_MS,targetId:String(item.id)};
+    }else{
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const b=boSpawnMob(auth,"bone-barrier",px+dx,py+dy,now);
+        if(b)b.boBarrier=true;
+      }
+    }
+  }
+  for(const e of st.eyes){
+    if(e.done||now<e.explodeAt)continue;
+    e.done=true;
+    const eye=mobs.find((m)=>m.id===e.id);
+    if(eye)eye.hp=0;
+    if(!eye)continue;
+    for(const item of players){
+      if(authorityVisualDistance(eye,item,auth)<=BO_EYE_RADIUS){
+        const max=Math.max(1,Number(maxStats(item.p).hp)||Number(item.p.hp)||1);
+        boHitPlayer(auth,item,max*BO_EYE_PCT/100,"agony",
+          Number(eye.x)||.5,Number(eye.y)||.5,"mist",now);
+      }
+    }
+  }
+  if(st.manaDrain&&now>=st.manaDrain.nextAt){
+    const item=(auth.players||[]).find((it)=>String(it.id)===st.manaDrain.targetId)||players[0];
+    if(item&&item.p){
+      const max=Math.max(0,Number(maxStats(item.p).mp)||0);
+      const drain=Math.min(Math.max(0,Number(item.p.mp)||0),
+        Math.max(1,Math.round(max*BO_MANA_PCT/100)));
+      item.p.mp=Math.max(0,(Number(item.p.mp)||0)-drain);
+      const pos=entityPosition(item,.13,.6);
+      auth.events.push({t:"taken",dmg:drain,x:pos.x,y:pos.y,
+        targetId:String(item.id),el:"manadrain",fx:"magic-blue",screen:true,ts:now});
+    }
+    if(--st.manaDrain.left<=0)st.manaDrain=null;
+    else st.manaDrain.nextAt=now+BO_MANA_MS;
+  }
+  if(st.curse&&now>=st.curse.nextAt){
+    const item=(auth.players||[]).find((it)=>String(it.id)===st.curse.targetId)||players[0];
+    if(item)boHitPlayer(auth,item,550,"physical",null,null,"explosion",now);
+    if(--st.curse.left<=0)st.curse=null;
+    else st.curse.nextAt=now+BO_CURSE_MS;
+  }
+  for(const m of mobs)
+    if(m.boField&&now-(Number(m.spawnAt)||now)>5000)m.hp=0;
+  if(!st.pendingBoss&&!live.length&&!liveBoss)auth.bo=null;
+}
 /* The Gravedigger (Roost): {{Summon|Bonelord Totem|amount=2}} oficial —
  * até GD_TOTEM_MAX totens vivos, um por GD_SUMMON_MS; os totens são
  * objetos estáticos invulneráveis (damageTakenMul 0) que fazem a área
@@ -8319,7 +8506,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);tickBoneOverlord(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);
