@@ -122,7 +122,8 @@ canvas { image-rendering: pixelated; }
   background: linear-gradient(180deg, #2e2a24, #191713);
   border-bottom: 2px solid var(--border-in);
   display: flex; align-items: center; gap: 14px;
-  padding: 6px 12px;
+  /* padding-right reserva a faixa dos heróis quadrados (position absolute). */
+  padding: 6px 196px 6px 12px;
   position: sticky; top: 0; z-index: 50;
   flex-wrap: wrap;
 }
@@ -4259,14 +4260,16 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 #btn-prey img.prey-btn-gif { display: inline-block; }
 
 /* ---- Topbar: heróis quadrados (PERSONAGEM + STORE) ----
- * Par de botões quadrados no canto superior direito — mais destaque com
- * moldura e glow dourados. Ficam na 1ª faixa da .topbar (depois do spacer);
- * os demais botões seguem o quadro metálico de 28px na faixa de baixo. */
+ * Par de botões quadrados ancorados no canto direito — atravessam as DUAS
+ * faixas da topbar (absolute top/bottom), preenchendo o canto sem espaço
+ * vazio. A .topbar ganha padding-right pra nenhum conteúdo passar por baixo. */
 .topbar-hero {
-  display: flex; gap: 8px; align-items: stretch; flex: none;
+  position: absolute; top: 6px; bottom: 6px; right: 12px;
+  display: flex; gap: 8px; align-items: stretch;
 }
 .topbar-hero-btn {
-  width: 78px; height: 78px;
+  /* estica até preencher a altura da topbar; aspect-ratio mantém o quadrado */
+  height: auto; width: auto; aspect-ratio: 1 / 1;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 4px;
   background: radial-gradient(circle at 50% 22%, rgba(120, 90, 30, .5) 0%, rgba(24, 20, 14, .94) 70%);
@@ -4305,7 +4308,8 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 .topbar-hero-label { font-size: 12px; font-weight: 800; letter-spacing: .6px; color: #ffe394; }
 @media (max-width: 640px) {
-  .topbar-hero-btn { width: 62px; height: 62px; }
+  .topbar-hero { gap: 6px; right: 8px; }
+  .topbar-hero-btn { gap: 2px; padding: 3px; }
   .topbar-hero-avatar { width: 40px; height: 36px; }
   #btn-switch-portrait canvas { height: 32px !important; max-width: 38px !important; }
 }

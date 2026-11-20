@@ -10,7 +10,10 @@ Histórico de alterações do jogo, mais recentes primeiro.
   `BUTO_PVP`, `BUTOPVP` e `buto__pvp` resolvem para o código canônico
   (`BUTO__PVP`). Claims e estado (pause/delete) são sempre gravados no
   canônico — não dá para resgatar duas vezes por variação de digitação.
-- Topbar hero: botões quadrados ampliados em 35% (58px → 78px).
+- Topbar hero: botões agora **atravessam as duas faixas** da topbar
+  (ancorados `top/bottom` à direita com `aspect-ratio:1`) — quadrados
+  perfeitos que preenchem o canto sem o espaço vazio que sobrava embaixo.
+  `.topbar` ganha `padding-right` reservando a faixa dos heróis.
 
 ---
 
