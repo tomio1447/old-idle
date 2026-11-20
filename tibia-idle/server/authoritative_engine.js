@@ -2450,8 +2450,10 @@ function applyOutgoingDamage(mob,element,dmg,now,piercePct){
   if(mob&&mob.boss&&Number(mob.spiteDamageTakenMul)>0&&Number(mob.spiteDamageTakenMul)!==1)
     out=Math.max(1,Math.floor(out*Number(mob.spiteDamageTakenMul)));
   /* Avatares do Adventurer Group (Roost): sofrem menos dano — multiplicador
-   * declarado no def trocado na transformação (def.damageTakenMul). */
+   * declarado no def trocado na transformação (def.damageTakenMul). O
+   * Bonelord Totem usa 0 = invulnerável oficial (dmg mods 0%). */
   const agMul=Number(mob&&mob.def&&mob.def.damageTakenMul);
+  if(agMul===0)return 0;
   if(agMul>0&&agMul!==1)out=Math.max(1,Math.floor(out*agMul));
   return out;
 }
@@ -6580,6 +6582,10 @@ function arenaBossBindMechanics(auth,now){
    * até IH_CRAWLER_MAX vivos, um a cada IH_SUMMON_MS. */
   if(auth.bossId==="ice-horror"&&!auth.iceH)
     auth.iceH={nextAt:now+6000};
+  /* The Gravedigger (Roost): Summon Bonelord Totem x2 oficial —
+   * até GD_TOTEM_MAX vivos, um a cada GD_SUMMON_MS. */
+  if(auth.bossId==="the-gravedigger"&&!auth.gd)
+    auth.gd={nextAt:now+8000};
   syncBossImmunityFlags(auth);
   return true;
 }
@@ -6725,6 +6731,32 @@ function tickIceHorror(auth,now){
       auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
         targetId:String(m.id),screen:true,ts:now});
       st.nextAt=now+IH_SUMMON_MS;
+    }else st.nextAt=now+2000;
+  }
+}
+
+/* The Gravedigger (Roost): {{Summon|Bonelord Totem|amount=2}} oficial —
+ * até GD_TOTEM_MAX totens vivos, um por GD_SUMMON_MS; os totens são
+ * objetos estáticos invulneráveis (damageTakenMul 0) que fazem a área
+ * de morte. Espelho do cliente (gravediggerBossTick). */
+const GD_TOTEM_MAX=2,GD_SUMMON_MS=15000;
+function tickGravedigger(auth,now){
+  const st=auth&&auth.gd;if(!st||auth.ended)return;
+  const boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+  if(!boss){if(arenaBossSpawnPending(auth))return;auth.gd=null;return;}
+  const alive=(auth.mobs||[]).filter((m)=>m.gdTotem&&m.hp>0).length;
+  if(alive<GD_TOTEM_MAX&&now>=(Number(st.nextAt)||0)){
+    const m=makeMob(auth,"bonelord-totem",false);
+    if(m){
+      m.gdTotem=true;m.speed=0;
+      const cell=claimSpawnCell(auth,Number(boss.cx)||0,Number(boss.cy)||0);
+      const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+      m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;m.sx=m.x;m.sy=m.y;
+      auth.mobs.unshift(m);
+      auth.events=auth.events||[];
+      auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
+        targetId:String(m.id),screen:true,ts:now});
+      st.nextAt=now+GD_SUMMON_MS;
     }else st.nextAt=now+2000;
   }
 }
@@ -8287,7 +8319,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);

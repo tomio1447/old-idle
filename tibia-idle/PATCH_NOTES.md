@@ -59,7 +59,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
   (`tickIceHorror` no engine + `iceHorrorBossInit/BossTick/Cleanup`
   no cliente).
 - **The Gravedigger** — race 2721, looktype 1880, exp 750.000;
-  Fire Ball 600–800, Bonelord Totem → área de morte.
+  Fire Ball 600–800 (oficial). Sala `gravedigger.otbm` nas coords
+  oficiais (center {1023,1032}, boss {1023,1029}, player {1023,1035}).
+  **Invoca Bonelord Totems ×2** (oficial `Summon amount=2`) — objetos
+  `lookItem 51192` **invulneráveis** (todos os dmg mods 0% →
+  `damageTakenMul 0` no funil) que fazem área de morte; cooldown oficial
+  resetável com Shrunken Head.
 - **Bonelord's Phylactery** — race 2771, `lookItem 52831`, exp
   1.000.000, 850k hp; earth 110% (fraco). Batalha máx. oficial 900s.
 - Cooldown **20h** em todos; gates `enforced` + `killsRequired`

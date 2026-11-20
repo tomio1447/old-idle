@@ -541,6 +541,29 @@ const ICE_CRAWLER = {
   loot: [], grupo: "quests",
 };
 
+/* ── The Gravedigger — Bonelord Totems invocados ──────────────────────
+ * Oficial (wikitext): {{Summon|Bonelord Totem|amount=2}} — o boss invoca
+ * até 2 totens. A ficha do Bonelord Totem lista objectID 51192 e TODOS
+ * os damage mods a 0% → objeto-hazard INVULNERÁVEL (damageTakenMul 0 no
+ * funnel; o jogador não o destrói — esquiva). A "área de morte" é o seu
+ * ataque documentado; dano/intervalo não são publicados → estimados. */
+const GD_TOTEM_MAX = 2;          // oficial: Summon amount=2
+const GD_SUMMON_MS = 15000;      // intervalo não publicado → design
+const BONELORD_TOTEM = {
+  name: "Bonelord Totem",
+  hp: 20000, exp: 0,
+  speed: 0, armor: 0, defense: 0,
+  damage: 0, element: "death", attackSpeed: 2000, mitigation: 0,
+  damageTakenMul: 0,             // oficial: todos os dmg mods 0%
+  skills: [
+    { el: "death", min: 500, max: 900, int: 4000, ch: 40, radius: 3,
+      fx: "mort-area", miss: "sudden-death" },
+  ],
+  lookItem: 51192, targetDistance: 1, staticAttack: 90,
+  imune: ["paralyze", "invisible"],
+  loot: [], grupo: "quests",
+};
+
 const ROOST_MONSTERS = {
   "adventurer-group": ADVENTURER_GROUP,
   "fiona-firstdream": FIONA_FIRSTDREAM,
@@ -561,6 +584,7 @@ const ROOST_MONSTERS = {
   "ice-horror": ICE_HORROR,
   "ice-crawler": ICE_CRAWLER,
   "the-gravedigger": THE_GRAVEDIGGER,
+  "bonelord-totem": BONELORD_TOTEM,
   "bonelords-phylactery": BONELORDS_PHYLACTERY,
 };
 
@@ -574,7 +598,7 @@ const ROOST_ROOMS = {
   "ice-horror": { otbm: "ice_horror",
     spawn: { x: 1030, y: 1031, z: 7 }, boss: { x: 1030, y: 1025, z: 7 } },
   "the-gravedigger": { otbm: "gravedigger",
-    spawn: { x: 1024, y: 1040, z: 7 }, boss: { x: 1023, y: 1032, z: 7 } },
+    spawn: { x: 1023, y: 1035, z: 7 }, boss: { x: 1023, y: 1029, z: 7 } },
   "bonelords-phylactery": { otbm: "bonelords_phylactery",
     spawn: { x: 1023, y: 1037, z: 7 }, boss: { x: 1025, y: 1033, z: 7 } },
 };
@@ -1149,6 +1173,52 @@ function iceHorrorBossTick(c, now) {
 }
 function iceHorrorBossCleanup(c) { if (c && c.iceH) delete c.iceH; }
 
+/* ── The Gravedigger — invocação de Bonelord Totems (cliente; espelho de
+ * tickGravedigger no authoritative_engine.js) ── */
+function gravediggerBossFight(c) { return !!(c && c.boss && c.boss.id === "the-gravedigger"); }
+function gdSpawnTotem(c, cx, cy) {
+  const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+    GAMEDATA.monsters["bonelord-totem"];
+  if (!def) return null;
+  const cell = agFreeCell(c, cx, cy); if (!cell) return null;
+  const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+    : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+  const hp = Math.max(1, Number(def.hp) || 1);
+  const mob = { slug: "bonelord-totem", def, hp, maxHp: hp, gdTotem: true,
+    atkCd: 400 + Math.random() * 1200,
+    id: "gd-bonelord-totem-" + Date.now().toString(36) + "-" +
+      Math.random().toString(36).slice(2, 7),
+    cx: cell.x, cy: cell.y, x: pos.x, y: pos.y, sx: pos.x, sy: pos.y,
+    dir: "w", moving: false, attackAnim: 0, speed: 0,
+    spawnAt: Date.now() };
+  c.mobs = c.mobs || []; c.mobs.unshift(mob);
+  c.events = c.events || [];
+  c.events.push({ t: "spawn", slug: "bonelord-totem", x: mob.x, y: mob.y,
+    targetId: mob.id, screen: true });
+  return mob;
+}
+function gravediggerBossInit(c, player) {
+  if (!gravediggerBossFight(c)) return c;
+  if (!(c.mobs || []).some((m) => m && m.boss)) return c;
+  c.gd = { nextAt: Date.now() + 8000 };
+  if (typeof addLog === "function")
+    addLog("info", "O <b>Gravedigger</b> invoca <b>Bonelord Totems</b> imortais — fique longe da área de morte!");
+  return c;
+}
+function gravediggerBossTick(c, now) {
+  const st = c && c.gd; if (!st || c.ended) return true;
+  const boss = (c.mobs || []).find((m) => m && m.boss && m.hp > 0);
+  if (!boss) return true;
+  const alive = (c.mobs || []).filter((m) => m.gdTotem && m.hp > 0).length;
+  if (alive < GD_TOTEM_MAX && now >= (st.nextAt || 0)) {
+    if (gdSpawnTotem(c, Number(boss.cx) || 0, Number(boss.cy) || 0))
+      st.nextAt = now + GD_SUMMON_MS;
+    else st.nextAt = now + 2000;
+  }
+  return true;
+}
+function gravediggerBossCleanup(c) { if (c && c.gd) delete c.gd; }
+
 const ROOST_DATA = {
   CRYPT_RUNES, CRYPT_WEAPONS, ROOST_ITEMS, ROOST_MONSTERS,
   ROOST_ROOMS, ROOST_MISSION_DEFS, ROOST_QUEST_ID,
@@ -1156,6 +1226,7 @@ const ROOST_DATA = {
   AG_CRYSTAL_MANA_DRAIN_PCT, AG_CRYSTAL_RADIUS,
   ELD_VENT_SPAWNS, ELD_STAGE_MS, ELD_RESPAWN_MS, ELD_TOTEM_IMMUNE,
   IH_CRAWLER_MAX, IH_SUMMON_MS,
+  GD_TOTEM_MAX, GD_SUMMON_MS,
   monsterSlugs: Object.keys(ROOST_MONSTERS),
   roostRollWeapon, roostCanExchange, roostState,
   registerMonsters(monsters) {

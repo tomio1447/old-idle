@@ -84,6 +84,9 @@ MOBS_LOOKITEM = {
     "pulsating-lava": 391,
     "eruption": 51952,
     "flame-totem": 51953,
+    # The Gravedigger — Bonelord Totem (objectID oficial 51192 do wikitext;
+    # invocável x2, todos os dmg mods 0% → hazard invulnerável).
+    "bonelord-totem": 51192,
 }
 
 # NPC Dragon Ancestor Spirit — dragão espírito (looktype 1899).

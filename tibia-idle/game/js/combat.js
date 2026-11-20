@@ -114,6 +114,8 @@ function arenaBossBindMechanics(c, now) {
     eldritchBossInit(c, player);
   if (id === "ice-horror" && typeof iceHorrorBossInit === "function" && !c.iceH)
     iceHorrorBossInit(c, player);
+  if (id === "the-gravedigger" && typeof gravediggerBossInit === "function" && !c.gd)
+    gravediggerBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -1895,6 +1897,7 @@ function applyResist(mob, element, dano, piercePct) {
 function mobTakenMul(mob, dmg) {
   if (mob && mob.eldritchImmune) return 0;
   const mul = mob && mob.def && Number(mob.def.damageTakenMul);
+  if (mul === 0) return 0; // Bonelord Totem: oficial 0% em tudo (invulnerável)
   return (mul > 0 && mul !== 1) ? Math.max(1, Math.floor(dmg * mul)) : dmg;
 }
 
@@ -5217,6 +5220,7 @@ function combatTick(c, p, dt, now) {
   if (typeof adventurerGroupBossTick === "function" && adventurerGroupBossTick(c, now) === false) return;
   if (typeof eldritchBossTick === "function" && eldritchBossTick(c, now) === false) return;
   if (typeof iceHorrorBossTick === "function" && iceHorrorBossTick(c, now) === false) return;
+  if (typeof gravediggerBossTick === "function" && gravediggerBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof echoRaidTick === "function") echoRaidTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);

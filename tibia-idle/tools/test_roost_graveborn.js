@@ -329,6 +329,29 @@ const engSrc = fs.readFileSync(path.join(__dirname, "..", "server",
 must(engSrc.includes("tickIceHorror") && engSrc.includes("iceCrawler"),
   "engine sem tickIceHorror/iceCrawler");
 
+/* -------- The Gravedigger: Bonelord Totems invocados -------- */
+must(M["bonelord-totem"], "bonelord-totem ausente do ROOST_MONSTERS");
+must(M["bonelord-totem"].lookItem === 51192 &&
+  M["bonelord-totem"].damageTakenMul === 0 && M["bonelord-totem"].exp === 0 &&
+  M["bonelord-totem"].loot.length === 0 &&
+  M["bonelord-totem"].skills.some((s) => s.el === "death" && s.radius >= 3),
+  "bonelord-totem ficha divergente (oficial: objectID 51192, dmg mods 0%)");
+must(E.MONSTERS["bonelord-totem"], "engine: bonelord-totem ausente");
+must(ctx.MOBSHEETS["bonelord-totem"] &&
+  fs.existsSync(path.join(game, "assets", "mob", "bonelord-totem.png")) &&
+  caCtx.CREATURE_ANCHORS["bonelord-totem"], "bonelord-totem sheet/âncora ausente");
+must(roost.GD_TOTEM_MAX === 2 && roost.GD_SUMMON_MS > 0,
+  "GD_TOTEM_MAX deve ser 2 (Summon amount=2 oficial)");
+must(combatSrc.includes("gravediggerBossInit") && combatSrc.includes("gravediggerBossTick"),
+  "cliente combat.js sem hooks do gravedigger");
+must(roostSrc.includes("gravediggerBossTick") && roostSrc.includes("gdSpawnTotem"),
+  "roost module sem mecânica do gravedigger");
+must(engSrc.includes("tickGravedigger") && engSrc.includes("gdTotem"),
+  "engine sem tickGravedigger/gdTotem");
+/* funil: damageTakenMul 0 deve zerar o dano (totem invulnerável oficial) */
+must(engSrc.includes("agMul===0") && combatSrc.includes("mul === 0"),
+  "funnels sem o caso damageTakenMul===0 (totem seria matável)");
+
 /* ---------------- engine ---------------- */
 for (const slug of BOSSES) {
   must(E.MONSTERS[slug], "engine: " + slug + " ausente do MONSTERS");
@@ -623,6 +646,45 @@ must(html.indexOf("js/make-believe-quest.js") < html.indexOf("js/roost-graveborn
   must(auth.authority.bossDefeated === true &&
     auth.authority.mobs.filter((m) => m.iceCrawler).length === nBefore,
     "invocação deve parar com o boss morto");
+}
+
+/* -------- Gravedigger: simulação autoritativa dos totens -------- */
+{
+  const bmap = OTBM.read(fs.readFileSync(
+    path.join(game, "maps", "gravedigger.otbm")).buffer.slice(0), { z: 7 });
+  const min = bmap.sourceBounds;
+  const L = (ax, ay) => ({ cx: ax - min.minX, cy: ay - min.minY });
+  const bcell = L(1023, 1029), pcell = L(1023, 1035);   // coords oficiais
+  const lvl = 500;
+  const player = { id: "1", name: "T", voc: "knight", level: lvl,
+    exp: engine.expForLevel(lvl), hp: 300000, mp: 20000, gold: 0,
+    skills: { sword: 120 }, ml: 20, equip: {}, supplies: {}, lootPouch: {},
+    kills: {}, bosses: {}, config: {} };
+  const desc = { v: 1, savedAt: 1000, kind: "boss", huntId: null,
+    bossId: "the-gravedigger", instanceMode: "boss", activeCharacterId: "1",
+    members: [{ id: "1", p: player }],
+    state: { players: [{ id: "1", p: player, cx: pcell.cx, cy: pcell.cy, x: .5, y: .5 }],
+      mobs: [{ id: "boss-1", slug: "the-gravedigger", boss: true,
+        cx: bcell.cx, cy: bcell.cy, x: .5, y: .5 }], events: [] } };
+  let auth = engine.initializeAuthority(desc, "d".repeat(64), 1000);
+  const adv = (ms) => JSON.parse(engine.advanceAuthorityState(
+    JSON.stringify(auth), ms, Number(auth.authority.clock) + ms).state);
+  auth = adv(6000);
+  must(auth.authority.gd, "gd não inicializado no bind do boss");
+  const silence = () => { for (const m of auth.authority.mobs) {
+    m.damage = 0; m.attackSpeed = Number.MAX_SAFE_INTEGER; m.attackAcc = 0;
+    m.skills = []; } };
+  const refill = () => { for (const it of auth.authority.players) it.p.hp = engine.maxStats(it.p).hp; };
+  silence(); refill(); auth = adv(9000); silence(); refill();
+  must(auth.authority.mobs.filter((m) => m.gdTotem && m.hp > 0).length >= 1,
+    "primeiro bonelord-totem não invocado");
+  auth = adv(16000); silence(); refill();
+  const totems = auth.authority.mobs.filter((m) => m.gdTotem && m.hp > 0);
+  must(totems.length === 2 && totems.every((m) => m.slug === "bonelord-totem" &&
+    m.def.damageTakenMul === 0 && m.def.lookItem === 51192),
+    "cap de totens divergente: " + totems.length);
+  /* invulnerável oficial: damageTakenMul 0 zera qualquer dano no funnel. */
+  must(totems.every((m) => m.speed === 0), "totem deve ser estático");
 }
 
 console.log("OK — Roost of the Graveborn Quest 450+: 5 bossrooms OTBM " +
