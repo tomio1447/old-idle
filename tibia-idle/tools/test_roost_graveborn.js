@@ -87,8 +87,8 @@ must(JSON.stringify(ctx.BOSS_DEFS["bonelords-phylactery"].requirement.killsRequi
 
 const mission = ctx.MISSION_DEFS["unhallowed-crypt"];
 must(mission && mission.tasks.length === 1 &&
-  mission.tasks[0].counter === "kills" && mission.tasks[0].target === 5000,
-  "Missão unhallowed-crypt deve pedir 5000 kills");
+  mission.tasks[0].counter === "kills" && mission.tasks[0].target === 500,
+  "Missão unhallowed-crypt deve pedir 500 kills");
 must(mission.completeReward && mission.completeReward.bossAccess === "adventurer-group",
   "Missão deve liberar o Adventurer Group");
 
@@ -530,8 +530,8 @@ for (const [, , mapName] of MAPS) {
   /* Estado da quest: M1 5k kills → M2 4 bosses → M3 phylactery. */
   const st0 = roost.roostState(p);
   must(!st0.m1.done && !st0.m2.done && !st0.m3.done, "estado inicial errado");
-  p.missions["unhallowed-crypt"] = { progress: { kills: 5000 } };
-  must(roost.roostState(p).m1.done, "M1 deve completar com 5000 kills");
+  p.missions["unhallowed-crypt"] = { progress: { kills: 500 } };
+  must(roost.roostState(p).m1.done, "M1 deve completar com 500 kills");
   for (const id of ["adventurer-group", "eldritch-dragon-lord", "ice-horror"])
     p.bosses[id] = { kills: 1 };
   must(!roost.roostState(p).m2.done, "M2 deve exigir os 4 bosses");
@@ -818,7 +818,7 @@ must(html.indexOf("js/make-believe-quest.js") < html.indexOf("js/roost-graveborn
 }
 
 console.log("OK — Roost of the Graveborn Quest 450+: 5 bossrooms OTBM " +
-  "z=7 (spawn/boss validados), cadeia sequencial M1 5000 kills → " +
+  "z=7 (spawn/boss validados), cadeia sequencial M1 500 kills → " +
   "Adventurer Group → Eldritch DL → Ice Horror → Gravedigger → " +
   "Phylactery (5 crypt runes), NPC Dragon Ancestor Spirit com troca " +
   "por roleta gif (7 armas crypt, pesos oficiais), paridade " +

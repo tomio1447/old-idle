@@ -2,7 +2,7 @@
  * update 15.20).
  *
  * Progressão (conforme pedido):
- *   Missão 1 — derrotar 5.000 monstros da Unhallowed Crypt
+ *   Missão 1 — derrotar 500 monstros da Unhallowed Crypt
  *     → libera o boss Adventurer Group ("The First Dragon").
  *   Missão 2 — derrotar os 4 bosses em sequência:
  *     1º Adventurer Group  (encounter "The First Dragon")
@@ -768,7 +768,7 @@ const ROOST_ROOMS = {
 const ROOST_BOSS_META = [
   { id: "adventurer-group", name: "Adventurer Group",
     title: "The First Dragon — Roost of the Graveborn",
-    text: "Roost Quest — Missão 1: derrotar 5.000 monstros na Unhallowed Crypt" },
+    text: "Roost Quest — Missão 1: derrotar 500 monstros na Unhallowed Crypt" },
   { id: "eldritch-dragon-lord", name: "Eldritch Dragon Lord",
     title: "Under Fire — Roost of the Graveborn",
     text: "Roost Quest — derrotar o Adventurer Group" },
@@ -783,13 +783,13 @@ const ROOST_BOSS_META = [
     text: "Roost Quest — derrotar os 4 bosses da cadeia" },
 ];
 
-/* Missão 1: 5.000 kills na Unhallowed Crypt → libera Adventurer Group. */
+/* Missão 1: 500 kills na Unhallowed Crypt → libera Adventurer Group. */
 const ROOST_MISSION_DEFS = {
   "unhallowed-crypt": {
     title: "Missão: Roost of the Graveborn — Unhallowed Crypt",
     tasks: [{
-      counter: "kills", target: 5000,
-      label: "Eliminar 5000 monstros na Unhallowed Crypt",
+      counter: "kills", target: 500,
+      label: "Eliminar 500 monstros na Unhallowed Crypt",
     }],
     completeReward: { bossAccess: "adventurer-group", bossName: "Adventurer Group" },
   },
@@ -811,14 +811,14 @@ function roostState(p) {
   const bosses = (p && p.bosses) || {};
   const killed = (slug) => Number(bosses[slug] && bosses[slug].kills) > 0;
   const m1k = roostMissionKills(p, "unhallowed-crypt");
-  const m1 = m1k >= 5000 || !!(p && p.missionsDone && p.missionsDone["unhallowed-crypt"]);
+  const m1 = m1k >= 500 || !!(p && p.missionsDone && p.missionsDone["unhallowed-crypt"]);
   const chainKills = ROOST_CHAIN.filter(killed).length;
   const m2 = chainKills === 4;
   const m3 = killed("bonelords-phylactery");
   const done = (p && p.missionsDone) || {};
   return {
     reqLevel: (p && Number(p.level)) >= 450,
-    m1: { done: m1, kills: Math.min(m1k, 5000), target: 5000 },
+    m1: { done: m1, kills: Math.min(m1k, 500), target: 500 },
     m2: { done: m2, kills: chainKills, target: 4 },
     m3: { done: m3, kills: m3 ? 1 : 0, target: 1 },
     chainDone: Object.fromEntries(ROOST_CHAIN.map((id) => [id, killed(id)])),
@@ -1048,7 +1048,7 @@ function roostBindExchange() {
       playable: false,
       icon: "small-treasure-chest",
       bossSprite: "bonelords-phylactery",
-      description: "A quest do update 15.20: uma horda de dragões sob o controle do Necromancer. Missão 1 — elimine 5.000 monstros na Unhallowed Crypt para liberar a cadeia sequencial de 4 bosses: Adventurer Group (5 aventureiros por vocação que viram avatares em vida vermelha + Bright Crystal e Fatal Bug), Eldritch Dragon Lord (vulcões que evoluem até Flame Totems — 3+ totens vivos o deixam IMORTAL), Ice Horror (invoca Ice Crawlers) e The Gravedigger (invoca até 2 Bonelord Totems invulneráveis, área de morte). O boss final, Bonelord's Phylactery, luta em 2 fases: F1 com 4 Soulcages de HP compartilhado guardadas por 4 dragon spirits invulneráveis (afaste-os ou eles curam o pool), F2 com a Phylactery + 4 Enthralled Dragons sob os gazes do Bone Overlord (An Eye, Wraithfire, Mana Drain, Curse, Bone Barrier). A vitória rende 1 de cada Crypt Rune; o Dragon Ancestor Spirit troca um set completo por uma arma Crypt aleatória.",
+      description: "A quest do update 15.20: uma horda de dragões sob o controle do Necromancer. Missão 1 — elimine 500 monstros na Unhallowed Crypt para liberar a cadeia sequencial de 4 bosses: Adventurer Group (5 aventureiros por vocação que viram avatares em vida vermelha + Bright Crystal e Fatal Bug), Eldritch Dragon Lord (vulcões que evoluem até Flame Totems — 3+ totens vivos o deixam IMORTAL), Ice Horror (invoca Ice Crawlers) e The Gravedigger (invoca até 2 Bonelord Totems invulneráveis, área de morte). O boss final, Bonelord's Phylactery, luta em 2 fases: F1 com 4 Soulcages de HP compartilhado guardadas por 4 dragon spirits invulneráveis (afaste-os ou eles curam o pool), F2 com a Phylactery + 4 Enthralled Dragons sob os gazes do Bone Overlord (An Eye, Wraithfire, Mana Drain, Curse, Bone Barrier). A vitória rende 1 de cada Crypt Rune; o Dragon Ancestor Spirit troca um set completo por uma arma Crypt aleatória.",
       renderDetail: renderRoostQuestDetail,
     };
   }

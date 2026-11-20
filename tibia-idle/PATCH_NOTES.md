@@ -4,6 +4,18 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Roost of the Graveborn: Missão 1 reduzida para 500 kills
+
+- A Missão 1 da quest (`MISSION_DEFS["unhallowed-crypt"]`) passa de
+  **5.000 para 500 kills** na Unhallowed Crypt para liberar a cadeia de
+  bosses (Adventurer Group → … → Bonelord's Phylactery). Label,
+  descrição da quest, `roostState` (progresso/conclusão) e testes
+  atualizados. Progresso já acumulado continua valendo — quem tinha
+  ≥500 kills tem a missão completa automaticamente.
+- `game/js/roost-graveborn.js` → `?v=roost-m1-500-v1`.
+
+---
+
 ## 2026-11-20 — Reward Chest: loot de boss aparece na Loot Pouch na hora + correções de integridade
 
 - **Bug corrigido**: ao recolher o loot de boss online, o item não
