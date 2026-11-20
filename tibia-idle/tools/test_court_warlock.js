@@ -345,6 +345,107 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
     "crédito do boss court-warlock não registrado");
 }
 
+/* ==================== Stag Bastion — hunt 400+ ==================== */
+{
+  const hunt = ctx.GAMEDATA.hunts["stag-bastion"];
+  must(hunt && hunt.cat === "hard" && hunt.level === 400 &&
+    hunt.minLevel === 400, "stag-bastion: hunt 400+ ausente");
+  must(hunt.packMin === 8 && hunt.packMax === 10,
+    "pack deve ser 8-10 (respawn oficial)");
+  must(hunt.otbm === "stag_bastion" && hunt.otbmFloor === 7,
+    "otbm/floor divergentes");
+  must(hunt.otbmSpawn.x === 1020 && hunt.otbmSpawn.y === 1024 &&
+    hunt.otbmSpawn.z === 7, "centerroom divergente");
+  must(hunt.otbmMobBounds.x === 1017 && hunt.otbmMobBounds.y === 1020 &&
+    hunt.otbmMobBounds.w === 9 && hunt.otbmMobBounds.h === 9,
+    "spawn radius divergente do oficial {1017,1020}-{1025,1028}");
+  must(hunt.monsters.length === 3, "hunt deve ter 3 raubritters");
+
+  /* Fichas oficiais (wikitext). */
+  const SB = {
+    "raubritter-skirmisher": { hp: 11000, exp: 8550, armor: 100,
+      mitigation: 3.92, lt: 1908, td: 1 },
+    "raubritter-chastener": { hp: 10000, exp: 9500, armor: 80,
+      mitigation: 3.68, lt: 1920, td: 1 },
+    "raubritter-marksman": { hp: 10500, exp: 9025, armor: 90,
+      mitigation: 3.45, lt: 1889, td: 4 },
+  };
+  for (const slug in SB) {
+    const m = M[slug], o = SB[slug];
+    must(m, slug + " ausente");
+    must(m.hp === o.hp && m.exp === o.exp && m.armor === o.armor &&
+      m.mitigation === o.mitigation, slug + ": ficha oficial divergente");
+    must(m.looktype === o.lt, slug + ": looktype " + o.lt);
+    must(m.targetDistance === o.td, slug + ": distance divergente");
+    must(m.imune.includes("paralyze") && m.imune.includes("invisible"),
+      slug + ": imunes oficiais ausentes");
+    must(m.loot.length >= 10, slug + ": loot incompleto");
+    for (const l of m.loot)
+      must(I[l.item], slug + ": loot sem item " + l.item);
+    must(fs.existsSync(path.join(game, "assets", "mob", slug + ".png")) &&
+      ctx.MOBSHEETS[slug], slug + ": sprite ausente");
+  }
+  /* Resistências oficiais (resist = 100 − dmgMod). */
+  must(M["raubritter-skirmisher"].resist.fire === -15 &&
+    M["raubritter-skirmisher"].resist.ice === 20, "skirmisher resists");
+  must(M["raubritter-chastener"].resist.physical === -20 &&
+    M["raubritter-chastener"].resist.ice === 25, "chastener resists");
+  must(M["raubritter-marksman"].resist.energy === 12 &&
+    M["raubritter-marksman"].ranged === 1, "marksman ranged/resists");
+
+  /* Itens novos da hunt — cids + npcvalues oficiais. */
+  const NEW_IT = { "stag-parchment": [52664, 3000],
+    "silver-poniard": [52662, 2000], "cuirass-plate": [52663, 1000],
+    "bottle-of-raubritter-lager": [52745, 0],
+    "marinated-sturgeon": [52638, 0], "crystalline-arrow": [15793, 0],
+    "ring-of-green-plasma": [23531, 8000],
+    "ring-of-orange-plasma": [50150, 8000] };
+  for (const s in NEW_IT) {
+    const it = I[s], [cid, sell] = NEW_IT[s];
+    must(it, s + " ausente");
+    must(it.cid === cid, s + ": cid oficial " + cid + " ≠ " + it.cid);
+    must(it.sell === sell, s + ": npcvalue oficial " + sell + " ≠ " + it.sell);
+    must(fs.existsSync(path.join(game, "assets", "item", s + ".png")),
+      s + ": ícone ausente");
+  }
+  /* Preços: placeholders ≤1 corrigidos ao npcvalue oficial
+   * (shockwave-amulet 3000, magma-amulet 1500, gold-ingot 5000).
+   * Itens com preço real já registrado ficam como estão (Yasir p/
+   * creature products, convenção antiga p/ equipamentos). */
+  const FIX = { "shockwave-amulet": 3000, "magma-amulet": 1500,
+    "gold-ingot": 5000 };
+  for (const s in FIX)
+    must(I[s] && I[s].sell === FIX[s],
+      s + ": preço oficial " + FIX[s] + " ≠ " + (I[s] && I[s].sell));
+  for (const s of ["magma-monocle", "wand-of-cosmic-energy",
+    "wand-of-starstorm", "lightning-robe", "terra-mantle",
+    "composite-hornbow"])
+    must(I[s] && I[s].sell > 1, s + ": sem preço registrado");
+
+  /* OTBM: retângulo de spawn 100% caminhável + center walkable. */
+  const sb = fs.readFileSync(path.join(game, "maps", "stag_bastion.otbm"));
+  const smap = OTBM.read(sb.buffer.slice(sb.byteOffset, sb.byteOffset + sb.byteLength), { z: 7 });
+  const smin = smap.sourceBounds;
+  let wcells = 0;
+  for (let ax = 1017; ax <= 1025; ax++)
+    for (let ay = 1020; ay <= 1028; ay++)
+      if ((smap.cells[(ax - smin.minX) + "," + (ay - smin.minY)] || {}).g) wcells++;
+  must(wcells === 81, "spawn rect deve ser 81/81 caminhável: " + wcells);
+  must((smap.cells[(1020 - smin.minX) + "," + (1024 - smin.minY)] || {}).g,
+    "centerroom não caminhável");
+
+  /* Modal + engine. */
+  const sectSrc = fs.readFileSync(path.join(js, "hunt-sections.js"), "utf8");
+  must(sectSrc.includes('"stag-bastion"'),
+    "stag-bastion ausente da seção HUNTS 400+");
+  must(engine.MONSTERS["raubritter-skirmisher"] &&
+    engine.MONSTERS["raubritter-chastener"] &&
+    engine.MONSTERS["raubritter-marksman"],
+    "raubritters de hunt não registrados no engine");
+}
+
 console.log("OK: Court Warlock — ficha oficial 2741/lt1903/120k, " +
   "raubritters + enraged, Stag Set + Marionette, sala/hazard OTBM, " +
-  "engine + hooks, sim autoritativa (waves→transform→falcons→boss→crédito).");
+  "engine + hooks, sim autoritativa (waves→transform→falcons→boss→crédito). " +
+  "Stag Bastion 400+: 3 raubritters oficiais, pack 8-10, retângulo de " +
+  "spawn validado, loot oficial com preços, sprites + seção modal.");

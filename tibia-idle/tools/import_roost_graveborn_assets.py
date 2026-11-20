@@ -36,6 +36,8 @@ MAPS = [
     ("bossesroom/bonelords_phylactery.otbm", "bonelords_phylactery.otbm"),
     # Court Warlock — Order of the Stag Quest (15.20).
     ("bossesroom/court_room.otbm", "court_room.otbm"),
+    # Stag Bastion — hunt 400+ dos Raubritters (15.20).
+    ("bossesroom/stag_bastion.otbm", "stag_bastion.otbm"),
 ]
 
 # 7 armas Crypt + 5 Crypt Runes (cids oficiais update 15.20, tibia.gg).
@@ -59,6 +61,12 @@ ITEM_ICONS = {
     "stag-footwraps": 52354, "stag-spellbook": 52355,
     "stag-scrolls": 52356, "stag-shield": 52357,
     "twisted-marionette": 52746,
+    # Stag Bastion — creature products/loot dos Raubritters de hunt
+    # (cids oficiais do wikitext Fandom).
+    "stag-parchment": 52664, "silver-poniard": 52662,
+    "cuirass-plate": 52663, "bottle-of-raubritter-lager": 52745,
+    "marinated-sturgeon": 52638, "crystalline-arrow": 15793,
+    "ring-of-green-plasma": 23531, "ring-of-orange-plasma": 50150,
 }
 
 # Bosses com looktype real (2 grupos: idle + walk, 4 dirs x 8 fases).
@@ -105,6 +113,11 @@ MOBS_LOOKTYPE = {
     "enraged-frozen-raubritter": 1885,
     "enraged-raging-raubritter": 1919,
     "enraged-energised-raubritter": 1882,
+    # Stag Bastion — Raubritters de hunt (bestiário existe mas sem
+    # looktype público → estimados do lote livre 15.20).
+    "raubritter-skirmisher": 1908,
+    "raubritter-chastener": 1920,
+    "raubritter-marksman": 1889,
 }
 
 # Bosses "lookItem": a entidade oficial aparece como objeto (cid). O sheet

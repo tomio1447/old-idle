@@ -226,6 +226,205 @@ const STRONG_FROZEN    = raubStrong(FROZEN_RAUBRITTER, 1885);
 const STRONG_RAGING    = raubStrong(RAGING_RAUBRITTER, 1919);
 const STRONG_ENERGISED = raubStrong(ENERGISED_RAUBRITTER, 1882);
 
+/* ── Stag Bastion — hunt 400+ (spawn dos Raubritters "normais", não os
+ * de boss). Fichas OFICIAIS (wikitext): hp/exp/armor/mitigation/speed,
+ * dmgMods (resist = 100−mod), walksthrough Fire/Energy/Poison,
+ * para-immune, sense-invis, maxdmg 1000+. Looktypes estimados do lote
+ * livre 15.20 (bestiário existe mas o staticdata não mapeia). ── */
+const SB_ITEMS = {
+  "stag-parchment":       { n: "stag parchment", s: null, t: "loot",
+                            cid: 52664, w: 7.5, sell: 3000, npcSell: 3000 },
+  "silver-poniard":       { n: "silver poniard", s: null, t: "loot",
+                            cid: 52662, w: 7.5, sell: 2000, npcSell: 2000 },
+  "cuirass-plate":        { n: "cuirass plate", s: null, t: "loot",
+                            cid: 52663, w: 7.5, sell: 1000, npcSell: 1000 },
+  /* Sem comprador oficial (npcvalue 0): lager e sturgeon → sell 0. */
+  "bottle-of-raubritter-lager": { n: "bottle of raubritter lager",
+                            s: null, t: "loot", cid: 52745, w: 5,
+                            sell: 0, npcSell: 0 },
+  "marinated-sturgeon":   { n: "marinated sturgeon", s: null, t: "loot",
+                            cid: 52638, w: 10, sell: 0, npcSell: 0 },
+  "crystalline-arrow":    { n: "crystalline arrow", s: "ammo", t: "loot",
+                            cid: 15793, w: 0.75, sell: 0, npcSell: 0 },
+  "ring-of-green-plasma": { n: "ring of green plasma", s: "ring",
+                            t: "armor", cid: 23531, w: 0.9,
+                            sell: 8000, npcSell: 8000 },
+  "ring-of-orange-plasma":{ n: "ring of orange plasma", s: "ring",
+                            t: "armor", cid: 50150, w: 0.9,
+                            sell: 8000, npcSell: 8000 },
+};
+/* Correções de preço oficial (npcvalue do wikitext) em itens já
+ * existentes usados nas tabelas de loot da hunt. */
+const SB_PRICE_FIX = {
+  "magma-monocle": 2500, "wand-of-cosmic-energy": 2000,
+  "wand-of-starstorm": 3600, "lightning-robe": 11000,
+  "terra-mantle": 11000, "composite-hornbow": 25000,
+  "shockwave-amulet": 3000, "magma-amulet": 1500, "gold-ingot": 5000,
+};
+
+const HUNT_RAUB_BASE = {
+  exp: 0, armor: 90, defense: 85, damage: 600, element: "physical",
+  attackSpeed: 2000, targetDistance: 1, staticAttack: 90,
+  imune: ["paralyze", "invisible"], loot: [], grupo: "humans",
+};
+/* Raubritter Skirmisher — melee, hp 11000, exp 8550, armor 100,
+ * mitigation 3.92, speed 150→160. */
+const RAUB_SKIRMISHER = Object.assign({}, HUNT_RAUB_BASE, {
+  name: "Raubritter Skirmisher", hp: 11000, exp: 8550,
+  armor: 100, defense: 90, mitigation: 3.92, speed: 160, damage: 700,
+  looktype: 1908,
+  resist: { physical: -12, earth: -6, fire: -15, death: 0, energy: 9,
+            holy: 15, ice: 20 },
+  skills: [
+    { el: "physical", min: 500, max: 900, int: 2000, ch: 40, range: 1 },
+    { el: "physical", min: 400, max: 800, int: 4500, ch: 25, radius: 2,
+      fx: "groundshaker", miss: "physical" },
+  ],
+  voices: { int: 6000, ch: 15, list: [
+    { t: "Out... sider, hrngh!" }, { t: "Must... resist!" },
+    { t: "Nnnooo... not... yesss, KILL!" } ] },
+  loot: [
+    { item: "platinum-coin", chance: 80, max: 10 },
+    { item: "cuirass-plate", chance: 12, max: 1 },
+    { item: "gold-ring", chance: 12, max: 1 },
+    { item: "silver-poniard", chance: 12, max: 1 },
+    { item: "fur-armor", chance: 12, max: 1 },
+    { item: "mercenary-sword", chance: 12, max: 1 },
+    { item: "crown-shield", chance: 6, max: 1 },
+    { item: "gold-ingot", chance: 6, max: 1 },
+    { item: "crown-armor", chance: 6, max: 1 },
+    { item: "marinated-sturgeon", chance: 1.5, max: 1 },
+    { item: "ring-of-orange-plasma", chance: 1.5, max: 1 },
+    { item: "ring-of-red-plasma", chance: 1.5, max: 1 },
+  ],
+});
+/* Raubritter Chastener — conjurador de magias elementais + escudos,
+ * hp 10000, exp 9500, armor 80, mitigation 3.68, speed 150. */
+const RAUB_CHASTENER = Object.assign({}, HUNT_RAUB_BASE, {
+  name: "Raubritter Chastener", hp: 10000, exp: 9500,
+  armor: 80, defense: 80, mitigation: 3.68, speed: 150, damage: 550,
+  looktype: 1920,
+  resist: { physical: -20, earth: -12, fire: -6, death: 0, energy: 15,
+            holy: 15, ice: 25 },
+  skills: [
+    { el: "fire",    min: 400, max: 800, int: 5000, ch: 25, radius: 3,
+      fx: "fire-area", miss: "fire" },
+    { el: "energy",  min: 400, max: 800, int: 5000, ch: 25, radius: 3,
+      fx: "energy-area", miss: "energy" },
+    { el: "holy",    min: 350, max: 700, int: 4000, ch: 25, range: 7,
+      miss: "holy", alvo: 1 },
+  ],
+  defSkills: [ { n: "shielding", int: 8000, ch: 20 } ],
+  voices: { int: 6000, ch: 15, list: [
+    { t: "Purification! Sal... vation! Deliver..." },
+    { t: "Bow... to the master..." }, { t: "You... will be cleansed." } ] },
+  loot: [
+    { item: "platinum-coin", chance: 80, max: 10 },
+    { item: "small-amethyst", chance: 40, max: 1 },
+    { item: "small-ruby", chance: 40, max: 1 },
+    { item: "red-gem", chance: 40, max: 1 },
+    { item: "magma-monocle", chance: 12, max: 1 },
+    { item: "wand-of-cosmic-energy", chance: 12, max: 1 },
+    { item: "stag-parchment", chance: 12, max: 1 },
+    { item: "silver-poniard", chance: 12, max: 1 },
+    { item: "wand-of-starstorm", chance: 12, max: 1 },
+    { item: "wooden-spellbook", chance: 12, max: 1 },
+    { item: "violet-gem", chance: 6, max: 1 },
+    { item: "lightning-robe", chance: 6, max: 1 },
+    { item: "shockwave-amulet", chance: 6, max: 1 },
+    { item: "ring-of-green-plasma", chance: 6, max: 1 },
+    { item: "magma-amulet", chance: 1.5, max: 1 },
+    { item: "bottle-of-raubritter-lager", chance: 1.5, max: 1 },
+    { item: "crystal-coin", chance: 1.5, max: 149 },
+  ],
+});
+/* Raubritter Marksman — distance fighter oficial, hp 10500, exp 9025,
+ * armor 90, mitigation 3.45, speed 170. */
+const RAUB_MARKSMAN = Object.assign({}, HUNT_RAUB_BASE, {
+  name: "Raubritter Marksman", hp: 10500, exp: 9025,
+  armor: 90, defense: 85, mitigation: 3.45, speed: 170, damage: 650,
+  looktype: 1889, targetDistance: 4, ranged: 1,
+  resist: { physical: -16, earth: -12, fire: -12, death: 0, energy: 12,
+            holy: 15, ice: 15 },
+  skills: [
+    { el: "physical", min: 450, max: 850, int: 1800, ch: 45, range: 7,
+      miss: "physical", alvo: 1 },
+    { el: "physical", min: 350, max: 700, int: 4000, ch: 30, range: 7,
+      radius: 2, miss: "physical" },
+  ],
+  voices: { int: 6000, ch: 15, list: [
+    { t: "This is ours now!" }, { t: "I'll... hunt you... down!" },
+    { t: "Gnnnah!!!" } ] },
+  loot: [
+    { item: "platinum-coin", chance: 80, max: 12 },
+    { item: "cuirass-plate", chance: 40, max: 1 },
+    { item: "stag-parchment", chance: 12, max: 2 },
+    { item: "blue-crystal-shard", chance: 12, max: 1 },
+    { item: "violet-crystal-shard", chance: 12, max: 1 },
+    { item: "green-crystal-shard", chance: 12, max: 1 },
+    { item: "green-gem", chance: 6, max: 1 },
+    { item: "blue-gem", chance: 6, max: 1 },
+    { item: "terra-mantle", chance: 6, max: 1 },
+    { item: "crystalline-arrow", chance: 1.5, max: 20 },
+    { item: "ring-of-blue-plasma", chance: 1.5, max: 1 },
+    { item: "composite-hornbow", chance: 1.5, max: 1 },
+    { item: "violet-gem", chance: 1.5, max: 1 },
+  ],
+});
+
+const SB_MONSTERS = {
+  "raubritter-skirmisher": RAUB_SKIRMISHER,
+  "raubritter-chastener": RAUB_CHASTENER,
+  "raubritter-marksman": RAUB_MARKSMAN,
+};
+
+/* ── Registro da hunt Stag Bastion ── */
+(function registerStagBastion() {
+  if (typeof GAMEDATA === "undefined") return;
+  const items = GAMEDATA.items || (GAMEDATA.items = {});
+  for (const slug in SB_ITEMS) {
+    const def = SB_ITEMS[slug];
+    if (!items[slug]) items[slug] = def;
+    else {
+      if (def.sell != null) items[slug].sell = def.sell;
+      if (def.npcSell != null) items[slug].npcSell = def.npcSell;
+      if (def.cid != null && items[slug].cid == null) items[slug].cid = def.cid;
+      if (def.w != null && items[slug].w == null) items[slug].w = def.w;
+      if (def.n && !items[slug].n) items[slug].n = def.n;
+    }
+  }
+  for (const slug in SB_PRICE_FIX) {
+    const it = items[slug];
+    if (!it) continue;
+    /* Só corrige placeholders/ausências — nunca sobrescreve um preço
+     * oficial já registrado (ex.: mercenary-sword 43000). */
+    if (it.sell == null || it.sell <= 1) it.sell = SB_PRICE_FIX[slug];
+    if (it.npcSell == null || it.npcSell <= 1) it.npcSell = SB_PRICE_FIX[slug];
+  }
+  if (typeof MONSTERDATA !== "undefined" && MONSTERDATA)
+    for (const slug in SB_MONSTERS) MONSTERDATA[slug] = SB_MONSTERS[slug];
+  GAMEDATA.monsters = GAMEDATA.monsters || {};
+  for (const slug in SB_MONSTERS) GAMEDATA.monsters[slug] = SB_MONSTERS[slug];
+
+  GAMEDATA.hunts = GAMEDATA.hunts || {};
+  GAMEDATA.hunts["stag-bastion"] = {
+    name: "Stag Bastion",
+    level: 400, minLevel: 400, cat: "hard",
+    pack: 9, packMin: 8, packMax: 10,    // "respawn de 8 a 10"
+    monsters: ["raubritter-skirmisher", "raubritter-chastener",
+               "raubritter-marksman"],
+    spawnWeights: { "raubritter-skirmisher": 20,
+                    "raubritter-chastener": 20,
+                    "raubritter-marksman": 20 },
+    color: "#5a4030", scene: "crypt",
+    otbm: "stag_bastion", otbmFloor: 7,
+    otbmSpawn: { x: 1020, y: 1024, z: 7 },           // centerroom
+    otbmMobBounds: { x: 1017, y: 1020, w: 9, h: 9, z: 7 }, // spawn radius
+    avgHp: 10500, avgExp: 9025, avgDamage: 900, avgArmor: 90,
+    avgGold: 500, respawn: 1,
+  };
+})();
+
 /* Tipo base → slug base/forte (para o check "4 do mesmo tipo"). */
 const CW_RAUB_TYPES = {
   earth:   { base: "poisoned-raubritter", strong: "enraged-poisoned-raubritter" },
@@ -455,11 +654,14 @@ const CW_DATA = {
   CW_HAZARD_OFFSETS, CW_HAZARD_DMG, CW_HAZARD_MS, CW_WAVE_MS,
   CW_WAVE_SIZE, CW_WAVES, CW_TRANSFORM_AT, CW_TELEPORT_MS,
   CW_FALCON_COUNT, CW_BOSS_HP_PER_TRANSFORM,
-  monsterSlugs: Object.keys(CW_MONSTERS),
+  SB_ITEMS, SB_PRICE_FIX, SB_MONSTERS,
+  monsterSlugs: Object.keys(CW_MONSTERS).concat(Object.keys(SB_MONSTERS)),
   registerMonsters(monsters) {
     if (!monsters) return;
     for (const slug of Object.keys(CW_MONSTERS))
       monsters[slug] = CW_MONSTERS[slug];
+    for (const slug of Object.keys(SB_MONSTERS))
+      monsters[slug] = SB_MONSTERS[slug];
   },
 };
 if (typeof module !== "undefined" && module.exports) module.exports = CW_DATA;

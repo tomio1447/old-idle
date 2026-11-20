@@ -48,6 +48,26 @@ Histórico de alterações do jogo, mais recentes primeiro.
   raging 1910, energised 1909; enraivecidos 1888/1885/1919/1882.
   Valores de waves/teleporte/bônus de hp são design documentado.
 
+### Stag Bastion — hunt 400+ (mesma sessão)
+
+- `stag_bastion.otbm` (20×19, z=7): spawn radius oficial
+  {1017,1020}–{1025,1028} (81/81 caminhável), center {1020,1024},
+  **respawn 8–10** (pack 9).
+- **3 Raubritters de hunt** (fichas OFICIAIS do wikitext):
+  - **Skirmisher** — melee: hp 11.000, exp 8.550, armor 100, mit 3.92
+  - **Chastener** — conjurador elemental + escudo: hp 10.000, exp 9.500,
+    armor 80, mit 3.68
+  - **Marksman** — distance fighter oficial: hp 10.500, exp 9.025,
+    armor 90, mit 3.45
+  - resistências oficiais (dmgMod→resist), walksthrough campos,
+    para-immune + sense-invis; looktypes estimados (1908/1920/1889).
+- **Loot oficial completo** — creature products novos: stag parchment
+  (52664→3k), silver poniard (52662→2k), cuirass plate (52663→1k),
+  bottle of raubritter lager (52745→sem comprador), marinated sturgeon
+  (52638→sem comprador), crystalline arrow, rings plasma verde/laranja
+  (23531/50150→8k); placeholders de preço corrigidos ao oficial
+  (shockwave amulet 3k, magma amulet 1,5k, gold ingot 5k).
+
 ### Correções de looktype (staticdata do client 15.20)
 
 - Adventurer Group: yorik 268 · percy 137 · grendel 144 ·
