@@ -118,6 +118,8 @@ function arenaBossBindMechanics(c, now) {
     gravediggerBossInit(c, player);
   if (id === "bonelords-phylactery" && typeof boneOverlordBossInit === "function" && !c.bo)
     boneOverlordBossInit(c, player);
+  if (id === "court-warlock" && typeof courtWarlockBossInit === "function" && !c.cw)
+    courtWarlockBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -5224,6 +5226,7 @@ function combatTick(c, p, dt, now) {
   if (typeof iceHorrorBossTick === "function" && iceHorrorBossTick(c, now) === false) return;
   if (typeof gravediggerBossTick === "function" && gravediggerBossTick(c, now) === false) return;
   if (typeof boneOverlordBossTick === "function" && boneOverlordBossTick(c, now) === false) return;
+  if (typeof courtWarlockBossTick === "function" && courtWarlockBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof echoRaidTick === "function") echoRaidTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);

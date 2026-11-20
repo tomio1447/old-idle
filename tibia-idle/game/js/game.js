@@ -1926,7 +1926,8 @@ const BOSS_DEFS = {
     loot: [],
   },
   "magma-bubble":      { id: "magma-bubble", name: "Magma Bubble", title: "EM BREVE", unavailable: true, sprite: "magma-bubble" },
-  "court-warlock":     { id: "court-warlock", name: "Court Warlock", title: "EM BREVE", unavailable: true, sprite: "court-warlock", portraitImage: "assets/mob/court-warlock-preview.gif" },
+  /* "court-warlock": definido em court-warlock.js (boss real da Order of
+   * the Stag Quest — antes era placeholder "EM BREVE"). */
   "maior-domus":       { id: "maior-domus", name: "Maior Domus", title: "EM BREVE", unavailable: true, sprite: "maior-domus", portraitImage: "assets/mob/maior-domus-preview.gif" },
   "phosphorus":        { id: "phosphorus", name: "Phosphorus", title: "EM BREVE", unavailable: true, sprite: "phosphorus", portraitImage: "assets/mob/phosphorus-preview.gif" },
   "mitmah-vanguard":   { id: "mitmah-vanguard", name: "Mitmah Vanguard", title: "EM BREVE", unavailable: true, sprite: "mitmah-vanguard" },
@@ -4266,6 +4267,7 @@ function cleanupEncounterState(c){
   if(typeof iceHorrorBossCleanup==="function")iceHorrorBossCleanup(c);
   if(typeof gravediggerBossCleanup==="function")gravediggerBossCleanup(c);
   if(typeof boneOverlordBossCleanup==="function")boneOverlordBossCleanup(c);
+  if(typeof courtWarlockBossCleanup==="function")courtWarlockBossCleanup(c);
 }
 
 /* Compra automaticamente a bless de todos e recria a mesma instância.

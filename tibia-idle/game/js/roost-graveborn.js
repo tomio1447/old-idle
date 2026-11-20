@@ -397,7 +397,9 @@ const BONELORDS_PHYLACTERY = {
  * mesmo patamar (estimado). exp 0 oficial: o XP do encontro (750.000)
  * vem todo do Fatal Bug. looktypes dos avatares = outfits oficiais das
  * vocações (Steel 1593, Light 1594, Storm 1595, Nature 1596, Balance 1823).
- * looktypes dos membros: lote 15.20 — atribuição por sprite (estimada). */
+ * looktypes dos membros: OFICIAIS do staticdata do client 15.20
+ * (yorik 268, percy 137, grendel 144, fiona 1681, nigel 1837 — outfits
+ * clássicos reutilizados: os aventureiros são humanos). */
 const AG_TRANSFORM_PCT = 0.30;
 const AG_MEMBER_BASE = {
   hp: 155000, exp: 0, speed: 210, armor: 90, defense: 80,
@@ -418,30 +420,30 @@ function agAvatar(name, looktype, skills, extra) {
     skills: skills.slice(),
   }, extra || {});
 }
-const YORIK_YOUNGBOOK = agMember("Yorik Youngbook", 2712, 1895, "avatar-of-steel", [
+const YORIK_YOUNGBOOK = agMember("Yorik Youngbook", 2712, 268, "avatar-of-steel", [
   { el: "physical", min: 800, max: 1400, int: 2000, ch: 45, range: 1 },
   { el: "physical", min: 700, max: 1200, int: 5000, ch: 30, radius: 2,
     fx: "groundshaker", miss: "physical" },
 ]);
-const PERCY_PEACETINKER = agMember("Percy Peacetinker", 2713, 1888, "avatar-of-light", [
+const PERCY_PEACETINKER = agMember("Percy Peacetinker", 2713, 137, "avatar-of-light", [
   { el: "physical", min: 700, max: 1200, int: 2000, ch: 45, range: 7,
     miss: "holy", alvo: 1 },
   { el: "holy",     min: 600, max: 1100, int: 4500, ch: 30, radius: 3,
     fx: "holy-area", miss: "holy" },
 ]);
-const GRENDEL_GREENLUNCH = agMember("Grendel Greenlunch", 2714, 1889, "avatar-of-nature", [
+const GRENDEL_GREENLUNCH = agMember("Grendel Greenlunch", 2714, 144, "avatar-of-nature", [
   { el: "earth",    min: 700, max: 1200, int: 3000, ch: 40, radius: 3,
     fx: "poison-area", miss: "poison" },
   { el: "ice",      min: 600, max: 1000, int: 5000, ch: 30, range: 7,
     miss: "ice", alvo: 1 },
 ]);
-const FIONA_FIRSTDREAM = agMember("Fiona Firstdream", 2715, 1884, "avatar-of-storm", [
+const FIONA_FIRSTDREAM = agMember("Fiona Firstdream", 2715, 1681, "avatar-of-storm", [
   { el: "fire",     min: 700, max: 1300, int: 3000, ch: 40, radius: 3,
     fx: "fire-area", miss: "fire" },
   { el: "energy",   min: 800, max: 1400, int: 5000, ch: 30, range: 7,
     miss: "energy", alvo: 1 },
 ]);
-const NIGEL_NEVERGUESS = agMember("Nigel Neverguess", 2716, 1882, "avatar-of-balance", [
+const NIGEL_NEVERGUESS = agMember("Nigel Neverguess", 2716, 1837, "avatar-of-balance", [
   { el: "physical", min: 800, max: 1400, int: 2000, ch: 45, range: 1 },
   { el: "energy",   min: 600, max: 1000, int: 4500, ch: 30, radius: 2,
     fx: "energy-area", miss: "energy" },
@@ -640,7 +642,7 @@ const SPIRIT_BASE = {
   ],
 };
 const ZHARVORINS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
-  name: "Zharvorin's Spirit", looktype: 1903, boCond: "rooted", boCageSlug: "zharvorins-soulcage",
+  name: "Zharvorin's Spirit", looktype: 1884, boCond: "rooted", boCageSlug: "zharvorins-soulcage",
   skills: SPIRIT_BASE.skills.concat([
     { el: "earth", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "root", miss: "rooting-effect" }]),
 });

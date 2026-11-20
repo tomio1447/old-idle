@@ -1,0 +1,465 @@
+/* court-warlock.js — Court Warlock (level 400+, boss final da The Order
+ * of the Stag Quest, update 15.20 / Isle of Ada).
+ *
+ * Ficha oficial (wikitext Fandom + staticdata do client 15.20):
+ *   - race_id 2741, looktype OFICIAL 1903 (decodificado do bestiário
+ *     do client), hp OFICIAL 120.000, exp 147.000, Archfoe;
+ *     walksthrough Fire/Energy/Poison (campos), para-immune,
+ *     sense-invis; maxdmg 1000+; cooldown resetável com Twisted
+ *     Marionette (aqui cooldown padrão 20h).
+ *   - Loot oficial completo: Stag Set (10 peças lvl 350 "Negotiable"
+ *     → sell 0), Twisted Marionette (npcvalue 125.000 → Yasir),
+ *     Wooden Spellbook (npcvalue 12.000 → Talila/Valindara),
+ *     Spellbook of Mind Control, Terra Hood, Lightning Headband,
+ *     Magma Coat, gems, moedas e poções ultimate.
+ *
+ * Mecânica oficial da luta (Spoiler da quest):
+ *   Fase 1 — Raubritters spawnam continuamente NA POSIÇÃO do jogador:
+ *     Poisoned (imune earth), Frozen (imune ice), Raging (imune fire),
+ *     Energised (lutador à distância, imune energy). Se 4 do MESMO tipo
+ *     ficarem vivos ao mesmo tempo → mudam de forma para uma versão
+ *     mais forte. Em intervalos, os jogadores são teleportados pela
+ *     sala; terreno especial (ground 500 do OTBM — anel central)
+ *     causa Death Damage alto a cada passo.
+ *   Fase 2 — após algumas waves a sala se enche de Falcon Paladins e
+ *     Falcon Knights; o terreno especial some.
+ *   Fase 3 — com todos os minions mortos o Court Warlock entra, com
+ *     menos HP dependendo de como foi a luta.
+ *   Valores não publicados (tamanho/intervalo das waves, bônus dos
+ *     enraivecidos, penalidade de HP) são design documentado.
+ *
+ * Este arquivo também roda no sandbox vm do servidor: lá só itens e
+ * monstros executam; o registro no MONSTERS é via module.exports.
+ */
+"use strict";
+
+const CW_QUEST_TITLE = "The Order of the Stag";
+const CW_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+
+/* Sala court_room.otbm (z=7) — coords oficiais informadas. */
+const CW_ROOM = {
+  otbm: "court_room",
+  center: { x: 1021, y: 1025, z: 7 },
+  spawn: { x: 1021, y: 1028, z: 7 },
+  boss: { x: 1021, y: 1022, z: 7 },
+};
+
+/* Terreno especial: as 12 células de ground 500 do OTBM (anel central),
+ * em offsets relativos ao bossspawn {1021,1022}. Oficial: "each step
+ * deals high Death Damage". */
+const CW_HAZARD_OFFSETS = [
+  [-3, +3], [-3, +4], [-2, +2], [-2, +5], [-1, +2], [-1, +5],
+  [0, +2], [0, +5], [+1, +2], [+1, +5], [+2, +3], [+2, +4],
+];
+const CW_HAZARD_DMG = [800, 1500];   // death damage por tick de exposição
+const CW_HAZARD_MS = 1200;           // intervalo do dano de terreno (design)
+const CW_WAVE_MS = 14000;            // intervalo entre waves (design)
+const CW_WAVE_SIZE = 3;              // raubritters por wave (design)
+const CW_WAVES = 5;                  // "after a few waves" → fase falcons
+const CW_TRANSFORM_AT = 4;           // oficial: 4 do mesmo tipo → forma forte
+const CW_TELEPORT_MS = 25000;        // "at intervals" (design)
+const CW_FALCON_COUNT = 8;           // "fills up with Paladins and Knights"
+const CW_BOSS_HP_PER_TRANSFORM = 15000; // hp extra por transform (design)
+
+/* ── Itens novos (cids oficiais do wikitext). Stag Set: "Negotiable"
+ * sem comprador NPC → sell 0 (padrão das crypt weapons). ── */
+const CW_ITEMS = {
+  /* ── Stag Set (lvl 350, upgrade class 4) ── */
+  "stag-helmet":    { n: "stag helmet",     s: "helmet", t: "armor", cid: 52348,
+                      arm: 8, ml: 2, fireMl: 2, res: { physical: 2, energy: 8 },
+                      imbSlots: 2, lvl: 350, vocs: ["sorcerer"], w: 14,
+                      drop: 1, sell: 0, npcSell: 0 },
+  "stag-robe":      { n: "stag robe",       s: "armor",  t: "armor", cid: 52349,
+                      arm: 10, res: { physical: 4 }, imbSlots: 2, lvl: 350,
+                      vocs: ["monk"], w: 80, drop: 1, sell: 0, npcSell: 0 },
+  "stag-plate":     { n: "stag plate",      s: "armor",  t: "armor", cid: 52350,
+                      arm: 17, dist: 3, res: { physical: 3, ice: 8 },
+                      imbSlots: 2, lvl: 350, vocs: ["paladin"], w: 130,
+                      drop: 1, sell: 0, npcSell: 0 },
+  "stag-legs":      { n: "stag legs",       s: "legs",   t: "armor", cid: 52351,
+                      arm: 10, sword: 3, club: 3, axe: 3,
+                      res: { physical: 7, fire: 7 }, lvl: 350,
+                      vocs: ["knight"], w: 11.5, drop: 1, sell: 0, npcSell: 0 },
+  "stag-shinguards":{ n: "stag shinguards", s: "boots",  t: "armor", cid: 52352,
+                      arm: 2, dist: 1, spd: 10, res: { physical: 2, energy: 5 },
+                      imbSlots: 1, lvl: 350, vocs: ["paladin"], w: 17,
+                      drop: 1, sell: 0, npcSell: 0 },
+  "stag-boots":     { n: "stag boots",      s: "boots",  t: "armor", cid: 52353,
+                      arm: 2, ml: 1, res: { energy: 8 }, imbSlots: 1,
+                      lvl: 350, vocs: ["druid"], w: 14, drop: 1, sell: 0, npcSell: 0 },
+  "stag-footwraps": { n: "stag footwraps",  s: "boots",  t: "armor", cid: 52354,
+                      arm: 2, res: { physical: 2, death: 3 }, imbSlots: 1,
+                      lvl: 350, vocs: ["monk"], w: 14, drop: 1, sell: 0, npcSell: 0 },
+  "stag-spellbook": { n: "stag spellbook",  s: "shield", t: "armor", cid: 52355,
+                      def: 34, ml: 5, res: { physical: 2, energy: 6 },
+                      imbSlots: 1, lvl: 350, vocs: ["sorcerer"], w: 20,
+                      drop: 1, sell: 0, npcSell: 0 },
+  "stag-scrolls":   { n: "stag scrolls",    s: "shield", t: "armor", cid: 52356,
+                      def: 34, ml: 5, res: { physical: 2, death: 5 },
+                      imbSlots: 1, lvl: 350, vocs: ["druid"], w: 20,
+                      drop: 1, sell: 0, npcSell: 0 },
+  "stag-shield":    { n: "stag shield",     s: "shield", t: "armor", cid: 52357,
+                      def: 52, res: { physical: 5, ice: 10 }, imbSlots: 1,
+                      lvl: 350, vocs: ["knight"], w: 55,
+                      drop: 1, sell: 0, npcSell: 0 },
+  /* ── Twisted Marionette: reseta o cooldown do boss (npcvalue 125k) ── */
+  "twisted-marionette": { n: "twisted marionette", s: null, t: "loot",
+                      cid: 52746, w: 10.01, sell: 125000, npcSell: 125000 },
+  /* ── Wooden Spellbook (npcvalue 12.000 → Talila/Valindara) ── */
+  "wooden-spellbook":   { n: "wooden spellbook", s: "shield", t: "armor",
+                      cid: 25699, def: 26, ml: 2, res: { earth: 5 },
+                      imbSlots: 1, lvl: 80, vocs: ["sorcerer", "druid"],
+                      w: 12, sell: 12000, npcSell: 12000 },
+  /* ── Ultimate Spirit Potion (poção de paladin/monk 130+) ── */
+  "ultimate-spirit-potion": { n: "ultimate spirit potion", s: "potion",
+                      t: "loot", cid: 23374, sell: 600, w: 3.1 },
+};
+
+/* ── Monstros ── */
+/* Court Warlock — hp OFICIAL 120.000, exp 147.000, race 2741 lt 1903.
+ * Skills estimadas (abilities oficiais ocultas; sons sugerem fogo —
+ * "COSY IN HERE!" — e raios de warlock). */
+const COURT_WARLOCK = {
+  name: "Court Warlock", hp: 120000, exp: 147000,
+  speed: 235, armor: 90, defense: 85,
+  damage: 1000, element: "energy", attackSpeed: 2000, mitigation: 0,
+  resist: { fire: 100, energy: 100, earth: 100 },  // walksthrough oficial
+  skills: [
+    /* Energy Ball 400-700 (design; maxdmg oficial 1000+). */
+    { el: "energy", min: 400, max: 700, int: 4500, ch: 30, radius: 2,
+      fx: "energy-area", miss: "energy" },
+    /* Fire Wave "COSY IN HERE!" (design). */
+    { el: "fire", min: 500, max: 900, int: 6000, ch: 25, range: 6,
+      wave: 1, fx: "fire-area", miss: "fire" },
+    /* Death strike no alvo (design). */
+    { el: "death", min: 450, max: 800, int: 5000, ch: 30, range: 7,
+      miss: "mort-area", alvo: 1 },
+  ],
+  looktype: 1903, raceId: 2741, targetDistance: 3, staticAttack: 90,
+  imune: ["paralyze", "invisible"], grupo: "quests",
+  voices: { int: 8000, ch: 18, list: [
+    { t: "Oh? Maybe it should get a little more COSY IN HERE!" },
+    { t: "I welcome you, to witness the spectacular destruction of the outside menace that cost so many of your dear brethren's lives!" },
+    { t: "Enough of this! Stop gawking and GET OVER THERE TO FINISH IT!" },
+    { t: "DO I REALLY NEED TO DO EVERYTHING... EEEVERYTHIIING MYSELF!" },
+    { t: "No, not like this, not without... NOOO!!!" },
+    { t: "You're just flies in my bed-chamber." },
+    { t: "Your medding with my affairs was a grave mistake!" },
+  ] },
+  loot: [
+    { item: "platinum-coin", chance: 100, max: 50 },
+    { item: "crystal-coin", chance: 60, max: 3 },
+    { item: "ultimate-health-potion", chance: 70, max: 12 },
+    { item: "ultimate-mana-potion", chance: 70, max: 12 },
+    { item: "ultimate-spirit-potion", chance: 70, max: 12 },
+    { item: "blue-gem", chance: 30, max: 2 },
+    { item: "red-gem", chance: 30, max: 2 },
+    { item: "lightning-headband", chance: 14, max: 1 },
+    { item: "magma-coat", chance: 14, max: 1 },
+    { item: "terra-hood", chance: 14, max: 1 },
+    { item: "spellbook-of-mind-control", chance: 12, max: 1 },
+    { item: "wooden-spellbook", chance: 10, max: 1 },
+    { item: "twisted-marionette", chance: 4, max: 1 },
+    { item: "crystal-coin", chance: 0.5, max: 500 },   // 500 cc very rare
+    { item: "stag-boots", chance: 0.8, max: 1 },
+    { item: "stag-footwraps", chance: 0.8, max: 1 },
+    { item: "stag-helmet", chance: 0.8, max: 1 },
+    { item: "stag-legs", chance: 0.8, max: 1 },
+    { item: "stag-plate", chance: 0.8, max: 1 },
+    { item: "stag-robe", chance: 0.8, max: 1 },
+    { item: "stag-scrolls", chance: 0.8, max: 1 },
+    { item: "stag-shinguards", chance: 0.8, max: 1 },
+    { item: "stag-shield", chance: 0.8, max: 1 },
+    { item: "stag-spellbook", chance: 0.8, max: 1 },
+  ],
+};
+
+/* Raubritters — hp OFICIAL 35.000, exp 0, imunes ao próprio elemento
+ * (dmgMod 0% oficial), walksthrough Fire/Energy/Poison (campos),
+ * para-immune + sense-invis. Looktypes estimados do lote livre 15.20. */
+const RAUB_BASE = {
+  hp: 35000, exp: 0, speed: 220, armor: 60, defense: 60,
+  attackSpeed: 2000, mitigation: 0, targetDistance: 1, staticAttack: 90,
+  imune: ["paralyze", "invisible"], loot: [], grupo: "quests",
+};
+function raub(name, looktype, el, skills, extra) {
+  const def = Object.assign({}, RAUB_BASE, {
+    name, looktype, element: el, damage: 600,
+    resist: { fire: 100, energy: 100, earth: 100 },
+    skills: skills.slice(), cwRaub: true,
+  }, extra || {});
+  def.resist[el] = 100;   // oficial: imune ao próprio elemento
+  return def;
+}
+const POISONED_RAUBRITTER = raub("Poisoned Raubritter", 1895, "earth", [
+  { el: "earth", min: 350, max: 700, int: 3500, ch: 30, radius: 2,
+    fx: "poison-area", miss: "poison" },
+]);
+const FROZEN_RAUBRITTER = raub("Frozen Raubritter", 1890, "ice", [
+  { el: "ice", min: 350, max: 700, int: 3500, ch: 30, radius: 2,
+    fx: "ice-attack", miss: "ice" },
+]);
+const RAGING_RAUBRITTER = raub("Raging Raubritter", 1910, "fire", [
+  { el: "fire", min: 350, max: 750, int: 3500, ch: 30, radius: 2,
+    fx: "fire-area", miss: "fire" },
+]);
+/* Energised: distance fighter oficial — mantém distância. */
+const ENERGISED_RAUBRITTER = raub("Energised Raubritter", 1909, "energy", [
+  { el: "energy", min: 350, max: 700, int: 3000, ch: 35, range: 7,
+    miss: "energy", alvo: 1 },
+], { targetDistance: 4, ranged: 1 });
+
+/* Formas fortes — oficial: "a stronger version of themselves". Stats
+ * estimados (+50% hp, +60% dano — design); looktypes estimados. */
+function raubStrong(base, looktype) {
+  return Object.assign({}, base, {
+    name: "Enraged " + base.name, looktype,
+    hp: Math.round(base.hp * 1.5), damage: Math.round(base.damage * 1.6),
+    armor: base.armor + 10, defense: base.defense + 10,
+    skills: base.skills.map((s) => Object.assign({}, s, {
+      min: Math.round(s.min * 1.6), max: Math.round(s.max * 1.6) })),
+    cwStrong: true,
+  });
+}
+const STRONG_POISONED  = raubStrong(POISONED_RAUBRITTER, 1888);
+const STRONG_FROZEN    = raubStrong(FROZEN_RAUBRITTER, 1885);
+const STRONG_RAGING    = raubStrong(RAGING_RAUBRITTER, 1919);
+const STRONG_ENERGISED = raubStrong(ENERGISED_RAUBRITTER, 1882);
+
+/* Tipo base → slug base/forte (para o check "4 do mesmo tipo"). */
+const CW_RAUB_TYPES = {
+  earth:   { base: "poisoned-raubritter", strong: "enraged-poisoned-raubritter" },
+  ice:     { base: "frozen-raubritter",   strong: "enraged-frozen-raubritter" },
+  fire:    { base: "raging-raubritter",   strong: "enraged-raging-raubritter" },
+  energy:  { base: "energised-raubritter",strong: "enraged-energised-raubritter" },
+};
+const CW_RAUB_SLUGS = Object.values(CW_RAUB_TYPES).map((t) => t.base);
+
+const CW_MONSTERS = {
+  "court-warlock": COURT_WARLOCK,
+  "poisoned-raubritter": POISONED_RAUBRITTER,
+  "frozen-raubritter": FROZEN_RAUBRITTER,
+  "raging-raubritter": RAGING_RAUBRITTER,
+  "energised-raubritter": ENERGISED_RAUBRITTER,
+  "enraged-poisoned-raubritter": STRONG_POISONED,
+  "enraged-frozen-raubritter": STRONG_FROZEN,
+  "enraged-raging-raubritter": STRONG_RAGING,
+  "enraged-energised-raubritter": STRONG_ENERGISED,
+};
+
+/* ── Mecânica do encontro (cliente; espelho de tickCourtWarlock no
+ * authoritative_engine.js) ── */
+function courtWarlockFight(c) { return !!(c && c.boss && c.boss.id === "court-warlock"); }
+function cwFreeCell(c, cx, cy) { return typeof agFreeCell === "function" ? agFreeCell(c, cx, cy) : null; }
+function cwMakeMob(c, slug, cx, cy, flags) {
+  const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+    GAMEDATA.monsters[slug];
+  if (!def) return null;
+  const cell = cwFreeCell(c, cx, cy); if (!cell) return null;
+  const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+    : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+  const hp = Math.max(1, Number(def.hp) || 1);
+  const mob = Object.assign({ slug, def, hp, maxHp: hp,
+    atkCd: 400 + Math.random() * 1200,
+    id: "cw-" + slug + "-" + Date.now().toString(36) + "-" +
+      Math.random().toString(36).slice(2, 7),
+    cx: cell.x, cy: cell.y, x: pos.x, y: pos.y, sx: pos.x, sy: pos.y,
+    dir: "w", moving: false, attackAnim: 0,
+    speed: def.speed ? .000055 : 0, spawnAt: Date.now() }, flags || {});
+  c.mobs = c.mobs || []; c.mobs.unshift(mob);
+  c.events = c.events || [];
+  c.events.push({ t: "spawn", slug, x: mob.x, y: mob.y, targetId: mob.id, screen: true });
+  return mob;
+}
+function cwTypeOf(m) {
+  if (m.cwType) return m.cwType;
+  for (const t in CW_RAUB_TYPES)
+    if (m.slug === CW_RAUB_TYPES[t].base || m.slug === CW_RAUB_TYPES[t].strong) return t;
+  return null;
+}
+function cwHazardCells(c) {
+  const st = c.bo2 || c.cw; if (!st || !st.hazards) return [];
+  return st.hazards;
+}
+function courtWarlockBossInit(c, player) {
+  if (!courtWarlockFight(c)) return c;
+  const boss = (c.mobs || []).find((m) => m && m.boss);
+  if (!boss) return c;
+  c.cw = { pendingBoss: boss, phase: 1, wave: 0, transforms: 0,
+    raubsKilled: 0, nextWaveAt: Date.now() + 2500,
+    nextTeleportAt: Date.now() + CW_TELEPORT_MS, hzAt: 0, hazards: [] };
+  c.mobs = c.mobs.filter((m) => m !== boss);
+  const bx = Number(boss.cx) || 0, by = Number(boss.cy) || 0;
+  for (const [dx, dy] of CW_HAZARD_OFFSETS)
+    c.cw.hazards.push(bx + dx + "," + (by + dy));
+  if (typeof addLog === "function")
+    addLog("info", "Os <b>Raubritters</b> invadem a sala — cuidado com o <b>terreno marcado</b>!");
+  return c;
+}
+function courtWarlockBossTick(c, now) {
+  const st = c && c.cw; if (!st || c.ended) return true;
+  const mobs = c.mobs || [];
+  const p = (c.player && c.player.p) || c.player;
+  /* Terreno especial: morte por exposição (cada CW_HAZARD_MS). */
+  if (st.phase === 1 && p && p.hp > 0 && now >= st.hzAt &&
+      st.hazards.indexOf((Number(c.player.cx) || 0) + "," + (Number(c.player.cy) || 0)) >= 0) {
+    st.hzAt = now + CW_HAZARD_MS;
+    const dmg = CW_HAZARD_DMG[0] + Math.random() * (CW_HAZARD_DMG[1] - CW_HAZARD_DMG[0]);
+    p.hp = Math.max(0, (p.hp || 0) - Math.round(dmg));
+    c.events.push({ t: "taken", dmg: Math.round(dmg), x: c.player.x, y: c.player.y,
+      targetId: "player", el: "death", fx: "mort-area", screen: true });
+  }
+  /* Teleporte periódico (oficial): o jogador some e reaparece na sala. */
+  if (st.phase === 1 && now >= st.nextTeleportAt) {
+    st.nextTeleportAt = now + CW_TELEPORT_MS;
+    const cell = cwFreeCell(c, (Number(c.player.cx) || 0) + 3, (Number(c.player.cy) || 0) - 4);
+    if (cell && st.hazards.indexOf(cell.x + "," + cell.y) < 0) {
+      const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+        : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+      c.player.cx = cell.x; c.player.cy = cell.y;
+      c.player.x = pos.x; c.player.y = pos.y;
+      c.player.sx = pos.x; c.player.sy = pos.y;
+      c.events.push({ t: "effect", x: pos.x, y: pos.y, screen: true, fx: "teleport" });
+      if (typeof addLog === "function") addLog("death", "O Warlock <b>teleporta você</b> pela sala!");
+    }
+  }
+  if (st.phase === 1) {
+    /* Waves: raubritters spawnam NA posição do jogador (oficial). */
+    if (now >= st.nextWaveAt) {
+      st.nextWaveAt = now + CW_WAVE_MS;
+      st.wave++;
+      const keys = Object.keys(CW_RAUB_TYPES);
+      for (let i = 0; i < CW_WAVE_SIZE; i++) {
+        const t = keys[Math.floor(Math.random() * keys.length)];
+        const m = cwMakeMob(c, CW_RAUB_TYPES[t].base,
+          (Number(c.player.cx) || 0) + (i % 2 ? 1 : -1),
+          (Number(c.player.cy) || 0) + (i === 2 ? 1 : 0));
+        if (m) m.cwType = t;
+      }
+    }
+    /* 4 do mesmo tipo vivos → transformam nas formas fortes. */
+    const alive = {};
+    for (const m of mobs) {
+      if (!(m.hp > 0)) continue;
+      const t = cwTypeOf(m); if (!t || m.cwStrong) continue;
+      (alive[t] = alive[t] || []).push(m);
+    }
+    for (const t in alive) {
+      if (alive[t].length < CW_TRANSFORM_AT) continue;
+      for (const m of alive[t]) {
+        const to = CW_RAUB_TYPES[t].strong;
+        const nd = GAMEDATA.monsters[to]; if (!nd) continue;
+        m.slug = to; m.def = nd; m.cwStrong = true;
+        m.hp = m.maxHp = Math.max(1, Number(nd.hp) || 1);
+        c.events.push({ t: "effect", x: m.x, y: m.y, screen: true, fx: "levelup" });
+      }
+      st.transforms++;
+      if (typeof addLog === "function")
+        addLog("death", "Os Raubritters <b>mudam de forma</b> — versões enraivecidas!");
+    }
+    /* Conta kills de raubritters (pra telemetria) e fim da fase 1. */
+    if (st.wave >= CW_WAVES) {
+      st.phase = 2;
+      st.hazards = [];                       // terreno especial some (oficial)
+      const bx = Number(c.boss && c.boss.cx) || 0, by = Number(c.boss && c.boss.cy) || 0;
+      const falc = ["falcon-knight", "falcon-paladin"];
+      for (let i = 0; i < CW_FALCON_COUNT; i++)
+        cwMakeMob(c, falc[i % 2], bx - 4 + (i % 4) * 2, by + 2 + Math.floor(i / 4) * 3,
+          { cwFalcon: true });
+      if (typeof addLog === "function")
+        addLog("info", "<b>Falcon Knights e Paladins</b> enchem a sala!");
+    }
+  } else if (st.phase === 2) {
+    if (!mobs.some((m) => m.cwFalcon && m.hp > 0)) {
+      st.phase = 3;
+      /* Boss entra com hp proporcional aos transforms (design; oficial:
+       * "spawns with less HP, depending on how the fight went"). */
+      const boss = st.pendingBoss; st.pendingBoss = null;
+      const bonus = st.transforms * CW_BOSS_HP_PER_TRANSFORM;
+      boss.hp = boss.maxHp = (Number(boss.maxHp) || 120000) + bonus;
+      const cell = cwFreeCell(c, Number(boss.cx) || 0, Number(boss.cy) || 0);
+      if (cell) {
+        const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+          : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+        boss.cx = cell.x; boss.cy = cell.y;
+        boss.x = pos.x; boss.y = pos.y; boss.sx = pos.x; boss.sy = pos.y;
+      }
+      mobs.unshift(boss);
+      c.events.push({ t: "spawn", slug: boss.slug, x: boss.x, y: boss.y,
+        targetId: boss.id, screen: true });
+      if (typeof addLog === "function")
+        addLog("death", "<b>COURT WARLOCK</b> — \"DO I REALLY NEED TO DO EVERYTHING MYSELF!\"");
+    }
+  }
+  return true;
+}
+function courtWarlockBossCleanup(c) { if (c && c.cw) delete c.cw; }
+
+/* ── Registro (cliente + sandbox do servidor) ── */
+(function registerCourtWarlock() {
+  if (typeof GAMEDATA === "undefined") return;
+  const items = GAMEDATA.items || (GAMEDATA.items = {});
+  for (const slug in CW_ITEMS) {
+    const def = CW_ITEMS[slug];
+    if (!items[slug]) items[slug] = def;
+    else {
+      if (def.sell != null) items[slug].sell = def.sell;
+      if (def.npcSell != null) items[slug].npcSell = def.npcSell;
+      if (def.cid != null && items[slug].cid == null) items[slug].cid = def.cid;
+      if (def.w != null && items[slug].w == null) items[slug].w = def.w;
+      if (def.n && !items[slug].n) items[slug].n = def.n;
+    }
+  }
+  if (typeof MONSTERDATA !== "undefined" && MONSTERDATA)
+    for (const slug in CW_MONSTERS) MONSTERDATA[slug] = CW_MONSTERS[slug];
+  GAMEDATA.monsters = GAMEDATA.monsters || {};
+  for (const slug in CW_MONSTERS) GAMEDATA.monsters[slug] = CW_MONSTERS[slug];
+
+  GAMEDATA.hunts = GAMEDATA.hunts || {};
+  GAMEDATA.hunts["court-warlock-room"] = {
+    name: "Court Warlock's Room",
+    hidden: true, level: 400, minLevel: 400,
+    monsters: ["court-warlock"],
+    color: "#3a2a4a", scene: "crypt",
+    otbm: CW_ROOM.otbm, otbmFloor: 7,
+    otbmSpawn: CW_ROOM.spawn,
+    otbmMobBounds: { x: CW_ROOM.boss.x, y: CW_ROOM.boss.y, w: 1, h: 1, z: 7 },
+    avgHp: COURT_WARLOCK.hp, avgExp: COURT_WARLOCK.exp,
+    avgDamage: COURT_WARLOCK.damage, avgArmor: COURT_WARLOCK.armor,
+    avgGold: 500, respawn: 1, pack: 1, cat: "boss-room",
+  };
+
+  if (typeof BOSS_DEFS !== "undefined") {
+    BOSS_DEFS["court-warlock"] = {
+      id: "court-warlock", name: "Court Warlock",
+      title: CW_QUEST_TITLE + " — Boss final",
+      hunt: "court-warlock-room", baseMonster: "court-warlock",
+      sprite: "court-warlock",
+      hp: COURT_WARLOCK.hp, exp: COURT_WARLOCK.exp,
+      damage: COURT_WARLOCK.damage, armor: COURT_WARLOCK.armor,
+      defense: COURT_WARLOCK.defense,
+      requirement: { level: 400, enforced: true,
+        text: "Requer nível 400+ (The Order of the Stag)" },
+      cooldown: CW_COOLDOWN_MS,
+    };
+    if (typeof BOSS_MODAL_SECTIONS !== "undefined") {
+      const sect = BOSS_MODAL_SECTIONS.find((s) => s.title === "BOSSES 400+");
+      if (sect && sect.ids.indexOf("court-warlock") < 0)
+        sect.ids.push("court-warlock");
+    }
+  }
+})();
+
+const CW_DATA = {
+  CW_ROOM, CW_ITEMS, CW_MONSTERS, CW_RAUB_TYPES, CW_RAUB_SLUGS,
+  CW_HAZARD_OFFSETS, CW_HAZARD_DMG, CW_HAZARD_MS, CW_WAVE_MS,
+  CW_WAVE_SIZE, CW_WAVES, CW_TRANSFORM_AT, CW_TELEPORT_MS,
+  CW_FALCON_COUNT, CW_BOSS_HP_PER_TRANSFORM,
+  monsterSlugs: Object.keys(CW_MONSTERS),
+  registerMonsters(monsters) {
+    if (!monsters) return;
+    for (const slug of Object.keys(CW_MONSTERS))
+      monsters[slug] = CW_MONSTERS[slug];
+  },
+};
+if (typeof module !== "undefined" && module.exports) module.exports = CW_DATA;

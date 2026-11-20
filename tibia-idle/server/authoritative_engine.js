@@ -66,6 +66,9 @@ require("../game/js/unhallowed-crypt.js").registerMonsters(MONSTERS);
 /* Roost of the Graveborn Quest (update 15.20): 5 bosses ausentes do
  * dump Canary — fichas oficiais registradas no MONSTERS. */
 require("../game/js/roost-graveborn.js").registerMonsters(MONSTERS);
+/* Court Warlock (Order of the Stag, update 15.20): boss + Raubritters
+ * — fichas oficiais registradas no MONSTERS. */
+require("../game/js/court-warlock.js").registerMonsters(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -547,7 +550,7 @@ try{
     "urmahlullu.js","bashmuul-issavi.js","true-asuras.js","mimar-haffar.js",
     "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
     "book-world.js","sir-leonard.js","norcferatus-fortress.js",
-    "unhallowed-crypt.js","roost-graveborn.js"]){
+    "unhallowed-crypt.js","roost-graveborn.js","court-warlock.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -6590,6 +6593,18 @@ function arenaBossBindMechanics(auth,now){
    * Soulcages (pool de HP compartilhado) + 4 dragon Spirits imunes;
    * o boss (Phylactery) fica retido até o pool zerar — então entra com
    * 4 Enthralled Dragons. Gazes rolam durante toda a luta. */
+  /* Court Warlock (Order of the Stag): fase 1 — waves de Raubritters
+   * spawnando na posição do jogador + terreno especial mortal +
+   * teleporte periódico; fase 2 — Falcons; fase 3 — o boss entra. */
+  if(auth.bossId==="court-warlock"&&!auth.cw){
+    auth.cw={pendingBoss:boss,phase:1,wave:0,transforms:0,
+      nextWaveAt:now+2500,nextTeleportAt:now+CW_TELEPORT_MS,hzAt:0};
+    auth.mobs=auth.mobs.filter((m)=>m!==boss);
+    auth.cw.hazards=[];
+    const bx=Number(boss.cx)||0,by=Number(boss.cy)||0;
+    for(const [dx,dy] of CW_HAZARD_OFFSETS)
+      auth.cw.hazards.push((bx+dx)+","+(by+dy));
+  }
   if(auth.bossId==="bonelords-phylactery"&&!auth.bo){
     auth.bo={pendingBoss:boss,cagePool:BO_CAGE_POOL,eyes:[],
       manaDrain:null,curse:null,gazeAt:now+BO_GAZE_MS};
@@ -6922,6 +6937,147 @@ function tickBoneOverlord(auth,now){
     if(m.boField&&now-(Number(m.spawnAt)||now)>5000)m.hp=0;
   if(!st.pendingBoss&&!live.length&&!liveBoss)auth.bo=null;
 }
+/* Court Warlock (Order of the Stag): fase 1 — waves de Raubritters na
+ * posição do jogador (CW_WAVE_MS/CW_WAVE_SIZE), 4 do mesmo tipo vivos →
+ * forma enraivecida; teleporte periódico + terreno especial (ground 500,
+ * anel central) com Death Damage alto por exposição; fase 2 — Falcons
+ * enchem a sala; fase 3 — Court Warlock entra com hp ajustado pelos
+ * transforms (oficial: "spawns with less HP depending on how the fight
+ * went"). Espelho do cliente (courtWarlockBossTick em court-warlock.js). */
+const CW_WAVE_MS=14000,CW_WAVE_SIZE=3,CW_WAVES=5,CW_TRANSFORM_AT=4,
+  CW_TELEPORT_MS=25000,CW_HAZARD_MS=1200,CW_FALCON_COUNT=8,
+  CW_BOSS_HP_PER_TRANSFORM=15000,CW_HAZARD_DMG=[800,1500];
+const CW_HAZARD_OFFSETS=[
+  [-3,+3],[-3,+4],[-2,+2],[-2,+5],[-1,+2],[-1,+5],
+  [0,+2],[0,+5],[+1,+2],[+1,+5],[+2,+3],[+2,+4]];
+const CW_RAUB_TYPES={
+  earth:{base:"poisoned-raubritter",strong:"enraged-poisoned-raubritter"},
+  ice:{base:"frozen-raubritter",strong:"enraged-frozen-raubritter"},
+  fire:{base:"raging-raubritter",strong:"enraged-raging-raubritter"},
+  energy:{base:"energised-raubritter",strong:"enraged-energised-raubritter"}};
+function cwTypeOf(m){
+  if(m.cwType)return m.cwType;
+  for(const t in CW_RAUB_TYPES)
+    if(m.slug===CW_RAUB_TYPES[t].base||m.slug===CW_RAUB_TYPES[t].strong)return t;
+  return null;
+}
+function cwSpawnMob(auth,slug,cx,cy,now){
+  const m=makeMob(auth,slug,false);if(!m)return null;
+  const cell=claimSpawnCell(auth,cx,cy);
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;m.sx=m.x;m.sy=m.y;
+  auth.mobs.unshift(m);
+  auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
+    targetId:String(m.id),screen:true,ts:now});
+  return m;
+}
+function cwDamagePlayer(auth,item,dmg,el,fx,now){
+  const p=item&&item.p;if(!p||p.hp<=0||item.downUntil)return;
+  const hit=Math.max(1,Math.round(dmg));
+  p.hp=Math.max(0,(Number(p.hp)||0)-hit);
+  const pos=entityPosition(item,.13,.6);
+  auth.events.push({t:"taken",dmg:hit,x:pos.x,y:pos.y,
+    targetId:String(item.id),el:el||"death",fx:fx||"mort-area",screen:true,ts:now});
+}
+function tickCourtWarlock(auth,now){
+  const st=auth&&auth.cw;if(!st||auth.ended)return;
+  const mobs=auth.mobs||[];
+  const players=(auth.players||[]).filter((it)=>it&&it.p&&it.p.hp>0&&!it.downUntil);
+  /* Terreno especial: Death Damage por exposição (oficial: "each step
+   * deals high Death Damage"). */
+  if(st.phase===1&&st.hazards&&now>=st.hzAt){
+    for(const item of players){
+      if(st.hazards.indexOf((Number(item.cx)||0)+","+(Number(item.cy)||0))<0)continue;
+      st.hzAt=now+CW_HAZARD_MS;
+      cwDamagePlayer(auth,item,
+        CW_HAZARD_DMG[0]+random(auth)*(CW_HAZARD_DMG[1]-CW_HAZARD_DMG[0]),
+        "death","mort-area",now);
+    }
+  }
+  /* Teleporte periódico (oficial: "at intervals, all players will be
+   * teleported around the room"). */
+  if(st.phase===1&&now>=st.nextTeleportAt){
+    st.nextTeleportAt=now+CW_TELEPORT_MS;
+    const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+    for(const item of players){
+      const cell=claimSpawnCell(auth,
+        (Number(item.cx)||0)+3,(Number(item.cy)||0)-4);
+      if(!cell||st.hazards.indexOf(cell.cx+","+cell.cy)>=0)continue;
+      item.cx=cell.cx;item.cy=cell.cy;
+      item.x=(item.cx+.5)/w;item.y=(item.cy+.5)/h;
+      item.sx=item.x;item.sy=item.y;
+      auth.events.push({t:"effect",x:item.x,y:item.y,
+        targetId:String(item.id),fx:"teleport",screen:true,ts:now});
+    }
+  }
+  if(st.phase===1){
+    /* Waves: raubritters spawnam na posição do jogador (oficial). */
+    if(now>=st.nextWaveAt){
+      st.nextWaveAt=now+CW_WAVE_MS;
+      st.wave++;
+      const keys=Object.keys(CW_RAUB_TYPES);
+      for(const item of players.slice(0,1)||players){
+        for(let i=0;i<CW_WAVE_SIZE;i++){
+          const t=keys[Math.floor(random(auth)*keys.length)];
+          const m=cwSpawnMob(auth,CW_RAUB_TYPES[t].base,
+            (Number(item.cx)||0)+(i%2?1:-1),
+            (Number(item.cy)||0)+(i===2?1:0),now);
+          if(m)m.cwType=t;
+        }
+      }
+    }
+    /* 4 do mesmo tipo vivos → forma enraivecida (oficial). */
+    const alive={};
+    for(const m of mobs){
+      if(!(m.hp>0))continue;
+      const t=cwTypeOf(m);if(!t||m.cwStrong)continue;
+      (alive[t]=alive[t]||[]).push(m);
+    }
+    for(const t in alive){
+      if(alive[t].length<CW_TRANSFORM_AT)continue;
+      for(const m of alive[t]){
+        const to=CW_RAUB_TYPES[t].strong;
+        const nd=MONSTERS[to];if(!nd)continue;
+        m.slug=to;m.def=nd;m.name=nd.name;m.cwStrong=true;
+        m.hp=m.maxHp=Math.max(1,Number(nd.hp)||1);
+        m.damage=Number(nd.damage)||m.damage;
+        const pos=entityPosition(m,.5,.5);
+        auth.events.push({t:"effect",x:pos.x,y:pos.y,targetId:String(m.id),
+          fx:"levelup",screen:true,ts:now});
+      }
+      st.transforms++;
+    }
+    /* "After a few waves" → fase dos Falcons; terreno especial some. */
+    if(st.wave>=CW_WAVES){
+      st.phase=2;st.hazards=[];
+      const boss=st.pendingBoss||{};
+      const bx=Number(boss.cx)||0,by=Number(boss.cy)||0;
+      const falc=["falcon-knight","falcon-paladin"];
+      for(let i=0;i<CW_FALCON_COUNT;i++){
+        const f=cwSpawnMob(auth,falc[i%2],
+          bx-4+(i%4)*2,by+2+Math.floor(i/4)*3,now);
+        if(f)f.cwFalcon=true;
+      }
+    }
+  }else if(st.phase===2){
+    if(!mobs.some((m)=>m.cwFalcon&&m.hp>0)){
+      st.phase=3;
+      const boss=st.pendingBoss;st.pendingBoss=null;
+      const bonus=st.transforms*CW_BOSS_HP_PER_TRANSFORM;
+      boss.hp=boss.maxHp=(Number(boss.maxHp)||120000)+bonus;
+      const cell=claimSpawnCell(auth,Number(boss.cx)||0,Number(boss.cy)||0);
+      const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+      boss.cx=cell.cx;boss.cy=cell.cy;
+      boss.x=(boss.cx+.5)/w;boss.y=(boss.cy+.5)/h;boss.sx=boss.x;boss.sy=boss.y;
+      mobs.unshift(boss);
+      auth.events.push({t:"spawn",slug:boss.slug,x:boss.x,y:boss.y,
+        targetId:String(boss.id),screen:true,ts:now});
+    }
+  }
+  if(!st.pendingBoss&&!mobs.some((m)=>m.cwRaub&&m.hp>0)&&
+     !mobs.some((m)=>m.boss&&m.hp>0)&&st.phase===3)auth.cw=null;
+}
+
 /* The Gravedigger (Roost): {{Summon|Bonelord Totem|amount=2}} oficial —
  * até GD_TOTEM_MAX totens vivos, um por GD_SUMMON_MS; os totens são
  * objetos estáticos invulneráveis (damageTakenMul 0) que fazem a área
@@ -8506,7 +8662,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);tickBoneOverlord(auth,now);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);tickBoneOverlord(auth,now);tickCourtWarlock(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);

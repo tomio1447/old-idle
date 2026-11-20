@@ -4,6 +4,59 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Court Warlock — boss 400+ final da The Order of the Stag (update 15.20)
+
+### Ficha oficial
+
+- **race_id 2741 · looktype OFICIAL 1903** (decodificado do bestiário
+  do client 15.20) · **hp 120.000** · **exp 147.000** · Archfoe;
+  walksthrough Fire/Energy/Poison, para-immune, sense-invis;
+  cooldown 20h (oficial: resetável com Twisted Marionette).
+- Sala `court_room.otbm` — center {1021,1025} / bossspawn {1021,1022} /
+  playerspawn {1021,1028} (coords oficiais), z=7.
+
+### Encontro oficial em 3 fases (Spoiler da quest)
+
+- **F1 — Raubritters**: waves spawnam **na posição do jogador** —
+  Poisoned (imune earth), Frozen (imune ice), Raging (imune fire),
+  Energised (distance fighter, imune energy); hp oficial 35.000.
+  **4 do mesmo tipo vivos → viram a versão enraivecida** (+hp/dano).
+  Teleporte periódico pela sala + **terreno especial** (as 12 células
+  de ground 500 do OTBM, anel central) causa **Death Damage alto por
+  exposição**.
+- **F2 — Falcons**: após as waves a sala enche de **Falcon Knights e
+  Falcon Paladins**; o terreno especial some.
+- **F3 — Court Warlock**: entra com **menos HP conforme a luta**
+  (implementado: hp base + 15k por transformação forçada).
+- Paridade: `tickCourtWarlock` + bind em `arenaBossBindMechanics` no
+  engine; `courtWarlockBossInit/BossTick/Cleanup` no cliente
+  (`court-warlock.js`), hooks em `combat.js`/`game.js`.
+
+### Loot oficial completo
+
+- **Stag Set** (10 peças, lvl 350, upgrade class 4, ids oficiais
+  52348–52357): helmet/robe/plate/legs/shinguards/boots/footwraps/
+  spellbook/scrolls/shield — "Negotiable", **sem comprador NPC →
+  sell 0** (padrão das crypt weapons).
+- **Twisted Marionette** 52746 — npcvalue 125.000 (Yasir), drop raro.
+- **Wooden Spellbook** 25699 — npcvalue 12.000 (Talila/Valindara).
+- Spellbook of Mind Control, Terra Hood, Lightning Headband, Magma
+  Coat, Blue/Red Gem, moedas (até **500 cc very rare**), poções
+  ultimate (health/mana/spirit).
+- Looktypes dos Raubritters **estimados** do lote livre 15.20
+  (não-bestiário, sem ficha pública): poisoned 1895, frozen 1890,
+  raging 1910, energised 1909; enraivecidos 1888/1885/1919/1882.
+  Valores de waves/teleporte/bônus de hp são design documentado.
+
+### Correções de looktype (staticdata do client 15.20)
+
+- Adventurer Group: yorik 268 · percy 137 · grendel 144 ·
+  fiona 1681 · nigel 1837 (estimativas anteriores substituídas).
+- Zharvorin's Spirit → 1884 (1903 é o looktype oficial do
+  Court Warlock — colisão resolvida).
+
+---
+
 ## 2026-11-20 — The Roost of the Graveborn Quest — boss quest 450+ (update 15.20)
 
 ### Progressão (oficial)

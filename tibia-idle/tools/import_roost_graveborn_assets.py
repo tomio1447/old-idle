@@ -34,6 +34,8 @@ MAPS = [
     ("bossesroom/eldritch_dl.otbm", "eldritch_dl.otbm"),
     ("bossesroom/gravedigger.otbm", "gravedigger.otbm"),
     ("bossesroom/bonelords_phylactery.otbm", "bonelords_phylactery.otbm"),
+    # Court Warlock — Order of the Stag Quest (15.20).
+    ("bossesroom/court_room.otbm", "court_room.otbm"),
 ]
 
 # 7 armas Crypt + 5 Crypt Runes (cids oficiais update 15.20, tibia.gg).
@@ -49,6 +51,14 @@ ITEM_ICONS = {
     "ancient-scales": 52713, "soul-trap": 52714, "skull-tendril": 52715,
     "bone-spikes": 52717, "icy-scales": 52726, "icy-horns": 52727,
     "frozen-crapace": 52728, "worn-guide-book": 52710,
+    # Court Warlock — Stag Set completo + Twisted Marionette (cids
+    # oficiais do wikitext Fandom; Stag = equipamentos "Negotiable"
+    # sem comprador NPC → sell 0).
+    "stag-helmet": 52348, "stag-robe": 52349, "stag-plate": 52350,
+    "stag-legs": 52351, "stag-shinguards": 52352, "stag-boots": 52353,
+    "stag-footwraps": 52354, "stag-spellbook": 52355,
+    "stag-scrolls": 52356, "stag-shield": 52357,
+    "twisted-marionette": 52746,
 }
 
 # Bosses com looktype real (2 grupos: idle + walk, 4 dirs x 8 fases).
@@ -56,13 +66,14 @@ MOBS_LOOKTYPE = {
     "eldritch-dragon-lord": 1879,
     "the-gravedigger": 1880,
     "ice-horror": 1881,
-    # Adventurer Group — 5 membros (looktypes estimados do lote 15.20;
-    # atribuição por sprite: cavaleiro/paladino/druida/feiticeira/monge).
-    "nigel-neverguess": 1882,
-    "fiona-firstdream": 1884,
-    "percy-peacetinker": 1888,
-    "grendel-greenlunch": 1889,
-    "yorik-youngbook": 1895,
+    # Adventurer Group — 5 membros: looktypes OFICIAIS do staticdata
+    # do client 15.20 (race→outfit: yorik 2712→268, percy 2713→137,
+    # grendel 2714→144, fiona 2715→1681, nigel 2716→1837).
+    "nigel-neverguess": 1837,
+    "fiona-firstdream": 1681,
+    "percy-peacetinker": 137,
+    "grendel-greenlunch": 144,
+    "yorik-youngbook": 268,
     # Avatares das vocações (outfits oficiais como looktype de criatura).
     "avatar-of-steel": 1593,
     "avatar-of-light": 1594,
@@ -72,12 +83,28 @@ MOBS_LOOKTYPE = {
     # Bright Crystal — objeto hostil estático (sprite 4x1 do lote 15.20).
     "bright-crystal": 1902,
     # Bone Overlord — summons (looktypes estimados do lote livre 15.20;
-    # 1883 = dragão espectral, 1886/1903/1904/1905 = bestas espectrais).
+    # 1883 = dragão espectral, 1884/1886/1904/1905 = bestas espectrais;
+    # 1903 é o looktype OFICIAL do Court Warlock — não usar nos summons).
     "enthralled-dragon": 1883,
     "myzareths-spirit": 1886,
-    "zharvorins-spirit": 1903,
+    "zharvorins-spirit": 1884,
     "elyraxs-spirit": 1904,
     "scariths-spirit": 1905,
+    # Court Warlock — looktype OFICIAL 1903 (staticdata do client 15.20,
+    # race 2741→outfit 1903). Raubritters não são bestiário → looktypes
+    # estimados do lote livre 15.20 (cavaleiros/magos espectrais).
+    "court-warlock": 1903,
+    # Raubritters: cavaleiros/espectros do lote livre 15.20 (1893/91/92
+    # são outfits VAZIOS no DAT — verificado). Enraivecidos: formas
+    # distintas estimadas.
+    "poisoned-raubritter": 1895,
+    "frozen-raubritter": 1890,
+    "raging-raubritter": 1910,
+    "energised-raubritter": 1909,
+    "enraged-poisoned-raubritter": 1888,
+    "enraged-frozen-raubritter": 1885,
+    "enraged-raging-raubritter": 1919,
+    "enraged-energised-raubritter": 1882,
 }
 
 # Bosses "lookItem": a entidade oficial aparece como objeto (cid). O sheet
