@@ -18,6 +18,18 @@ function paintCosmeticNpcPortraits() {
       canvas.style.cssText = "width:52px;height:52px;object-fit:contain;image-rendering:pixelated";
       slot.appendChild(canvas);
     });
+    // Previews das montarias do catálogo do Lothar (frame parado, sul).
+    document.querySelectorAll("[data-cosmetic-mount]").forEach((slot) => {
+      if (slot.firstChild) return;
+      const src = AppearanceRenderer.mount(slot.dataset.cosmeticMount, "s", 0);
+      if (!src) { pending = true; return; }
+      const canvas = document.createElement("canvas");
+      canvas.width = src.width; canvas.height = src.height;
+      canvas.getContext("2d").drawImage(src, 0, 0);
+      const size = Number(slot.dataset.size) || 44;
+      canvas.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;image-rendering:pixelated`;
+      slot.appendChild(canvas);
+    });
     if (pending && attempt < 60) setTimeout(() => paint(attempt + 1), 100);
   };
   paint(0);
@@ -75,11 +87,17 @@ function renderCosmeticNpcOffers(id, offers) {
           return `${item ? itemImg(i.slug, 22) : ""} ${i.count}× ${escape(item ? item.n : i.slug.replace(/-/g, " "))}`;
         }).join(" + ")}</span><button class="sm" data-cosmetic-exchange="${escape(r.id)}" data-alternative="${index}" ${r.owned || !r.available || !enough ? "disabled" : ""}>Trocar</button></div>`;
       }).join("");
-      return `<div class="panel mb8"><div class="panel-body"><b>${title}</b><div class="tiny dim mb4">${r.owned ? "Desbloqueado na conta" : escape(r.reason || "Troca por itens")}</div>${r.catalyst && !r.owned ? `<div class="tiny dim">Também requer ${escape(r.catalyst.replace(/-/g, " "))} na Bag (não consumido).</div>` : ""}${costs}</div></div>`;
+      const mountMeta = r.kind === "mount" && typeof APP_MOUNT !== "undefined" && APP_MOUNT[r.target];
+      const mountSprite = mountMeta && mountMeta.cw
+        ? `<span data-cosmetic-mount="${escape(r.target)}" data-size="44" class="cosmetic-mount-sprite"
+            style="display:inline-flex;width:44px;height:44px;align-items:center;justify-content:center;flex:none"></span>`
+        : "";
+      return `<div class="panel mb8"><div class="panel-body"><div class="row" style="gap:8px;align-items:center">${mountSprite}<div style="flex:1"><b>${title}</b><div class="tiny dim mb4">${r.owned ? "Desbloqueado na conta" : escape(r.reason || "Troca por itens")}</div>${r.catalyst && !r.owned ? `<div class="tiny dim">Também requer ${escape(r.catalyst.replace(/-/g, " "))} na Bag (não consumido).</div>` : ""}${costs}</div></div></div></div>`;
     }).join("") || `<div class="tiny dim">Nenhum resultado.</div>`;
     content.querySelectorAll("[data-cosmetic-exchange]").forEach((button) => {
       button.onclick = () => { button.disabled = true; openCosmeticNpc(id, button.dataset.cosmeticExchange, Number(button.dataset.alternative)); };
     });
+    paintCosmeticNpcPortraits();
   };
   $("#cosmetic-npc-search").oninput = render;
   render();

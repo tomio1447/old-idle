@@ -27,6 +27,10 @@ function must(v, m) { if (!v) throw Error(m); }
 
 const engine = require("../server/authoritative_engine.js");
 const OTBM = require(path.join(js, "otbm.js"));
+global.window = global.window || {};
+if (typeof global.window.addEventListener !== "function")
+  global.window.addEventListener = function () {};
+const { applyHuntOtbmZones } = require(path.join(js, "otbmhunt.js"));
 const cw = require("../game/js/court-warlock.js");
 
 /* ---------------- dados do cliente (vm, ordem do index) ---------------- */
@@ -362,13 +366,16 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
   must(hunt.monsters.length === 3, "hunt deve ter 3 raubritters");
 
   /* Fichas oficiais (wikitext). */
+  /* looktype/race OFICIAIS do staticdata do client 15.20
+   * (race→outfit): skirmisher 2750→1900, chastener 2752→1902,
+   * marksman 2751→1901. */
   const SB = {
     "raubritter-skirmisher": { hp: 11000, exp: 8550, armor: 100,
-      mitigation: 3.92, lt: 1908, td: 1 },
+      mitigation: 3.92, lt: 1900, race: 2750, td: 1 },
     "raubritter-chastener": { hp: 10000, exp: 9500, armor: 80,
-      mitigation: 3.68, lt: 1920, td: 1 },
+      mitigation: 3.68, lt: 1902, race: 2752, td: 1 },
     "raubritter-marksman": { hp: 10500, exp: 9025, armor: 90,
-      mitigation: 3.45, lt: 1889, td: 4 },
+      mitigation: 3.45, lt: 1901, race: 2751, td: 4 },
   };
   for (const slug in SB) {
     const m = M[slug], o = SB[slug];
@@ -376,6 +383,7 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
     must(m.hp === o.hp && m.exp === o.exp && m.armor === o.armor &&
       m.mitigation === o.mitigation, slug + ": ficha oficial divergente");
     must(m.looktype === o.lt, slug + ": looktype " + o.lt);
+    must(m.raceId === o.race, slug + ": raceId oficial " + o.race);
     must(m.targetDistance === o.td, slug + ": distance divergente");
     must(m.imune.includes("paralyze") && m.imune.includes("invisible"),
       slug + ": imunes oficiais ausentes");
@@ -454,6 +462,13 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
   must(hunt.packMin === 8 && hunt.packMax === 10, "pack 8-10 ausente");
   must(hunt.otbm === "arean_outskirts" && hunt.otbmFloor === 7,
     "otbm divergente");
+  /* O .otbm 39×41 tinha a FOV 21×13 centrada no centro do mapa — a
+   * arena (abs y1014-1020) ficava fora da janela (abs y1017-1029).
+   * O crop 21×13 centrado no centermap fixa a FOV sobre a zona. */
+  must(hunt.otbmBounds && hunt.otbmBounds.x === 1010 &&
+    hunt.otbmBounds.y === 1012 && hunt.otbmBounds.w === 21 &&
+    hunt.otbmBounds.h === 13 && hunt.otbmBounds.z === 7,
+    "otbmBounds (crop p/ FOV) divergente");
   must(hunt.otbmSpawn.x === 1020 && hunt.otbmSpawn.y === 1018 &&
     hunt.otbmSpawn.z === 7, "centerroom divergente");
   must(hunt.otbmMobBounds.x === 1015 && hunt.otbmMobBounds.y === 1014 &&
@@ -462,11 +477,14 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
   must(hunt.monsters.length === 4, "hunt deve ter 4 monstros");
 
   /* Night Harpy — ficha oficial: hp 14000, exp 21000, armor 90,
-   * mit 3.92, speed 190, Bird. */
+   * mit 3.92, speed 190, Bird. looktype/race OFICIAIS do staticdata
+   * 15.20: race 2764 → outfit 1899. */
   const nh = M["night-harpy"];
   must(nh && nh.hp === 14000 && nh.exp === 21000 && nh.armor === 90 &&
     nh.mitigation === 3.92 && nh.speed === 190,
     "night-harpy: ficha oficial divergente");
+  must(nh.looktype === 1899 && nh.raceId === 2764,
+    "night-harpy: looktype 1899 / raceId 2764 oficiais");
   must(nh.resist.earth === 40 && nh.resist.fire === 30 &&
     nh.resist.ice === -12 && nh.resist.death === -9,
     "night-harpy: resists oficiais divergentes");
@@ -505,8 +523,43 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
   must(w2 === 63, "spawn rect deve ser 63/63 caminhável: " + w2);
   must((omap.cells[(1020 - omin.minX) + "," + (1018 - omin.minY)] || {}).g,
     "centerroom não caminhável");
+
+  /* FOV: crop+centro da janela deve cobrir o spawn e 100% da zona de
+   * mobs (antes a FOV do mapa cheio deixava a arena fora da tela). */
+  {
+    let c = OTBM.crop(omap, hunt.otbmBounds);
+    applyHuntOtbmZones(c, hunt);
+    must(c.spawn && c.spawn.x === 10 && c.spawn.y === 6,
+      "spawn local deve cair no centro do crop 21×13");
+    const HMW = Math.min(c.w, 21), HMH = Math.min(c.h, 13);
+    const fX = Math.floor((c.w - HMW) / 2), fY = Math.floor((c.h - HMH) / 2);
+    const inFov = (p) => p && p.x >= fX && p.x <= fX + HMW - 1 &&
+      p.y >= fY && p.y <= fY + HMH - 1;
+    must(inFov(c.spawn), "centermap fora da FOV");
+    must(c.mob.every(inFov), "zona de mobs fora da FOV");
+  }
   must(engine.MONSTERS["night-harpy"],
     "night-harpy não registrado no engine");
+
+  /* Todo `miss` de skill vira sprite de projétil real: aceita só
+   * arquivo assets/missile/<miss>_e.png ou elemento mapeado em
+   * ELEMENT_MISSILE (o 404 de "physical_*.png" veio de miss literal). */
+  {
+    const ELMISS = { physical: 1, fire: 1, ice: 1, energy: 1, earth: 1,
+      death: 1, holy: 1, drown: 1, manadrain: 1, lifedrain: 1, agony: 1 };
+    const mdir = path.join(game, "assets", "missile");
+    for (const slug of ["night-harpy", "raubritter-skirmisher",
+                        "raubritter-chastener", "raubritter-marksman"])
+      for (const sk of (M[slug].skills || [])) {
+        if (!sk.miss) continue;
+        must(ELMISS[sk.miss] ||
+          fs.existsSync(path.join(mdir, sk.miss + "_e.png")),
+          slug + ": miss '" + sk.miss + "' sem sprite de projétil");
+      }
+    must((M["raubritter-marksman"].skills || [])
+      .some((s) => s.miss === "bolt"),
+      "marksman: projétil deve ser 'bolt' (crossbow)");
+  }
 }
 
 /* ==================== Order of the Stag Quest (350+) ==================== */

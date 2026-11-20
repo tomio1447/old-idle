@@ -6973,6 +6973,60 @@ function initAccountLogin() {
     };
     $("#acc-logout").onclick = logoutAccount;
   }
+  function openRecoverModal() {
+    if (!openAccountModal(`
+      <div class="panel-title">Recuperar senha
+        <span style="flex:1"></span><button class="sm" id="acc-recover-cancel">✕</button>
+      </div>
+      <div class="panel-body account-flow-body">
+        <div class="tiny dim mb4">Informe o login ou o e-mail da conta. Enviaremos um código de 6 dígitos para o e-mail cadastrado.</div>
+        <div class="field"><label for="acc-recover-ident">Login ou e-mail</label>
+          <input id="acc-recover-ident" maxlength="120" placeholder="login ou seu@email.com" autocomplete="username"></div>
+        <button class="full" id="acc-recover-send">Enviar código</button>
+        <div class="field mt8"><label for="acc-recover-code">Código recebido</label>
+          <input id="acc-recover-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+        <div class="field"><label for="acc-recover-pass">Nova senha</label>
+          <input id="acc-recover-pass" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password"></div>
+        <button class="primary full mt8" id="acc-recover-confirm">Trocar senha</button>
+        <div class="tiny dim center mt8" id="acc-recover-msg"></div>
+      </div>`)) return;
+    $("#acc-recover-cancel").onclick = closeAccountModal;
+    const status = $("#acc-recover-msg");
+    const send = $("#acc-recover-send");
+    send.onclick = async () => {
+      if (send.disabled) return;
+      const ident = ($("#acc-recover-ident").value || "").trim();
+      if (!ident) { status.textContent = "Informe o login ou o e-mail."; return; }
+      send.disabled = true; status.textContent = "Enviando...";
+      try {
+        const r = await accountRecoverRequest(ident);
+        status.textContent = (r.msg || "Se a conta existir, enviamos o código.") +
+          (r.devCode ? " (teste: " + r.devCode + ")" : "");
+        const codeInput = $("#acc-recover-code");
+        if (codeInput) codeInput.focus();
+      } finally { send.disabled = false; }
+    };
+    const confirm = $("#acc-recover-confirm");
+    confirm.onclick = async () => {
+      if (confirm.disabled) return;
+      const ident = ($("#acc-recover-ident").value || "").trim();
+      const code = ($("#acc-recover-code").value || "").trim();
+      const pass = $("#acc-recover-pass").value || "";
+      if (!ident || !code || !pass) { status.textContent = "Preencha login, código e nova senha."; return; }
+      confirm.disabled = true; status.textContent = "Alterando senha...";
+      try {
+        const r = await accountRecoverConfirm(ident, code, pass);
+        if (!r.ok) { status.textContent = r.msg || "Código incorreto ou expirado."; return; }
+        closeAccountModal();
+        msg("Senha alterada! Entre com a nova senha.");
+        const loginInput = $("#acc-login");
+        if (loginInput) { loginInput.value = ident; }
+        const passInput = $("#acc-password");
+        if (passInput) passInput.focus();
+      } finally { confirm.disabled = false; }
+    };
+  }
+
   function openRegisterModal() {
     if (!openAccountModal(`
       <div class="panel-title">Criar conta
@@ -7069,6 +7123,8 @@ function initAccountLogin() {
   }
 
   $("#acc-open-register").addEventListener("click", openRegisterModal);
+  const recoverBtn = $("#acc-open-recover");
+  if (recoverBtn) recoverBtn.addEventListener("click", openRecoverModal);
   $("#account-login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = $("#acc-btn-login");

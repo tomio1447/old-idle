@@ -2082,6 +2082,12 @@ async function accountEmailSendCode(token, email) {
 }
 
 /* Confirma o código de verificação e marca o e-mail como confirmado. */
+async function accountRecoverRequest(ident) {
+  return _api("POST", "/api/account/recover", { login: ident, email: ident });
+}
+async function accountRecoverConfirm(login, code, password) {
+  return _api("POST", "/api/account/recover/confirm", { login, code, password });
+}
 async function accountEmailVerify(token, code) {
   const r = await _api("POST", "/api/account/email/verify", { token, code: code || "" });
   return r.data || { ok: false, msg: "Falha ao confirmar o código" };

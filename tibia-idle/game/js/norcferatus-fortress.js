@@ -92,6 +92,7 @@ const NORCFERATUS_ITEMS = {
   "ritual-bone-knife":         { n: "ritual bone knife",         s: null, t: "loot", cid: 51475, w: 0.2,  sell: 820,    npcSell: 820 },
   "greater-proficiency-catalyst": { n: "greater proficiency catalyst", s: null, t: "loot", cid: 51589, w: 7.5,  sell: 0,      npcSell: 0 },
   "blood-sceptre":             { n: "blood sceptre",             s: null, t: "loot", cid: 51481, w: 0.2,  sell: 178000, npcSell: 178000 },
+  "blood-crown":               { n: "blood crown",               s: null, t: "loot", cid: 51483, w: 0.2,  sell: 116000, npcSell: 116000 },
   "war-drum":                  { n: "war drum",                  s: null, t: "loot", cid: 2966,  w: 30.0, sell: 1000,   npcSell: 1000 },
   "bone-toothpick":            { n: "bone toothpick",            s: null, t: "loot", cid: 24380, w: 20.0, sell: 150,    npcSell: 150 },
   "bast-skirt":                { n: "bast skirt",                s: "legs", t: "armor", cid: 3560, w: 3.5, sell: 750,   npcSell: 750 },
@@ -326,7 +327,6 @@ const VLADRUKH = {
     { chance: 10, max: 7, item: "ultimate-spirit-potion" },
     { chance: 10, max: 15, item: "great-spirit-potion" },
     { chance: 5, max: 1, item: "skull-belt" },
-    { chance: 5, max: 1, item: "blood-sceptre" },
     { chance: 5, max: 2, item: "red-gem" },
     { chance: 5, max: 1, item: "giant-emerald" },
     { chance: 5, max: 2, item: "yellow-gem" },
@@ -336,6 +336,21 @@ const VLADRUKH = {
     { chance: 1.5, max: 1, item: "vampire-teeth" },
     { chance: 1.5, max: 1, item: "skull-staff" },
     { chance: 1.5, max: 1, item: "death-ring" },
+    /* Raros oficiais (wiki): Blood Sceptre + Blood Crown. */
+    { chance: 1.5, max: 1, item: "blood-sceptre" },
+    { chance: 1.5, max: 1, item: "blood-crown" },
+    /* Muito raros oficiais: as 10 peças do set Norcferatu (itens de
+     * equipamento já catalogados no weapondata, ids 51260-51269). */
+    { chance: 0.5, max: 1, item: "norcferatu-bloodhide" },
+    { chance: 0.5, max: 1, item: "norcferatu-bloodstrider" },
+    { chance: 0.5, max: 1, item: "norcferatu-bonecloak" },
+    { chance: 0.5, max: 1, item: "norcferatu-bonehood" },
+    { chance: 0.5, max: 1, item: "norcferatu-goretrampers" },
+    { chance: 0.5, max: 1, item: "norcferatu-thornwraps" },
+    { chance: 0.5, max: 1, item: "norcferatu-tuskplate" },
+    { chance: 0.5, max: 1, item: "norcferatu-skullguard" },
+    { chance: 0.5, max: 1, item: "norcferatu-fleshguards" },
+    { chance: 0.5, max: 1, item: "norcferatu-fangstompers" },
   ],
   voices: {
     int: 5000,
@@ -432,10 +447,15 @@ function renderBloodyTusksQuestDetail(q, ui) {
   const reqRow = (label, ok) =>
     `<div class="shop-row"><span class="info">${label}</span><b style="color:${ok ? "#9ce84a" : "#ff9a6a"}">${ok ? "✓" : "✗"}</b></div>`;
   const rewardsUnlocked = st.m2.done;
-  const mountBox = `<section class="quest-detail-panel mb-reward-box"><div class="hunt-best-title">MONTARIA</div>
+  const mountPrev = typeof questMountFrameHtml === "function"
+    ? questMountFrameHtml("gloom-maw", 56) : "";
+  const boxState = st.claimed.mount ? "claimed" : (rewardsUnlocked ? "ready" : "locked");
+  const mountBox = `<section class="quest-detail-panel mb-reward-box ${boxState}"><div class="hunt-best-title">MONTARIA — GLOOM MAW</div>
     ${st.claimed.mount
-      ? `<div class="mb-outfit-granted"><span class="tiny" style="color:#9ce84a">✓ Resgatada — Gloom Maw</span></div>`
-      : `<button type="button" class="sm primary quest-action" id="bt-claim-mount" ${rewardsUnlocked ? "" : "disabled"}>RESGATAR</button>`}
+      ? `<div class="mb-outfit-granted">${mountPrev}<span class="tiny" style="color:#9ce84a">✓ Resgatada — Gloom Maw (toda a conta)</span></div>`
+      : `<div class="mb-outfit-granted">${mountPrev}<span class="tiny dim">Gloom Maw — montaria de conta</span></div>
+         <button type="button" class="sm primary quest-action" id="bt-claim-mount" ${rewardsUnlocked ? "" : "disabled"}>RESGATAR</button>
+         ${rewardsUnlocked ? "" : '<div class="mb-reward-state dim">🔒 concluir a Missão 2</div>'}`}
   </section>`;
 
   ui.body.innerHTML = `<div class="panel-title">${q.name} — Level ${q.level}+<span class="spacer"></span><button class="sm" id="boss-quest-close">Fechar</button></div>

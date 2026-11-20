@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   password_hash VARCHAR(128) NOT NULL,
   email         VARCHAR(128) DEFAULT NULL,
   display_name  VARCHAR(24)  DEFAULT NULL UNIQUE,   -- nome público (chat/ranking/perfil)
+  recovery_code CHAR(6)      DEFAULT NULL,          -- código de recuperação de senha
+  recovery_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0,
   level         INT UNSIGNED NOT NULL DEFAULT 1,    -- level da CONTA (compartilhado)
   exp           BIGINT UNSIGNED NOT NULL DEFAULT 0, -- exp da CONTA
   role          ENUM('user','admin') NOT NULL DEFAULT 'user',

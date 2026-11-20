@@ -139,9 +139,99 @@ test("Make Believe rewards derive from mission completion facts, not only claims
   assert.equal(str.outfits["illuminated-warrior"], 2);
 });
 
-test("future hazard and missing client art are not exchangeable", () => {
+test("future hazard is not exchangeable, but mounts with 15.x art are", () => {
   assert.equal(W.exchange({}, [], { bag: {} }, "mount:noxious-ripptor", 0).ok, false);
-  assert.equal(W.exchange({}, [], { bag: { "demon-in-a-golden-box": 1 } }, "mount:alpha-demonosaur", 0).ok, false);
+  // Alpha Demonosaur ganhou sheet 15.x (looktype 1827) — a troca funciona.
+  const acc = {}, shared = { bag: { "demon-in-a-golden-box": 1 } };
+  assert.equal(W.exchange(acc, [], shared, "mount:alpha-demonosaur", 0).ok, true);
+  assert.equal(acc.cosmetics.mounts["alpha-demonosaur"], true);
+  assert.equal(shared.bag["demon-in-a-golden-box"], undefined);
+});
+
+test("battlefrazzle: marinated sturgeon desbloqueia a montaria da conta", () => {
+  const catalog = W.catalog({}, []);
+  const entry = catalog.find((r) => r.id === "mount:battlefrazzle");
+  assert.equal(entry.available, true);
+  assert.equal(entry.name, "Battlefrazzle");
+  const account = {}, shared = { bag: { "marinated-sturgeon": 2 },
+    itemInstances: [{ id: "a", slug: "marinated-sturgeon", loc: "bag" }] };
+  assert.equal(W.exchange(account, [], shared, "mount:battlefrazzle", 0).ok, true);
+  assert.equal(shared.bag["marinated-sturgeon"], 1);
+  assert.equal(shared.itemInstances.length, 0);
+  assert.equal(account.cosmetics.mounts.battlefrazzle, true);
+  assert.equal(W.exchange(account, [], shared, "mount:battlefrazzle", 0).ok, false);
+});
+
+test("mounts 15.x (Alpha/Battlefrazzle/Ram/Jaracal) têm aparência e sheet", () => {
+  const fs = require("node:fs"), path = require("node:path");
+  const w = {};
+  new Function("window", fs.readFileSync(
+    path.join(__dirname, "../game/js/appearancedata.js"), "utf8"))(w);
+  const byId = Object.fromEntries(w.APPEARANCES.mounts.map((m) => [m.id, m]));
+  const expected = { "alpha-demonosaur": 1827, battlefrazzle: 1882,
+    "reliable-ram": 1936, jaracal: 1962 };
+  for (const [id, looktype] of Object.entries(expected)) {
+    assert.equal(byId[id] && byId[id].looktype, looktype, id + " looktype");
+    assert.ok(byId[id].cw > 0 && byId[id].cols === 9 && byId[id].rows === 4,
+      id + " meta de sheet");
+    assert.ok(fs.existsSync(path.join(__dirname, "../game/assets/appearance/mount",
+      id + ".base.png")), id + " sem base.png");
+  }
+});
+
+test("marinated sturgeon: drop 0.01% no raubritter-skirmisher (cliente+engine)", () => {
+  const E = require("../server/authoritative_engine.js");
+  const m = E.MONSTERS["raubritter-skirmisher"];
+  const drop = m && m.loot.find((l) => l.item === "marinated-sturgeon");
+  assert.equal(drop && drop.chance, 0.01);
+  assert.ok(require("node:fs").existsSync(
+    require("node:path").join(__dirname, "../game/assets/item/marinated-sturgeon.png")));
+});
+
+test("itens de troca do Lothar/Addoner têm definição e sprite", () => {
+  const fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
+  process.on("unhandledRejection", () => {});
+  const stubEl = () => ({ getContext: () => null, style: {},
+    classList: { add: () => {}, toggle: () => {}, remove: () => {} },
+    querySelector: () => null, querySelectorAll: () => [],
+    appendChild: () => {}, addEventListener: () => {} });
+  const doc = { getElementById: () => null, querySelectorAll: () => [],
+    querySelector: () => null, addEventListener: () => {},
+    createElement: stubEl,
+    body: { classList: { add: () => {}, remove: () => {}, toggle: () => {},
+      contains: () => false }, appendChild: () => {}, prepend: () => {} } };
+  const ls = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  const ctx = { console, setTimeout: () => 0, clearTimeout: () => {},
+    setInterval: () => 0, clearInterval: () => {}, document: doc,
+    localStorage: ls, sessionStorage: ls, navigator: {},
+    location: { href: "", search: "" },
+    fetch: () => Promise.resolve({ ok: true, status: 200,
+      json: async () => ({}), text: async () => "" }),
+    requestAnimationFrame: () => 0, addEventListener: () => {},
+    Image: function () {}, performance: { now: () => 0 }, URL,
+    customElements: { define: () => {} }, Audio: function () {},
+    MutationObserver: function () {}, ResizeObserver: function () {},
+    Worker: function () {} };
+  ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  const html = fs.readFileSync(path.join(__dirname, "../game/index.html"), "utf8");
+  for (const m of html.matchAll(/src="(js\/[a-z0-9._-]+\.js)/g))
+    try { vm.runInContext(fs.readFileSync(path.join(__dirname, "../game", m[1]), "utf8"), ctx, { filename: m[1] }); } catch (e) {}
+  // frostheart-shard/mermaid-comb não existem no client 15.20: sem def e sem
+  // sprite — aparecem como nome-only até um client mais novo trazer a arte.
+  const semSprite = new Set(["frostheart-shard", "mermaid-comb"]);
+  const slugs = new Set();
+  for (const r of recipes) for (const alt of r.alternatives || [])
+    for (const c of alt) slugs.add(c.slug);
+  const missing = [];
+  for (const slug of slugs) {
+    const it = ctx.GAMEDATA.items[slug];
+    if (!it) { if (!semSprite.has(slug)) missing.push(slug + ":sem def"); continue; }
+    if (!semSprite.has(slug) && !fs.existsSync(
+      path.join(__dirname, "../game/assets/item", slug + ".png")))
+      missing.push(slug + ":sem png");
+  }
+  assert.deepEqual(missing, []);
 });
 
 test("client equips account unlocks on both sexes and does not enable unowned addon layers", () => {

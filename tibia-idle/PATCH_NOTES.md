@@ -4,6 +4,84 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Lothar: montarias 15.x + sprites de troca, Vladrukh com drops raros, recuperação de senha por e-mail
+
+- **Fix — troca de montaria travada no Lothar**: o Battlefrazzle (e
+  outras montarias 15.x) não existiam em `APPEARANCES.mounts`, então o
+  catálogo marcava a oferta como indisponível ("Aparência ainda não
+  disponível no cliente") e o botão Trocar nunca habilitava mesmo com o
+  item na Bag. Renderizadas as sheets oficiais do client 15.20:
+  **Alpha Demonosaur** (looktype 1827), **Battlefrazzle** (1882),
+  **Reliable Ram** (1936) e **Jaracal** (1962) — todas trocáveis. A
+  receita falsa `hell-demonosaur` foi removida.
+- **Novo — preview da montaria no modal**: cada oferta de montaria do
+  Lothar mostra a sprite da montaria a receber (frame parado) e os
+  ícones dos itens exigidos.
+- **Novo — sprites dos itens de troca**: 75 itens sem definição nem
+  ícone (reins, diapason, music box, demon-in-a-box, horseshoes,
+  vouchers gnomish, peças de addons etc.) ganharam definição com cid
+  oficial do `appearances.dat` 15.x + sprite renderizado em
+  `assets/item/`. `frostheart-shard` e `mermaid-comb` não existem no
+  client 15.20 — permanecem nome-only.
+- **Fix — Marinated Sturgeon 0,01%**: drop oficial somente no
+  Raubritter Skirmisher; chance ajustada de 1,5% para **0,01%**
+  (cliente + engine).
+- **Fix — Vladrukh sem drops raros/muito raros**: adicionados
+  Blood Sceptre e Blood Crown (raros, 1,5%) e as 10 peças do set
+  Norcferatu (muito raras, 0,5%): Bloodhide, Bloodstrider, Bonecloak,
+  Bonehood, Goretrampers, Thornwraps, Tuskplate, Skullguard,
+  Fleshguards e Fangstompers — 33 drops no total, com paridade
+  cliente/engine.
+- **Novo — recuperação de senha por e-mail**: link "Esqueci a senha" no
+  login abre o fluxo em 2 passos (código de 6 dígitos/10 min + nova
+  senha). Resposta genérica anti-enumeração, hash bcrypt, revoga todas
+  as sessões da conta. SMTP usa a configuração existente; em
+  `TEST_SERVER=1` o código volta como `devCode`. Confirmação por SMS
+  fica desativada — `server/smser.js` é só o stub do provedor futuro.
+
+---
+
+## 2026-11-20 — Arean Outskirts: outfits oficiais + FOV da arena
+
+- **Fix — FOV fora da arena**: a FOV 21×13 é centrada no centro do mapa
+  OTBM (39×41), então a arena (y1014–1020) ficava acima da janela
+  visível (y1017–1029) — o centermap {1020,1018} colava na borda
+  superior da tela e 3 linhas da zona de spawn ficavam fora/inacessíveis.
+  Adicionado `otbmBounds` {1010,1012,21,13} que recorta o mapa centrado
+  no centermap: jogador nasce no centro exato da tela e 100% da zona de
+  spawn fica visível.
+- **Fix — 404 de projéteis (`physical_*.png`)**: as skills dos
+  monstros declaravam `miss: "physical"` (nome de elemento, não de
+  sprite) — o client pedia `missile/physical_<dir>.png` inexistente e o
+  engine marcava `projectile` até em skill de área. O Marksman agora
+  dispara `bolt` real; os `miss` mortos de skills de área (groundshaker
+  do Skirmisher, swoop da Night Harpy, groundshaker do Yorik Youngbook
+  no Roost e o root do Zharvorin's Spirit — que pedia
+  `rooting-effect_*.png`) foram removidos. Consumers de `sk.miss`
+  (client + engine) agora resolvem nome de elemento via
+  `ELEMENT_MISSILE` antes de virar nome de arquivo.
+- **Fix — sprites errados na Arean Outskirts (400+)**: os 4 monstros
+  usavam looktypes estimados do lote livre 15.20. Corrigidos para os
+  looktypes oficiais do staticdata do client 15.20 (race→outfit):
+  Night Harpy **1899** (era 1901 — o looktype do Marksman), Raubritter
+  Skirmisher **1900**, Raubritter Marksman **1901** e Raubritter
+  Chastener **1902**. As mesmas fichas valem para a Stag Bastion.
+  Sheets 9×4 re-renderizados a partir do DAT convertido.
+
+---
+
+## 2026-11-20 — Vladrukh: drops raros e muito raros oficiais
+
+- **Loot do Vladrukh corrigido** — faltavam os tiers raros do loot
+  oficial. Adicionados: **Blood Crown** (item novo, 116k no Yasir) e
+  as 10 peças do **set Norcferatu** (Bloodhide, Bloodstrider,
+  Bonecloak, Bonehood, Goretrampers, Thornwraps, Tuskplate,
+  Skullguard, Fleshguards e Fangstompers) como drops muito raros.
+  Blood Sceptre passou a ser classificado como drop raro, como na
+  tabela oficial.
+
+---
+
 ## 2026-11-20 — Progresso por CONTA: level/exp, nome público, bless no wipe
 
 - **Level e EXP passam a ser da conta, não do personagem**: todos os

@@ -307,6 +307,25 @@ JsonStore.prototype._nextId = function (arr) {
 JsonStore.prototype.findAccountByLogin = function (login) {
   return this.accounts.find((a) => a.login === login) || null;
 };
+JsonStore.prototype.findAccountByEmail = function (email) {
+  const em = String(email || "").toLowerCase();
+  return (this.accounts || []).find((a) => String(a.email || "").toLowerCase() === em && em) || null;
+};
+JsonStore.prototype.setAccountRecoveryCode = function (accountId, code, expiresAt) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.recovery_code = String(code || "");
+  a.recovery_code_expires = Math.max(0, Math.floor(Number(expiresAt) || 0));
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountPassword = function (accountId, hash) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.password_hash = String(hash || "");
+  this._save();
+  return a;
+};
 JsonStore.prototype.findAccountById = function (id) {
   return this.accounts.find((a) => a.id === Number(id)) || null;
 };
@@ -3298,6 +3317,21 @@ async function MysqlStore() {
         [verified ? 1 : 0, Number(accountId)]);
       return this.findAccountById(accountId);
     },
+    async findAccountByEmail(email) {
+      const rows = await this.query("SELECT * FROM accounts WHERE email = ? AND email != ''",
+        [String(email || "").slice(0, 120)]);
+      return hydrateAccount(rows[0] || null);
+    },
+    async setAccountRecoveryCode(accountId, code, expiresAt) {
+      await this.run("UPDATE accounts SET recovery_code = ?, recovery_code_expires = ? WHERE id = ?",
+        [String(code || ""), Math.max(0, Math.floor(Number(expiresAt) || 0)), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountPassword(accountId, hash) {
+      await this.run("UPDATE accounts SET password_hash = ? WHERE id = ?",
+        [String(hash || ""), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
     async migrateAccountGold(accountId) {
       const account = await this.findAccountById(accountId);
       if (!account) return null;
@@ -5740,6 +5774,9 @@ async function ensureSchema(pool) {
     "ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0",
     "ADD COLUMN email_code CHAR(6) DEFAULT NULL",
     "ADD COLUMN email_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0",
+    /* Recuperação de senha por e-mail (código de 6 dígitos, 10 min). */
+    "ADD COLUMN recovery_code CHAR(6) DEFAULT NULL",
+    "ADD COLUMN recovery_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0",
     /* Identidade pública (chat/ranking/perfil) + progresso da CONTA. */
     "ADD COLUMN display_name VARCHAR(24) DEFAULT NULL",
     "ADD COLUMN level INT UNSIGNED NOT NULL DEFAULT 1",

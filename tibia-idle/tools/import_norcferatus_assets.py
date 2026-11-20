@@ -49,6 +49,7 @@ LOOT_ITEMS = {
     "ritual-bone-knife": 51475,
     "greater-proficiency-catalyst": 51589,
     "blood-sceptre": 51481,
+    "blood-crown": 51483,
     "war-drum": 2966,
     "bone-toothpick": 24380,
 }

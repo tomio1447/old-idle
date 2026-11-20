@@ -131,7 +131,21 @@ for (const slug of Object.keys(STATS)) {
 const vd = M[BOSS_ID];
 must(vd && vd.hp === 390000 && vd.exp === 450000 && vd.looktype === 1862,
   "vladrukh: ficha divergente");
-must(vd.loot.length === 22, "vladrukh deve ter 22 drops oficiais");
+must(vd.loot.length === 33, "vladrukh deve ter 33 drops oficiais");
+/* Raros oficiais (chance 1.5): Blood Sceptre + Blood Crown; muito raros
+ * oficiais (chance 0.5): as 10 peças do set Norcferatu. */
+const VLADRUKH_DROPS = {};
+for (const l of vd.loot) VLADRUKH_DROPS[l.item] = l.chance;
+must(VLADRUKH_DROPS["blood-sceptre"] === 1.5 &&
+  VLADRUKH_DROPS["blood-crown"] === 1.5,
+  "vladrukh: blood-sceptre/blood-crown devem ser raros (1.5)");
+const NORC_SET = ["norcferatu-bloodhide", "norcferatu-bloodstrider",
+  "norcferatu-bonecloak", "norcferatu-bonehood", "norcferatu-goretrampers",
+  "norcferatu-thornwraps", "norcferatu-tuskplate", "norcferatu-skullguard",
+  "norcferatu-fleshguards", "norcferatu-fangstompers"];
+for (const s of NORC_SET)
+  must(VLADRUKH_DROPS[s] === 0.5,
+    "vladrukh: " + s + " deve ser muito raro (0.5)");
 
 /* ---------------- contagens oficiais de loot ---------------- */
 const LOOT_COUNT = {
@@ -157,8 +171,18 @@ const NEW_ITEMS = {
   "orcish-toothbrush": [51477, 750], "bone-fibula": [51485, 580],
   "bloodshot-giant-eye": [51482, 1820], "ritual-bone-knife": [51475, 820],
   "greater-proficiency-catalyst": [51589, 0], "blood-sceptre": [51481, 178000],
+  "blood-crown": [51483, 116000],
   "war-drum": [2966, 1000], "bone-toothpick": [24380, 150],
   "bast-skirt": [3560, 750],
+};
+/* Set Norcferatu: equipamentos do weapondata (guardam o client id no
+ * campo `id`, não `cid`) — drops muito raros do Vladrukh. */
+const NORC_SET_ITEMS = {
+  "norcferatu-skullguard": [51260, 528], "norcferatu-bonehood": [51261, 304],
+  "norcferatu-tuskplate": [51262, 1184], "norcferatu-bloodhide": [51263, 768],
+  "norcferatu-bonecloak": [51264, 768], "norcferatu-thornwraps": [51265, 560],
+  "norcferatu-bloodstrider": [51266, 1184], "norcferatu-fleshguards": [51267, 240],
+  "norcferatu-goretrampers": [51268, 544], "norcferatu-fangstompers": [51269, 736],
 };
 const catalog = { console }; catalog.window = catalog; vm.createContext(catalog);
 for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js",
@@ -179,6 +203,17 @@ for (const slug of Object.keys(NEW_ITEMS)) {
   must(client && server, slug + ": ausente no cliente ou no servidor");
   must(client.cid === cid && server.cid === cid,
     slug + ": cid divergente (" + cid + ")");
+  must(Number(client.sell) === sell && Number(server.sell) === sell,
+    slug + ": preço NPC divergente (" + sell + ")");
+  must(fs.existsSync(path.join(game, "assets", "item", slug + ".png")),
+    slug + ": ícone ausente");
+}
+for (const slug of Object.keys(NORC_SET_ITEMS)) {
+  const [id, sell] = NORC_SET_ITEMS[slug];
+  const client = catalog.GAMEDATA.items[slug], server = E.ITEMS[slug];
+  must(client && server, slug + ": ausente no cliente ou no servidor");
+  must(client.id === id && server.id === id,
+    slug + ": id divergente (" + id + ")");
   must(Number(client.sell) === sell && Number(server.sell) === sell,
     slug + ": preço NPC divergente (" + sell + ")");
   must(fs.existsSync(path.join(game, "assets", "item", slug + ".png")),
@@ -382,6 +417,7 @@ must(html.includes("js/norcferatus-fortress.js?v="),
 
 console.log("OK — Norcferatus Fortress: OTBM 25×25 z=7, zona 13×8 (94 sqm " +
   "conectados), 5 regulares + Varg extra 3%/onda + respawn 8s, " +
-  "Vladrukh 390k/450k cooldown 20h, Bloody Tusks Quest " +
+  "Vladrukh 390k/450k cooldown 20h (33 drops: raros blood-sceptre/" +
+  "blood-crown + set Norcferatu muito raro), Bloody Tusks Quest " +
   "(M1 5 Vargs → boss, M2 boss → montaria Gloom Maw), " +
-  "20 itens novos, BOSSES/HUNTS 400+.");
+  "22 itens novos, BOSSES/HUNTS 400+.");

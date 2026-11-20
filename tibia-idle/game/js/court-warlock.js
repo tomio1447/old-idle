@@ -268,17 +268,19 @@ const HUNT_RAUB_BASE = {
   imune: ["paralyze", "invisible"], loot: [], grupo: "humans",
 };
 /* Raubritter Skirmisher — melee, hp 11000, exp 8550, armor 100,
- * mitigation 3.92, speed 150→160. */
+ * mitigation 3.92, speed 150→160.
+ * looktype/race OFICIAIS do staticdata do client 15.20:
+ * race 2750 → outfit 1900. */
 const RAUB_SKIRMISHER = Object.assign({}, HUNT_RAUB_BASE, {
   name: "Raubritter Skirmisher", hp: 11000, exp: 8550,
   armor: 100, defense: 90, mitigation: 3.92, speed: 160, damage: 700,
-  looktype: 1908,
+  looktype: 1900, raceId: 2750,
   resist: { physical: -12, earth: -6, fire: -15, death: 0, energy: 9,
             holy: 15, ice: 20 },
   skills: [
     { el: "physical", min: 500, max: 900, int: 2000, ch: 40, range: 1 },
     { el: "physical", min: 400, max: 800, int: 4500, ch: 25, radius: 2,
-      fx: "groundshaker", miss: "physical" },
+      fx: "groundshaker" },
   ],
   voices: { int: 6000, ch: 15, list: [
     { t: "Out... sider, hrngh!" }, { t: "Must... resist!" },
@@ -293,17 +295,18 @@ const RAUB_SKIRMISHER = Object.assign({}, HUNT_RAUB_BASE, {
     { item: "crown-shield", chance: 6, max: 1 },
     { item: "gold-ingot", chance: 6, max: 1 },
     { item: "crown-armor", chance: 6, max: 1 },
-    { item: "marinated-sturgeon", chance: 1.5, max: 1 },
+    { item: "marinated-sturgeon", chance: 0.01, max: 1 },
     { item: "ring-of-orange-plasma", chance: 1.5, max: 1 },
     { item: "ring-of-red-plasma", chance: 1.5, max: 1 },
   ],
 });
 /* Raubritter Chastener — conjurador de magias elementais + escudos,
- * hp 10000, exp 9500, armor 80, mitigation 3.68, speed 150. */
+ * hp 10000, exp 9500, armor 80, mitigation 3.68, speed 150.
+ * staticdata 15.20: race 2752 → outfit 1902. */
 const RAUB_CHASTENER = Object.assign({}, HUNT_RAUB_BASE, {
   name: "Raubritter Chastener", hp: 10000, exp: 9500,
   armor: 80, defense: 80, mitigation: 3.68, speed: 150, damage: 550,
-  looktype: 1920,
+  looktype: 1902, raceId: 2752,
   resist: { physical: -20, earth: -12, fire: -6, death: 0, energy: 15,
             holy: 15, ice: 25 },
   skills: [
@@ -339,18 +342,19 @@ const RAUB_CHASTENER = Object.assign({}, HUNT_RAUB_BASE, {
   ],
 });
 /* Raubritter Marksman — distance fighter oficial, hp 10500, exp 9025,
- * armor 90, mitigation 3.45, speed 170. */
+ * armor 90, mitigation 3.45, speed 170.
+ * staticdata 15.20: race 2751 → outfit 1901. */
 const RAUB_MARKSMAN = Object.assign({}, HUNT_RAUB_BASE, {
   name: "Raubritter Marksman", hp: 10500, exp: 9025,
   armor: 90, defense: 85, mitigation: 3.45, speed: 170, damage: 650,
-  looktype: 1889, targetDistance: 4, ranged: 1,
+  looktype: 1901, raceId: 2751, targetDistance: 4, ranged: 1,
   resist: { physical: -16, earth: -12, fire: -12, death: 0, energy: 12,
             holy: 15, ice: 15 },
   skills: [
     { el: "physical", min: 450, max: 850, int: 1800, ch: 45, range: 7,
-      miss: "physical", alvo: 1 },
+      miss: "bolt", alvo: 1 },
     { el: "physical", min: 350, max: 700, int: 4000, ch: 30, range: 7,
-      radius: 2, miss: "physical" },
+      radius: 2 },
   ],
   voices: { int: 6000, ch: 15, list: [
     { t: "This is ours now!" }, { t: "I'll... hunt you... down!" },
@@ -393,17 +397,19 @@ const AO_PRICE_FIX = {
 
 /* Night Harpy — ficha OFICIAL: hp 14.000, exp 21.000, armor 90,
  * mitigation 3.92, speed 190, Bird/Hard, "attack in flocks and with
- * swift precision" → melee rápido. dmgMods oficiais → resist. */
+ * swift precision" → melee rápido. dmgMods oficiais → resist.
+ * looktype/race OFICIAIS do staticdata 15.20: race 2764 → outfit
+ * 1899 (o 1901 usado antes era do Raubritter Marksman). */
 const NIGHT_HARPY = Object.assign({}, HUNT_RAUB_BASE, {
   name: "Night Harpy", hp: 14000, exp: 21000,
   armor: 90, defense: 85, mitigation: 3.92, speed: 190, damage: 750,
-  looktype: 1901,   // ave negra do lote livre 15.20 (estimado)
+  looktype: 1899, raceId: 2764,
   resist: { physical: 0, earth: 40, fire: 30, death: -9, energy: 0,
             holy: -9, ice: -12 },
   skills: [
     { el: "physical", min: 450, max: 900, int: 1500, ch: 45, range: 1 },
     { el: "physical", min: 400, max: 800, int: 3500, ch: 30, radius: 2,
-      fx: "physical", miss: "physical" },
+      fx: "physical" },
     { el: "energy",   min: 400, max: 750, int: 5000, ch: 25, range: 7,
       miss: "energy", alvo: 1 },
   ],
@@ -445,6 +451,12 @@ SB_MONSTERS["night-harpy"] = NIGHT_HARPY;
                     "raubritter-marksman": 20 },
     color: "#2a2a3a", scene: "crypt",
     otbm: "arean_outskirts", otbmFloor: 7,
+    /* O .otbm é 39×41 e a FOV 21×13 é centrada no CENTRO DO MAPA —
+     * sem recorte a arena (y1014-1020) ficava fora da janela visível
+     * (abs y1017-1029) e o spawn colava na borda superior. O crop
+     * 21×13 centrado no centermap {1020,1018} põe a FOV exatamente
+     * sobre a zona de spawn (jogador no centro da tela). */
+    otbmBounds: { x: 1010, y: 1012, w: 21, h: 13, z: 7 },
     otbmSpawn: { x: 1020, y: 1018, z: 7 },            // centerroom
     otbmMobBounds: { x: 1015, y: 1014, w: 9, h: 7, z: 7 },  // spawn rect
     avgHp: 11375, avgExp: 12006, avgDamage: 900, avgArmor: 90,

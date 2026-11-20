@@ -33,17 +33,20 @@ function configured() {
   return !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
 }
 
-async function sendVerificationCode(to, code, login) {
-  const subject = "Seu código de verificação — Global-Idle";
-  const text = "Olá " + (login || "jogador") + ",\n\nSeu código de verificação é: " +
-    code + "\n\nEle expira em 10 minutos.";
+async function sendRecoveryCode(to, code, login) {
+  const subject = "Recuperação de senha — Global-Idle";
+  const text = "Olá " + (login || "jogador") + ",\n\nSeu código de recuperação é: " +
+    code + "\n\nEle expira em 10 minutos. Se você não pediu a recuperação, ignore este e-mail.";
   const html = "<p>Olá <b>" + escapeHtml(login || "jogador") + "</b>,</p>" +
-    "<p>Seu código de verificação da conta Global-Idle é:</p>" +
+    "<p>Pedimos a recuperação da sua senha. Seu código é:</p>" +
     "<p style=\"font-size:26px;letter-spacing:6px;font-weight:bold\">" + escapeHtml(code) + "</p>" +
-    "<p>Ele expira em 10 minutos. Se você não pediu este código, ignore este e-mail.</p>";
+    "<p>Ele expira em 10 minutos. Se você não pediu a recuperação, ignore este e-mail.</p>";
+  return send(to, subject, text, html);
+}
 
+async function send(to, subject, text, html) {
   if (TEST_SERVER) {
-    console.log("[mailer][mock] código de verificação para", to, "→", code);
+    console.log("[mailer][mock]", subject, "para", to, "→", /:\s*(\d{6})/.exec(text)?.[1] || text);
     return { ok: true, mock: true };
   }
   if (!configured()) {
@@ -65,4 +68,16 @@ async function sendVerificationCode(to, code, login) {
   }
 }
 
-module.exports = { configured, sendVerificationCode };
+async function sendVerificationCode(to, code, login) {
+  const subject = "Seu código de verificação — Global-Idle";
+  const text = "Olá " + (login || "jogador") + ",\n\nSeu código de verificação é: " +
+    code + "\n\nEle expira em 10 minutos.";
+  const html = "<p>Olá <b>" + escapeHtml(login || "jogador") + "</b>,</p>" +
+    "<p>Seu código de verificação da conta Global-Idle é:</p>" +
+    "<p style=\"font-size:26px;letter-spacing:6px;font-weight:bold\">" + escapeHtml(code) + "</p>" +
+    "<p>Ele expira em 10 minutos. Se você não pediu este código, ignore este e-mail.</p>";
+
+  return send(to, subject, text, html);
+}
+
+module.exports = { configured, sendVerificationCode, sendRecoveryCode };

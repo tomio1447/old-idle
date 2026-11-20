@@ -4545,6 +4545,60 @@ async function verifyEmailCode(db, body) {
   return { code: 200, body: { ok: true, emailVerified: true } };
 }
 
+/* ------------------------- recuperação de senha -------------------------
+ * Fluxo em 2 passos, sem token (o jogador não está logado):
+ *   POST /api/account/recover         {login|email}  → código por e-mail
+ *   POST /api/account/recover/confirm {login, code, password} → troca senha
+ * A resposta do passo 1 é sempre genérica para não vazar quais logins/e-mails
+ * existem. O código reusa o formato do e-mail (6 dígitos, 10 min) mas em
+ * colunas próprias para não colidir com uma verificação pendente. Trocar a
+ * senha revoga TODAS as sessões da conta. */
+const RECOVERY_CODE_TTL_MS = 10 * 60 * 1000;
+async function requestPasswordRecovery(db, body) {
+  const ident = String(body.login || body.email || "").trim().slice(0, 120);
+  const generic = { code: 200, body: { ok: true,
+    msg: "Se a conta existir, enviamos um código para o e-mail cadastrado." } };
+  if (!ident) return generic;
+  let acc = await db.findAccountByLogin(ident);
+  if (!acc && EMAIL_RE.test(ident) && typeof db.findAccountByEmail === "function")
+    acc = await db.findAccountByEmail(ident);
+  if (!acc || !EMAIL_RE.test(String(acc.email || ""))) return generic;
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  if (typeof db.setAccountRecoveryCode === "function")
+    await db.setAccountRecoveryCode(acc.id, code, Date.now() + RECOVERY_CODE_TTL_MS);
+  const sent = await mailer.sendRecoveryCode(acc.email, code, acc.login);
+  return { code: 200, body: { ok: true,
+    msg: "Se a conta existir, enviamos um código para o e-mail cadastrado.",
+    emailSent: !!sent.ok,
+    ...(TEST_SERVER ? { devCode: code } : {}) } };
+}
+async function confirmPasswordRecovery(db, body) {
+  const login = String(body.login || "").trim().slice(0, 32);
+  const code = String(body.code || "").trim();
+  const password = String(body.password || "");
+  if (!login) return { code: 400, body: { ok: false, msg: "Informe o login da conta." } };
+  if (!/^\d{6}$/.test(code)) return { code: 400, body: { ok: false, msg: "Código inválido." } };
+  if (password.length < 1) return { code: 400, body: { ok: false, msg: "Informe a nova senha." } };
+  let acc = await db.findAccountByLogin(login);
+  if (!acc && EMAIL_RE.test(login) && typeof db.findAccountByEmail === "function")
+    acc = await db.findAccountByEmail(login);
+  if (!acc) return { code: 400, body: { ok: false, msg: "Código incorreto ou expirado." } };
+  const stored = String(acc.recovery_code || "");
+  const expiresAt = Number(acc.recovery_code_expires) || 0;
+  if (!stored || expiresAt < Date.now() || code !== stored)
+    return { code: 400, body: { ok: false, msg: "Código incorreto ou expirado." } };
+  const hash = bcrypt.hashSync(password, SALT_ROUNDS);
+  if (typeof db.setAccountPassword === "function") await db.setAccountPassword(acc.id, hash);
+  else if (typeof db.run === "function")
+    await db.run("UPDATE accounts SET password_hash = ? WHERE id = ?", [hash, Number(acc.id)]);
+  if (typeof db.setAccountRecoveryCode === "function")
+    await db.setAccountRecoveryCode(acc.id, "", 0);
+  /* Troca de senha = revoga todas as sessões (inclui a sessão do invasor,
+   * se o código vazou depois de uso legítimo). */
+  if (typeof db.revokeAccountSessions === "function") await db.revokeAccountSessions(acc.id);
+  return { code: 200, body: { ok: true, msg: "Senha alterada. Faça login novamente." } };
+}
+
 /* ------------------------------ MARKET P2P ------------------------------ */
 
 /* ====================== REGRAS OFICIAIS DO MARKET ======================
@@ -5892,6 +5946,14 @@ async function main() {
       if(req.method==="POST"&&url==="/api/account/email/verify"){
         const limited=rateLimit(req,"email-verify",20,600000);if(limited)return send(res,limited.code,limited.body);
         const r=await verifyEmailCode(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/recover"){
+        const limited=rateLimit(req,"acc-recover",5,600000);if(limited)return send(res,limited.code,limited.body);
+        const r=await requestPasswordRecovery(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/recover/confirm"){
+        const limited=rateLimit(req,"acc-recover-confirm",10,600000);if(limited)return send(res,limited.code,limited.body);
+        const r=await confirmPasswordRecovery(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="GET"&&url==="/api/instance"){
         const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
