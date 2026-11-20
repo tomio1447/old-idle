@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Modal de patch notes compacto
+
+- Modal de boas-vindas/patch notes **menor** (720 → 560px, logo 96px,
+  lista até 260px) e **fundo no padrão dos painéis da cidade**
+  (`#23262d`, header/footer `#1b1e24`).
+
+---
+
 ## 2026-11-20 — Wheel of Destiny: novo layout do modal (wod)
 
 - **Palco circular** — a roda fica contida em um palco com gradiente

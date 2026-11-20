@@ -6431,8 +6431,9 @@ body.quest-lobby-open #party-panel { display:none !important; }
 
 /* ── Patch notes modal (beta oficial) — layout gi-patch-* ── */
 #alpha-announce-modal {
-  --gi-bg-overlay: rgba(10, 12, 15, 0.85);
-  --gi-modal-bg: #101218;
+  --gi-bg-overlay: rgba(0, 0, 0, 0.82);
+  /* fundo no padrão dos painéis/modais da cidade (global-idle.css) */
+  --gi-modal-bg: #23262d;
   --gi-border-gold: #8c6d32;
   --gi-text-main: #f3efe6;
   --gi-text-muted: #a39e93;
@@ -6445,69 +6446,69 @@ body.quest-lobby-open #party-panel { display:none !important; }
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 #alpha-announce-modal .gi-patch-modal {
-  position: relative; width: 100%; max-width: 720px;
+  position: relative; width: 100%; max-width: 560px;
   background: var(--gi-modal-bg); border: 2px solid var(--gi-border-gold);
   box-shadow: 0 20px 50px rgba(0,0,0,0.9); border-radius: 6px;
   overflow: hidden; display: flex; flex-direction: column;
   margin: auto;
 }
 #alpha-announce-modal .gi-modal-header {
-  background: linear-gradient(180deg, #26282c 0%, #181a1f 100%);
+  background: #1b1e24;
   border-bottom: 1px solid var(--gi-border-gold);
-  padding: 10px 16px; text-align: center;
+  padding: 8px 14px; text-align: center;
 }
 #alpha-announce-modal .gi-beta-tag {
-  font-size: 0.8rem; font-weight: 700; color: var(--gi-text-highlight);
+  font-size: 0.72rem; font-weight: 700; color: var(--gi-text-highlight);
   letter-spacing: 2px; text-transform: uppercase;
 }
 #alpha-announce-modal .gi-modal-content {
-  padding: 24px 30px; flex-grow: 1;
-  display: flex; flex-direction: column; gap: 20px;
+  padding: 16px 22px; flex-grow: 1;
+  display: flex; flex-direction: column; gap: 14px;
 }
 #alpha-announce-modal .gi-welcome-block { text-align: center; }
 #alpha-announce-modal .gi-hero-logo {
-  width: 140px; height: auto; margin-bottom: 16px;
+  width: 96px; height: auto; margin-bottom: 10px;
   filter: drop-shadow(0 0 10px rgba(230, 184, 76, 0.3));
 }
 #alpha-announce-modal .gi-welcome-text {
-  margin: 0 auto; font-size: 0.95rem; color: var(--gi-text-main);
-  line-height: 1.5; max-width: 90%;
+  margin: 0 auto; font-size: 0.85rem; color: var(--gi-text-main);
+  line-height: 1.45; max-width: 92%;
 }
-#alpha-announce-modal .gi-notes-section { display: flex; flex-direction: column; gap: 12px; }
+#alpha-announce-modal .gi-notes-section { display: flex; flex-direction: column; gap: 10px; }
 #alpha-announce-modal .gi-section-title {
-  margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--gi-text-muted);
+  margin: 0; font-size: 0.8rem; font-weight: 600; color: var(--gi-text-muted);
   text-transform: uppercase; letter-spacing: 1px;
 }
 #alpha-announce-modal .gi-timestamp-bar {
   background: rgba(230, 184, 76, 0.15); color: var(--gi-text-highlight);
-  border: 1px solid var(--gi-border-gold); padding: 8px 12px;
-  font-size: 0.85rem; border-radius: 4px; font-weight: 600;
+  border: 1px solid var(--gi-border-gold); padding: 6px 10px;
+  font-size: 0.78rem; border-radius: 4px; font-weight: 600;
 }
 #alpha-announce-modal .gi-patch-list {
   list-style: none; margin: 0; padding: 0;
-  display: flex; flex-direction: column; gap: 10px;
-  max-height: 400px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 260px; overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--gi-border-gold) var(--gi-modal-bg);
 }
 #alpha-announce-modal .gi-patch-list::-webkit-scrollbar { width: 8px; }
 #alpha-announce-modal .gi-patch-list::-webkit-scrollbar-track { background: var(--gi-modal-bg); }
 #alpha-announce-modal .gi-patch-list::-webkit-scrollbar-thumb { background: var(--gi-border-gold); border-radius: 4px; }
-#alpha-announce-modal .gi-patch-item { display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; }
+#alpha-announce-modal .gi-patch-item { display: flex; align-items: flex-start; gap: 8px; padding: 1px 0; }
 #alpha-announce-modal .gi-new-badge {
   flex-shrink: 0; background-color: var(--gi-new-badge-bg); color: var(--gi-new-badge-text);
-  font-size: 0.7rem; font-weight: 800; padding: 2px 6px;
+  font-size: 0.62rem; font-weight: 800; padding: 2px 5px;
   border-radius: 2px; letter-spacing: 0.5px;
 }
 #alpha-announce-modal .gi-new-badge.is-fix { background-color: #2b6cb0; }
-#alpha-announce-modal .gi-item-text { font-size: 0.9rem; color: var(--gi-text-main); line-height: 1.5; }
+#alpha-announce-modal .gi-item-text { font-size: 0.8rem; color: var(--gi-text-main); line-height: 1.45; }
 #alpha-announce-modal .gi-modal-footer {
-  padding: 16px 30px; border-top: 1px solid var(--gi-border-gold);
-  background: linear-gradient(180deg, #181a1f 0%, #26282c 100%);
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 12px 22px; border-top: 1px solid var(--gi-border-gold);
+  background: #1b1e24;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
 #alpha-announce-modal .gi-ok-btn {
-  min-width: 160px; padding: 10px 20px; font-size: 1rem; font-weight: 700;
+  min-width: 140px; padding: 8px 18px; font-size: 0.9rem; font-weight: 700;
   color: #fff; background: linear-gradient(180deg, #a67a25 0%, #735212 100%);
   border: 1.5px solid #f2c96b; border-radius: 4px; cursor: pointer;
   text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s ease;
@@ -6519,10 +6520,10 @@ body.quest-lobby-open #party-panel { display:none !important; }
 }
 #alpha-announce-modal .gi-ok-btn:active { transform: translateY(1px); }
 #alpha-announce-modal .gi-copyright {
-  margin: 0; font-size: 0.75rem; color: var(--gi-text-muted); letter-spacing: 0.5px;
+  margin: 0; font-size: 0.68rem; color: var(--gi-text-muted); letter-spacing: 0.5px;
 }
 @media (max-width: 640px) {
   #alpha-announce-modal .gi-patch-modal { max-width: 95%; }
-  #alpha-announce-modal .gi-modal-content { padding: 16px 20px; }
-  #alpha-announce-modal .gi-hero-logo { width: 110px; }
+  #alpha-announce-modal .gi-modal-content { padding: 14px 16px; }
+  #alpha-announce-modal .gi-hero-logo { width: 80px; }
 }
