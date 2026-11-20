@@ -70,9 +70,9 @@ const SIR_LEONARD_STATS = {
 /* Itens de loot novos (cids do appearances.dat 15.x). Preços oficiais
  * (TibiaWiki): axe of sir leonard = Yasir/Fiona 49.000; helmet of sir
  * leonard = Yasir/Fiona 46.000; gearwheel chain = Flint 5.000;
- * white gem = joalheria 12.000. Os 5 itens Ink, a proficiency catalyst
- * e o blank imbuement scroll não têm comprador NPC (TibiaWiki sellto
- * "--" / "Jogadores") → sell 0. */
+ * white gem = joalheria 12.000; blank imbuement scroll 25.000
+ * (pedido). Os 5 itens Ink e a proficiency catalyst não têm comprador
+ * NPC (TibiaWiki sellto "--" / "Jogadores") → sell 0. */
 const SIR_LEONARD_LOOT_ITEMS = {
   "ink-blade":              { n: "ink blade",              s: null, t: "loot", cid: 51270, w: 3.5,  sell: 0,     npcSell: 0 },
   "ink-quill":              { n: "ink quill",              s: null, t: "loot", cid: 51271, w: 0.8,  sell: 0,     npcSell: 0 },
@@ -83,7 +83,7 @@ const SIR_LEONARD_LOOT_ITEMS = {
   "helmet-of-sir-leonard":  { n: "helmet of sir leonard",  s: null, t: "loot", cid: 51430, w: 0.25, sell: 46000, npcSell: 46000 },
   "gearwheel-chain":        { n: "gearwheel chain",        s: null, t: "loot", cid: 21170, w: 10.0, sell: 5000,  npcSell: 5000 },
   "proficiency-catalyst":   { n: "proficiency catalyst",   s: null, t: "loot", cid: 51588, w: 5.0,  sell: 0,     npcSell: 0 },
-  "blank-imbuement-scroll": { n: "blank imbuement scroll", s: null, t: "loot", cid: 51442, w: 2.5,  sell: 0,     npcSell: 0 },
+  "blank-imbuement-scroll": { n: "blank imbuement scroll", s: null, t: "loot", cid: 51442, w: 2.5,  sell: 25000, npcSell: 25000 },
   "white-gem":              { n: "white gem",              s: null, t: "loot", cid: 32769, w: 0.3,  sell: 12000, npcSell: 12000 },
 };
 

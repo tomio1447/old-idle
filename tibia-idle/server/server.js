@@ -56,13 +56,15 @@ const { forgeCanFuse, forgeFuseAuth } = require("./forge");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const { createPvpController, PVP_MAPS, pvpMapLocal, pvpRectCenter, pvpApplyBattlePreset,
   pvpFilterVisualState, pvpResumeLiveOnBoot, pvpAuthCacheGet, pvpAuthCacheSet,
-  pvpAuthCacheDrop, pvpAuthSerialize, PVP_AUTH_PERSIST_MS } = require("./pvp");
+  pvpAuthCacheDrop, pvpAuthSerialize, PVP_AUTH_PERSIST_MS,
+  pvpAuthMarkAllDirty } = require("./pvp");
 const { createQuestController, QUEST_DEFS } = require("./quest_controller");
 // Inventário DA CONTA (bag/lootPouch/depot/reward chest compartilhados entre
 // os personagens). Pure module — db.js persiste accounts.shared_inventory.
 let SharedInv = null;
 try { SharedInv = require("./shared_inventory"); } catch (e) { SharedInv = null; }
 const store = require("./store");
+const rmt = require("./rmt");
 const mailer = require("./mailer");
 
 const PORT = parseInt(process.env.PORT || "8001", 10);
@@ -183,13 +185,13 @@ async function authorizeMaintenance(req,body,db){
 }
 
 /* ---------------------------------------------------------- server save
- * Todo dia às 00:00 no fuso SERVER_SAVE_TZ o processo agenda manutenção,
- * executa o server save (libera a recompensa diária de exercise weapon) e
- * sai — o supervisor externo (docker --restart, pm2, systemd) sobe de novo
- * já com as atualizações pendentes do código. SERVER_SAVE_NOEXIT=1 apenas
- * marca o save sem reiniciar (dev local sem supervisor). */
+ * Todo dia às 00:00 no fuso SERVER_SAVE_TZ o processo executa o savestate
+ * global: libera a recompensa diária de exercise weapon, marca o cache
+ * quente de PvP como sujo (próximo tick commita o blob inteiro) e flusha o
+ * runtime do JsonStore. Jogadores NÃO desconectam — não há mais restart
+ * nem countdown de manutenção. SERVER_SAVE_EXIT=1 restaura o restart
+ * legado pós-save (deploy/manual ops apenas). */
 const SERVER_SAVE_TZ=String(process.env.SERVER_SAVE_TZ||"America/Sao_Paulo").trim()||"America/Sao_Paulo";
-const SERVER_SAVE_WARN_MS=Math.max(10000,parseInt(process.env.SERVER_SAVE_WARN_MS||"60000",10)||60000);
 const DAILY_EXERCISE_CHARGES=Math.max(1,parseInt(process.env.DAILY_EXERCISE_CHARGES||"3000",10)||3000);
 const SERVER_META_FILE=path.join(
   process.env.GLOBAL_IDLE_DATA_DIR?path.resolve(process.env.GLOBAL_IDLE_DATA_DIR):path.join(__dirname,"data"),
@@ -209,33 +211,43 @@ function serverSaveWall(date){
   return {day:`${parts.year}-${parts.month}-${parts.day}`,
     seconds:((+parts.hour)%24)*3600+(+parts.minute)*60+(+parts.second)};
 }
-function msToServerSaveMidnight(date){
-  const wall=serverSaveWall(date);
-  return (86400-wall.seconds)*1000-Math.max(0,date.getMilliseconds());
+/* Savestate global: persiste tudo o que ainda estiver volátil SEM derrubar
+ * jogadores. JsonStore descarrega o runtime; o cache quente de PvP é
+ * marcado sujo para o próximo tick commitar o blob; o resto (contas,
+ * personagens, instâncias de hunt) já é durável via saves/checkpoints
+ * versionados. */
+async function runGlobalSavestate(db){
+  let flushed=false;
+  try{if(db&&typeof db._flushRuntime==="function"){db._flushRuntime();flushed=true;}}
+  catch(e){console.error("[savestate] runtime flush:",e&&e.message);}
+  try{if(typeof pvpAuthMarkAllDirty==="function")pvpAuthMarkAllDirty();}
+  catch(e){console.error("[savestate] pvp dirty:",e&&e.message);}
+  SERVER_META.lastSavestateAt=new Date().toISOString();saveServerMeta(SERVER_META);
+  console.log("[savestate] global concluído (runtimeFlush="+flushed+") — jogadores permanecem conectados");
 }
 async function runServerSave(db,day){
   DAILY_REWARD_DAY=day;SERVER_META.rewardDay=day;SERVER_META.lastSaveAt=new Date().toISOString();
   saveServerMeta(SERVER_META);
-  console.log("[server-save] 00:00 "+SERVER_SAVE_TZ+" — recompensa diária liberada ("+day+")");
+  console.log("[server-save] 00:00 "+SERVER_SAVE_TZ+" — savestate global + recompensa diária ("+day+")");
+  await runGlobalSavestate(db).catch((e)=>console.error("[savestate]",e&&e.message));
   try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll("server-save",{day,charges:DAILY_EXERCISE_CHARGES});}catch(e){}
-  if(process.env.SERVER_SAVE_NOEXIT==="1"){console.log("[server-save] SERVER_SAVE_NOEXIT=1 — sem restart");return;}
-  // Respiro para o instance worker comitar o tick corrente antes da saída.
-  setTimeout(()=>{console.log("[server-save] reiniciando processo (pending updates)");process.exit(0);},2500);
+  if(process.env.SERVER_SAVE_EXIT==="1"){
+    // Opt-in legado (deploy/ops): restart supervisionado após o save.
+    setTimeout(()=>{console.log("[server-save] SERVER_SAVE_EXIT=1 — reiniciando processo");process.exit(0);},2500);
+  }
 }
 function startServerSaveScheduler(db){
   // Primeiro boot da feature: libera a recompensa já no deploy para todos
   // poderem coletar. Saves seguintes só no 00:00 do fuso.
   if(!DAILY_REWARD_DAY){DAILY_REWARD_DAY=serverSaveWall(new Date()).day;
     SERVER_META.rewardDay=DAILY_REWARD_DAY;saveServerMeta(SERVER_META);}
-  let lastDay=serverSaveWall(new Date()).day,warned=false;
+  let lastDay=serverSaveWall(new Date()).day;
   const timer=setInterval(()=>{
     const now=new Date(),wall=serverSaveWall(now);
-    if(wall.day!==lastDay){lastDay=wall.day;runServerSave(db,wall.day);return;}
-    if(!warned&&msToServerSaveMidnight(now)<=SERVER_SAVE_WARN_MS){
-      warned=true;scheduleMaintenance(Math.ceil(msToServerSaveMidnight(now)/1000));}
+    if(wall.day!==lastDay){lastDay=wall.day;runServerSave(db,wall.day);}
   },5000);
   if(timer.unref)timer.unref();
-  console.log("[server-save] agendado — 00:00 "+SERVER_SAVE_TZ+" (rewardDay="+DAILY_REWARD_DAY+")");
+  console.log("[server-save] agendado — 00:00 "+SERVER_SAVE_TZ+" savestate global, sem desconexão (rewardDay="+DAILY_REWARD_DAY+")");
 }
 const EXERCISE_REWARD_WEAPONS={"exercise-sword":"sword","exercise-axe":"axe","exercise-club":"club",
   "exercise-bow":"dist","exercise-rod":"magic","exercise-wand":"magic","exercise-shield":"shield",
@@ -283,6 +295,16 @@ function readBody(req) {
       try { resolve(data ? JSON.parse(data) : {}); }
       catch (e) { reject(e); }
     });
+    req.on("error", reject);
+  });
+}
+/* Body bruto para uploads multipart (comprovante RMT) — limite de ~6MB. */
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (c) => { size += c.length; if (size > 6e6) { req.destroy(); return; } chunks.push(c); });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
 }
@@ -1260,6 +1282,7 @@ async function applyAdminPlayerToInstance(db,acc,charId,player,lease,requesterAc
   for(let attempt=0;attempt<4;attempt++){
     const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
     if(!current||current.status!=="active")return {ok:true,instance:null};
+    let synced=null;
     const result=await db.instancePatchState(current.account_id,requester,current.instance_id,Number(current.version),(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
@@ -1270,7 +1293,17 @@ async function applyAdminPlayerToInstance(db,acc,charId,player,lease,requesterAc
       next.voc=String(next.voc||item.p.voc||"knight");
       next.level=Math.max(1,Math.floor(Number(next.level)||1));
       next.gold=Math.max(0,Math.floor(Number(next.gold)||0));
+      /* Bag/itemInstances são DA CONTA: o grant troca só o item.p do alvo e
+       * as cópias dos demais personagens ficam sem as instâncias novas. Na
+       * próxima mutação de bag de OUTRO membro, syncInstancePouchCopies
+       * tratava a cópia do executor como canônica e destruía as instâncias
+       * concedidas — o item "sumia" da bag sem equipar (count órfão). O
+       * alvo vira a fonte canônica já no patch: o delta propaga na hora. */
+      const preGrant={pouch:Object.assign({},item.p.lootPouch||{}),
+        bag:Object.assign({},item.p.bag||{})};
       item.p=next;
+      synced=typeof syncInstancePouchCopies==="function"
+        ?syncInstancePouchCopies(descriptor.authority.players,charId,preGrant):null;
       if(Array.isArray(descriptor.members)){
         const member=descriptor.members.find((entry)=>String(entry&&entry.id)===String(charId));
         if(member){member.p=cloneJson(next);member.hp=next.hp;member.mp=next.mp;}
@@ -1279,6 +1312,7 @@ async function applyAdminPlayerToInstance(db,acc,charId,player,lease,requesterAc
     },lease);
     last=result;
     if(result.ok){
+      if(synced){try{await persistSharedPouchSync(db,acc,synced);}catch(e){}}
       await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
         status:result.instance.status,source:"admin-grant",holderId:String(lease&&lease.holderId||"")});
       return {ok:true,instance:result.instance};
@@ -5060,6 +5094,7 @@ async function adminServerSave(db,token){
   const auth=await adminSession(db,token);if(auth.error)return auth.error;
   let flushed=false;
   try{if(typeof db._flushRuntime==="function"){db._flushRuntime();flushed=true;}}catch(e){}
+  try{if(typeof pvpAuthMarkAllDirty==="function")pvpAuthMarkAllDirty();}catch(e){}
   try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")
     SYNC_BUS.broadcastAll("server-save",{day:new Date().toISOString().slice(0,10),manual:true});}catch(e){}
   return {code:200,body:{ok:true,flushed}};
@@ -6094,6 +6129,103 @@ async function main() {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const q = new URL(req.url, "http://x").searchParams;
         const r = await marketHistory(db, token, Number(q.get("limit")) || 100);
+        return send(res, r.code, r.body);
+      }
+
+      /* -------- RMT — recompra oficial de TC via PIX (server/rmt.js) -------- */
+      const rmtCtx = { publishSync, ip: String((TRUST_PROXY && req.headers["x-forwarded-for"]) || req.socket.remoteAddress || "").split(",")[0].trim() };
+      if (req.method === "GET" && url === "/api/rmt/dashboard") {
+        const r = await rmt.playerDashboard(db, { token: bearerToken(req) });
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/rmt/rate") {
+        const body = await readBody(req);
+        const r = await rmt.playerRate(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/rmt/history") {
+        const r = await rmt.playerHistory(db, { token: bearerToken(req) });
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/rmt/payment-profile") {
+        const r = await rmt.playerProfileGet(db, { token: bearerToken(req) });
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "PUT" && url === "/api/rmt/payment-profile") {
+        const limited = rateLimit(req, "rmt-profile", 10, 60000); if (limited) return send(res, limited.code, limited.body);
+        const body = bodyWithSessionToken(req, await readBody(req));
+        const r = await rmt.playerProfilePut(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/rmt/requests") {
+        const limited = rateLimit(req, "rmt-create", 10, 60000); if (limited) return send(res, limited.code, limited.body);
+        const body = bodyWithSessionToken(req, await readBody(req));
+        const r = await rmt.playerCreate(db, body, rmtCtx);
+        return send(res, r.code, r.body);
+      }
+      const rmtReqMatch = url.match(/^\/api\/rmt\/requests\/(\d+)(\/cancel)?$/);
+      if (rmtReqMatch && req.method === "GET" && !rmtReqMatch[2]) {
+        const r = await rmt.playerRequestGet(db, { token: bearerToken(req) }, Number(rmtReqMatch[1]));
+        return send(res, r.code, r.body);
+      }
+      if (rmtReqMatch && req.method === "POST" && rmtReqMatch[2]) {
+        const body = bodyWithSessionToken(req, await readBody(req));
+        const r = await rmt.playerCancel(db, body, Number(rmtReqMatch[1]), rmtCtx);
+        return send(res, r.code, r.body);
+      }
+      /* -------- RMT admin -------- */
+      if (req.method === "GET" && url === "/api/admin/rmt/dashboard") {
+        const r = await rmt.adminDashboard(db, bearerToken(req));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/admin/rmt/requests") {
+        const q = Object.fromEntries(new URL(req.url, "http://x").searchParams);
+        const r = await rmt.adminList(db, bearerToken(req), q);
+        return send(res, r.code, r.body);
+      }
+      const rmtAdmMatch = url.match(/^\/api\/admin\/rmt\/requests\/(\d+)(?:\/(review|approve|reject|payment|confirm-payment|receipt))?$/);
+      if (rmtAdmMatch && req.method === "GET" && !rmtAdmMatch[2]) {
+        const r = await rmt.adminGet(db, bearerToken(req), Number(rmtAdmMatch[1]));
+        return send(res, r.code, r.body);
+      }
+      if (rmtAdmMatch && req.method === "POST" && rmtAdmMatch[2] && rmtAdmMatch[2] !== "receipt") {
+        const limited = rateLimit(req, "rmt-admin", 30, 60000); if (limited) return send(res, limited.code, limited.body);
+        const body = await readBody(req);
+        const r = await rmt.adminTransition(db, bearerToken(req), Number(rmtAdmMatch[1]), rmtAdmMatch[2], body || {}, rmtCtx);
+        return send(res, r.code, r.body);
+      }
+      if (rmtAdmMatch && req.method === "POST" && rmtAdmMatch[2] === "receipt") {
+        const raw = await readRawBody(req);
+        const r = await rmt.adminReceiptUpload(db, bearerToken(req), Number(rmtAdmMatch[1]), req, raw, rmtCtx);
+        return send(res, r.code, r.body);
+      }
+      const rmtRcptMatch = url.match(/^\/api\/admin\/rmt\/receipts\/(\d+)$/);
+      if (rmtRcptMatch && req.method === "GET") {
+        // window.open não envia Authorization — aceita ?token= para o download.
+        const rcptTok = bearerToken(req) || String(new URL(req.url, "http://x").searchParams.get("token") || "");
+        const r = await rmt.adminReceiptGet(db, rcptTok, Number(rmtRcptMatch[1]), res);
+        if (r.file) {
+          const fs = require("fs");
+          res.writeHead(200, Object.assign(hardenedHeaders(res), {
+            "Content-Type": r.mime, "Content-Length": fs.statSync(r.file).size,
+            "Content-Disposition": "inline; filename=\"receipt" + rmtRcptMatch[1] + "\"",
+          }));
+          return fs.createReadStream(r.file).pipe(res);
+        }
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/admin/rmt/settings") {
+        const r = await rmt.adminSettingsGet(db, bearerToken(req));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "PUT" && url === "/api/admin/rmt/settings") {
+        const body = await readBody(req);
+        const r = await rmt.adminSettingsPut(db, bearerToken(req), body, rmtCtx);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/admin/rmt/audit") {
+        const q = Object.fromEntries(new URL(req.url, "http://x").searchParams);
+        const r = await rmt.adminAudit(db, bearerToken(req), q);
         return send(res, r.code, r.body);
       }
       if(req.method==="GET"&&(url==="/api/admin/backup"||url==="/api/admin/snapshots")){

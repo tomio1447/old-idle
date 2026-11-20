@@ -4,6 +4,85 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-19 (v2) — Savestate global sem desconexão + visual gótico do login
+
+### Server save → savestate global
+
+- **Fim da desconexão das 00h** — o server save não derruba mais o
+  processo: às 00:00 (America/Sao_Paulo) o servidor executa um savestate
+  global — libera a recompensa diária de exercise weapon, marca o cache
+  quente de PvP como sujo (o próximo tick commita o blob inteiro da
+  batalha no banco) e flusha o runtime do JsonStore. Jogadores seguem
+  online, sem countdown de manutenção.
+- `SERVER_SAVE_EXIT=1` restaura o restart legado supervisionado (uso
+  exclusivo de ops/deploy). A topbar passa a exibir "DAILY RESET IN".
+
+### Visual da entrada (login / seleção / loading)
+
+- **Background Verão 2026** — novo wallpaper global
+  (`backgroundverao2026.webp`), sem filtros escuros sobre a imagem
+  (`#login-bg`/`#login-overlay` transparentes).
+- **Login sem modal** — caixa transparente integrada ao ambiente;
+  logo e botões LOGIN/CREATE ACCOUNT (arte) mantidos, sem moldura
+  amarela atrás da arte.
+- **Seleção de party gótica** — moldura dourada com ornamentos de canto
+  em SVG, header "Selecione sua Party • Global Idle" + saldo de TC,
+  cards com alça de arraste, badge 👑 LÍDER, level verde e botão ENTRAR
+  outlined; rodapé com botões primário/secundário/danger.
+- **Loading bestiário** — mesmo padrão gótico: pedestal iluminado com
+  sprite flutuante, badge elemental colorido (HOLY/FIRE/ICE/DEATH/
+  EARTH/ENERGY), pills HP/EXP/ARMOR e barra de progresso dourada com
+  contador fixo `N/M` (tabular-nums).
+
+### Outras correções acumuladas
+
+- **Phosphorus** — mapa OTBM com bounds reais (crop correto), sem
+  cooldown, mecânica Agony em área 3000–5000 (20% a cada 8s, true
+  damage), missile físico corrigido (fim do 404 physical_w.png).
+- **PvP multi-guerras** — cache de batalhas sem thrash (PVP_AUTH_CACHE_MAX),
+  pool MySQL configurável (MYSQL_POOL_LIMIT=25) e lock de conta com 1 query
+  (fim do N+1 de rosters).
+- **Topbar** — botões padronizados (mesmo tamanho/espaçamento/ícones).
+- **FOV +1 coluna** em todas as hunts — laterais do combate sem faixas
+  pretas.
+- Regressões de testes corrigidas (pillar-of-dark-energy restaurado no
+  mobsheetdata, asserts de cache-bust/SHA atualizadas).
+
+---
+
+## 2026-11-19 — RMT: recompra oficial de Tibia Coins via PIX
+
+### Novo módulo (economia)
+
+- **Market → aba RMT** — o servidor passa a recomprar Tibia Coins dos
+  jogadores com pagamento manual via PIX: dashboard (saldo, cotação,
+  reservadas, últimas transações), formulário de venda com simulação e
+  confirmação, cadastro de dados PIX do titular (CPF/CNPJ/e-mail/
+  telefone/chave aleatória) e histórico de tickets com linha do tempo.
+- **Reserva atômica de TC** — ao criar a solicitação as TC são debitadas
+  na mesma transação de banco (FOR UPDATE + UPDATE condicional); TC
+  reservadas não podem ser usadas em market, transferências ou outras
+  solicitações. Devolução idempotente em cancelamento/reprovação.
+- **Cotação fixa configurável** — padrão 1.000 TC = R$ 10,00; cada
+  ticket grava snapshot imutável da cotação e dos dados de recebimento.
+  Valores sempre em centavos inteiros (nunca ponto flutuante).
+- **Máquina de estados** — pending → under_review → approved →
+  payment_processing → paid, com rejected/cancelled; comprovante PIX
+  (upload jpg/png/pdf com SHA-256) é obrigatório para concluir.
+- **Painel admin → aba RMT** — tesouraria (TC compradas/reservadas,
+  comprometido, caixa disponível), fila com filtros, tela do ticket com
+  ações por permissão, configurações com histórico e auditoria.
+- **Segurança** — permissões granulares RMT_* (nova coluna
+  accounts.admin_perms; role=admin continua super), PIX/CPF cifrados
+  AES-256-GCM (RMT_ENC_KEY) e exibidos mascarados, logs administrativos
+  append-only em rmt_admin_logs, ledger reusa coin_ledger, rate limits,
+  elegibilidade (idade da conta, bans, rejeições repetidas, fila aberta).
+- **Backend**: server/rmt.js + tabelas rmt_requests, rmt_payment_profiles,
+  rmt_settings(+history), rmt_admin_logs, rmt_receipts — MySQL only;
+  em modo JSON o módulo responde indisponível.
+
+---
+
 ## 2026-11-17 (v2) — Norcferatus Fortress, Vladrukh e Bloody Tusks Quest
 
 ### Novo conteúdo

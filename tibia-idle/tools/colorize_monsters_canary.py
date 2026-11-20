@@ -168,6 +168,13 @@ CANARY_COLORS = {
     "dawnfire-asura":     (114, 94, 78, 79),
     "midnight-asura":     (0, 114, 90, 90),
     "frost-flower-asura": (0, 0, 0, 86),
+    # True Asuras (Thalassara): looktype 1068 com cores + addons do canary .lua.
+    "true-dawnfire-asura":     (114, 94, 79, 121),
+    "true-midnight-asura":     (0, 76, 53, 0),
+    "true-frost-flower-asura": (9, 0, 86, 9),
+    # Bashmuul - Issavi: looktype 1408 com cores + addons do canary .lua.
+    "bashmu":          (0, 50, 42, 79),
+    "juvenile-bashmu": (0, 112, 3, 79),
     # Falcon Bastion: looktype 1071 (Preceptor Lazare 1078) oficiais.
     "falcon-knight":              (57, 96, 38, 105),
     "falcon-paladin":             (57, 96, 38, 105),
@@ -230,6 +237,9 @@ CANARY_ADDONS = {"pirat-bombardier": 2, "pirat-cutthroat": 1, "pirat-mate": 3,
                   "falcon-knight": 1, "falcon-paladin": 2,
                   "werelion": 3,
                   "dawnfire-asura": 1, "midnight-asura": 1, "frost-flower-asura": 3,
+                  "true-dawnfire-asura": 1, "true-midnight-asura": 1,
+                  "true-frost-flower-asura": 0,
+                  "bashmu": 3, "juvenile-bashmu": 0,
                   "grand-commander-soeren": 2,
                   "preceptor-lazare": 0,
                   "grand-chaplain-gaunder": 1,

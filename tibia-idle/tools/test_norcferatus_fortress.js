@@ -16,10 +16,10 @@
  * o mesmo roll.
  *
  * Monstros (fichas oficiais TibiaWiki, HP/Exp do pedido):
- *   dworc-shadowstalker    8900/8930  raceId 2667  looktype 1850 (DAT)
+ *   dworc-shadowstalker    8900/8930  raceId 2667  sheet do GIF (looktype 215 fallback)
  *   gloom-maw              8700/8770  raceId 2669  sheet do GIF
- *   norcferatu-heartless   5700/5900  raceId 2664  sheet do GIF
- *   norcferatu-nightweaver 6100/6370  raceId 2666  sheet do GIF
+ *   norcferatu-heartless   5700/5900  raceId 2664  looktype 1852 (DAT)
+ *   norcferatu-nightweaver 6100/6370  raceId 2666  looktype 1851 (DAT)
  *   orclops-bloodbreaker  10300/10250 raceId 2668  looktype 1854 (DAT)
  *   varg                   5400/5630  raceId 2665  looktype 1855 (DAT)
  *   vladrukh             390000/450000 Archfoe     looktype 1862 (DAT)
@@ -107,10 +107,10 @@ must(b.requirement && b.requirement.level === 400 &&
 
 /* ---------------- fichas oficiais ---------------- */
 const STATS = {
-  "dworc-shadowstalker":    [8900, 8930, 2667, 2.99, 1850],
+  "dworc-shadowstalker":    [8900, 8930, 2667, 2.99, 215],
   "gloom-maw":              [8700, 8770, 2669, 2.81, 1866],
-  "norcferatu-heartless":   [5700, 5900, 2664, 2.44, 1863],
-  "norcferatu-nightweaver": [6100, 6370, 2666, 2.81, 1864],
+  "norcferatu-heartless":   [5700, 5900, 2664, 2.44, 1852],
+  "norcferatu-nightweaver": [6100, 6370, 2666, 2.81, 1851],
   "orclops-bloodbreaker":   [10300, 10250, 2668, 3.26, 1854],
   "varg":                   [5400, 5630, 2665, 2.67, 1855],
 };
@@ -150,14 +150,14 @@ for (const slug of Object.keys(LOOT_COUNT)) {
 const NEW_ITEMS = {
   "blood-amulet": [51473, 1230], "bone-rattle": [51478, 790],
   "norcferatu-talisman": [51714, 670], "chain-leash": [51472, 970],
-  "piece-of-frozen-night": [51474, 680], "tiny-bat-coffin": [51471, 0],
+  "piece-of-frozen-night": [51474, 680], "tiny-bat-coffin": [51471, 3650],
   "heart-amphora": [51484, 930], "pot-of-orcish-warpaint": [51476, 1150],
   "spiked-gorget": [51486, 850], "greater-garlic-necklace": [51275, 10000],
   "blood-hood": [51480, 1550], "spiked-bracers": [51479, 1360],
   "orcish-toothbrush": [51477, 750], "bone-fibula": [51485, 580],
   "bloodshot-giant-eye": [51482, 1820], "ritual-bone-knife": [51475, 820],
   "greater-proficiency-catalyst": [51589, 0], "blood-sceptre": [51481, 178000],
-  "war-drum": [2966, 0], "bone-toothpick": [24380, 150],
+  "war-drum": [2966, 1000], "bone-toothpick": [24380, 150],
   "bast-skirt": [3560, 750],
 };
 const catalog = { console }; catalog.window = catalog; vm.createContext(catalog);
@@ -184,9 +184,9 @@ for (const slug of Object.keys(NEW_ITEMS)) {
   must(fs.existsSync(path.join(game, "assets", "item", slug + ".png")),
     slug + ": ícone ausente");
 }
-/* Tiny Bat Coffin, Greater Proficiency Catalyst e War Drum: sem
- * comprador NPC oficial → sell 0 (nunca preço inventado). */
-for (const slug of ["tiny-bat-coffin", "greater-proficiency-catalyst", "war-drum"]) {
+/* Greater Proficiency Catalyst: sem comprador NPC → sell 0. Tiny Bat
+ * Coffin (3650) e War Drum (1000) têm preço fixado por pedido. */
+for (const slug of ["greater-proficiency-catalyst"]) {
   must(Number(catalog.GAMEDATA.items[slug].sell) === 0,
     slug + ": sem comprador oficial — sell deve ser 0");
 }

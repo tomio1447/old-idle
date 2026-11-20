@@ -122,7 +122,7 @@ const MAIOR_DOMUS = {
   staticAttack: 90,
   imune: ["paralyze", "invisible"],
   skills: [
-    { el: "physical", min: 700, max: 1200, int: 2000, ch: 18, range: 1, miss: "physical" },
+    { el: "physical", min: 700, max: 1200, int: 2000, ch: 18, range: 1, miss: "small-stone" },
     { el: "energy", min: 600, max: 1050, int: 2000, ch: 15, radius: 4, fx: "energy-hit" },
     /* Gerar Cargas: rajada dupla de energy descarregada no alvo. */
     { el: "energy", min: 800, max: 1400, int: 2000, ch: 10, length: 7, spread: 0, fx: "purple-energy" },
@@ -182,8 +182,11 @@ const PHOSPHORUS = {
   staticAttack: 90,
   imune: ["paralyze", "invisible"],
   skills: [
-    { el: "physical", min: 900, max: 1500, int: 2000, ch: 18, range: 1, miss: "physical" },
+    { el: "physical", min: 900, max: 1500, int: 2000, ch: 18, range: 1, miss: "small-stone" },
     { el: "holy", min: 700, max: 1200, int: 2000, ch: 15, radius: 5, fx: "holy" },
+    /* Agony em área (true damage): 3000–5000, 20% a cada 8s, raio 5.
+     * chLock = a rolagem acontece uma vez por intervalo, não a cada ataque. */
+    { el: "agony", min: 3000, max: 5000, int: 8000, ch: 20, chLock: true, radius: 5, fx: "draw-blood" },
     { el: "holy", min: 800, max: 1400, int: 2000, ch: 12, length: 8, spread: 3, fx: "holy-area" },
     { el: "energy", min: 600, max: 1100, int: 2000, ch: 15, range: 7, miss: "energy" },
     { el: "physical", min: 0, max: 0, int: 2000, ch: 12, n: "speed", range: 7, fx: "magic-red" },
@@ -293,6 +296,31 @@ if (typeof module !== "undefined" && module.exports) module.exports = FINAL_RADI
     cat: "boss-room",
   };
 
+  /* Arena do Phosphorus (World Boss): final_radiant.otbm inteiro, z=7,
+   * bounds absolutos 1008..1046 × 1015..1041 → local 39×27. Spawn do
+   * jogador 1028,1031 (local 20,16) e do boss 1028,1023 (local 20,8). */
+  GAMEDATA.hunts["phosphorus-room"] = {
+    name: "Phosphorus — Final Radiant",
+    hidden: true,
+    level: 800,
+    minLevel: 800,
+    monsters: ["phosphorus"],
+    color: "#8a6a2a",
+    scene: "palace",
+    otbm: "final_radiant",
+    otbmFloor: 7,
+    otbmBounds: { x: 1008, y: 1015, w: 39, h: 27, z: 7 },
+    otbmRuntimeWidth: 39,
+    otbmRuntimeHeight: 27,
+    noFovBound: true,
+    otbmSpawn: { x: 1028, y: 1031, z: 7 },
+    otbmMobBounds: { x: 1028, y: 1023, w: 1, h: 1, z: 7 },
+    worldBoss: true,
+    respawn: 0,
+    pack: 1,
+    cat: "boss",
+  };
+
   if (typeof BOSS_DEFS === "undefined") return;
 
   BOSS_DEFS["maior-domus"] = {
@@ -318,5 +346,27 @@ if (typeof module !== "undefined" && module.exports) module.exports = FINAL_RADI
       text: "Make Believe Quest — Missão 1: eliminar 2500 criaturas em Moonstone Castle (requer Doctor Marrow + nível 800)",
     },
     cooldown: MAIOR_DOMUS_COOLDOWN_MS,
+  };
+
+  /* Phosphorus — world boss exclusivo do lobby (warzoneId "phosphorus").
+   * Substitui o placeholder "EM BREVE" do BOSS_DEFS: com hunt apontando a
+   * arena real, newBossCombat deixa de cair no mapa placeholder 40×40 e
+   * carrega o final_radiant.otbm (39×27, igual ao grid do servidor). */
+  BOSS_DEFS["phosphorus"] = {
+    id: "phosphorus",
+    name: "Phosphorus",
+    title: "World Boss — Final Radiant",
+    hunt: "phosphorus-room",
+    worldBoss: true,
+    baseMonster: "phosphorus",
+    sprite: "phosphorus",
+    hp: PHOSPHORUS_STATS.hp,
+    exp: PHOSPHORUS_STATS.exp,
+    damage: PHOSPHORUS_STATS.damage,
+    armor: PHOSPHORUS_STATS.armor,
+    defense: PHOSPHORUS_STATS.defense,
+    portraitImage: "assets/mob/phosphorus-preview.gif",
+    requirement: { level: 800, text: "Entra pelo lobby do World Boss (nível 800+)" },
+    loot: PHOSPHORUS.loot,
   };
 })();

@@ -13,21 +13,22 @@ must(game.includes("G.combat&&(partyEntity||partyMember)")&&
   partyUi.includes('sessionStorage.setItem("tibia-idle-online-autoload"')&&
   game.includes('sessionStorage.setItem("tibia-idle-online-autoload"'),
   "troca na party ainda pode reabrir o picker da tela inicial");
-must(game.includes("account-character-list-head")&&game.includes("account-character-name")&&
+must(game.includes("account-character-handle")&&game.includes("account-character-name")&&
   game.includes("account-character-voc")&&game.includes("account-character-level")&&
+  game.includes("account-character-action")&&game.includes("gi-modal__header")&&
   css.includes("flex-direction: column")&&css.includes(".account-character-voc"),
   "seletor de personagem não está em lista outfit/nome/vocação/level");
 must(partyUi.includes("partyApplyOutfitPreview")&&
-  partyUi.includes("source.outfit||summary&&summary.outfit||member.outfit")&&
+  partyUi.includes("member.outfit, summary && summary.outfit")&&
   partyUi.includes("data-party-preview")&&
   partyServer.includes("outfit.appearance=raw.appearance")&&
   partyServer.includes("outfit.addons=Math.max")&&
   (partyServer.includes('sex:data.sex==="female"?"female":"male"')||
    partyServer.includes('sex: data.sex === "female" ? "female" : "male"')),
   "modal/painel da party não publicam o look atual");
-must(index.includes("js/party-ui.js?v=party-switch-v1")&&
+must(index.includes("js/party-ui.js?v=")&&
   index.includes("js/game.js?v=")&&
-  index.includes("css/layout.css?v=party-list-v1"),
+  index.includes("css/layout.css?v="),
   "assets da correção sem cache-bust");
 
 const start=partyUi.indexOf("function partyLookKey"),

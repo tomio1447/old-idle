@@ -157,7 +157,7 @@ function openWorldBossDetail(warzoneId) {
   ui.body.innerHTML = `<div class="panel-title">${worldBossPortrait(wz.sprite, 24)} ${wz.name} — <span class="dim" style="font-weight:normal">${wz.title}</span>
     <span style="flex:1"></span><button class="sm" id="wb-detail-close">✕</button></div>
     <div class="panel-body boss-detail-body wb-detail-body">
-      <div class="boss-detail-summary"><span>Lobby: <b style="color:#9ce84a">1–${wz.maxChars || 20} personagens</b></span><span>Cooldown: <b>16 horas por personagem</b></span></div>
+      <div class="boss-detail-summary"><span>Lobby: <b style="color:#9ce84a">1–${wz.maxChars || 20} personagens</b></span><span>Cooldown: <b>${wz.id === "phosphorus" ? "sem cooldown" : "16 horas por personagem"}</b></span></div>
       <div class="wb-detail-description">${wz.description || ""}</div>
       <div class="wb-detail-grid">
         <section class="wb-detail-identity">
@@ -194,7 +194,7 @@ async function worldBossPickCharacter(warzoneId, action) {
     worldBossToast("Seletor de personagens indisponível. Recarregue a página.");
     return null;
   }
-  const selected = await megaLobbyConfirmCharModal(worldBossActiveChar(), `${action} — ${wz.name}`, "Escolha um personagem da sua conta. O cooldown de 16 horas é individual por personagem.");
+  const selected = await megaLobbyConfirmCharModal(worldBossActiveChar(), `${action} — ${wz.name}`, wz.id === "phosphorus" ? "Escolha um personagem da sua conta." : "Escolha um personagem da sua conta. O cooldown de 16 horas é individual por personagem.");
   if (!selected) openWorldBossDetail(warzoneId);
   return selected;
 }

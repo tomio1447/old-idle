@@ -7,11 +7,15 @@ const js = path.join(game, 'js');
 function must(ok, msg) { if (!ok) throw Error(msg); }
 
 const requested = [];
-const label = {textContent:''}, fill = {style:{}};
+const label = {textContent:''}, fill = {style:{}}, count = {textContent:''};
 const loading = {
   style:{display:'none'},
   dataset:{},
-  querySelector(selector){ return selector === '.gl-text' ? label : fill; },
+  querySelector(selector){
+    if (selector === '.gl-text') return label;
+    if (selector === '#gl-progress-count') return count;
+    return fill;
+  },
 };
 function FakeImage() {}
 Object.defineProperty(FakeImage.prototype, 'src', {
@@ -34,7 +38,7 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   must(loading.style.display === 'flex' && label.textContent === 'Carregando teste...',
     'overlay não aparece ao iniciar troca de mapa');
   const preload = ctx.preloadHuntMapAssets({mapa:'arena',monsters:['rat']}, 'Preparando teste');
-  must(label.textContent === 'Preparando teste 0/6',
+  must(label.textContent === 'Preparando teste' && count.textContent === '0/6',
     'preloader não informa o estágio antes da primeira imagem');
   await preload;
   for (const asset of [

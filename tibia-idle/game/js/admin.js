@@ -42,6 +42,7 @@ const ADMIN_TABS = [
   { id: "forge", nome: "⚒ FORJE" },
   { id: "mobs", nome: "👹 Invocar" },
   { id: "store", nome: "💰 Financeiro" },
+  { id: "rmt", nome: "💵 RMT" },
   { id: "ban", nome: "🔨 Banimento" },
   { id: "server", nome: "💾 Server" },
   { id: "popup", nome: "📜 Popup" },
@@ -241,6 +242,7 @@ function renderAdminContent() {
     forge: renderAdminForge, mobs: renderAdminMobs, store: renderAdminStore,
     ban: renderAdminBan, server: renderAdminServer, popup: renderAdminPopup,
     templo: renderAdminTemplo, raid: renderAdminRaid, spec: renderAdminSpec,
+    rmt: renderAdminRmt,
   }[ADMIN.aba] || renderAdminChar;
   fn(p, el);
   renderAdminLog();
@@ -1944,3 +1946,4 @@ async function openAdminOnlineModal() {
   _adminOnlineTimer = setInterval(render, 5000);
 }
 window.openAdminOnlineModal = openAdminOnlineModal;
+

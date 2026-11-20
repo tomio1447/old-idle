@@ -126,7 +126,7 @@ for (const slug of lootSlugs) {
 for (const [slug, price] of Object.entries({
   "bloated-maggot": 5200, "rotten-roots": 3800, "rotten-vermin-ichor": 4500,
   "terra-rod": 2000, "glacier-mask": 2500, "buckle": 7000,
-  "organic-acid": 0, "crimson-sword": 0,
+  "organic-acid": 0, "crimson-sword": 610,
 })) for (const items of [catalog.GAMEDATA.items, E.ITEMS])
   must(items[slug] && (items[slug].npcSell ?? items[slug].sell) === price,
     slug + ": preço oficial incorreto");

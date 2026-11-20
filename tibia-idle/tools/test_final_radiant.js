@@ -94,12 +94,53 @@ must(Array.isArray(wz.requiresBossKills) &&
 must(wz.otbm === "final_radiant" && wz.otbmFloor === 7 &&
      wz.gridW === 39 && wz.gridH === 27,
   "warzone: otbm/grid divergentes");
+must(wz.otbmBounds && wz.otbmBounds.x === 1008 && wz.otbmBounds.y === 1015 &&
+     wz.otbmBounds.w === 39 && wz.otbmBounds.h === 27 && wz.otbmBounds.z === 7,
+  "warzone: otbmBounds deve ser o crop real 1008,1015 39×27 (era 0,0 = void)");
 must(wz.playerSpawn.x === 20 && wz.playerSpawn.y === 16 &&
      wz.bossSpawn.x === 20 && wz.bossSpawn.y === 8,
   "warzone: spawns locais divergentes (player 20,16 / boss 20,8)");
 must(wb.bossIdForWarzone("phosphorus") === "phosphorus", "bossIdForWarzone sem phosphorus");
 must(wb.isWorldBossBossId("phosphorus"), "isWorldBossBossId sem phosphorus");
 must(wb.warzoneIdFromBossId("phosphorus") === "phosphorus", "warzoneIdFromBossId sem phosphorus");
+
+/* Mecânica Agony em área (true damage): 3000–5000, 20% a cada 8s, raio 5.
+ * chLock = a rolagem acontece uma vez por intervalo (não a cada ataque). */
+const agony = pho.skills.find((s) => s.el === "agony");
+must(agony && agony.min === 3000 && agony.max === 5000 &&
+     agony.int === 8000 && agony.ch === 20 && agony.chLock === true &&
+     agony.radius === 5,
+  "phosphorus: skill agony 3000–5000/20%/8s/raio5 (chLock) ausente ou errada");
+must(!pho.skills.some((s) => s.miss === "physical"),
+  "phosphorus: miss='physical' gera 404 (usar small-stone)");
+must(!M["maior-domus"].skills.some((s) => s.miss === "physical"),
+  "maior-domus: miss='physical' gera 404 (usar small-stone)");
+must(fs.existsSync(path.join(game, "assets", "missile", "small-stone_e.png")) &&
+     fs.existsSync(path.join(game, "assets", "missile", "small-stone_w.png")),
+  "assets missile small-stone ausentes");
+const frSrc = fs.readFileSync(path.join(js, "final-radiant.js"), "utf8");
+must(!frSrc.includes('miss: "physical"'), 'final-radiant.js ainda tem miss:"physical"');
+const engSrc = fs.readFileSync(path.join(__dirname, "..", "server", "authoritative_engine.js"), "utf8");
+must(engSrc.includes("chLock"), "engine sem suporte a chLock");
+const combatSrc = fs.readFileSync(path.join(js, "combat.js"), "utf8");
+must(combatSrc.includes("chLock"), "combat.js sem suporte a chLock (paridade)");
+
+/* Arena cliente + BOSS_DEFS reais (o placeholder "EM BREVE" fazia o world
+ * boss cair no mapa genérico 40×40 — "mapa não carregado"). */
+const phoHunt = ctx.GAMEDATA.hunts["phosphorus-room"];
+must(phoHunt && phoHunt.otbm === "final_radiant" && phoHunt.otbmFloor === 7,
+  "hunt phosphorus-room sem otbm final_radiant");
+must(phoHunt.worldBoss === true && phoHunt.hidden === true &&
+     phoHunt.otbmBounds && phoHunt.otbmBounds.x === 1008 && phoHunt.otbmBounds.y === 1015 &&
+     phoHunt.otbmRuntimeWidth === 39 && phoHunt.otbmRuntimeHeight === 27,
+  "hunt phosphorus-room sem bounds/runtime 39×27");
+must(phoHunt.otbmSpawn.x === 1028 && phoHunt.otbmSpawn.y === 1031 &&
+     phoHunt.otbmMobBounds.x === 1028 && phoHunt.otbmMobBounds.y === 1023,
+  "hunt phosphorus-room: spawns absolutos errados");
+must(ctx.BOSS_DEFS["phosphorus"] && ctx.BOSS_DEFS["phosphorus"].worldBoss === true &&
+     ctx.BOSS_DEFS["phosphorus"].hunt === "phosphorus-room" &&
+     !ctx.BOSS_DEFS["phosphorus"].unavailable,
+  "BOSS_DEFS.phosphorus ainda é placeholder EM BREVE");
 
 /* HPs oficiais restaurados nos demais world bosses (era teste 2500). */
 const EXPECTED_WB_HP = {
@@ -116,6 +157,12 @@ for (const w of wb.WARZONES) {
 const wbSrc = fs.readFileSync(path.join(__dirname, "..", "server", "world_boss.js"), "utf8");
 must(!wbSrc.includes("WORLD_BOSS_TEST_HP"), "WORLD_BOSS_TEST_HP deve ter sido removido");
 must(wbSrc.includes("BOSS_KILLS_REQUIRED"), "join sem gate de kills (BOSS_KILLS_REQUIRED)");
+
+/* Phosphorus sem cooldown de 16h por personagem (a pedido). */
+must(wbSrc.includes('wz === "phosphorus"') && wbSrc.includes("applyCharCooldown"),
+  "world_boss.js sem exceção de cooldown para phosphorus");
+const wbmSrc = fs.readFileSync(path.join(js, "world-bosses-modal.js"), "utf8");
+must(wbmSrc.includes("sem cooldown"), "modal sem texto 'sem cooldown' para phosphorus");
 
 /* ---------------- seção BOSSES 800+ no modal (game.js) ---------------- */
 const gameSrc = fs.readFileSync(path.join(js, "game.js"), "utf8");

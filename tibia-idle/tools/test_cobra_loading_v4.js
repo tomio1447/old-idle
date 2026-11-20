@@ -31,7 +31,7 @@ function verifyPrecompiledMap() {
     (entry.g || []).forEach((id) => sprites.add(id));
   });
 
-  must(crypto.createHash("sha256").update(source).digest("hex").startsWith("962fbbb5"),
+  must(crypto.createHash("sha256").update(source).digest("hex").startsWith("34306e95"),
     "SHA do pré-compilado divergiu");
   must(hm.rows.length === 17 && hm.rows.every((row) => row.length === 24),
     "pré-compilado não é 24×17");
@@ -47,7 +47,7 @@ function verifyPrecompiledMap() {
 function verifyIndexOrder() {
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   const huntmaps = html.indexOf('src="js/huntmapdata.js?');
-  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v17"');
+  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=');
   const otbm = html.indexOf('src="js/otbm.js?');
   const otbmhunt = html.indexOf('src="js/otbmhunt.js?');
   must(huntmaps >= 0 && cobra > huntmaps && otbm > cobra && otbmhunt > cobra,

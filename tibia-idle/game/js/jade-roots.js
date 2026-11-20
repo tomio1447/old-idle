@@ -42,12 +42,12 @@
   Object.keys(jadedLootItems).forEach((slug) => registerLootItem(slug, jadedLootItems[slug]));
 
   /* Preços NPC oficiais (TibiaWiki) para loot já registrado sem sell.
-   * Crimson Sword: só é vendida POR NPCs (610 gp) — sem comprador, sell=0. */
+   * Crimson Sword: vende por 610 gp (pedido do jogador). */
   const jadedPriceFixes = {
     "terra-rod":     { sell: 2000 },  // Rashid
     "glacier-mask":  { sell: 2500 },  // Rashid
     "buckle":        { sell: 7000 },  // Rashid
-    "crimson-sword": { sell: 0 },     // sem comprador NPC
+    "crimson-sword": { sell: 610 },   // NPC vende por 610 (pedido do jogador)
   };
   Object.keys(jadedPriceFixes).forEach((slug) => {
     registerLootItem(slug, jadedPriceFixes[slug]);

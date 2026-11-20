@@ -114,7 +114,7 @@ const LOOT = { "ink-blade": [51270, 0], "ink-quill": [51271, 0],
   "ink-claw": [51272, 0], "ink-vine": [51273, 0], "ink-brush": [51274, 0],
   "axe-of-sir-leonard": [51429, 49000], "helmet-of-sir-leonard": [51430, 46000],
   "gearwheel-chain": [21170, 5000], "proficiency-catalyst": [51588, 0],
-  "blank-imbuement-scroll": [51442, 0], "white-gem": [32769, 12000] };
+  "blank-imbuement-scroll": [51442, 25000], "white-gem": [32769, 12000] };
 must(mon.loot.length === 25, "loot deve ter 25 entradas oficiais");
 must(mon.loot[0].item === "platinum-coin" && mon.loot[0].min === 1 &&
   mon.loot[0].max === 20 && mon.loot[0].chance === 100,

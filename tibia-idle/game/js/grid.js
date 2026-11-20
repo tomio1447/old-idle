@@ -101,8 +101,11 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
   const rows = combat && combat.gridH ? combat.gridH
     : (typeof GRID_H !== "undefined" ? GRID_H : DEFAULT_GRID_H);
   const map = combat && combat.huntMap;
+  /* +1 coluna de zoom-out em TODAS as hunts (a pedido): preenche as faixas
+   * pretas laterais em canvases largos sem encolher demais o tile. */
+  const fovCols = (map && map.fovWidth ? map.fovWidth : DEFAULT_GRID_W) + 1;
   const view = centeredGridViewport(canvasWidth, canvasHeight, cols, rows,
-    map && map.fovWidth ? map.fovWidth : undefined,
+    fovCols,
     map && map.fovHeight ? map.fovHeight : undefined);
   const followPlayer = combat && (combat.worldBoss || (combat.boss && combat.boss.worldBoss) ||
     combat.questId || combat.instanceMode === "quest" || !!combat.pvpBattle);

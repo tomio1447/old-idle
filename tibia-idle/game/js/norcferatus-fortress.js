@@ -37,11 +37,14 @@
  *     cooldown 20h. Resistências oficiais não publicadas (infobox
  *     "100%?") — fica neutro.
  *
- * Sprites: 4 looktypes do DAT convertido por pixel-diff contra os
- * GIFs oficiais (dworc 1850, orclops 1854, varg 1855, vladrukh 1862).
- * gloom-maw, norcferatu-heartless e norcferatu-nightweaver NÃO existem
- * no DAT convertido — sheets montadas dos GIFs oficiais, 8 quadros
- * replicados nas 4 direções (padrão bramble-wyrmling/sir-leonard).
+ * Sprites: 6 looktypes do DAT convertido por pixel-diff/comparação
+ * visual contra os GIFs oficiais (nightweaver 1851 e heartless 1852
+ * exatos; orclops 1854, varg 1855, vladrukh 1862).
+ * dworc-shadowstalker e gloom-maw NÃO existem no DAT convertido —
+ * sheets montadas dos GIFs oficiais, 8 quadros replicados nas 4
+ * direções (padrão bramble-wyrmling/sir-leonard). O dworc usa
+ * looktype 215 (Dworc Fleshhunter — visual quase idêntico) como
+ * fallback; o 1850 inicialmente anotado renderiza outra criatura.
  *
  * Bloody Tusks Quest: M1 = 5× Varg (MISSION_DEFS) → acesso ao
  * Vladrukh (requirement.mission enforced). M2 = derrotar o Vladrukh →
@@ -62,10 +65,12 @@
  * game/assets/item/). Preços NPC oficiais (TibiaWiki): creature
  * products do update vendem ao Yasir; greater-garlic-necklace vende
  * ao Haroun (10k).
- *   - tiny-bat-coffin: nenhum NPC compra → sell 0.
+ *   - tiny-bat-coffin: 3.650 gp (pedido do jogador — sem comprador
+ *     oficial no wiki; valor fixado aqui).
  *   - greater-proficiency-catalyst: nenhum NPC compra → sell 0.
- *   - war-drum: nenhum NPC compra → sell 0 (só dropa; era referenciado
- *     em loot antigo do Canary sem definição/ícone — registrado aqui).
+ *   - war-drum: 1.000 gp (pedido do jogador — sem comprador oficial;
+ *     era referenciado em loot antigo do Canary sem definição/ícone —
+ *     registrado aqui).
  *   - bast-skirt: já existia no catálogo sem preço — sell 750
  *     (Brengus) via merge abaixo. */
 const NORCFERATUS_ITEMS = {
@@ -74,7 +79,7 @@ const NORCFERATUS_ITEMS = {
   "norcferatu-talisman":       { n: "norcferatu talisman",       s: null, t: "loot", cid: 51714, w: 0.2,  sell: 670,    npcSell: 670 },
   "chain-leash":               { n: "chain leash",               s: null, t: "loot", cid: 51472, w: 0.2,  sell: 970,    npcSell: 970 },
   "piece-of-frozen-night":     { n: "piece of frozen night",     s: null, t: "loot", cid: 51474, w: 0.2,  sell: 680,    npcSell: 680 },
-  "tiny-bat-coffin":           { n: "tiny bat coffin",           s: null, t: "loot", cid: 51471, w: 6.3,  sell: 0,      npcSell: 0 },
+  "tiny-bat-coffin":           { n: "tiny bat coffin",           s: null, t: "loot", cid: 51471, w: 6.3,  sell: 3650,   npcSell: 3650 },
   "heart-amphora":             { n: "heart amphora",             s: null, t: "loot", cid: 51484, w: 0.2,  sell: 930,    npcSell: 930 },
   "pot-of-orcish-warpaint":    { n: "pot of orcish warpaint",    s: null, t: "loot", cid: 51476, w: 0.2,  sell: 1150,   npcSell: 1150 },
   "spiked-gorget":             { n: "spiked gorget",             s: null, t: "loot", cid: 51486, w: 0.2,  sell: 850,    npcSell: 850 },
@@ -87,7 +92,7 @@ const NORCFERATUS_ITEMS = {
   "ritual-bone-knife":         { n: "ritual bone knife",         s: null, t: "loot", cid: 51475, w: 0.2,  sell: 820,    npcSell: 820 },
   "greater-proficiency-catalyst": { n: "greater proficiency catalyst", s: null, t: "loot", cid: 51589, w: 7.5,  sell: 0,      npcSell: 0 },
   "blood-sceptre":             { n: "blood sceptre",             s: null, t: "loot", cid: 51481, w: 0.2,  sell: 178000, npcSell: 178000 },
-  "war-drum":                  { n: "war drum",                  s: null, t: "loot", cid: 2966,  w: 30.0, sell: 0,      npcSell: 0 },
+  "war-drum":                  { n: "war drum",                  s: null, t: "loot", cid: 2966,  w: 30.0, sell: 1000,   npcSell: 1000 },
   "bone-toothpick":            { n: "bone toothpick",            s: null, t: "loot", cid: 24380, w: 20.0, sell: 150,    npcSell: 150 },
   "bast-skirt":                { n: "bast skirt",                s: "legs", t: "armor", cid: 3560, w: 3.5, sell: 750,   npcSell: 750 },
 };
@@ -106,7 +111,10 @@ const DWORC_SHADOWSTALKER = {
       miss: "sudden-death", alvo: 1 },
     { el: "physical", min: 200, max: 380, int: 2000, ch: 25, range: 1 },
   ],
-  looktype: 1850, race: "blood", raceId: 2667, targetDistance: 1,
+  /* Sem looktype oficial no DAT convertido (1850 renderiza outra
+   * criatura) — a arte real vem da sheet montada do GIF; 215 é o
+   * Dworc Fleshhunter, visual quase idêntico, como fallback. */
+  looktype: 215, race: "blood", raceId: 2667, targetDistance: 1,
   staticAttack: 90, imune: ["paralyze", "invisible"],
   loot: [
     { chance: 100, max: 23, item: "platinum-coin" },
@@ -171,7 +179,7 @@ const NORCFERATU_HEARTLESS = {
       fx: "mort-area", miss: "sudden-death" },
     { el: "physical", min: 150, max: 300, int: 2000, ch: 25, range: 1 },
   ],
-  looktype: 1863, race: "blood", raceId: 2664, targetDistance: 1,
+  looktype: 1852, race: "blood", raceId: 2664, targetDistance: 1,
   staticAttack: 90, imune: ["paralyze", "invisible"],
   loot: [
     { chance: 100, max: 15, item: "platinum-coin" },
@@ -204,7 +212,7 @@ const NORCFERATU_NIGHTWEAVER = {
     { el: "energy", min: 150, max: 300, int: 3000, ch: 20, range: 7,
       miss: "energy", alvo: 1 },
   ],
-  looktype: 1864, race: "blood", raceId: 2666, targetDistance: 5,
+  looktype: 1851, race: "blood", raceId: 2666, targetDistance: 5,
   ranged: 1, staticAttack: 90, imune: ["paralyze", "invisible"],
   loot: [
     { chance: 100, max: 14, item: "platinum-coin" },

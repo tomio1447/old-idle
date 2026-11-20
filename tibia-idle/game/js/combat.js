@@ -4404,6 +4404,8 @@ function mobCastSkill(c, p, mob, now) {
       else if (/paralyz/i.test(nomeFx)) sk.cond = "freezing";
     }
     if (dist > mobSkillRangeSQM(sk, mob)) continue;
+    // chLock: rola UMA vez por intervalo — paridade com o motor do servidor.
+    if (sk.chLock) mob.skillCds[key] = now + (sk.int || 2000);
     if (Math.random() * 100 >= (sk.ch === undefined ? 15 : sk.ch)) continue;
     mob.skillCds[key] = now + (sk.int || 2000);
     mob.attackAnim = 220;

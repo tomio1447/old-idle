@@ -44,7 +44,7 @@
  * (TibiaWiki): creature products do update vendem ao Yasir; hydra-head
  * também ao Grizzly Adams.
  *   - grape(s): comida comum, nenhum NPC compra → sell 0.
- *   - etcher: NPC Albinius VENDE por 30k; ninguém compra → sell 0.
+ *   - etcher: NPC Albinius vende por 30k; vende-se por 30k (pedido).
  *   - cookbook do Book World é um creature product (cid 51424, vende
  *     ao Yasir por 870) — o slug `cookbook` já era o item de quest
  *     cid 3234, então usa-se `cookbook-creature-product`.
@@ -59,7 +59,7 @@ const BOOK_WORLD_ITEMS = {
   "cookbook-creature-product":{ n: "cookbook",                 s: null, t: "loot", cid: 51424, w: 13.0, sell: 870,  npcSell: 870 },
   "book-with-an-hourglass":   { n: "book with an hourglass",   s: null, t: "loot", cid: 51425, w: 13.0, sell: 1450, npcSell: 1450 },
   "sealing-wax":              { n: "sealing wax",              s: null, t: "loot", cid: 51426, w: 0.5,  sell: 620,  npcSell: 620 },
-  "etcher":                   { n: "etcher",                   s: null, t: "loot", cid: 51443, w: 3.0,  sell: 0,    npcSell: 0 },
+  "etcher":                   { n: "etcher",                   s: null, t: "loot", cid: 51443, w: 3.0,  sell: 30000, npcSell: 30000 },
   "hydra-head":               { n: "hydra head",               s: null, t: "loot", cid: 10282, w: 13.0, sell: 600,  npcSell: 600 },
 };
 

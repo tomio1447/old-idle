@@ -2663,6 +2663,19 @@ JsonStore.prototype.pvpRosterGet = function (battleId) {
       kills: Number(r.kills) || 0, deaths: Number(r.deaths) || 0, damage: Number(r.damage) || 0 };
   });
 };
+/* Lock de preparo/batalha por conta: 1 consulta em vez de N+1 rosters —
+ * o caminho anterior iterava TODAS as batalhas ativas por request. */
+JsonStore.prototype.pvpLockedBattleForAccount = function (accountId) {
+  const aid = Number(accountId);
+  const battles = (this.pvpBattles || []).filter((b) =>
+    ["prep", "live"].includes(String(b.status)));
+  for (const b of battles) {
+    const hit = (this.pvpBattleRoster || []).some((r) =>
+      Number(r.battle_id) === Number(b.id) && Number(r.account_id) === aid);
+    if (hit) return { battle_id: Number(b.id), status: String(b.status) };
+  }
+  return null;
+};
 JsonStore.prototype.accountAddInsignias = function (accountId, n) {
   const acc = (this.accounts || []).find((a) => Number(a.id) === Number(accountId));
   if (!acc) return false;
@@ -2683,7 +2696,11 @@ async function MysqlStore() {
   const pool = mysql.createPool({
     host: MYSQL_HOST, user: MYSQL_USER, password: MYSQL_PASS,
     database: MYSQL_DB, port: MYSQL_PORT,
-    waitForConnections: true, connectionLimit: 10,
+    waitForConnections: true,
+    /* Múltiplas guerras PvP: cada tick da batalha segura uma conexão durante
+     * a transação (inclui o avanço da autoridade). Com N batalhas × ~35
+     * req/s o pool de 10 voltava a afogar — 25 por padrão, configurável. */
+    connectionLimit: Math.max(10, Number(process.env.MYSQL_POOL_LIMIT) || 25),
     charset: "utf8mb4",
   });
   // garante o schema (tabelas) no primeiro uso
@@ -5059,6 +5076,16 @@ async function MysqlStore() {
           kills: Number(r.kills) || 0, deaths: Number(r.deaths) || 0, damage: Number(r.damage) || 0 };
       });
     },
+    /* Lock de preparo/batalha por conta: JOIN único — com múltiplas guerras
+     * simultâneas o caminho iterativo custava 1+N queries por request. */
+    async pvpLockedBattleForAccount(accountId) {
+      const rows = await this.query(
+        `SELECT b.id AS battle_id, b.status FROM pvp_battles b
+           JOIN pvp_battle_roster r ON r.battle_id=b.id
+           WHERE r.account_id=? AND b.status IN ('prep','live') LIMIT 1`,
+        [Number(accountId)]);
+      return rows[0] || null;
+    },
     async accountAddInsignias(accountId, n) {
       await this.run("UPDATE accounts SET pvp_insignias=GREATEST(0,pvp_insignias+?) WHERE id=?",
         [Math.floor(Number(n) || 0), Number(accountId)]);
@@ -5352,6 +5379,183 @@ async function MysqlStore() {
            AND (i.expires_at IS NULL OR i.expires_at > NOW())
          ORDER BY i.created_at DESC`,
         [Number(inviteeId), status]);
+    },
+
+    /* ---------------- RMT (Real Money Trading) ----------------
+     * Todas as mutações de saldo acontecem DENTRO de rmtTransact com a linha da
+     * conta travada (FOR UPDATE) — nunca confie em leitura fora da transação. */
+    async rmtTransact(fn) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.query("BEGIN");
+        const out = await fn(conn);
+        await conn.query("COMMIT");
+        return out;
+      } catch (e) {
+        try { await conn.query("ROLLBACK"); } catch (_) { }
+        throw e;
+      } finally {
+        conn.release();
+      }
+    },
+    async rmtSettingsGet() {
+      const rows = await this.query("SELECT k, v FROM rmt_settings");
+      const out = {}; for (const r of rows) out[r.k] = r.v;
+      return out;
+    },
+    async rmtSettingsSet(k, v, by) {
+      const old = await this.query("SELECT v FROM rmt_settings WHERE k=?", [String(k)]);
+      await this.run("INSERT INTO rmt_settings (k, v, updated_by) VALUES (?, ?, ?) " +
+        "ON DUPLICATE KEY UPDATE v=VALUES(v), updated_by=VALUES(updated_by)",
+        [String(k), String(v), String(by || "")]);
+      await this.run("INSERT INTO rmt_settings_history (k, old_v, new_v, changed_by) VALUES (?, ?, ?, ?)",
+        [String(k), old[0] ? String(old[0].v) : "", String(v), String(by || "")]);
+      return true;
+    },
+    async rmtProfileGet(accountId) {
+      const rows = await this.query("SELECT * FROM rmt_payment_profiles WHERE account_id=?", [Number(accountId)]);
+      return rows[0] || null;
+    },
+    async rmtProfileUpsert(accountId, f) {
+      await this.run(
+        `INSERT INTO rmt_payment_profiles (account_id, holder_name, holder_document_enc, pix_key_type, pix_key_enc, verification_status)
+         VALUES (?, ?, ?, ?, ?, 'pending')
+         ON DUPLICATE KEY UPDATE holder_name=VALUES(holder_name), holder_document_enc=VALUES(holder_document_enc),
+           pix_key_type=VALUES(pix_key_type), pix_key_enc=VALUES(pix_key_enc), verification_status='pending', verified_at=NULL`,
+        [Number(accountId), String(f.holder_name || ""), f.holder_document_enc || null,
+         f.pix_key_type || null, f.pix_key_enc || null]);
+      return this.rmtProfileGet(accountId);
+    },
+    /* Reserva atômica: trava a conta, debita coins, insere request + ledger.
+     * Retorna {error} ou {request}. Tudo dentro de rmtTransact (chamado por rmt.js). */
+    async rmtRequestCreate(conn, req) {
+      const acc = (await conn.query("SELECT id, coins FROM accounts WHERE id=? FOR UPDATE", [req.account_id]))[0][0];
+      if (!acc) return { error: "ACCOUNT_NOT_FOUND" };
+      const [upd] = await conn.query("UPDATE accounts SET coins=coins-? WHERE id=? AND coins>=?",
+        [req.tc_amount, req.account_id, req.tc_amount]);
+      if (!upd.affectedRows) return { error: "INSUFFICIENT_COINS" };
+      const ins = await conn.query(
+        `INSERT INTO rmt_requests (ticket_number, client_nonce, account_id, character_id, character_name,
+           tc_amount, rate_unit_tc, rate_value_cents, gross_amount_cents, fee_amount_cents, net_amount_cents,
+           holder_name, holder_document_enc, pix_key_type, pix_key_enc)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [req.ticket_number, req.client_nonce, req.account_id, req.character_id || null,
+         req.character_name || "", req.tc_amount, req.rate_unit_tc, req.rate_value_cents,
+         req.gross_amount_cents, req.fee_amount_cents, req.net_amount_cents,
+         req.holder_name || "", req.holder_document_enc || null,
+         req.pix_key_type || "", req.pix_key_enc || null]);
+      const coinsAfter = acc.coins - req.tc_amount;
+      await conn.query(
+        "INSERT INTO coin_ledger (account_id, login, kind, delta, coins_after, brl_cents, ref, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [req.account_id, req.login || "", "rmt_reserve", -req.tc_amount, coinsAfter, req.net_amount_cents,
+         req.ticket_number, "Reserva RMT " + req.tc_amount + " TC"]);
+      const rows = (await conn.query("SELECT * FROM rmt_requests WHERE id=?", [ins[0].insertId]))[0];
+      return { request: rows[0], coins_after: coinsAfter };
+    },
+    async rmtRequestGet(id) {
+      const rows = await this.query("SELECT * FROM rmt_requests WHERE id=?", [Number(id)]);
+      return rows[0] || null;
+    },
+    async rmtRequestByNonce(nonce) {
+      const rows = await this.query("SELECT * FROM rmt_requests WHERE client_nonce=?", [String(nonce)]);
+      return rows[0] || null;
+    },
+    async rmtRequestList(f) {
+      const w = [], p = [];
+      if (f.accountId) { w.push("account_id=?"); p.push(Number(f.accountId)); }
+      if (f.status) { w.push("status=?"); p.push(String(f.status)); }
+      if (f.statusIn && f.statusIn.length) { w.push("status IN (" + f.statusIn.map(() => "?").join(",") + ")"); f.statusIn.forEach(s => p.push(s)); }
+      if (f.from) { w.push("created_at>=?"); p.push(f.from); }
+      if (f.to) { w.push("created_at<=?"); p.push(f.to); }
+      const lim = Math.min(500, Math.max(1, Number(f.limit) || 100));
+      return this.query(
+        "SELECT * FROM rmt_requests" + (w.length ? " WHERE " + w.join(" AND ") : "") +
+        " ORDER BY created_at DESC LIMIT " + lim, p);
+    },
+    /* Transição de estado atômica: UPDATE ... WHERE id=? AND status=?
+     * Retorna o request atualizado ou {error:"BAD_STATE"} quando a fila mudou. */
+    async rmtRequestTransition(conn, id, fromStates, patch) {
+      const rows = (await conn.query("SELECT * FROM rmt_requests WHERE id=? FOR UPDATE", [Number(id)]))[0];
+      const cur = rows[0];
+      if (!cur) return { error: "NOT_FOUND" };
+      if (fromStates && fromStates.length && !fromStates.includes(cur.status))
+        return { error: "BAD_STATE", current: cur.status };
+      const set = [], params = [];
+      for (const k in patch) { set.push(k + "=?"); params.push(patch[k]); }
+      if (set.length) {
+        params.push(Number(id));
+        await conn.query("UPDATE rmt_requests SET " + set.join(", ") + " WHERE id=?", params);
+      }
+      return { request: Object.assign({}, cur, patch), previous: cur };
+    },
+    /* Devolve as TC reservadas — somente uma vez por request (idem_released). */
+    async rmtReleaseReserved(conn, requestId, accountId, tcAmount, ticket, login) {
+      const rel = await conn.query("UPDATE rmt_requests SET idem_released=1 WHERE id=? AND idem_released=0", [requestId]);
+      if (!rel[0].affectedRows) return { released: false };
+      const acc = (await conn.query("SELECT coins FROM accounts WHERE id=? FOR UPDATE", [accountId]))[0][0];
+      await conn.query("UPDATE accounts SET coins=coins+? WHERE id=?", [tcAmount, accountId]);
+      await conn.query(
+        "INSERT INTO coin_ledger (account_id, login, kind, delta, coins_after, brl_cents, ref, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [accountId, login || "", "rmt_release", tcAmount, (acc ? acc.coins : 0) + tcAmount, 0,
+         ticket || "", "Devolução reserva RMT"]);
+      return { released: true };
+    },
+    async rmtAdminLog(conn, row) {
+      await (conn || pool).query(
+        "INSERT INTO rmt_admin_logs (admin_id, admin_login, request_id, action, old_status, new_status, description, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [row.admin_id || null, row.admin_login || "", row.request_id || null,
+         row.action || "", row.old_status || "", row.new_status || "",
+         String(row.description || "").slice(0, 400), row.ip || ""]);
+    },
+    async rmtAdminLogs(opts) {
+      const w = [], p = [];
+      if (opts && opts.requestId) { w.push("request_id=?"); p.push(Number(opts.requestId)); }
+      if (opts && opts.adminId) { w.push("admin_id=?"); p.push(Number(opts.adminId)); }
+      const lim = Math.min(500, Math.max(1, Number(opts && opts.limit) || 200));
+      return this.query("SELECT * FROM rmt_admin_logs" + (w.length ? " WHERE " + w.join(" AND ") : "") +
+        " ORDER BY created_at DESC LIMIT " + lim, p);
+    },
+    async rmtReceiptAdd(row) {
+      const r = await this.run(
+        "INSERT INTO rmt_receipts (request_id, stored_name, original_name, sha256, size_bytes, mime, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [Number(row.request_id), row.stored_name || "", String(row.original_name || "").slice(0, 160),
+         row.sha256 || "", Number(row.size_bytes) || 0, row.mime || "", row.uploaded_by || ""]);
+      await this.run("UPDATE rmt_requests SET receipt_id=? WHERE id=?", [r.insertId, Number(row.request_id)]);
+      return r.insertId;
+    },
+    async rmtReceipts(requestId) {
+      return this.query("SELECT * FROM rmt_receipts WHERE request_id=? ORDER BY created_at", [Number(requestId)]);
+    },
+    async rmtAccountSummary(accountId) {
+      const rows = await this.query(
+        `SELECT status, COUNT(*) n, COALESCE(SUM(tc_amount),0) tc, COALESCE(SUM(net_amount_cents),0) cents
+         FROM rmt_requests WHERE account_id=? GROUP BY status`, [Number(accountId)]);
+      const out = { reservedTc: 0, pendingCents: 0, paidTc: 0, paidCents: 0, openTickets: 0 };
+      for (const r of rows) {
+        if (["pending", "under_review", "approved", "payment_processing"].includes(r.status)) {
+          out.reservedTc += Number(r.tc); out.openTickets += Number(r.n);
+        }
+        if (["approved", "payment_processing"].includes(r.status)) out.pendingCents += Number(r.cents);
+        if (r.status === "paid") { out.paidTc += Number(r.tc); out.paidCents += Number(r.cents); }
+      }
+      return out;
+    },
+    async rmtTreasury() {
+      const rows = await this.query(
+        `SELECT status, COUNT(*) n, COALESCE(SUM(tc_amount),0) tc, COALESCE(SUM(net_amount_cents),0) cents
+         FROM rmt_requests GROUP BY status`);
+      const out = { soldTc: 0, reservedTc: 0, monthTc: 0, paidCents: 0, committedCents: 0, pendingTickets: 0, reviewTickets: 0 };
+      for (const r of rows) {
+        if (r.status === "paid") { out.soldTc += Number(r.tc); out.paidCents += Number(r.cents); }
+        if (["pending", "under_review", "approved", "payment_processing"].includes(r.status)) out.reservedTc += Number(r.tc);
+        if (["approved", "payment_processing"].includes(r.status)) out.committedCents += Number(r.cents);
+        if (r.status === "pending") out.pendingTickets += Number(r.n);
+        if (r.status === "under_review") out.reviewTickets += Number(r.n);
+      }
+      const m = await this.query(
+        "SELECT COALESCE(SUM(tc_amount),0) tc FROM rmt_requests WHERE status='paid' AND paid_at >= DATE_FORMAT(NOW(), '%Y-%m-01')");
+      out.monthTc = Number(m[0] && m[0].tc) || 0;
+      return out;
     },
   };
   return db;
@@ -5783,6 +5987,7 @@ async function ensureSchema(pool) {
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN missions_done MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN admin_perms MEDIUMTEXT NULL"); } catch (e) { }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN shared_inventory MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN tutorial MEDIUMTEXT NULL"); }
@@ -5868,6 +6073,97 @@ async function ensureSchema(pool) {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_ledger_acc (account_id, created_at),
     INDEX idx_ledger_kind (kind, created_at)
+  ) ENGINE=InnoDB`);
+
+  /* ---------- RMT (Real Money Trading) — recompra oficial de TC via PIX ----------
+   * Ledger financeiro de coins reusa `coin_ledger` (kinds rmt_reserve/release/
+   * purchase). Valores monetarios SEMPRE em centavos inteiros — nunca float.
+   * PIX/CPF viajam criptografados (AES-256-GCM, helpers em server/rmt.js) e a
+   * request guarda SNAPSHOT imutavel dos dados de recebimento. */
+  await pool.query(`CREATE TABLE IF NOT EXISTS rmt_payment_profiles (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    account_id INT UNSIGNED NOT NULL UNIQUE,
+    holder_name VARCHAR(120) NOT NULL DEFAULT '',
+    holder_document_enc TEXT,
+    pix_key_type ENUM('cpf','cnpj','email','phone','random') DEFAULT NULL,
+    pix_key_enc TEXT,
+    verification_status ENUM('unverified','pending','verified','rejected') NOT NULL DEFAULT 'unverified',
+    verified_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_rmt_profile_acc (account_id)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rmt_requests (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    ticket_number VARCHAR(24) NOT NULL UNIQUE,
+    client_nonce VARCHAR(64) NOT NULL UNIQUE,
+    account_id INT UNSIGNED NOT NULL,
+    character_id INT UNSIGNED DEFAULT NULL,
+    character_name VARCHAR(32) NOT NULL DEFAULT '',
+    tc_amount BIGINT UNSIGNED NOT NULL,
+    rate_unit_tc BIGINT UNSIGNED NOT NULL,
+    rate_value_cents BIGINT UNSIGNED NOT NULL,
+    gross_amount_cents BIGINT UNSIGNED NOT NULL,
+    fee_amount_cents BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    net_amount_cents BIGINT UNSIGNED NOT NULL,
+    status ENUM('pending','under_review','approved','payment_processing','paid','rejected','cancelled') NOT NULL DEFAULT 'pending',
+    holder_name VARCHAR(120) NOT NULL DEFAULT '',
+    holder_document_enc TEXT,
+    pix_key_type VARCHAR(16) NOT NULL DEFAULT '',
+    pix_key_enc TEXT,
+    admin_id INT UNSIGNED DEFAULT NULL,
+    admin_login VARCHAR(64) NOT NULL DEFAULT '',
+    rejection_reason TEXT,
+    admin_note TEXT,
+    idem_released TINYINT(1) NOT NULL DEFAULT 0,
+    receipt_id INT UNSIGNED DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    approved_at TIMESTAMP NULL,
+    paid_at TIMESTAMP NULL,
+    INDEX idx_rmt_acc (account_id, created_at),
+    INDEX idx_rmt_status (status, created_at)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rmt_admin_logs (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT UNSIGNED DEFAULT NULL,
+    admin_login VARCHAR(64) NOT NULL DEFAULT '',
+    request_id INT UNSIGNED DEFAULT NULL,
+    action VARCHAR(32) NOT NULL,
+    old_status VARCHAR(24) NOT NULL DEFAULT '',
+    new_status VARCHAR(24) NOT NULL DEFAULT '',
+    description VARCHAR(400) NOT NULL DEFAULT '',
+    ip_address VARCHAR(64) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_rmt_log_req (request_id, created_at),
+    INDEX idx_rmt_log_admin (admin_id, created_at)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rmt_settings (
+    k VARCHAR(48) NOT NULL PRIMARY KEY,
+    v VARCHAR(256) NOT NULL DEFAULT '',
+    updated_by VARCHAR(64) NOT NULL DEFAULT '',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rmt_settings_history (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    k VARCHAR(48) NOT NULL,
+    old_v VARCHAR(256) NOT NULL DEFAULT '',
+    new_v VARCHAR(256) NOT NULL DEFAULT '',
+    changed_by VARCHAR(64) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_rmt_set_hist (k, created_at)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rmt_receipts (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    request_id INT UNSIGNED NOT NULL,
+    stored_name VARCHAR(128) NOT NULL DEFAULT '',
+    original_name VARCHAR(160) NOT NULL DEFAULT '',
+    sha256 VARCHAR(64) NOT NULL DEFAULT '',
+    size_bytes INT UNSIGNED NOT NULL DEFAULT 0,
+    mime VARCHAR(64) NOT NULL DEFAULT '',
+    uploaded_by VARCHAR(64) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_rmt_rcpt_req (request_id)
   ) ENGINE=InnoDB`);
 }
 

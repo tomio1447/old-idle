@@ -13,11 +13,14 @@
  *   M3 — Eliminar 5000 monstros em Radiant Skyhold
  *        → libera o World Boss Phosphorus (wz.requiresMission no servidor).
  *   M4 — Derrotar o World Boss Phosphorus
- *        → rewards abaixo, 1 botão por reward, 1x por conta:
- *          outfit Illuminated Warrior (addon 1+2), montaria Radiant Nimbus,
- *          1 arma Moonsilver aleatória e 1 elmo Moonsilver aleatório —
- *          os itens aleatórios usam uma "roleta": a caixa cicla os ícones
- *          como um gif; no claim a roleta gira e para no item sorteado.
+ *
+ * Rewards: 1 por missão concluída, 1 botão por reward, 1x por conta:
+ *   M1 → outfit Illuminated Warrior (addon 1+2)
+ *   M2 → 1 elmo Moonsilver aleatório (roleta)
+ *   M3 → montaria Radiant Nimbus
+ *   M4 → 1 arma Moonsilver aleatória (roleta)
+ * Os itens aleatórios usam uma "roleta": a caixa cicla os ícones como um
+ * gif; no claim a roleta gira e para no item sorteado.
  *
  * Persistência por conta: claims ficam em p.missionsDone["make-believe:*"]
  * (mergeFlagMap preserva o valor — strings guardam o item sorteado) e
@@ -147,7 +150,7 @@ function mbItemIcon(slug, size) {
 function mbRouletteBoxHtml(boxId, label, items) {
   return `<section class="quest-detail-panel mb-reward-box" id="${boxId}">
     <div class="hunt-best-title">${label}</div>
-    <div class="mb-roulette-frame"><span class="mb-roulette-icon" id="${boxId}-icon">${mbItemIcon(items[0], 44)}</span></div>
+    <div class="mb-roulette-frame"><span class="mb-roulette-icon" id="${boxId}-icon">${mbItemIcon(items[0], 52)}</span></div>
     <div class="mb-roulette-name tiny" id="${boxId}-name">???</div>
     <button type="button" class="sm primary quest-action" id="${boxId}-btn">RESGATAR</button>
   </section>`;
@@ -157,10 +160,11 @@ function mbStartPreview(boxId, items) {
   const icon = $(`#${boxId}-icon`);
   if (!icon) return null;
   let i = 0;
+  /* Gif da roleta: troca o item a cada 2s (pedido). */
   const timer = setInterval(() => {
     i = (i + 1) % items.length;
-    icon.innerHTML = mbItemIcon(items[i], 44);
-  }, 110);
+    icon.innerHTML = mbItemIcon(items[i], 52);
+  }, 2000);
   MB_ROULETTE_TIMERS.push(timer);
   return timer;
 }
@@ -173,7 +177,7 @@ function mbSpinTo(boxId, items, slug, onDone) {
   let i = Math.floor(Math.random() * items.length), delay = 70, ticks = 0;
   const step = () => {
     i = (i + 1) % items.length;
-    icon.innerHTML = mbItemIcon(items[i], 44);
+    icon.innerHTML = mbItemIcon(items[i], 52);
     ticks++;
     if (delay >= 260 && i === winIdx) {
       const nameEl = $(`#${boxId}-name`);
@@ -196,49 +200,68 @@ function renderMakeBelieveQuestDetail(q, ui) {
   if (typeof pullAccountMissions === "function") pullAccountMissions(p);
   const st = makeBelieveState(p);
   const fmtK = (n) => (typeof fmtFull === "function" ? fmtFull(n) : String(n));
-  const row = (label, cur, target, done) =>
-    `<div class="shop-row"><span class="info">${label}</span><b style="color:${done ? "#9ce84a" : "#d4af37"}">${done ? "✓ " : ""}${fmtK(cur)}/${fmtK(target)}</b></div>`;
   const reqRow = (label, ok) =>
     `<div class="shop-row"><span class="info">${label}</span><b style="color:${ok ? "#9ce84a" : "#ff9a6a"}">${ok ? "✓" : "✗"}</b></div>`;
-  const claimedCard = (label, inner) =>
-    `<section class="quest-detail-panel mb-reward-box"><div class="hunt-best-title">${label}</div>${inner}</section>`;
+  const mobThumbs = (slugs) => `<span class="mb-mission-mobs">` +
+    (slugs || []).map((s) => typeof mobImg === "function" ? mobImg(s, 30) : "").join("") + `</span>`;
+  const mission = (num, label, m, reward, mobs) =>
+    `<div class="mb-mission${m.done ? " done" : ""}">
+      <div class="mb-mission-head"><span class="mb-mission-title">${mobThumbs(mobs)}<span class="info">Missão ${num} — ${label}</span></span>
+        <b class="mb-mission-prog">${m.done ? "✓ " : ""}${fmtK(m.kills)}/${fmtK(m.target)}</b></div>
+      <div class="mb-mission-bar"><div class="mb-mission-fill" style="width:${Math.min(100, Math.round(100 * m.kills / m.target))}%"></div></div>
+      <div class="mb-mission-reward">Recompensa: ${reward}</div>
+    </div>`;
+  const claimedCard = (label, state, inner) =>
+    `<section class="quest-detail-panel mb-reward-box ${state}"><div class="hunt-best-title">${label}</div>${inner}</section>`;
+  const cardState = (claimed, unlocked) => claimed ? "claimed" : (unlocked ? "ready" : "locked");
 
-  const rewardsUnlocked = st.m4.done;
-  const outfitCard = claimedCard("OUTFIT", st.claimed.outfit
-    ? `<div class="mb-outfit-granted">${typeof questOutfitPreviewHtml === "function" ? questOutfitPreviewHtml(MAKE_BELIEVE_OUTFIT, 40) : ""}<span class="tiny" style="color:#9ce84a">✓ Resgatada — Illuminated Warrior (addon 1+2)</span></div>`
-    : `<div class="mb-outfit-granted">${typeof questOutfitPreviewHtml === "function" ? questOutfitPreviewHtml(MAKE_BELIEVE_OUTFIT, 40) : ""}</div>
-       <button type="button" class="sm primary quest-action" id="mb-claim-outfit" ${rewardsUnlocked ? "" : "disabled"}>RESGATAR</button>`);
-  const mountCard = claimedCard("MONTARIA", st.claimed.mount
-    ? `<div class="mb-outfit-granted">${typeof questMountFrameHtml === "function" ? questMountFrameHtml(MAKE_BELIEVE_MOUNT, 40) : ""}<span class="tiny" style="color:#9ce84a">✓ Resgatada — Radiant Nimbus (toda a conta)</span></div>`
-    : `<div class="mb-outfit-granted">${typeof questMountFrameHtml === "function" ? questMountFrameHtml(MAKE_BELIEVE_MOUNT, 40) : ""}</div>
-       <button type="button" class="sm primary quest-action" id="mb-claim-mount" ${rewardsUnlocked ? "" : "disabled"}>RESGATAR</button>`);
-  const weaponCard = st.claimed.weapon
-    ? claimedCard("ARMA MOONSILVER", `<div class="mb-roulette-frame mb-roulette-win">${mbItemIcon(st.claimed.weapon, 44)}</div><div class="tiny" style="color:#9ce84a">✓ ${st.claimed.weapon.replace(/-/g, " ")}</div>`)
-    : mbRouletteBoxHtml("mb-weapon", "ARMA MOONSILVER (aleatória)", MAKE_BELIEVE_WEAPONS);
+  /* 1 reward por missão: M1 outfit, M2 elmo, M3 montaria, M4 arma. */
+  const unlockOutfit = st.m1.done, unlockHelmet = st.m2.done,
+    unlockMount = st.m3.done, unlockWeapon = st.m4.done;
+  const lockHint = (n, unlocked) => unlocked ? "" :
+    `<div class="mb-reward-state dim">🔒 concluir a Missão ${n}</div>`;
+  const outfitCard = claimedCard("OUTFIT — Missão 1", cardState(st.claimed.outfit, unlockOutfit), st.claimed.outfit
+    ? `<div class="mb-outfit-granted">${typeof questOutfitPreviewHtml === "function" ? questOutfitPreviewHtml(MAKE_BELIEVE_OUTFIT, 56) : ""}<span class="tiny" style="color:#9ce84a">✓ Resgatada — Illuminated Warrior (addon 1+2)</span></div>`
+    : `<div class="mb-outfit-granted">${typeof questOutfitPreviewHtml === "function" ? questOutfitPreviewHtml(MAKE_BELIEVE_OUTFIT, 56) : ""}</div>
+       <button type="button" class="sm primary quest-action" id="mb-claim-outfit" ${unlockOutfit ? "" : "disabled"}>RESGATAR</button>${lockHint(1, unlockOutfit)}`);
   const helmetCard = st.claimed.helmet
-    ? claimedCard("ELMO MOONSILVER", `<div class="mb-roulette-frame mb-roulette-win">${mbItemIcon(st.claimed.helmet, 44)}</div><div class="tiny" style="color:#9ce84a">✓ ${st.claimed.helmet.replace(/-/g, " ")}</div>`)
-    : mbRouletteBoxHtml("mb-helmet", "ELMO MOONSILVER (aleatório)", MAKE_BELIEVE_HELMETS);
+    ? claimedCard("ELMO MOONSILVER — Missão 2", "claimed", `<div class="mb-roulette-frame mb-roulette-win">${mbItemIcon(st.claimed.helmet, 52)}</div><div class="tiny" style="color:#9ce84a">✓ ${st.claimed.helmet.replace(/-/g, " ")}</div>`)
+    : claimedCard("ELMO MOONSILVER (aleatório) — Missão 2", cardState(false, unlockHelmet),
+        `<div class="mb-roulette-frame"><span class="mb-roulette-icon" id="mb-helmet-icon">${mbItemIcon(MAKE_BELIEVE_HELMETS[0], 44)}</span></div>
+         <div class="mb-roulette-name tiny" id="mb-helmet-name">???</div>
+         <button type="button" class="sm primary quest-action" id="mb-helmet-btn" ${unlockHelmet ? "" : "disabled"}>RESGATAR</button>${lockHint(2, unlockHelmet)}`);
+  const mountCard = claimedCard("MONTARIA — Missão 3", cardState(st.claimed.mount, unlockMount), st.claimed.mount
+    ? `<div class="mb-outfit-granted">${typeof questMountFrameHtml === "function" ? questMountFrameHtml(MAKE_BELIEVE_MOUNT, 56) : ""}<span class="tiny" style="color:#9ce84a">✓ Resgatada — Radiant Nimbus (toda a conta)</span></div>`
+    : `<div class="mb-outfit-granted">${typeof questMountFrameHtml === "function" ? questMountFrameHtml(MAKE_BELIEVE_MOUNT, 56) : ""}</div>
+       <button type="button" class="sm primary quest-action" id="mb-claim-mount" ${unlockMount ? "" : "disabled"}>RESGATAR</button>${lockHint(3, unlockMount)}`);
+  const weaponCard = st.claimed.weapon
+    ? claimedCard("ARMA MOONSILVER — Missão 4", "claimed", `<div class="mb-roulette-frame mb-roulette-win">${mbItemIcon(st.claimed.weapon, 52)}</div><div class="tiny" style="color:#9ce84a">✓ ${st.claimed.weapon.replace(/-/g, " ")}</div>`)
+    : claimedCard("ARMA MOONSILVER (aleatória) — Missão 4", cardState(false, unlockWeapon),
+        `<div class="mb-roulette-frame"><span class="mb-roulette-icon" id="mb-weapon-icon">${mbItemIcon(MAKE_BELIEVE_WEAPONS[0], 44)}</span></div>
+         <div class="mb-roulette-name tiny" id="mb-weapon-name">???</div>
+         <button type="button" class="sm primary quest-action" id="mb-weapon-btn" ${unlockWeapon ? "" : "disabled"}>RESGATAR</button>${lockHint(4, unlockWeapon)}`);
 
   ui.body.innerHTML = `<div class="panel-title">${q.name} — Level ${q.level}+<span class="spacer"></span><button class="sm" id="boss-quest-close">Fechar</button></div>
     <div class="panel-body quest-detail-body">
       <div class="quest-detail-desc">${q.description || ""}</div>
-      <section class="quest-detail-panel"><div class="hunt-best-title">REQUISITOS</div>
-        ${reqRow("Level 800+", st.reqLevel)}
-        ${reqRow("Eliminar o Doctor Marrow", st.reqMarrow)}
-        <div class="tiny dim">A quest é completada apenas 1 vez por conta.</div>
-      </section>
-      <section class="quest-detail-panel"><div class="hunt-best-title">MISSÕES</div>
-        ${row("Missão 1 — Eliminar criaturas em Moonstone Castle", st.m1.kills, st.m1.target, st.m1.done)}
-        <div class="tiny dim" style="margin:-4px 0 6px 4px">Recompensa: acesso aos bosses Mimar Haffar e Maior Domus</div>
-        ${row("Missão 2 — Eliminar Mimar Haffar e Maior Domus", st.m2.kills, st.m2.target, st.m2.done)}
-        <div class="tiny dim" style="margin:-4px 0 6px 4px">Recompensa: acesso à hunt Radiant Skyhold</div>
-        ${row("Missão 3 — Eliminar monstros em Radiant Skyhold", st.m3.kills, st.m3.target, st.m3.done)}
-        <div class="tiny dim" style="margin:-4px 0 6px 4px">Recompensa: acesso ao World Boss Phosphorus</div>
-        ${row("Missão 4 — Derrotar o World Boss Phosphorus", st.m4.kills, st.m4.target, st.m4.done)}
-      </section>
-      <section class="quest-detail-panel"><div class="hunt-best-title">REWARDS${rewardsUnlocked ? "" : " — complete a Missão 4"}</div>
-        <div class="mb-rewards-grid">${outfitCard}${mountCard}${weaponCard}${helmetCard}</div>
-      </section>
+      <div class="mb-detail-cols">
+        <div>
+          <section class="quest-detail-panel"><div class="hunt-best-title">REQUISITOS</div>
+            ${reqRow("Level 800+", st.reqLevel)}
+            ${reqRow("Eliminar o Doctor Marrow", st.reqMarrow)}
+            <div class="tiny dim">A quest é completada apenas 1 vez por conta.</div>
+          </section>
+          <section class="quest-detail-panel" style="margin-top:8px"><div class="hunt-best-title">MISSÕES</div>
+            ${mission(1, "Eliminar criaturas em Moonstone Castle", st.m1, "acesso aos bosses Mimar Haffar e Maior Domus", ["moonsilver-custodian", "moonstone-miner"])}
+            ${mission(2, "Eliminar Mimar Haffar e Maior Domus", st.m2, "acesso à hunt Radiant Skyhold", ["mimar-haffar", "maior-domus"])}
+            ${mission(3, "Eliminar monstros em Radiant Skyhold", st.m3, "acesso ao World Boss Phosphorus", ["radiant-acolyte", "radiant-paragon", "radiant-warden"])}
+            ${mission(4, "Derrotar o World Boss Phosphorus", st.m4, "conclusão da quest", ["phosphorus"])}
+          </section>
+        </div>
+        <section class="quest-detail-panel"><div class="hunt-best-title">REWARDS — 1 por missão concluída</div>
+          <div class="mb-rewards-grid">${outfitCard}${helmetCard}${mountCard}${weaponCard}</div>
+        </section>
+      </div>
       <button class="sm" id="boss-quest-back">Voltar</button>
     </div>`;
 
@@ -252,7 +275,7 @@ function renderMakeBelieveQuestDetail(q, ui) {
   if (!st.claimed.outfit) {
     const btn = $("#mb-claim-outfit");
     if (btn) btn.onclick = () => {
-      if (!rewardsUnlocked) return;
+      if (!unlockOutfit) return;
       makeBelieveGrantOutfit(p);
       makeBelieveClaim(p, "outfit");
       if (typeof addLog === "function") addLog("level", "Outfit <b>Illuminated Warrior</b> (addon 1+2) desbloqueada!");
@@ -263,7 +286,7 @@ function renderMakeBelieveQuestDetail(q, ui) {
   if (!st.claimed.mount) {
     const btn = $("#mb-claim-mount");
     if (btn) btn.onclick = () => {
-      if (!rewardsUnlocked || typeof grantMissionReward !== "function") return;
+      if (!unlockMount || typeof grantMissionReward !== "function") return;
       grantMissionReward(p, { accountMount: MAKE_BELIEVE_MOUNT });
       makeBelieveClaim(p, "mount");
       if (typeof addLog === "function") addLog("level", "Montaria <b>Radiant Nimbus</b> desbloqueada para a conta!");
@@ -271,14 +294,14 @@ function renderMakeBelieveQuestDetail(q, ui) {
       renderMakeBelieveQuestDetail(q, ui);
     };
   }
-  const bindRoulette = (boxId, items, key, btnId) => {
+  const bindRoulette = (boxId, items, key, unlocked) => {
     if (st.claimed[key]) return;
     mbStartPreview(boxId, items);
     const btn = $(`#${boxId}-btn`);
     if (btn) {
-      if (!rewardsUnlocked) btn.disabled = true;
+      if (!unlocked) btn.disabled = true;
       btn.onclick = () => {
-        if (!rewardsUnlocked || btn.disabled) return;
+        if (!unlocked || btn.disabled) return;
         btn.disabled = true;
         mbStopRoulettes();
         const slug = items[Math.floor(Math.random() * items.length)];
@@ -292,8 +315,8 @@ function renderMakeBelieveQuestDetail(q, ui) {
       };
     }
   };
-  bindRoulette("mb-weapon", MAKE_BELIEVE_WEAPONS, "weapon");
-  bindRoulette("mb-helmet", MAKE_BELIEVE_HELMETS, "helmet");
+  bindRoulette("mb-weapon", MAKE_BELIEVE_WEAPONS, "weapon", unlockWeapon);
+  bindRoulette("mb-helmet", MAKE_BELIEVE_HELMETS, "helmet", unlockHelmet);
 }
 
 /* ── Registro ── */

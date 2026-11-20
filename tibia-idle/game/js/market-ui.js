@@ -336,6 +336,7 @@ function renderMarket() {
         <button class="sm ${_mTab === "sell" ? "primary" : ""}" data-mtab="sell">💰 Vender</button>
         <button class="sm ${_mTab === "mine" ? "primary" : ""}" data-mtab="mine">📋 Minhas ofertas</button>
         <button class="sm ${_mTab === "history" ? "primary" : ""}" data-mtab="history">🧾 Histórico</button>
+        ${typeof renderRmt === "function" ? `<button class="sm ${_mTab === "rmt" ? "primary" : ""}" data-mtab="rmt">💵 RMT</button>` : ""}
       </div>
       <div id="market-body" style="height:520px;overflow:auto"></div>
     </div>`;
@@ -345,7 +346,8 @@ function renderMarket() {
     b.addEventListener("click", () => { _mTab = b.dataset.mtab; renderMarket(); }));
 
   const body = $("#market-body");
-  if (_mTab === "sell") renderMarketSell(body, p);
+  if (_mTab === "rmt" && typeof renderRmt === "function") renderRmt(body);
+  else if (_mTab === "sell") renderMarketSell(body, p);
   else if (_mTab === "mine") renderMarketMine(body, p);
   else if (_mTab === "history") renderMarketHistory(body, p);
   else { _mTab = "browse"; renderMarketBrowse(body, p); }

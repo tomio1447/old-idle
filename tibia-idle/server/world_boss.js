@@ -85,7 +85,7 @@ const WARZONES = [
     requiresMissionTarget: 5000,
     gridW: 39, gridH: 27, playerSpawn: { x: 20, y: 16 }, bossSpawn: { x: 20, y: 8 },
     otbm: "final_radiant", otbmFloor: 7,
-    otbmBounds: { x: 0, y: 0, w: 39, h: 27, z: 7 },
+    otbmBounds: { x: 1008, y: 1015, w: 39, h: 27, z: 7 },
   },
 ];
 
@@ -658,6 +658,8 @@ function createWorldBossController(opts) {
   function applyCharCooldown() {
     const cd = now() + 16 * 3600 * 1000;
     const wz = event ? String(event.warzoneId || "") : "";
+    // Phosphorus: sem cooldown por personagem (a pedido).
+    if (wz === "phosphorus") return;
     for (const join of (event && event.joins ? event.joins.values() : [])) {
       for (const c of (join.chars || [])) charCooldownUntil.set(Number(c.id) + ":" + wz, cd);
     }

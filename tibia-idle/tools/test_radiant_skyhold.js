@@ -156,11 +156,13 @@ for (const slug of hunt.monsters) {
 }
 
 // Loot: 8 itens registrados cliente e servidor, todos sell 0
-// (sem comprador NPC oficial) + ícones presentes.
+// (sem comprador NPC oficial) exceto blank-imbuement-scroll (25k,
+// pedido do jogador) + ícones presentes.
 const LOOT = { "book-of-faith": 54357, "cloud-familiar": 54361,
   "lunar-ascension-orb": 53695, "blank-imbuement-scroll": 51442,
   "gilded-bell": 54362, "broken-arrow": 54356, "tatty-robe": 54355,
   "blue-quiver": 35848 };
+const LOOT_SELL = { "blank-imbuement-scroll": 25000 };
 const catalog = { console }; catalog.window = catalog; vm.createContext(catalog);
 for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js",
   "core.js", "accessorydata.js", "supply-stash-data.js", "supplydata.js", "supplies.js",
@@ -175,9 +177,10 @@ for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js
 const E = require(path.join(__dirname, "..", "server", "authoritative_engine.js"));
 for (const slug of Object.keys(LOOT)) {
   const client = catalog.GAMEDATA.items[slug], server = E.ITEMS[slug];
+  const sell = LOOT_SELL[slug] || 0;
   must(client && server && client.cid === LOOT[slug] && server.cid === LOOT[slug] &&
-    Number(client.sell) === 0 && Number(server.sell) === 0,
-    slug + ": registro/preço inconsistente (sem comprador NPC → sell 0)");
+    Number(client.sell) === sell && Number(server.sell) === sell,
+    slug + ": registro/preço inconsistente");
   must(fs.existsSync(path.join(game, "assets", "item", slug + ".png")),
     slug + ": ícone ausente");
 }

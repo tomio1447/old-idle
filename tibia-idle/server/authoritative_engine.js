@@ -4478,6 +4478,10 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
       else if(/paralyz/i.test(nomeFx))sk.cond="freezing";
     }
     if(dist>mobSkillRangeSQM(sk,mob))continue;
+    /* chLock: rola UMA vez por intervalo (ex.: "20% a cada 8s") — sem o
+     * flag, uma chance baixa re-rola a cada ataque até acertar, ficando
+     * muito mais frequente que o intervalo pedido. */
+    if(sk.chLock)mob.skillCds[key]=now+(sk.int||2000);
     if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
     mob.skillCds[key]=now+(sk.int||2000);
     const el=inferSkillElement(sk);

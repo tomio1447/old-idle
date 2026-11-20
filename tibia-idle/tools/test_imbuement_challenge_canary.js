@@ -201,7 +201,7 @@ must(fs.existsSync(path.join(__dirname, "..", "game", "assets", "effects", "chal
   "sprite challenge-effect.png ausente");
 
 const css = fs.readFileSync(path.join(__dirname, "..", "game", "css", "layout.css"), "utf8");
-must(css.includes("#game-loading{display:none;"),
+must(/#game-loading\s*{[^}]*display\s*:\s*none/.test(css),
   "overlay de loading sem display:none padrão");
 
 console.log("OK: imbuements Canary, Challenge online, prey e FX de exeta.");

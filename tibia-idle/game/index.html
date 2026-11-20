@@ -9,12 +9,12 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=deploy-1711-v1">
+  <link rel="stylesheet" href="css/layout.css?v=deploy-1911-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-voc-v1">
   <link rel="stylesheet" href="css/proficiency.css?v=proficiency-v4">
-  <link rel="stylesheet" href="css/client-background.css">
+  <link rel="stylesheet" href="css/client-background.css?v=deploy-1911-v1">
   <link rel="stylesheet" href="css/mobile.css?v=char-details-v1">
   <link rel="stylesheet" href="css/chat.css?v=chat-mod-v2">
   <script>
@@ -39,7 +39,39 @@
 </head>
 <body>
 
-<div id="game-loading" aria-live="polite"><div class="gl-box"><div class="gl-brand">GLOBAL-IDLE</div><div class="gl-hint" id="gl-monster-hint"><div class="gl-hint-art" id="gl-hint-art"></div><div class="gl-hint-info"><span class="gl-hint-label">CREATURE HINT</span><strong id="gl-hint-name">Carregando criatura...</strong><div class="gl-hint-stats"><span>HP <b id="gl-hint-hp">—</b></span><span>EXP <b id="gl-hint-exp">—</b></span><span>ARMOR <b id="gl-hint-armor">—</b></span></div><p id="gl-hint-tip">Prepare-se para explorar o mundo.</p></div></div><div class="gl-text" data-i18n="loading">Carregando...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
+<div id="game-loading" aria-live="polite">
+  <div class="gi-load-modal">
+    <span class="gi-corner gi-corner--tl"></span><span class="gi-corner gi-corner--tr"></span>
+    <span class="gi-corner gi-corner--bl"></span><span class="gi-corner gi-corner--br"></span>
+    <header class="gi-load-header">
+      <div class="gi-load-brand"><span class="gi-brand-line"></span><h1>GLOBAL-IDLE</h1><span class="gi-brand-line"></span></div>
+      <span class="gi-load-subtitle">BESTIÁRIO &amp; DICAS DE CAÇA</span>
+    </header>
+    <section class="gi-creature-card" id="gl-monster-hint">
+      <div class="gi-creature-pedestal"><div class="gi-pedestal-glow"></div><div class="gi-hint-art" id="gl-hint-art"></div></div>
+      <div class="gi-creature-info">
+        <div class="gi-creature-top">
+          <span class="gi-hint-tag">CREATURE HINT</span>
+          <span class="gi-element-badge" id="gl-hint-element" style="display:none"></span>
+        </div>
+        <h2 class="gi-creature-name" id="gl-hint-name">Carregando criatura...</h2>
+        <div class="gi-creature-stats">
+          <div class="gi-stat-pill"><span class="gi-stat-label">HP</span><span class="gi-stat-value" id="gl-hint-hp">—</span></div>
+          <div class="gi-stat-pill"><span class="gi-stat-label">EXP</span><span class="gi-stat-value" id="gl-hint-exp">—</span></div>
+          <div class="gi-stat-pill"><span class="gi-stat-label">ARMOR</span><span class="gi-stat-value" id="gl-hint-armor">—</span></div>
+        </div>
+        <p class="gi-creature-note" id="gl-hint-tip">Prepare-se para explorar o mundo.</p>
+      </div>
+    </section>
+    <footer class="gi-load-footer">
+      <div class="gi-progress-meta">
+        <span class="gi-progress-status gl-text" data-i18n="loading">Carregando...</span>
+        <span class="gi-progress-count" id="gl-progress-count"></span>
+      </div>
+      <div class="gi-progress-track"><div class="gi-progress-fill gl-fill"><span class="gi-progress-spark"></span></div></div>
+    </footer>
+  </div>
+</div>
 
 <button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
 
@@ -241,31 +273,31 @@
       <span>SERVER TIME:</span>
       <b id="server-time-text">--:--:--</b>
     </div>
-    <div class="topbar-clock" id="server-save" title="Tempo até o server save (00h)">
-      <span>SERVER SAVE IN:</span>
+    <div class="topbar-clock" id="server-save" title="Reset diário (00h) — savestate global, sem desconexão">
+      <span>DAILY RESET IN:</span>
       <b id="server-save-text">--:--:--</b>
     </div>
     <span class="spacer"></span>
     <div class="topbar-btns">
-    <button class="sm" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin">🛠 <span data-i18n="btn.admin">Admin</span></button>
+    <button class="sm topbar-sys-btn" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin"><span class="topbar-btn-emoji" aria-hidden="true">🛠</span><span class="topbar-btn-label" data-i18n="btn.admin">Admin</span></button>
     <button class="sm topbar-sys-btn" id="btn-calendar" title="Calendário — eventos e metas do servidor">
       <span class="topbar-btn-emoji" aria-hidden="true">📅</span>
       <span class="topbar-btn-label">CALENDÁRIO</span>
     </button>
-    <button class="sm" id="btn-config" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
-    <button class="sm" id="btn-cyclo"><img src="assets/item/spellbook-of-ancient-arcana.png?v=guild-v1" alt="" class="topbar-btn-icon" width="18" height="18"> <span data-i18n="btn.cyclo">Cyclopedia</span></button>
+    <button class="sm topbar-sys-btn" id="btn-config" type="button" data-i18n-title="config.title"><span class="topbar-btn-emoji" aria-hidden="true">⚙</span><span class="topbar-btn-label" data-i18n="config.btn">CONFIG</span></button>
+    <button class="sm topbar-sys-btn" id="btn-cyclo"><img src="assets/item/spellbook-of-ancient-arcana.png?v=guild-v1" alt="" class="topbar-btn-icon" width="18" height="18"><span class="topbar-btn-label" data-i18n="btn.cyclo">Cyclopedia</span></button>
     <button class="sm topbar-sys-btn" id="btn-guild" title="Guilds — clãs por conta com tasks diárias" data-i18n-title="title.guild">
       <span class="topbar-btn-icon guild-btn-icon" aria-hidden="true"></span><span class="topbar-btn-label">Guild</span>
     </button>
     <button class="sm topbar-sys-btn" id="btn-pvp" title="PvP — Guerras agendadas entre guilds (requer guild)">
       <span class="topbar-btn-icon pvp-btn-icon" aria-hidden="true"></span><span class="topbar-btn-label">PVP</span>
     </button>
-    <button class="sm primary" id="btn-city" data-i18n-title="btn.city">🏛 <span data-i18n="btn.city">Ir para a cidade</span></button>
+    <button class="sm primary topbar-sys-btn" id="btn-city" data-i18n-title="btn.city"><span class="topbar-btn-emoji" aria-hidden="true">🏛</span><span class="topbar-btn-label" data-i18n="btn.city">Ir para a cidade</span></button>
     <button class="sm topbar-sys-btn" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
       <span class="topbar-btn-emoji" aria-hidden="true">👥</span>
       <span data-i18n="btn.party">PARTY</span><span id="party-badge" style="display:none;color:#9ce84a;font-weight:bold;margin-left:3px"></span>
     </button>
-    <button class="sm topbar-sys-btn btn-switch-portrait" id="btn-switch" style="font-size:15px;padding:8px 16px;font-weight:bold" title="Detalhes do personagem — trocar, outfit e roda" data-i18n-title="btn.switch">
+    <button class="sm topbar-sys-btn btn-switch-portrait" id="btn-switch" title="Detalhes do personagem — trocar, outfit e roda" data-i18n-title="btn.switch">
       <span id="btn-switch-portrait" class="btn-switch-avatar" style="transform:scale(1.35);transform-origin:center;margin:0 4px" aria-hidden="true"></span>
       <span class="topbar-btn-label" data-i18n="btn.switch">Personagem</span>
     </button>
@@ -611,7 +643,7 @@
 <script src="js/runedata.js"></script>
 <script src="js/monstermovedata.js"></script>
 <script src="js/monsterdata.js?v=drakens-loot-v1"></script>
-<script src="js/mobsheetdata.js?v=bloodrotten-v1"></script>
+<script src="js/mobsheetdata.js?v=deploy-1911-v1"></script>
 <script src="js/idleanimdata.js?v=sex-looktype-v2"></script>
 <script src="js/creatureanchordata.js"></script>
 <script src="js/areadata.js?v=wave-origin-ahead-v2"></script>
@@ -642,7 +674,7 @@
 <script src="js/ammo.js?v=caldera-diamond-dmg-v1"></script>
   <script src="js/combo.js?v=combo-diag-v2"></script>
 <script src="js/speed.js"></script>
-<script src="js/grid.js?v=mapblock-fix-v1"></script>
+<script src="js/grid.js?v=deploy-1911-v1"></script>
 <script src="js/area.js?v=wave-aim-target-v1"></script>
   <script src="js/gridai.js?v=deploy-0511-v1"></script>
 <script src="js/buffs.js"></script>
@@ -660,7 +692,7 @@
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
 <script src="js/player.js?v=lootcfg-icons-v1"></script>
 <script src="js/accessories.js?v=depot-authority-v1"></script>
-  <script src="js/combat.js?v=deploy-1711-v2"></script>
+  <script src="js/combat.js?v=deploy-1911-v1"></script>
 <script src="js/city.js?v=stamina-regen-v1"></script>
 <script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
 <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
@@ -670,7 +702,7 @@
 <script src="js/tilemap.js?v=wall-depth-v1"></script>
 <script src="js/effectdata.js?v=block-hit-fix-v1"></script>
 <script src="js/icondata.js?v=rotten-rooted-v1"></script>
-<script src="js/render.js?v=pvp-wars-v9"></script>
+<script src="js/render.js?v=deploy-1911-v1"></script>
 <script src="js/city-render.js?v=wall-depth-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
@@ -714,10 +746,11 @@
 <script src="js/announce.js?v=gm-panel-v1"></script>
 <script src="js/daily-boost.js?v=daily-boost-v2"></script>
 <script src="js/player-profile.js?v=guild-req-tab-v1"></script>
-<script src="js/account-client.js?v=pvp-wars-v9"></script>
+<script src="js/account-client.js?v=deploy-1911-v1"></script>
 <script src="js/chat.js?v=social-v2"></script>
 <script src="js/marketdata.js"></script>
-<script src="js/market-ui.js?v=market-tc-item-v1"></script>
+<script src="js/market-ui.js?v=deploy-1911-v1"></script>
+<script src="js/rmt-ui.js?v=rmt-v1"></script>
 <script src="js/store-ui.js?v=store-coin-icon-v1"></script>
 <script src="js/market-local.js"></script>
 <script src="js/reward-chest.js?v=collect-all-per-boss-v1"></script>
@@ -726,15 +759,16 @@
 <script src="js/accessorydata.js?v=plasma-collars-v1"></script>
 <script src="js/supply-stash-data.js?v=primal-rings-v2"></script>
 <script src="js/supply-stash.js?v=loot-rules-v1"></script>
-<script src="js/admin.js?v=players-online-v1"></script>
+<script src="js/admin.js?v=deploy-1911-v1"></script>
+<script src="js/admin-rmt.js?v=rmt-v1"></script>
 <script src="js/admin-spectate.js?v=gm-spectator-v1"></script>
 <script src="js/city-ui.js?v=depot-city-v2"></script>
 <script src="js/cosmetic-npcs.js?v=cosmetic-npcs-v2"></script>
 <script src="js/calendar.js?v=calendar-v1"></script>
 <script src="js/guild-ui.js?v=pvp-wars-v9"></script>
 <script src="js/pvp-ui.js?v=pvp-wars-v9"></script>
-<script src="js/preload.js?v=pvp-wars-v9"></script>
-<script src="js/game.js?v=deploy-1711-v2"></script>
+<script src="js/preload.js?v=deploy-1911-v1"></script>
+<script src="js/game.js?v=deploy-1911-v1"></script>
 <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v1"></script>
 <script src="js/feast-of-souls.js?v=paleworm-fov-v1"></script>
@@ -777,14 +811,15 @@
 <script src="js/bashmuul-issavi.js?v=bashmuul-issavi-v1"></script>
 <script src="js/true-asuras.js?v=true-asuras-v1"></script>
 <script src="js/mimar-haffar.js?v=deploy-1711-v2"></script>
+<script src="js/questdata.js?v=bakragore-quest-v2"></script>
 <script src="js/moonstone-castle.js?v=moonstone-castle-v1"></script>
-<script src="js/radiant-skyhold.js?v=radiant-skyhold-v1"></script>
-<script src="js/final-radiant.js?v=final-radiant-v1"></script>
-<script src="js/book-world.js?v=book-world-v1"></script>
-<script src="js/sir-leonard.js?v=sir-leonard-v1"></script>
-<script src="js/norcferatus-fortress.js?v=norcferatus-v1"></script>
-<script src="js/make-believe-quest.js?v=make-believe-v1"></script>
-<script src="js/jade-roots.js?v=jade-roots-v1"></script>
+<script src="js/radiant-skyhold.js?v=deploy-1911-v1"></script>
+<script src="js/final-radiant.js?v=deploy-1911-v1"></script>
+<script src="js/book-world.js?v=deploy-1911-v1"></script>
+<script src="js/sir-leonard.js?v=deploy-1911-v1"></script>
+<script src="js/norcferatus-fortress.js?v=deploy-1911-v1"></script>
+<script src="js/make-believe-quest.js?v=deploy-1911-v1"></script>
+<script src="js/jade-roots.js?v=deploy-1911-v1"></script>
 <script src="js/putrefactory.js?v=putrefactory-v1"></script>
 <script src="js/darklight-core.js?v=darklight-core-v1"></script>
 <script src="js/gloom-pillars.js?v=gloom-pillars-v1"></script>
@@ -822,9 +857,8 @@
 <script src="js/megalomania-lobby.js?v=world-boss-char-select-v1"></script>
 <script src="js/pale-worm-lobby.js?v=world-boss-raids-v1"></script>
 <script src="js/social.js?v=social-city-v1"></script>
-<script src="js/world-bosses-modal.js?v=deploy-1711-v1"></script>
-<script src="js/questdata.js?v=bakragore-quest-v2"></script>
-<script src="js/quest-ui.js?v=deploy-1711-v1"></script>
+<script src="js/world-bosses-modal.js?v=deploy-1911-v1"></script>
+<script src="js/quest-ui.js?v=deploy-1911-v1"></script>
 <script src="js/wheel-data.js?v=wheel-data-monk-v1"></script>
 <script src="js/wheel-planner.js?v=wheel-planner-active-v1"></script>
 <script src="js/wheel-modal.js?v=wheel-real-v1"></script>

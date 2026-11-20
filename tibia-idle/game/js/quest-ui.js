@@ -143,12 +143,18 @@ function openQuestsModal() {
   const ui = questPrepareModal("quests-modal-shell");
   if (!ui) return;
   const quests = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS : {};
-  const worldCards = Object.values(quests).filter((q) => (q.questType !== "party" && q.questType !== "boss") || q.worldQuest).map(questCard).join("");
+  /* Boss quests (incl. as worldQuest — Book World, Bloody Tusks e
+   * Make Believe são quests de boss) vão para BOSSES QUESTS. */
+  const worldCards = Object.values(quests).filter((q) => q.questType !== "party" && q.questType !== "boss").map(questCard).join("");
   const partyCards = Object.values(quests).filter((q) => q.questType === "party").map(questCard).join("");
-  const bossCards = Object.values(quests).filter((q) => q.questType === "boss" && !q.worldQuest).map(questCard).join("");
+  const bossCards = Object.values(quests).filter((q) => q.questType === "boss").map(questCard).join("");
+  /* Abas de categoria — mesmo accordion do modal HUNTS/BOSSES: todas
+   * minimizadas, clicar abre uma e fecha as demais. */
   const section = (title, cards) => cards
-    ? `<div class="small mb4 mt8" style="color:#d4af37;font-weight:bold;letter-spacing:.5px">${title}</div>
-       <div style="display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:10px 14px;">${cards}</div>`
+    ? `<section class="hunt-modal-section accordion-section">
+         <div class="hunt-cat-title accordion-head" role="button" tabindex="0" aria-expanded="false">${title}</div>
+         <div class="hunts-group collapsed">${cards}</div>
+       </section>`
     : "";
   ui.body.innerHTML = `<div class="panel-title quest-modal-title">
     <img src="assets/item/small-treasure-chest.png" width="20" height="20" style="vertical-align:middle;margin-right:6px" alt="">
@@ -158,6 +164,8 @@ function openQuestsModal() {
       ${section("PARTY QUESTS", partyCards)}
       ${section("BOSSES QUESTS", bossCards)}
       ${(!worldCards && !partyCards && !bossCards) ? '<span class="dim">Nenhuma quest disponível.</span>' : ""}</div>`;
+  if (typeof bindCatalogAccordion === "function")
+    bindCatalogAccordion($("#quests-modal-list"), "accordion");
   $("#quests-modal-close").onclick = () => {
     ui.modal.classList.remove("show");
     ui.body.classList.remove("quests-modal-shell");

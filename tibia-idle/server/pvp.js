@@ -96,16 +96,37 @@ try { HELPER_FIELDS = require("../game/js/helper-presets.js").HELPER_PRESET_CONF
  * o tick recarrega e re-parseia. */
 const PVP_AUTH_CACHE = new Map();
 const PVP_AUTH_PERSIST_MS = 4000;
+/* Múltiplas guerras simultâneas: o cap fixo de 8 despejava a batalha mais
+ * ANTIGA mesmo viva — cada tick voltava a dar parse no blob de ~5MB
+ * (~35 req/s) e o CPU derretia. Só despeja entrada de batalha encerrada ou
+ * sem toque há 2min; se o cache encher com batalhas vivas, cresce além do
+ * cap em vez de thrashar (cada descritor ~5–10MB — o warn marca o teto). */
+const PVP_AUTH_CACHE_MAX = Math.max(4, Number(process.env.PVP_AUTH_CACHE_MAX) || 32);
 function pvpAuthCacheGet(instanceId) {
   const e = PVP_AUTH_CACHE.get(String(instanceId));
   if (e) e.touchedAt = Date.now();
   return e || null;
 }
 function pvpAuthCacheSet(instanceId, entry) {
-  if (PVP_AUTH_CACHE.size >= 8) PVP_AUTH_CACHE.delete(PVP_AUTH_CACHE.keys().next().value);
+  if (PVP_AUTH_CACHE.size >= PVP_AUTH_CACHE_MAX) {
+    const now = Date.now();
+    for (const [id, e] of PVP_AUTH_CACHE) {
+      const dead = e && e.descriptor && e.descriptor.authority && e.descriptor.authority.ended;
+      const stale = now - (Number(e && e.touchedAt) || Number(e && e.savedAt) || 0) > 120000;
+      if (dead || stale) { PVP_AUTH_CACHE.delete(id); break; }
+    }
+    if (PVP_AUTH_CACHE.size >= PVP_AUTH_CACHE_MAX)
+      console.warn("[pvp] PVP_AUTH_CACHE além do cap com batalhas vivas:", PVP_AUTH_CACHE.size);
+  }
   PVP_AUTH_CACHE.set(String(instanceId), entry);
 }
 function pvpAuthCacheDrop(instanceId) { PVP_AUTH_CACHE.delete(String(instanceId)); }
+/* Savestate global: marca todos os descritores quentes como sujos — o
+ * próximo tick de cada batalha (até ~1s em batalhas vivas) commita o blob
+ * inteiro no banco em vez de esperar o throttle de PVP_AUTH_PERSIST_MS. */
+function pvpAuthMarkAllDirty() {
+  for (const e of PVP_AUTH_CACHE.values()) if (e) e.savedAt = 0;
+}
 function pvpAuthCacheSweep() {
   const now = Date.now();
   for (const [id, e] of PVP_AUTH_CACHE) {
@@ -892,6 +913,12 @@ function createPvpController(opts) {
 
   /* Conta travada no preparo/batalha (bloqueia hunts/bosses/quests). */
   async function lockedAccount(db, accountId) {
+    /* Múltiplas guerras: uma query JOIN no lugar de 1+N pvpRosterGet por
+     * request (o lock é consultado em todo start de instância). */
+    if (typeof db.pvpLockedBattleForAccount === "function") {
+      const hit = await db.pvpLockedBattleForAccount(accountId);
+      return hit ? { battleId: Number(hit.battle_id), status: String(hit.status) } : null;
+    }
     const rows = await activeBattles(db);
     for (const b of rows) {
       if (!["prep", "live"].includes(String(b.status))) continue;
@@ -941,4 +968,5 @@ module.exports = {
   pvpMapLocal, pvpRectCenter, pvpApplyBattlePreset, pvpFilterVisualState,
   pvpResumeLiveOnBoot, pvpGuildActiveBattle, pvpClientArenas,
   pvpAuthCacheGet, pvpAuthCacheSet, pvpAuthCacheDrop, pvpAuthSerialize, PVP_AUTH_PERSIST_MS,
+  pvpAuthMarkAllDirty,
 };

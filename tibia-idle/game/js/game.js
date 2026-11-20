@@ -6471,12 +6471,12 @@ function initAccountLogin() {
   function closeAccountModal() {
     const modal = $("#modal"), body = $("#modal-body");
     if (modal) modal.classList.remove("show", "wide", "login-modal");
-    if (body) body.classList.remove("chard-modal-shell");
+    if (body) body.classList.remove("chard-modal-shell", "gi-picker");
   }
   function openAccountModal(html, wide) {
     const body = $("#modal-body"), modal = $("#modal");
     if (!body || !modal) return false;
-    body.classList.remove("chard-modal-shell");
+    body.classList.remove("chard-modal-shell", "gi-picker");
     body.innerHTML = html;
     modal.classList.add("show");
     modal.classList.toggle("wide", !!wide);
@@ -6857,30 +6857,40 @@ function initAccountLogin() {
     const cards = characters.length ? characters.map((c) => `
       <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""}"
         ${c.identityMismatch?`data-repair-char="${c.id}"`:`data-acc-char="${c.id}"`}>
+        <span class="account-character-handle" title="Arrastar para reordenar">⋮⋮</span>
         <span class="account-character-outfit" data-account-portrait="${c.id}"></span>
         <span class="account-character-name">
           <b>${c.name}</b>
           ${c.identityMismatch?`<span class="identity-error">Dados cruzados com ${c.dataOwnerName||"outro personagem"}</span>`:""}
         </span>
         <span class="account-character-voc">${vocationName({voc:c.voc || "knight",promoted:!!c.promoted})}</span>
-        <span class="account-character-level">${Number(c.level) || 1}</span>
-        <span class="account-character-enter">${c.identityMismatch?"REPARAR":"ENTRAR ›"}</span>
+        <span class="account-character-action">
+          <span class="account-character-level">${Number(c.level) || 1}</span>
+          <span class="account-character-enter">${c.identityMismatch?"REPARAR":"ENTRAR ›"}</span>
+        </span>
       </button>`).join("") :
       `<div class="account-character-empty">Nenhum personagem nesta conta.</div>`;
     if (!openAccountModal(`
-      <div class="panel-title">Personagens de ${account.login || "sua conta"}
-        <span style="flex:1"></span><span class="tiny dim">${account.coins || 0} Tibia Coins</span>
-      </div>
+      <span class="gi-corner gi-corner--tl"></span><span class="gi-corner gi-corner--tr"></span>
+      <span class="gi-corner gi-corner--bl"></span><span class="gi-corner gi-corner--br"></span>
+      <header class="gi-modal__header">
+        <h1 class="gi-modal__title">Selecione sua Party <span class="gi-dot">•</span> Global Idle</h1>
+        <div class="gi-coins">
+          <span>${Number(account.coins)||0} Tibia Coins</span>
+          <img class="gi-coin-icon" src="assets/ui/coins/tibia-coins.gif" alt="Tibia Coins">
+        </div>
+      </header>
       <div class="panel-body account-flow-body">
-        <div class="account-character-list">${characters.length ? `<div class="account-character-list-head">
-          <span></span><span>Nome</span><span>Vocação</span><span>Level</span><span></span>
-        </div>` : ""}${cards}</div>
-        ${characters.length>1?`<div class="tiny dim center mt4 account-party-hint">Arraste os personagens para ordenar a party — o 1º da lista é o líder.</div>`:""}
-        <button class="primary full mt8" id="acc-open-create-char">Criar personagem</button>
-        ${account.emailVerified ? "" : `<button class="full mt8" id="acc-verify-email">📧 Confirmar e-mail</button>`}
-        <button class="full mt8" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
-        <button class="danger full mt8" id="acc-logout">Logout</button>
+        ${characters.length?`<div class="gi-divider-hint"><span>Arraste os personagens para ordenar a party — o 1º da lista é o líder</span></div>`:""}
+        <div class="account-character-list">${cards}</div>
+        <footer class="gi-modal__footer">
+          <button class="gi-btn gi-btn--primary" id="acc-open-create-char">Criar personagem</button>
+          ${account.emailVerified ? "" : `<button class="gi-btn gi-btn--secondary" id="acc-verify-email">✉️ Confirmar e-mail</button>`}
+          <button class="gi-btn gi-btn--secondary" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
+          <button class="gi-btn gi-btn--danger" id="acc-logout">Logout</button>
+        </footer>
       </div>`, true)) return;
+    $("#modal-body").classList.add("gi-picker");
     paintAccountPortraits(characters);
     $$("#modal-body [data-acc-char]").forEach((row) => row.addEventListener("click", () => {
       const summary = characters.find((c) => String(c.id) === String(row.dataset.accChar));
@@ -6892,14 +6902,14 @@ function initAccountLogin() {
     }));
     /* ---- Party automática: arraste para ordenar — o 1º vira líder ---- */
     const _partyList=$("#modal-body .account-character-list");
-    if(_partyList&&characters.length>1){
+    if(_partyList&&characters.length){
       let _dragCard=null,_dragMoved=false;
       const _paintOrder=()=>{
         $$("#modal-body .account-character-card").forEach((el,i)=>{
           el.classList.toggle("is-leader",i===0);
           let badge=el.querySelector(".account-character-pos");
           if(!badge){badge=document.createElement("span");badge.className="account-character-pos";el.prepend(badge);}
-          badge.textContent=i===0?"1º · LÍDER":(i+1)+"º";
+          badge.textContent=i===0?"👑 LÍDER":(i+1)+"º";
         });
       };
       const _submitOrder=async()=>{
@@ -6915,7 +6925,7 @@ function initAccountLogin() {
           }
         }catch(e){}
       };
-      $$("#modal-body .account-character-card").forEach((el)=>{
+      if(characters.length>1)$$("#modal-body .account-character-card").forEach((el)=>{
         el.setAttribute("draggable","true");
         el.addEventListener("dragstart",(e)=>{
           _dragCard=el;_dragMoved=true;e.dataTransfer.effectAllowed="move";

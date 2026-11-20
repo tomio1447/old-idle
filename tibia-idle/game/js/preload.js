@@ -88,6 +88,18 @@ function renderLoadingMonsterHint(force) {
   if (exp) exp.textContent = loadingHintNumber(monster.exp);
   if (armor) armor.textContent = loadingHintNumber(monster.armor);
   if (tip) tip.textContent = loadingHintTip(monster);
+  const badge = document.getElementById("gl-hint-element");
+  if (badge) {
+    const el = String(monster.element || "").toLowerCase();
+    if (["holy","fire","ice","death","earth","energy"].includes(el)) {
+      badge.textContent = "✦ " + el.toUpperCase();
+      badge.className = "gi-element-badge element-" + el;
+      badge.style.display = "";
+    } else {
+      badge.style.display = "none";
+      badge.className = "gi-element-badge";
+    }
+  }
 }
 function showGameLoading(show, text, pct) {
   const el = document.getElementById("game-loading");
@@ -102,7 +114,19 @@ function showGameLoading(show, text, pct) {
     }
     if (!show) el.dataset.hintVisible = "0";
     const label = el.querySelector(".gl-text"), fill = el.querySelector(".gl-fill");
-    if (label && text) label.textContent = text;
+    const count = el.querySelector("#gl-progress-count");
+    if (label && text) {
+      /* Status + contador separados: "Carregando mapa 124/261" → status à
+         esquerda, "124/261" fixo à direita (tabular-nums, sem jitter). */
+      const m = String(text).match(/^(.*?)\s*(\d+\s*\/\s*\d+)\s*$/);
+      if (m && count) {
+        label.textContent = m[1].trim() || text;
+        count.textContent = m[2].replace(/\s+/g, "");
+      } else {
+        label.textContent = text;
+        if (count) count.textContent = "";
+      }
+    }
     if (fill && pct !== undefined && pct !== null)
       fill.style.width = Math.max(0, Math.min(100, pct || 0)) + "%";
   }

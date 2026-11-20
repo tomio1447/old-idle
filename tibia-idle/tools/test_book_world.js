@@ -174,7 +174,7 @@ const LOOT = { "paper-boat": [51420, 800], "star-ink": [51422, 1250],
   "torn-page": [51427, 340], "pressed-flower": [51428, 570],
   "cookbook-creature-product": [51424, 870],
   "book-with-an-hourglass": [51425, 1450], "sealing-wax": [51426, 620],
-  "etcher": [51443, 0], "hydra-head": [10282, 600] };
+  "etcher": [51443, 30000], "hydra-head": [10282, 600] };
 const catalog = { console }; catalog.window = catalog; vm.createContext(catalog);
 for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js",
   "core.js", "accessorydata.js", "supply-stash-data.js", "supplydata.js", "supplies.js",

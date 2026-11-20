@@ -44,8 +44,8 @@
  *     broken-arrow: creature products sem trade NPC registrado.
  *   - lunar-ascension-orb: consome no Weapon Proficiency (upgrade de
  *     perks); só tem valor de mercado.
- *   - blank-imbuement-scroll: NPC Albinius VENDE por 25k; ninguém
- *     compra do jogador.
+ *   - blank-imbuement-scroll: NPC Albinius vende por 25k; vende-se
+ *     por 25k (pedido).
  *   - blue-quiver: NPCs vendem por 400; nenhum compra do jogador.
  *     Registrada aqui como loot para o drop resolver (o quiver real
  *     continua em quiverdata.js).
@@ -55,7 +55,7 @@ const RADIANT_SKYHOLD_ITEMS = {
   "book-of-faith":          { n: "book of faith",          s: null, t: "loot", cid: 54357, w: 2.7,  sell: 0, npcSell: 0 },
   "cloud-familiar":         { n: "cloud familiar",         s: null, t: "loot", cid: 54361, w: 0.5,  sell: 0, npcSell: 0 },
   "lunar-ascension-orb":    { n: "lunar ascension orb",    s: null, t: "loot", cid: 53695, w: 10.0, sell: 0, npcSell: 0 },
-  "blank-imbuement-scroll": { n: "blank imbuement scroll", s: null, t: "loot", cid: 51442, w: 2.5,  sell: 0, npcSell: 0 },
+  "blank-imbuement-scroll": { n: "blank imbuement scroll", s: null, t: "loot", cid: 51442, w: 2.5,  sell: 25000, npcSell: 25000 },
   "gilded-bell":            { n: "gilded bell",            s: null, t: "loot", cid: 54362, w: 0.8,  sell: 0, npcSell: 0 },
   "broken-arrow":           { n: "broken arrow",           s: null, t: "loot", cid: 54356, w: 0.9,  sell: 0, npcSell: 0 },
   "tatty-robe":             { n: "tatty robe",             s: null, t: "loot", cid: 54355, w: 2.3,  sell: 0, npcSell: 0 },

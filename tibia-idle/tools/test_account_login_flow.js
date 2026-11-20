@@ -23,9 +23,9 @@ must(loginButton&&registerButton&&!/\sdata-i18n=/.test(loginButton[0].split(">")
   fs.existsSync(path.join(game,"assets","create-account-btn.png")),
   "arte dos botões deve permanecer no HTML e não ser substituída pelo applyI18n");
 must(css.includes('max-width: 270px')&&
-  css.includes('../assets/loginbackground.png?v=login-background-fix-v2')&&
-  fs.existsSync(path.join(game,"assets","loginbackground.png"))&&
-  html.includes('css/layout.css?v=login-background-fix-v2'),
+  css.includes('../assets/ui/background/backgroundverao2026.webp')&&
+  fs.existsSync(path.join(game,"assets","ui","background","backgroundverao2026.webp"))&&
+  html.includes('css/layout.css?v='),
   "fundo do login e tamanho compacto das imagens dos botões devem carregar do caminho servido");
 must(html.includes('id="account-login-form"')&&html.includes('onsubmit="return false;"')&&
   html.includes('action="#"'),
@@ -82,8 +82,8 @@ must(css.includes(".account-character-list")&&css.includes(".account-character-l
   css.includes(".account-character-voc")&&css.includes(".account-character-level"),
   "picker de personagens sem layout em lista");
 must(server.includes("function accountCharacterSummary")&&server.includes("sex:data.sex")&&
-  server.includes("outfit:data.outfit")&&
-  (server.match(/characters: characters\.map\(accountCharacterSummary\)/g)||[]).length===2,
+  server.includes("outfit:data.outfit")&&server.includes("charSummaryWithGold")&&
+  (server.match(/characters: characters\.map\(charSummaryWithGold\(acc\)\)/g)||[]).length===2,
   "API não retorna outfit/cores/sexo no resumo da conta");
 must(js.includes("startHuntAfterLease")&&js.includes("lease.unauthorized")&&
   js.includes("ONLINE_SESSION_INVALID=true;ONLINE_RUNTIME_RETRY_AT=Number.POSITIVE_INFINITY"),
