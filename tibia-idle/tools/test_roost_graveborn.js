@@ -281,6 +281,23 @@ must(combatSrc.includes("adventurerGroupBossInit") && combatSrc.includes("advent
 const roostSrc = fs.readFileSync(path.join(js, "roost-graveborn.js"), "utf8");
 must(roostSrc.includes("AG_MEMBER_SPAWNS") && roostSrc.includes("adventurerGroupBossTick"),
   "roost module sem mecânica do encontro");
+must(roostSrc.includes("ELD_VENT_SPAWNS") && roostSrc.includes("eldritchBossTick"),
+  "roost module sem vulcões");
+
+/* -------- Eldritch Dragon Lord: vulcões oficiais -------- */
+for (const s of ["pulsating-lava", "eruption", "flame-totem"]) {
+  must(M[s], s + " ausente do ROOST_MONSTERS");
+  must(M[s].lookItem, s + " deve ser lookItem (objeto oficial)");
+  must(ctx.MOBSHEETS[s] && fs.existsSync(path.join(game, "assets", "mob", s + ".png")),
+    s + " sheet ausente");
+  must(E.MONSTERS[s], "engine: " + s + " ausente");
+}
+must(M["pulsating-lava"].eldStage.next === "eruption" &&
+  M["eruption"].eldStage.next === "flame-totem" &&
+  !M["flame-totem"].eldStage, "cadeia de evolução divergente");
+must(M["flame-totem"].skills.length > 0, "flame-totem deve atacar");
+must(M["pulsating-lava"].noAttack === true && M["pulsating-lava"].exp === 0,
+  "pulsating-lava deve ser hazard estático");
 
 /* ---------------- engine ---------------- */
 for (const slug of BOSSES) {
@@ -298,6 +315,11 @@ must(engineSrc.includes("tickAdventurerGroup") && engineSrc.includes("agCrystal"
   engineSrc.includes("agMember") && engineSrc.includes("damageTakenMul") &&
   engineSrc.includes("mob.critAll") && engineSrc.includes('auth.bossId==="adventurer-group"'),
   "engine sem mecânica do encontro Adventurer Group");
+must(engineSrc.includes("tickEldritch") && engineSrc.includes("eldVent") &&
+  engineSrc.includes("eldritchImmune") && engineSrc.includes('auth.bossId==="eldritch-dragon-lord"'),
+  "engine sem mecânica dos vulcões");
+must(combatSrc.includes("eldritchBossInit") && combatSrc.includes("eldritchBossTick"),
+  "cliente sem hooks dos vulcões");
 
 /* ---------------- OTBMs: bounds, spawns, caminhabilidade ---------------- */
 const tfCtx = { console }; tfCtx.window = tfCtx; vm.createContext(tfCtx);
@@ -461,6 +483,62 @@ must(html.indexOf("js/make-believe-quest.js") < html.indexOf("js/roost-graveborn
     Number(auth.authority.players[0].p.bosses["adventurer-group"] &&
       auth.authority.players[0].p.bosses["adventurer-group"].kills) === 1,
     "crédito do boss adventurer-group não registrado");
+}
+
+/* -------- Eldritch: simulação autoritativa dos vulcões -------- */
+{
+  const bmap = OTBM.read(fs.readFileSync(
+    path.join(game, "maps", "eldritch_dl.otbm")).buffer.slice(0), { z: 7 });
+  const min = bmap.sourceBounds;
+  const L = (ax, ay) => ({ cx: ax - min.minX, cy: ay - min.minY });
+  const bcell = L(1021, 1024), pcell = L(1021, 1030);   // coords oficiais
+  const lvl = 500;
+  const player = { id: "1", name: "T", voc: "knight", level: lvl,
+    exp: engine.expForLevel(lvl), hp: 300000, mp: 20000, gold: 0,
+    skills: { sword: 120 }, ml: 20, equip: {}, supplies: {}, lootPouch: {},
+    kills: {}, bosses: {}, config: {} };
+  const desc = { v: 1, savedAt: 1000, kind: "boss", huntId: null,
+    bossId: "eldritch-dragon-lord", instanceMode: "boss", activeCharacterId: "1",
+    members: [{ id: "1", p: player }],
+    state: { players: [{ id: "1", p: player, cx: pcell.cx, cy: pcell.cy, x: .5, y: .5 }],
+      mobs: [{ id: "boss-1", slug: "eldritch-dragon-lord", boss: true,
+        cx: bcell.cx, cy: bcell.cy, x: .5, y: .5 }], events: [] } };
+  let auth = engine.initializeAuthority(desc, "b".repeat(64), 1000);
+  const adv = (ms) => JSON.parse(engine.advanceAuthorityState(
+    JSON.stringify(auth), ms, Number(auth.authority.clock) + ms).state);
+  auth = adv(6000);
+  const vents = auth.authority.mobs.filter((m) => m.eldVent);
+  must(auth.authority.eld && vents.length === 4 &&
+    vents.every((m) => m.slug === "pulsating-lava"),
+    "4 pulsating-lavas não spawnaram: " +
+    auth.authority.mobs.map((m) => m.slug).join(","));
+  /* Silencia o dano (mesmo padrão do harness de boss) — queremos observar
+   * a evolução, não medir TTK. */
+  for (const m of auth.authority.mobs) {
+    m.damage = 0; m.attackSpeed = Number.MAX_SAFE_INTEGER; m.attackAcc = 0;
+  }
+  const refill = () => { for (const it of auth.authority.players) it.p.hp = engine.maxStats(it.p).hp; };
+  /* Evolução: lava → eruption → flame-totem (~18s/estágio). */
+  refill(); auth = adv(19000);
+  must(auth.authority.mobs.filter((m) => m.eldVent && m.hp > 0)
+    .every((m) => m.slug === "eruption"), "lavas não viraram eruptions");
+  refill(); auth = adv(19000);
+  must(auth.authority.mobs.filter((m) => m.eldVent && m.hp > 0)
+    .every((m) => m.slug === "flame-totem"), "eruptions não viraram totems");
+  const boss = auth.authority.mobs.find((m) => m.boss);
+  must(boss && boss.eldritchImmune === true,
+    "boss deve ficar imortal com 4 flame totems (>=3)");
+  /* Mata 2 totems → imunidade cai; respawn volta como lava. */
+  let dead = 0;
+  for (const m of auth.authority.mobs)
+    if (m.eldVent && m.slug === "flame-totem" && dead++ < 2) m.hp = 0;
+  auth = adv(400);
+  must(auth.authority.mobs.find((m) => m.boss).eldritchImmune === false,
+    "imunidade deve cair com 2 totems vivos");
+  auth = adv(31000);
+  must(auth.authority.mobs.some((m) => m.eldVent && m.hp > 0 &&
+    m.slug === "pulsating-lava"),
+    "vent morto não respawnou como pulsating-lava");
 }
 
 console.log("OK — Roost of the Graveborn Quest 450+: 5 bossrooms OTBM " +

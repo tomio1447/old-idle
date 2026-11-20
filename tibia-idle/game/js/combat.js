@@ -110,6 +110,8 @@ function arenaBossBindMechanics(c, now) {
     brainheadBossInit(c, player);
   if (id === "adventurer-group" && typeof adventurerGroupBossInit === "function" && !c.ag)
     adventurerGroupBossInit(c, player);
+  if (id === "eldritch-dragon-lord" && typeof eldritchBossInit === "function" && !c.eld)
+    eldritchBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -1889,6 +1891,7 @@ function applyResist(mob, element, dano, piercePct) {
 /* Multiplicador de dano SOFRIDO do mob (def.damageTakenMul) — usado pelos
  * avatares do Adventurer Group (sofrem menos dano). Espelho do servidor. */
 function mobTakenMul(mob, dmg) {
+  if (mob && mob.eldritchImmune) return 0;
   const mul = mob && mob.def && Number(mob.def.damageTakenMul);
   return (mul > 0 && mul !== 1) ? Math.max(1, Math.floor(dmg * mul)) : dmg;
 }
@@ -5210,6 +5213,7 @@ function combatTick(c, p, dt, now) {
   if (typeof heartBossTick === "function" && heartBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof adventurerGroupBossTick === "function" && adventurerGroupBossTick(c, now) === false) return;
+  if (typeof eldritchBossTick === "function" && eldritchBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof echoRaidTick === "function") echoRaidTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);

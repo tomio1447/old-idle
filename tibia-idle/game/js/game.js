@@ -4262,6 +4262,7 @@ function cleanupEncounterState(c){
   if(typeof crueltyBossCleanup==="function")crueltyBossCleanup(c);
   if(typeof megaBossCleanup==="function")megaBossCleanup(c);
   if(typeof adventurerGroupBossCleanup==="function")adventurerGroupBossCleanup(c);
+  if(typeof eldritchBossCleanup==="function")eldritchBossCleanup(c);
 }
 
 /* Compra automaticamente a bless de todos e recria a mesma instância.

@@ -39,8 +39,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
     oficiais "BRRRRMM"/"I'm bugged!") entra na sala; matá-lo encerra e
     credita `adventurer-group`. Loot oficial dele: Ancient Crypt Rune
     + Worn Guide Book (rare). HP/XP ocultos — 520k/750k estimados.
-- **Eldritch Dragon Lord** — race 2739, looktype 1879, exp 750.000,
-  680k hp; fire imune (oficial: se cura com fogo).
+- **Eldritch Dragon Lord** (Under Fire, `eldritch_dl.otbm`, center
+  {1021,1028} / bossspawn {1021,1024} / playerspawn {1021,1030}) —
+  race 2739, looktype 1879, exp 750.000, 680k hp; fire imune (oficial:
+  se cura com fogo). **Vulcões oficiais**: 4 vents fixos
+  ({1017,1024} {1026,1024} {1016,1034} {1026,1033}) que acumulam vida e
+  evoluem **Pulsating Lava → Eruption → Flame Totem** (~18s/estágio,
+  vent destruído respawna como lava em 30s). **3+ Flame Totems vivos →
+  boss IMORTAL** (`mob.eldritchImmune` → dano 0 no funnel
+  `applyOutgoingDamage`; totens atacam nova de fogo). Objetos oficiais:
+  Eruption 51952 / Flame Totem 51953 (lookItem); Pulsating Lava sem
+  objectID público → lava vent 391.
 - **Ice Horror** — race 2733, looktype 1881, **hp oficial 542.700**,
   exp 259.000; ice 0% (imune), Death Ring 950+, Great Energy Wave 1300+.
 - **The Gravedigger** — race 2721, looktype 1880, exp 750.000;

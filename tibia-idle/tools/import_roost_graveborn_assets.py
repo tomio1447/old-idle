@@ -78,6 +78,12 @@ MOBS_LOOKTYPE = {
 MOBS_LOOKITEM = {
     "adventurer-group": 52836,   # relíquia/troféu do grupo
     "bonelords-phylactery": 52831,  # face do Bone Overlord (pinata oficial)
+    # Vulcões do Eldritch Dragon Lord — objectIDs oficiais do wikitext
+    # (Eruption 51952, Flame Totem 51953); Pulsating Lava sem objectID
+    # público → lava vent clássico 391 (aproximação documentada).
+    "pulsating-lava": 391,
+    "eruption": 51952,
+    "flame-totem": 51953,
 }
 
 # NPC Dragon Ancestor Spirit — dragão espírito (looktype 1899).

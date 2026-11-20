@@ -476,6 +476,43 @@ const AG_MEMBER_SPAWNS = [
   { slug: "nigel-neverguess",   dx: -1, dy: 2  },
 ];
 const AG_CRYSTAL_OFFSET = { dx: -1, dy: 6 }; // {1029,1033} — ao lado do player spawn
+
+/* ── Eldritch Dragon Lord — vulcões oficiais ──────────────────────────
+ * Oficial (tibiawiki): 4 Pulsating Lavas espalhados pela sala; a cada
+ * turno acumulam vida e evoluem Pulsating Lava → Eruption → Flame Totem.
+ * Com 3+ Flame Totems vivos simultâneos o boss fica IMORTAL (sem dano).
+ * Os vulcões são OBJETOS (lookItem): Eruption objectID 51952 e Flame
+ * Totem objectID 51953 oficiais no wikitext; o Pulsating Lava não tem
+ * objectID público → aproximação: lava vent 391 (documentado).
+ * Spawns oficiais (enunciado): {1017,1024} {1026,1024} {1016,1034}
+ * {1026,1033} → offsets vs bossspawn {1021,1024}. exp 0/loot vazio —
+ * são hazards do encontro, não recompensa. */
+const ELD_STAGE_MS = 18000;      // ~"a cada turno" — 18s por estágio
+const ELD_RESPAWN_MS = 30000;    // vent destruído volta como lava
+const ELD_TOTEM_IMMUNE = 3;      // 3+ totens → boss imortal
+const ELD_VENT_BASE = {
+  speed: 0, armor: 0, defense: 0, damage: 0, attackSpeed: 2000,
+  targetDistance: 1, exp: 0, loot: [], grupo: "quests",
+  imune: ["paralyze", "invisible"], staticAttack: 0,
+};
+const PULSATING_LAVA = Object.assign({}, ELD_VENT_BASE, {
+  name: "Pulsating Lava", hp: 15000, noAttack: true,
+  lookItem: 391, eldStage: { next: "eruption" },
+});
+const ERUPTION = Object.assign({}, ELD_VENT_BASE, {
+  name: "Eruption", hp: 20000, noAttack: true,
+  lookItem: 51952, eldStage: { next: "flame-totem" },
+});
+/* Flame Totem oficial: ATACA (nova de fogo) — o totem é o perigo real. */
+const FLAME_TOTEM = Object.assign({}, ELD_VENT_BASE, {
+  name: "Flame Totem", hp: 25000,
+  lookItem: 51953,
+  skills: [{ el: "fire", min: 500, max: 800, int: 3000, ch: 35,
+    radius: 2, fx: "fire-area", miss: "fire" }],
+});
+const ELD_VENT_SPAWNS = [       // offsets vs bossspawn oficial {1021,1024}
+  { dx: -4, dy: 0 }, { dx: +5, dy: 0 }, { dx: -5, dy: +10 }, { dx: +5, dy: +9 },
+];
 const AG_CRYSTAL_MANA_DRAIN_PCT = 35;   // % da mana máxima drenada
 const AG_CRYSTAL_RADIUS = 2;
 
@@ -492,6 +529,9 @@ const ROOST_MONSTERS = {
   "avatar-of-storm": AVATAR_OF_STORM,
   "avatar-of-balance": AVATAR_OF_BALANCE,
   "bright-crystal": BRIGHT_CRYSTAL,
+  "pulsating-lava": PULSATING_LAVA,
+  "eruption": ERUPTION,
+  "flame-totem": FLAME_TOTEM,
   "eldritch-dragon-lord": ELDRITCH_DRAGON_LORD,
   "ice-horror": ICE_HORROR,
   "the-gravedigger": THE_GRAVEDIGGER,
@@ -504,7 +544,7 @@ const ROOST_ROOMS = {
   "adventurer-group": { otbm: "first_dragon",
     spawn: { x: 1029, y: 1034, z: 7 }, boss: { x: 1030, y: 1027, z: 7 } },
   "eldritch-dragon-lord": { otbm: "eldritch_dl",
-    spawn: { x: 1017, y: 1036, z: 7 }, boss: { x: 1021, y: 1028, z: 7 } },
+    spawn: { x: 1021, y: 1030, z: 7 }, boss: { x: 1021, y: 1024, z: 7 } },
   "ice-horror": { otbm: "ice_horror",
     spawn: { x: 1028, y: 1033, z: 7 }, boss: { x: 1030, y: 1029, z: 7 } },
   "the-gravedigger": { otbm: "gravedigger",
@@ -962,11 +1002,87 @@ function adventurerGroupBossTick(c, now) {
 }
 function adventurerGroupBossCleanup(c) { if (c && c.ag) delete c.ag; }
 
+/* ── Eldritch Dragon Lord — vulcões (cliente; espelho de tickEldritch
+ * no authoritative_engine.js) ── */
+function eldritchBossFight(c) { return !!(c && c.boss && c.boss.id === "eldritch-dragon-lord"); }
+function eldSpawnAt(c, slug, cx, cy, ventId) {
+  const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+    GAMEDATA.monsters[slug];
+  if (!def) return null;
+  const cell = agFreeCell(c, cx, cy); if (!cell) return null;
+  const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+    : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+  const hp = Math.max(1, Number(def.hp) || 1);
+  const mob = { slug, def, hp, maxHp: hp, eldVent: true, _ventId: ventId,
+    atkCd: 400 + Math.random() * 1200, eldStageAt: Date.now(),
+    id: "eld-" + slug + "-" + Date.now().toString(36) + "-" +
+      Math.random().toString(36).slice(2, 7),
+    cx: cell.x, cy: cell.y, x: pos.x, y: pos.y, sx: pos.x, sy: pos.y,
+    dir: "w", moving: false, attackAnim: 0, speed: 0, spawnAt: Date.now() };
+  c.mobs = c.mobs || []; c.mobs.unshift(mob);
+  c.events = c.events || [];
+  c.events.push({ t: "spawn", slug, x: mob.x, y: mob.y, targetId: mob.id, screen: true });
+  return mob;
+}
+function eldritchBossInit(c, player) {
+  if (!eldritchBossFight(c)) return c;
+  const boss = (c.mobs || []).find((m) => m && m.boss);
+  if (!boss) return c;
+  c.eld = { vents: [] };
+  const bx = Number(boss.cx) || 0, by = Number(boss.cy) || 0;
+  ELD_VENT_SPAWNS.forEach((s, i) => {
+    const cell = agFreeCell(c, bx + s.dx, by + s.dy); if (!cell) return;
+    if (eldSpawnAt(c, "pulsating-lava", cell.x, cell.y, i))
+      c.eld.vents.push({ cx: cell.x, cy: cell.y, respawnAt: 0 });
+  });
+  if (typeof addLog === "function")
+    addLog("info", "Os vulcões evoluem — mantenha menos de <b>3 Flame Totems</b> ou o Eldritch é imortal!");
+  return c;
+}
+function eldritchBossTick(c, now) {
+  const st = c && c.eld; if (!st || c.ended) return true;
+  const boss = (c.mobs || []).find((m) => m && m.boss);
+  const mobs = c.mobs || [];
+  for (const m of mobs) {
+    if (!m.eldVent || !(m.hp > 0)) continue;
+    const nx = m.def && m.def.eldStage && m.def.eldStage.next;
+    if (nx && now - (m.eldStageAt || m.spawnAt || 0) >= ELD_STAGE_MS) {
+      const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+        GAMEDATA.monsters[nx];
+      m.eldStageAt = now;
+      if (def) { m.slug = nx; m.def = def; m.hp = m.maxHp = def.hp; }
+      c.events.push({ t: "effect", x: m.x, y: m.y, screen: true, fx: "fire-area" });
+    }
+  }
+  const alive = new Set(mobs.filter((m) => m.eldVent && m.hp > 0)
+    .map((m) => m._ventId));
+  st.vents.forEach((v, i) => {
+    if (alive.has(i)) { v.respawnAt = 0; return; }
+    v.respawnAt = v.respawnAt || now + ELD_RESPAWN_MS;
+    if (now >= v.respawnAt) {
+      if (eldSpawnAt(c, "pulsating-lava", v.cx, v.cy, i)) v.respawnAt = 0;
+    }
+  });
+  const totems = mobs.filter((m) => m.eldVent && m.hp > 0 &&
+    m.slug === "flame-totem").length;
+  if (boss) {
+    boss.eldritchImmune = totems >= ELD_TOTEM_IMMUNE;
+    if (boss.eldritchImmune && !st._warned) {
+      st._warned = 1;
+      if (typeof addLog === "function")
+        addLog("death", "<b>3+ Flame Totems</b> ativos — o Eldritch Dragon Lord está IMORTAL!");
+    } else if (!boss.eldritchImmune) st._warned = 0;
+  }
+  return true;
+}
+function eldritchBossCleanup(c) { if (c && c.eld) delete c.eld; }
+
 const ROOST_DATA = {
   CRYPT_RUNES, CRYPT_WEAPONS, ROOST_ITEMS, ROOST_MONSTERS,
   ROOST_ROOMS, ROOST_MISSION_DEFS, ROOST_QUEST_ID,
   AG_MEMBER_SPAWNS, AG_CRYSTAL_OFFSET, AG_TRANSFORM_PCT,
   AG_CRYSTAL_MANA_DRAIN_PCT, AG_CRYSTAL_RADIUS,
+  ELD_VENT_SPAWNS, ELD_STAGE_MS, ELD_RESPAWN_MS, ELD_TOTEM_IMMUNE,
   monsterSlugs: Object.keys(ROOST_MONSTERS),
   roostRollWeapon, roostCanExchange, roostState,
   registerMonsters(monsters) {

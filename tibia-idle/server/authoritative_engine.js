@@ -2398,7 +2398,7 @@ function applyOutgoingDamage(mob,element,dmg,now,piercePct){
     }
     return out;
   }
-  if(mob&&(mob.greedImmune||mob.qteImmune))return 0;
+  if(mob&&(mob.greedImmune||mob.qteImmune||mob.eldritchImmune))return 0;
   /* Hazard dodge (Gnomprona, crystalserver): 0,85%/nível de anular por
    * completo o dano recebido do jogador (qualquer fonte de combate). */
   if(mob&&Number(mob.hazard)>0){
@@ -6556,6 +6556,26 @@ function arenaBossBindMechanics(auth,now){
     const cry=makeMob(auth,"bright-crystal",false);
     if(cry){cry.agCrystal=true;place(cry,-1,6);}
   }
+  /* Eldritch Dragon Lord (Roost): 4 vulcões oficiais nos pontos fixos
+   * da sala — evoluem lava→eruption→totem a cada ELD_STAGE_MS; 3+
+   * Flame Totems vivos → boss imortal (mob.eldritchImmune). */
+  if(auth.bossId==="eldritch-dragon-lord"&&!auth.eld){
+    auth.eld={vents:[]};
+    const bx=Number(boss.cx)||0,by=Number(boss.cy)||0;
+    const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+    const offs=[[-4,0],[5,0],[-5,10],[5,9]];
+    offs.forEach(([dx,dy],i)=>{
+      const m=makeMob(auth,"pulsating-lava",false);if(!m)return;
+      m.eldVent=true;m._ventId=i;m.eldStageAt=now;
+      const cell=claimSpawnCell(auth,bx+dx,by+dy);
+      m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;
+      m.sx=m.x;m.sy=m.y;m.speed=0;
+      auth.mobs.unshift(m);
+      auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
+        targetId:String(m.id),screen:true,ts:now});
+      auth.eld.vents.push({cx:cell.cx,cy:cell.cy,respawnAt:0});
+    });
+  }
   syncBossImmunityFlags(auth);
   return true;
 }
@@ -6635,6 +6655,49 @@ function tickAdventurerGroup(auth,now){
   }
   if(!st.pendingBoss&&!mobs.some((m)=>m.agMember&&m.hp>0)&&
      !mobs.some((m)=>m.boss&&m.hp>0))auth.ag=null;
+}
+
+/* Eldritch Dragon Lord (Roost): vulcões evoluem lava→eruption→totem a
+ * cada ELD_STAGE_MS, vent morto respawna após ELD_RESPAWN_MS, e com 3+
+ * Flame Totems vivos o boss fica imortal (eldritchImmune → dano 0 no
+ * funnel applyOutgoingDamage). Espelho do cliente (roost-graveborn.js). */
+const ELD_STAGE_MS=18000,ELD_RESPAWN_MS=30000,ELD_TOTEM_IMMUNE=3;
+function tickEldritch(auth,now){
+  const st=auth&&auth.eld;if(!st||auth.ended)return;
+  const mobs=auth.mobs||[];
+  const boss=mobs.find((m)=>m.boss);
+  for(const m of mobs){
+    if(!m.eldVent||!(m.hp>0))continue;
+    const nx=m.def&&m.def.eldStage&&m.def.eldStage.next;
+    if(nx&&now-(Number(m.eldStageAt)||0)>=ELD_STAGE_MS){
+      const def=monsterDef(nx);m.eldStageAt=now;
+      if(def){m.slug=nx;m.def=def;
+        const hp=Math.max(1,Number(def.hp)||1);m.hp=hp;m.maxHp=hp;}
+      const pos=entityPosition(m,.5,.5);
+      auth.events.push({t:"effect",x:pos.x,y:pos.y,targetId:String(m.id),
+        fx:"fire-area",screen:true,ts:now});
+    }
+  }
+  const alive=new Set(mobs.filter((m)=>m.eldVent&&m.hp>0).map((m)=>m._ventId));
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  st.vents.forEach((v,i)=>{
+    if(alive.has(i)){v.respawnAt=0;return;}
+    v.respawnAt=v.respawnAt||now+ELD_RESPAWN_MS;
+    if(now>=v.respawnAt){
+      const m=makeMob(auth,"pulsating-lava",false);
+      if(!m)return;
+      m.eldVent=true;m._ventId=i;m.eldStageAt=now;m.speed=0;
+      const cell=claimSpawnCell(auth,v.cx,v.cy);
+      m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;m.sx=m.x;m.sy=m.y;
+      mobs.unshift(m);
+      auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
+        targetId:String(m.id),screen:true,ts:now});
+      v.respawnAt=0;
+    }
+  });
+  const totems=mobs.filter((m)=>m.eldVent&&m.hp>0&&m.slug==="flame-totem").length;
+  if(boss)boss.eldritchImmune=totems>=ELD_TOTEM_IMMUNE;
+  if(!boss&&!st.vents.length)auth.eld=null;
 }
 
 const MEGA_PERSONAL_MIN_MS=10000,MEGA_PERSONAL_MAX_MS=25000;
@@ -8098,7 +8161,7 @@ function tickDelayedHits(auth,now){
   for(const h of pending){
     if(h.at>now){auth.delayedHits.push(h);continue;}
     const mob=(auth.mobs||[]).find((m)=>String(m.id)===String(h.mobId));
-    if(!mob||!(mob.hp>0)||mob.greedImmune||mob.qteImmune)continue;
+    if(!mob||!(mob.hp>0)||mob.greedImmune||mob.qteImmune||mob.eldritchImmune)continue;
     const who=(auth.players||[]).find((x)=>String(x.id)===String(h.whoId));
     let dmg=Math.max(1,Number(h.dmg)||0);
     dmg=applyOutgoingDamage(mob,h.el||"death",dmg,now,profPiercePctFor(who&&who.p,h.el||"death"));
@@ -8195,7 +8258,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);
