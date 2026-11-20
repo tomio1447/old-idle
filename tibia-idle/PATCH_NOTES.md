@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Voucher tolerante a underscores
+
+- O resgate de vouchers agora ignora variações de underscores no código:
+  `BUTO_PVP`, `BUTOPVP` e `buto__pvp` resolvem para o código canônico
+  (`BUTO__PVP`). Claims e estado (pause/delete) são sempre gravados no
+  canônico — não dá para resgatar duas vezes por variação de digitação.
+- Topbar hero: botões quadrados ampliados em 35% (58px → 78px).
+
+---
+
 ## 2026-11-20 — Topbar: PERSONAGEM e STORE quadrados com glow
 
 - Os botões **Personagem** e **STORE** saíram da faixa de botões e agora

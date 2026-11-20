@@ -472,11 +472,19 @@ const VOUCHERS = {
     } },
   // futuros: { items: [{ slug: "x", qty: 1, instanced: false, tier: 0 }], label: "..." }
 };
+/* Código sem underscores → código canônico (lookup tolerante no resgate). */
+const VOUCHER_CANON = {};
+for (const c of Object.keys(VOUCHERS)) VOUCHER_CANON[c.replace(/_/g, "")] = c;
 
 async function redeemVoucher(db, body) {
   const acc = await db.findAccountByToken(body && body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
-  const code = String((body && body.code) || "").trim().toUpperCase().slice(0, 40);
+  /* Lookup tolerante a underscores: BUTO_PVP / BUTOPVP / buto__pvp resolvem
+   * para o código canônico BUTO__PVP — claims e estado sempre gravam no
+   * canônico (sem resgate duplo por variação de digitação). */
+  const raw = String((body && body.code) || "").trim().toUpperCase().slice(0, 40);
+  const stripped = raw.replace(/_/g, "");
+  const code = VOUCHER_CANON[stripped] || raw;
   const v = code && VOUCHERS[code];
   if (!v) return { code: 400, body: { ok: false, msg: "Voucher inválido" } };
 
