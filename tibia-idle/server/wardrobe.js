@@ -49,10 +49,25 @@ function migrate(account, characters) {
   // derivam daqui — cura retroativa de claims feitos antes do grant ser
   // durável no servidor (o cliente só escrevia sessionStorage).
   const done = object(account.missionsDone);
-  if (done["make-believe:outfit"])
+  /* Make Believe: a recompensa decorre da MISSÃO CONCLUÍDA (fato), não só do
+   * claim manual — progresso por conta, mas a flag pode existir só no char
+   * que jogou (ou ter sido injetada). M1→outfit, M3→montaria (elmo/arma
+   * seguem roleta manual). */
+  const mProg = (ms, id) => Number(object(object(object(ms)[id]).progress).kills) || 0;
+  const accMissions = object(account.missions);
+  let mbM1 = !!done["moonstone-castle"] || mProg(accMissions, "moonstone-castle") >= 2500;
+  let mbM3 = !!done["radiant-skyhold"] || mProg(accMissions, "radiant-skyhold") >= 5000;
+  for (const character of characters) {
+    if (mbM1 && mbM3) break;
+    const p = object(character.data);
+    const pd = object(p.missionsDone), pm = object(p.missions);
+    if (!mbM1) mbM1 = !!pd["moonstone-castle"] || mProg(pm, "moonstone-castle") >= 2500;
+    if (!mbM3) mbM3 = !!pd["radiant-skyhold"] || mProg(pm, "radiant-skyhold") >= 5000;
+  }
+  if (done["make-believe:outfit"] || mbM1)
     cosmetics.outfits["illuminated-warrior"] =
       Math.max(2, Number(cosmetics.outfits["illuminated-warrior"]) || 0);
-  if (done["make-believe:mount"]) cosmetics.mounts["radiant-nimbus"] = true;
+  if (done["make-believe:mount"] || mbM3) cosmetics.mounts["radiant-nimbus"] = true;
   for (const [id, count] of Object.entries(cosmetics.outfits)) {
     const mask = Number(count) >= 2 ? 3 : Number(count) >= 1 ? 1 : 0;
     cosmetics.addonBits[id] = (Number(cosmetics.addonBits[id]) || 0) | mask;

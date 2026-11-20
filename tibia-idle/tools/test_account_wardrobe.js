@@ -113,6 +113,32 @@ test("Make Believe claims derive account cosmetics from missionsDone", () => {
   assert.equal(fromMysql.mounts["radiant-nimbus"], true);
 });
 
+test("Make Believe rewards derive from mission completion facts, not only claims", () => {
+  // Flag de conclusão da M1 no CHAR (claim nunca clicado) → outfit.
+  const byCharFlag = W.migrate({}, [character({ missionsDone: { "moonstone-castle": true } })]);
+  assert.equal(byCharFlag.outfits["illuminated-warrior"], 2);
+  assert.equal(byCharFlag.addonBits["illuminated-warrior"], 3);
+  // Progresso de kills no char (sem flag) → também vale.
+  const byCharProg = W.migrate({}, [character({ missions: { "moonstone-castle": { progress: { kills: 2500 } } } })]);
+  assert.equal(byCharProg.outfits["illuminated-warrior"], 2);
+  // Abaixo do alvo → nada.
+  const below = W.migrate({}, [character({ missions: { "moonstone-castle": { progress: { kills: 2499 } } } })]);
+  assert.equal(below.outfits["illuminated-warrior"], undefined);
+  // M3 (radiant-skyhold) no char → montaria da conta.
+  const byCharM3 = W.migrate({}, [character({ missionsDone: { "radiant-skyhold": true } })]);
+  assert.equal(byCharM3.mounts["radiant-nimbus"], true);
+  const byCharM3Prog = W.migrate({}, [character({ missions: { "radiant-skyhold": { progress: { kills: 5000 } } } })]);
+  assert.equal(byCharM3Prog.mounts["radiant-nimbus"], true);
+  // Fatos no mapa da CONTA (sem chars) → idem.
+  const byAccFlag = W.migrate({ missionsDone: { "moonstone-castle": true } }, []);
+  assert.equal(byAccFlag.outfits["illuminated-warrior"], 2);
+  const byAccProg = W.migrate({ missions: { "radiant-skyhold": { progress: { kills: 5000 } } } }, []);
+  assert.equal(byAccProg.mounts["radiant-nimbus"], true);
+  // data como string JSON (linha do MySQL) também funciona.
+  const str = W.migrate({}, [{ data: JSON.stringify({ missionsDone: { "moonstone-castle": true } }) }]);
+  assert.equal(str.outfits["illuminated-warrior"], 2);
+});
+
 test("future hazard and missing client art are not exchangeable", () => {
   assert.equal(W.exchange({}, [], { bag: {} }, "mount:noxious-ripptor", 0).ok, false);
   assert.equal(W.exchange({}, [], { bag: { "demon-in-a-golden-box": 1 } }, "mount:alpha-demonosaur", 0).ok, false);

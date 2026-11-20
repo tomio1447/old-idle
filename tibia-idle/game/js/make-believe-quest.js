@@ -198,7 +198,22 @@ function renderMakeBelieveQuestDetail(q, ui) {
   // Claims são por conta — puxa o merge antes de ler (outro char pode
   // ter resgatado uma recompensa desta quest).
   if (typeof pullAccountMissions === "function") pullAccountMissions(p);
-  const st = makeBelieveState(p);
+  let st = makeBelieveState(p);
+  /* Recompensas determinísticas resgatam sozinhas ao concluir a missão —
+   * o jogador não precisa clicar em RESGATAR para outfit/montaria. */
+  if (st.m1.done && !st.claimed.outfit) {
+    makeBelieveGrantOutfit(p);
+    makeBelieveClaim(p, "outfit");
+    if (typeof addLog === "function") addLog("level", "Outfit <b>Illuminated Warrior</b> (addon 1+2) desbloqueada!");
+    if (typeof toast === "function") toast("Outfit Illuminated Warrior desbloqueada!", "level");
+  }
+  if (st.m3.done && !st.claimed.mount && typeof grantMissionReward === "function") {
+    grantMissionReward(p, { accountMount: MAKE_BELIEVE_MOUNT });
+    makeBelieveClaim(p, "mount");
+    if (typeof addLog === "function") addLog("level", "Montaria <b>Radiant Nimbus</b> desbloqueada para a conta!");
+    if (typeof toast === "function") toast("Montaria Radiant Nimbus desbloqueada!", "level");
+  }
+  st = makeBelieveState(p);
   const fmtK = (n) => (typeof fmtFull === "function" ? fmtFull(n) : String(n));
   const reqRow = (label, ok) =>
     `<div class="shop-row"><span class="info">${label}</span><b style="color:${ok ? "#9ce84a" : "#ff9a6a"}">${ok ? "✓" : "✗"}</b></div>`;
