@@ -1,0 +1,13 @@
+{{Infobox Quest|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = The Roost of the Graveborn Quest
+| reward         = One random [[Crypt Rune]].
+| location       = [[Greenshore]], [[Pits of Inferno]], [[Okolnir]], [[Kha'zeel]], [[Draconia]].
+| lvl            = 450
+| lvlrec         = 450
+| log            = yes
+| premium        = yes
+| transcripts    = 
+| dangers        = [[Dragons]], [[Adventurer Group]], [[Fatal Bug]], [[Eldritch Dragon Lord]], [[Ice Horror]], [[The Gravedigger]], [[Enthralled Dragon]]s, [[Bonelords's Phylactery]], [[Bone Overlord]]
+| legend         = A mysterious [[Necromancer]] emerges and puts Tibia’s [[Dragons]] in danger.
+| implemented    = 15.20.7a5cc9
+}}

@@ -1,0 +1,38 @@
+{{Infobox Creature|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = Adventurer Group
+| article        = an
+| implemented    = 15.20.7a5cc9
+| plural         = 
+| hp             = 
+| exp            =
+| race_id        = 2773	
+| sounds         = {{Sound List|}}
+| senseinvis     = 
+| paraimmune     = 
+| isboss         = yes
+| spawntype      = Triggered
+| bosstiaryclass = Archfoe
+| cooldown       = 20
+| loot           = <!-- The loot is in Fatal Bug -->
+| physicalDmgMod = 100%?
+| earthDmgMod    = 100%?
+| fireDmgMod     = 100%?
+| deathDmgMod    = 100%?
+| energyDmgMod   = 100%?
+| holyDmgMod     = 100%?
+| iceDmgMod      = 100%?
+| hpDrainDmgMod  = 100%?
+| drownDmgMod    = 100%?
+| healMod        = 100%?
+| notes          = This represents a group of five enemies that players fight against at the same time, during [[The Roost of the Graveborn Quest]]. They count as one in the [[Bosstiary]], and the group can be the daily boosted boss as a whole. The five members represent one of each [[vocation]]:
+* [[Yorik Youngbook]] as [[Knight]]
+* [[Nigel Neverguess]] as [[Monk]]
+* [[Percy Peacetinker]] as [[Paladin]]
+* [[Fiona Firstdream]] as [[Sorcerer]]
+* [[Grendel Greenlunch]] as [[Druid]]
+
+After all five are killed, the [[Fatal Bug]] appears, which is also the creature that holds the loot. Its cooldown can be reset by using a {{ilink|Worn Guide Book}} [[Worn Guide Book]].
+| bestiaryname     = adventurergroup
+| location       = [[Greenshore]] ({{Mapper Coords|126.13|125.125|9|4|text=here}})
+| convince       = --
+}}

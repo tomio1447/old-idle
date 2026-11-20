@@ -1,0 +1,21 @@
+{{Infobox NPC|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = Dragon Ancestor Spirit
+| implemented    = 15.20.7a5cc9
+| job            =
+| gender         = 
+| race           = Dragon
+| location       = 
+| posx           = 
+| posy           = 
+| posz           = 
+| city           = Ab'Dendriel
+| subarea        = Draconia 
+| notes          = A random Crypt weapon can be obtained by trading one of each of the following [[Crypt Runes]] with the [[Dragon Ancestor Spirit]]. To complete the trade, say: {{KW|Hi}} → {{KW|Trade}} → {{KW|Yes}}.
+
+* {{Ilink|Fiery Crypt Rune}} [[Fiery Crypt Rune]]
+* {{Ilink|Icy Crypt Rune}} [[Icy Crypt Rune]]
+* {{Ilink|Deathly Crypt Rune}} [[Deathly Crypt Rune]]
+* {{Ilink|Ancient Crypt Rune}} [[Ancient Crypt Rune]]
+* {{Ilink|Necromantic Crypt Rune}} [[Necromantic Crypt Rune]]
+{{SeeAlso|Crypt Runes/Statistics}}
+}}

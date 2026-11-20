@@ -1,0 +1,30 @@
+{{Infobox Object|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name          = Pair of Earmuffs
+| article       = a
+| actualname    = pair of earmuffs
+| plural        = pair of earmuffs
+| itemid        = 7459
+| objectclass   = Body Equipment
+| primarytype   = Helmets
+| slot          = Head
+| flavortext    = They feel nice and warm on your ears.
+| implemented   = 8.00
+| immobile      = no
+| walkable      = yes
+| pickupable    = yes
+| upgradeclass  = 2
+| armor         = 0
+| resist        = ice +2%
+| weight        = 5.00
+| stackable     = no
+| marketable    = yes
+| droppedby     = {{Dropped By|Ice Witch|Melting Frozen Horror|Yakchal|Zushuka}}
+| value         = 1,500 - 10,000
+| npcvalue      = 1500
+| npcprice      = 0
+| buyfrom       = --
+| sellto        = Iyad
+| notes         = A rather rare item just used for [[decoration]]. Not recommended to sell to [[NPC]]s.
+<br />Can be obtained from an [[Unrealized Dream]].
+| history       = After [[Updates/8.4|Update 8.4]], it gives +2% [[Ice damage]] protection.
+}}

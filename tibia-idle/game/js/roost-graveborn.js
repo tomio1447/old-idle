@@ -938,23 +938,51 @@ function roostRollWeapon() {
 }
 
 function npcCryptExchangeHtml(p) {
-  const rows = roostRuneCounts(p).map((r) => {
+  const npc = (typeof NPCS !== "undefined" && NPCS["dragon-ancestor-spirit"]) || {};
+  const slots = roostRuneCounts(p).map((r) => {
     const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[r.slug]) || {};
     const ok = r.have > 0;
-    return `<div class="shop-row" style="opacity:${ok ? 1 : .5}">
-      <span class="info">${typeof mbItemIcon === "function" ? mbItemIcon(r.slug, 26) : ""} ${it.n || r.slug}</span>
-      <b style="color:${ok ? "#9ce84a" : "#ff9a6a"}">${r.have}x</b></div>`;
-  }).join("");
+    return `<div class="gi-rune-slot${ok ? " is-owned" : ""}">
+          <span class="gi-rune-count">${r.have}x</span>
+          <div class="gi-rune-icon-box">${typeof mbItemIcon === "function" ? mbItemIcon(r.slug, 36) : ""}</div>
+          <span class="gi-rune-name">${it.n || r.slug}</span>
+        </div>`;
+  }).join("\n        ");
   const can = roostCanExchange(p);
-  return `<section class="quest-detail-panel mb-reward-box">
-    <div class="hunt-best-title">TROCAR CRYPT RUNES</div>
-    ${rows}
-    <div class="tiny dim mb8">Traga 1 de cada runa e eu a transformo numa arma Crypt.</div>
-    <div class="mb-roulette-frame"><span class="mb-roulette-icon" id="roost-exchange-icon">${typeof mbItemIcon === "function" ? mbItemIcon(CRYPT_WEAPONS[0].slug, 52) : ""}</span></div>
-    <div class="mb-roulette-name tiny" id="roost-exchange-name">???</div>
-    <button type="button" class="sm primary quest-action" id="roost-exchange-btn" ${can ? "" : "disabled"}>TROCAR</button>
-    ${can ? "" : `<div class="mb-reward-state dim">🔒 faltam runas (derrote os bosses da Roost Quest)</div>`}
-  </section>`;
+  return `<div class="gi-crypt-modal" role="dialog" aria-modal="true" aria-labelledby="cryptModalTitle">
+    <header class="gi-crypt-header">
+      <div class="gi-crypt-npc">
+        <div class="gi-crypt-npc-icon">
+          <img src="assets/npc/dragon-ancestor-spirit_s.png" alt="Dragon Ancestor Spirit" />
+        </div>
+        <div class="gi-crypt-npc-titles">
+          <h2 id="cryptModalTitle">Dragon Ancestor Spirit</h2>
+          <span>${npc.role || "Troca Crypt Runes"}</span>
+        </div>
+      </div>
+      <button type="button" class="gi-crypt-close" id="gi-crypt-close">Fechar</button>
+    </header>
+    <blockquote class="gi-crypt-quote">
+      "${npc.greet || "Mortals' greed split my kin. Bring me the five crypt runes and I shall forge them into a weapon worthy of a dragon's heir."}"
+    </blockquote>
+    <section class="gi-crypt-body">
+      <h3 class="gi-crypt-section-title">TROCAR CRYPT RUNES</h3>
+      <div class="gi-rune-grid">
+        ${slots}
+      </div>
+      <p class="gi-crypt-instruction">
+        Traga 1 de cada runa e eu a transformo numa arma Crypt.
+      </p>
+      <div class="gi-crypt-reward">
+        <div class="gi-reward-box"><span class="gi-reward-placeholder" id="roost-exchange-icon">???</span></div>
+        <span class="gi-reward-label" id="roost-exchange-name">Arma Crypt</span>
+      </div>
+      <div class="gi-crypt-actions">
+        <button type="button" class="gi-crypt-btn${can ? " is-ready" : ""}" id="roost-exchange-btn" ${can ? "" : "disabled"}>TROCAR</button>
+        ${can ? "" : `<p class="gi-crypt-status"><span aria-hidden="true">🔒</span> faltam runas (derrote os bosses da Roost Quest)</p>`}
+      </div>
+    </section>
+  </div>`;
 }
 
 /* Wiring do botão — chamado pelo bindNpc("crypt-exchange"). */
@@ -963,6 +991,8 @@ function roostBindExchange() {
   const slugs = CRYPT_WEAPONS.map((w) => w.slug);
   if (typeof mbStopRoulettes === "function") mbStopRoulettes();
   if (typeof mbStartPreview === "function") mbStartPreview("roost-exchange", slugs);
+  const close = $("#gi-crypt-close");
+  if (close && typeof closeNpc === "function") close.onclick = closeNpc;
   const btn = $("#roost-exchange-btn");
   if (!btn) return;
   btn.onclick = () => {

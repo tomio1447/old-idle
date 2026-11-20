@@ -1,0 +1,39 @@
+{{Infobox Object|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = Necromantic Crypt Rune
+| itemid         = 52661
+| article        = a
+| actualname     = necromantic crypt rune
+| implemented    = 15.20.7a5cc9
+| weight         = 5.00
+| primarytype    = Creature Products
+| objectclass    = Plants, Animal Products, Food and Drink
+| flavortext     = This rune pulses with corrupt magic bound into bone. Only by offering a complete set to the guardian spirit may its blight be undone.
+| pickupable     = yes
+| droppedby      = {{Dropped By|}}
+| marketable     = yes
+| value          = Negotiable
+| npcvalue       = 0
+| npcprice       = 0
+| buyfrom        = --
+| sellto         = --
+| notes          = A random Crypt weapon can be obtained from the [[Dragon Ancestor Spirit]] in [[Draconia]] by trading one of each of the following [[Crypt Runes]]. To complete the trade, say: {{KW|Hi}} → {{KW|Trade}} → {{KW|Yes}}.
+* {{Ilink|Fiery Crypt Rune}} [[Fiery Crypt Rune]]
+* {{Ilink|Icy Crypt Rune}} [[Icy Crypt Rune]]
+* {{Ilink|Deathly Crypt Rune}} [[Deathly Crypt Rune]]
+* {{Ilink|Ancient Crypt Rune}} [[Ancient Crypt Rune]]
+* {{Ilink|Necromantic Crypt Rune}} [[Necromantic Crypt Rune]]
+
+Possible weapons are:
+* {{Ilink|Crypt Bile}} [[Crypt Bile]]
+* {{Ilink|Crypt Breaker}} [[Crypt Breaker]]
+* {{Ilink|Crypt Jaw}} [[Crypt Jaw]]
+* {{Ilink|Crypt Slicer}} [[Crypt Slicer]]
+* {{Ilink|Crypt Spine}} [[Crypt Spine]]
+* {{Ilink|Crypt Splitter}} [[Crypt Splitter]]
+* {{Ilink|Crypt Strike}} [[Crypt Strike]]
+{{SeeAlso|Crypt Runes/Statistics}}
+| history        = On November 18, 2025, in a post on the [[Test Server]] forums for the [[Winter Update 2025]], [[Ilyndor]] stated that these runes are affected by [[Cyclopedia#Boss_Points|boss slot bonus]].
+
+On {{Post|39569432|February 6, 2025}}, [[Liamas]] confirmed it can be dropped from the [[Bonelords's Phylactery]] by characters that finished [[The Roost of the Graveborn Quest]].
+| immobile       = no
+}}

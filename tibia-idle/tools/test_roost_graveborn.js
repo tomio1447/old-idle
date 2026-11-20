@@ -113,6 +113,35 @@ must((cui.match(/case "crypt-exchange":/g) || []).length === 2,
 must(cui.includes("roostBindExchange"), "bindNpc sem wiring crypt-exchange");
 must(fs.existsSync(path.join(game, "assets", "npc", "dragon-ancestor-spirit_s.png")),
   "portrait do NPC ausente");
+/* Outfit: 1899 era a Night Harpy — o espírito usa 1883 (dragão espectral). */
+const imp = fs.readFileSync(path.join(__dirname, "import_roost_graveborn_assets.py"), "utf8");
+must(imp.includes('NPC_PORTRAIT = ("dragon-ancestor-spirit", 1883)') &&
+  !imp.includes('"dragon-ancestor-spirit", 1899'),
+  "importer ainda gera o portrait com looktype 1899 (Night Harpy)");
+/* Modal dedicado gi-crypt-* com grid de runas, roleta e close. */
+must(typeof ctx.npcCryptExchangeHtml === "function", "npcCryptExchangeHtml ausente");
+const htmlNoRunes = ctx.npcCryptExchangeHtml({ lootPouch: {} });
+for (const cls of ["gi-crypt-modal", "gi-crypt-header", "gi-crypt-npc-icon",
+  "gi-crypt-quote", "gi-crypt-body", "gi-rune-grid", "gi-crypt-reward",
+  "gi-reward-box", "gi-crypt-actions", "gi-crypt-btn", "gi-crypt-status"])
+  must(htmlNoRunes.includes(cls), `modal sem .${cls}`);
+must((htmlNoRunes.match(/gi-rune-slot/g) || []).length === 5,
+  "grid deve ter 5 rune slots");
+must(!htmlNoRunes.includes("is-owned"), "slot marcado is-owned sem runas");
+must(htmlNoRunes.includes("gi-crypt-close") && htmlNoRunes.includes("id=\"roost-exchange-btn\"") &&
+  htmlNoRunes.includes("id=\"roost-exchange-icon\"") && htmlNoRunes.includes("id=\"roost-exchange-name\""),
+  "modal sem close/roleta/botão");
+must(htmlNoRunes.includes("disabled"), "botão deve vir disabled sem runas");
+const htmlReady = ctx.npcCryptExchangeHtml({ lootPouch: Object.fromEntries(
+  ["fiery-crypt-rune", "icy-crypt-rune", "deathly-crypt-rune",
+   "ancient-crypt-rune", "necromantic-crypt-rune"].map((s) => [s, 2])) });
+must(htmlReady.includes("is-ready") && !/id="roost-exchange-btn" disabled/.test(htmlReady),
+  "botão pronto deve ter is-ready sem disabled");
+must((htmlReady.match(/is-owned/g) || []).length >= 5, "slots com runas sem is-owned");
+must(cui.includes("gi-crypt-shell"), "openNpc sem shell dedicado crypt-exchange");
+const lcss = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
+must(lcss.includes(".gi-crypt-shell") && lcss.includes(".gi-rune-slot.is-owned"),
+  "CSS gi-crypt ausente no layout.css");
 
 /* ---------------- runas + armas: tabela da roleta ---------------- */
 const RUNES = ["fiery-crypt-rune", "icy-crypt-rune", "deathly-crypt-rune",

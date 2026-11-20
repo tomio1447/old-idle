@@ -1,0 +1,24 @@
+{{Infobox Object|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name          = Frosty Heart
+| article       = a
+| actualname    = frosty heart
+| plural        = frosty hearts
+| itemid        = 9661
+| objectclass   = Plants, Animal Products, Food and Drink
+| primarytype   = Creature Products
+| implemented   = 8.54
+| immobile      = no
+| walkable      = yes
+| pickupable    = yes
+| imbuements    = Basic Frost, Intricate Frost, Powerful Frost
+| weight        = 1.86
+| stackable     = yes
+| marketable    = yes
+| droppedby     = {{Dropped By|Frost Dragon Hatchling|Hirintror|Ice Golem|Icecold Book|Melting Frozen Horror|Shardhead|Squid Warden}}
+| value         = Negotiable
+| npcvalue      = 280
+| npcprice      = 0
+| buyfrom       = --
+| sellto        = Fiona, Yasir
+| notes         = 25 of them are needed for the [[Basic Frost]], [[Intricate Frost]] and [[Powerful Frost]] [[Imbuing|Imbuement]].
+}}

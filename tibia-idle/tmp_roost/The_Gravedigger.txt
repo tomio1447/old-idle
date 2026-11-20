@@ -1,0 +1,66 @@
+{{Infobox Creature|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = The Gravedigger
+| implemented    = 15.20.7a5cc9
+| plural         = 
+| hp             = 
+| exp            = 750000
+| race_id        = 2721	
+| sounds         = {{Sound List|}}
+| senseinvis     = 
+| paraimmune     = 
+| isboss         = yes
+| bestiaryname   = thegravedigger
+| spawntype      = Triggered
+| bestiarytext   = 
+| bestiaryclass  = 
+| bestiarylevel  = 
+| loot           = {{Loot Table
+ |{{Loot Item|32-58|Crystal Coin|common}}
+ |{{Loot Item|33-58|Great Spirit Potion|common}}
+ |{{Loot Item|1-2|Bonelord Eye|common}}
+ |{{Loot Item|Necrotic Rod|common}}
+ |{{Loot Item|9-17|Supreme Health Potion|common}}
+ |{{Loot Item|23-38|Ultimate Health Potion|common}}
+ |{{Loot Item|12-25|Ultimate Mana Potion|common}}
+ |{{Loot Item|4-10|Yellow Gem|common}}
+ |{{Loot Item|2-26|Assassin Star|common}}
+ |{{Loot Item|36-63|Great Mana Potion|common}}
+ |{{Loot Item|3-9|Red Gem|common}}
+ |{{Loot Item|76-93|Strong Mana Potion|common}}
+ |{{Loot Item|Terra Rod|common}}
+ |{{Loot Item|12-23|Ultimate Spirit Potion|uncommon}}
+ |{{Loot Item|1-2|Bonelord Shield|uncommon}}
+ |{{Loot Item|Assassin Dagger|uncommon}}
+ |{{Loot Item|2|Blue Gem|uncommon}}
+ |{{Loot Item|1-2|Giant Sapphire|uncommon}}
+ |{{Loot Item|Grave Flower|uncommon}}
+ |{{Loot Item|2|Giant Amethyst|uncommon}}
+ |{{Loot Item|Giant Ruby|uncommon}}
+ |{{Loot Item|Shrunken Head|uncommon}}
+ |{{Loot Item|Small Flask of Eyedrops|uncommon}}
+ |{{Loot Item|Deathly Crypt Rune|rare}}
+}}
+| physicalDmgMod = 100%
+| earthDmgMod    = 100%
+| fireDmgMod     = 100%
+| deathDmgMod    = 100%
+| energyDmgMod   = 100%
+| holyDmgMod     = 100%
+| iceDmgMod      = 100%
+| hpDrainDmgMod  = 100%
+| drownDmgMod    = 100%
+| healMod        = 100%
+| bosstiaryclass = Archfoe
+| cooldown       = 20
+| abilities      = {{Ability List
+ |{{Melee}}
+ |{{Ability|Fire Ball|damage=600-800+|element=fire
+  |scene={{Scene|spell=6sqmstrike|caster=The Gravedigger|effect=Fire Effect|missile=Fire Missile|missile_direction=south-east|missile_distance=6/6}}}}
+ |{{Summon|Bonelord Totem|amount=2}}
+}}
+| location       = Entrance to its lever room is found in [[Ankrahmun]]'s desert, {{Mapper Coords|129.25|127.171|4|4|text=here}}.
+| notes          = Part of [[The Roost of the Graveborn Quest]]. [[Deathly Crypt Rune]] can drop only after the quest has been fully completed. Its cooldown can be reset by using a {{ilink|Shrunken Head}} [[Shrunken Head]].
+
+Is not affected by [[Challenge]]. Usually targets the closest player.
+| convince       = --
+}}

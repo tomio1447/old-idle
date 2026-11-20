@@ -1,0 +1,35 @@
+{{Infobox Creature|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = Fatal Bug
+| article        = a
+| implemented    = 15.20.7a5cc9
+| plural         = 
+| hp             = 
+| exp            = 750000
+| race_id        = 
+| sounds         = {{Sound List|I'm bugged!|BRRRRMM|SHRIIIIIIIEK}}
+| senseinvis     = 
+| paraimmune     = 
+| isboss         = yes
+| spawntype      = Triggered
+| bestiaryname   = 
+| bestiarytext   = 
+| bestiaryclass  = 
+| bestiarylevel  = 
+| location       = Boss room of the [[Adventurer Group]].
+| loot           = {{Loot Table
+ |{{Loot Item|Ancient Crypt Rune|rare}}
+ |{{Loot Item|Worn Guide Book|rare}}
+}}
+| physicalDmgMod = 100%?
+| earthDmgMod    = 100%?
+| fireDmgMod     = 100%?
+| deathDmgMod    = 100%?
+| energyDmgMod   = 100%?
+| holyDmgMod     = 100%?
+| iceDmgMod      = 100%?
+| hpDrainDmgMod  = 100%?
+| drownDmgMod    = 100%?
+| healMod        = 100%?
+| notes          = Part of [[The Roost of the Graveborn Quest]], during the fight against the [[Adventurer Group]], after defeating all five members. [[Ancient Crypt Rune]] can drop only after the quest has been fully completed.
+| convince       = --
+}}

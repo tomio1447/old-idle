@@ -124,7 +124,7 @@ const CITY_MODAL_SHELLS = [
   "hunts-modal-shell", "bosses-modal-shell", "boss-modal-shell", "reward-modal-shell",
   "social-modal-shell", "calendar-modal-shell", "chard-modal-shell",
   "lootcfg-modal-shell", "depot-modal-shell", "imb-modal-shell",
-  "pvp-modal-shell",
+  "pvp-modal-shell", "gi-crypt-shell",
 ];
 
 const RANKING_TABS = [
@@ -478,10 +478,17 @@ function openNpc(id) {
     case "crypt-exchange": body = npcCryptExchangeHtml(p); break;
   }
 
+  const mbody = $("#modal-body");
+  if (npc.type === "crypt-exchange") {
+    mbody.classList.add("npc-modal-shell", "gi-crypt-shell");
+    mbody.innerHTML = `<div id="npc-content">${body}</div>`;
+    $("#modal").classList.add("show");
+    bindNpc(id, npc.type);
+    return;
+  }
   const npcTitleSprite = npc.sprite === "umbral-creation"
     ? `<span class="npc-anim-guzzlemaw" role="img" aria-label="${npc.name}" style="transform:scale(0.4);width:40px;height:40px;display:inline-block"></span>`
     : `<img src="assets/npc/${npc.sprite}_s.png" class="npc-modal-title-sprite" alt="">`;
-  const mbody = $("#modal-body");
   mbody.classList.add("npc-modal-shell");
   mbody.innerHTML = `
     <div class="panel-title npc-modal-title">
@@ -503,7 +510,7 @@ function closeNpc() {
   if (typeof mbStopRoulettes === "function") mbStopRoulettes();
   $("#modal").classList.remove("show");
   const b = $("#modal-body");
-  if (b) b.classList.remove("npc-modal-shell");
+  if (b) b.classList.remove("npc-modal-shell", "gi-crypt-shell");
   renderAll();
 }
 

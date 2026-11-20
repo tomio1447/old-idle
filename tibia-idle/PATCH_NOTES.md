@@ -4,6 +4,22 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Dragon Ancestor Spirit: outfit corrigida + novo modal de troca
+
+- **Outfit corrigida** — o retrato do NPC usava o looktype 1899, que é a
+  Night Harpy (o NPC aparecia como uma ave). Agora usa o looktype 1883
+  (dragão espectral sombrio). Importer atualizado para não regredir.
+- **Modal dedicado** — a troca de Crypt Runes saiu do painel genérico
+  para um layout próprio (`gi-crypt-*`): cabeçalho com retrato do NPC,
+  citação, grade de 5 runas com destaque `.is-owned` nas que o jogador
+  possui, caixa de recompensa com a roleta de armas Crypt, botão
+  TROCAR que só habilita (`.is-ready`) com as 5 runas e status de
+  bloqueio. O botão Fechar usa o fechamento padrão do modal de NPC.
+- Regras inalteradas: 1 de cada runa → 1 arma Crypt aleatória com os
+  mesmos pesos oficiais; débito antes do giro e crédito na Loot Pouch.
+
+---
+
 ## 2026-11-20 — Roost of the Graveborn: Missão 1 reduzida para 500 kills
 
 - A Missão 1 da quest (`MISSION_DEFS["unhallowed-crypt"]`) passa de

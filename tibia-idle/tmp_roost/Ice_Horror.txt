@@ -1,0 +1,69 @@
+{{Infobox Creature|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = Ice Horror
+| article        = 
+| implemented    = 15.20.7a5cc9
+| plural         = 
+| hp             =542700 
+| exp            =259000
+| race_id        = 2733	
+| sounds         = {{Sound List|}}
+| senseinvis     =yes 
+| paraimmune     =yes 
+| isboss         = yes
+| spawntype      = Triggered
+| bestiaryname   = icehorror
+| bestiarytext   = 
+| bestiarylevel  = 
+| location       = [[Okolnir]] ({{Mapper Coords|125.151|122.221|7|8|text=here}})
+| loot           = {{Loot Table
+ |{{Loot Item|33-49|Crystal Coin|common}}
+ |{{Loot Item|31-58|Great Spirit Potion|common}}
+ |{{Loot Item|Ice Rapier|common}}
+ |{{Loot Item|8-17|Supreme Health Potion|common}}
+ |{{Loot Item|36-67|Great Mana Potion|common}}
+ |{{Loot Item|5-10|Red Gem|common}}
+ |{{Loot Item|23-36|Ultimate Health Potion|common}}
+ |{{Loot Item|Frosty Heart|common}}
+ |{{Loot Item|Crystal Ring|uncommon}}
+ |{{Loot Item|1-2|Pair of Earmuffs|uncommon}}
+ |{{Loot Item|13-25|Ultimate Mana Potion|uncommon}}
+ |{{Loot Item|1-3|Blue Gem|uncommon}}
+ |{{Loot Item|54-90|Strong Mana Potion|uncommon}}
+ |{{Loot Item|12-24|Ultimate Spirit Potion|uncommon}}
+ |{{Loot Item|5-10|Yellow Gem|uncommon}}
+ |{{Loot Item|Glacier Amulet|uncommon}}
+ |{{Loot Item|Crystal Mace|uncommon}}
+ |{{Loot Item|1-2|Giant Emerald|uncommon}}
+ |{{Loot Item|2|Giant Sapphire|uncommon}}
+ |{{Loot Item|Frozen Crapace|semi-rare}}
+ |{{Loot Item|2|Giant Ruby|semi-rare}}
+ |{{Loot Item|Ice Cube|semi-rare}}
+ |{{Loot Item|Icy Horns|semi-rare}}
+ |{{Loot Item|Icy Scales|semi-rare}}
+ |{{Loot Item|Shard|semi-rare}}
+ |{{Loot Item|Icy Crypt Rune|rare}}
+}}
+| physicalDmgMod = 100%
+| earthDmgMod    = 100%
+| fireDmgMod     = 100%
+| deathDmgMod    = 100%
+| energyDmgMod   = 100%
+| holyDmgMod     = 100%
+| iceDmgMod      = 0%
+| hpDrainDmgMod  = 100%
+| drownDmgMod    = 100%
+| healMod        = 0%
+| abilities      = {{Ability List
+  |{{Melee|400+}}
+  |{{Ability|Small Bluish Explosion|damage=?|element=?
+   |scene={{Scene|spell=2sqmballself|effect=Explosion Hit (Blue)|look_direction=east}}}}
+  |{{Ability|Death Ring|damage=950+|element=death
+   |scene={{Scene|spell=4sqmring3|effect=Death Effect|look_direction=east}}}}
+  |{{Ability|Great Energy Wave|damage=1300+|element=energy
+   |scene={{Scene|spell=7sqmwavewide|effect=Energy Shock (Yellow)|look_direction=east}}}}
+ }}
+| bosstiaryclass = Archfoe
+| cooldown       = 20
+| notes          = Part of [[The Roost of the Graveborn Quest]]. [[Icy Crypt Rune]] can drop only after the quest has been fully completed. Its cooldown can be reset by using a {{ilink|Icy Horns}} [[Icy Horns]].
+| convince       = --
+|walksthrough=Fire, Energy, Poison|illusionable=no|pushable=no|pushobjects=yes}}

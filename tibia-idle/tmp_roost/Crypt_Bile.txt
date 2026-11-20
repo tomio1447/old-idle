@@ -1,0 +1,36 @@
+{{Infobox Object|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name          = Crypt Bile
+| itemid        = 52336
+| article       = a
+| actualname    = crypt bile
+| implemented   = 15.20.7a5cc9
+| weight        = 20.00
+| primarytype   = Wands
+| slot          = Weapon Hand
+| objectclass   = Weapons
+| flavortext    = For long only rumored among necromancers to exist, this wand, known as Bonechant, hums with the faint chorus of the dead. One of the creations of the mysterious soul-smith.
+| attrib        = magic level +4
+| resist        = fire +6%
+| augments      = 
+| damagetype    = Physical
+| damagerange   = 110 (85-135)
+| imbueslots    = 2
+| pickupable    = yes
+| droppedby     = {{Dropped By|}}
+| usable        = no
+| levelrequired = 450
+| vocrequired   = sorcerers
+| hands         = One
+| upgradeclass  = 4
+| marketable    = yes
+| value         = Negotiable
+| npcvalue      = 0
+| npcprice      = 0
+| buyfrom       = --
+| sellto        = --
+| notes         =This [[wand]] can be used on most hunting places in the game since very few creatures are immune to [[physical Damage|physical damage]]. Due to its 7 range, it is able to hit creatures located at any point of the screen, provided there is not a wall in the way.
+
+This weapon's auto attack damage greatly changes depending on its weapon proficiency perks choice. Without any of them its attack damage is extremely low. It then ties with the [[Soultainter]] with the first perk, and when fully upgraded with the third perk it becomes the second strongest [[wand]]s in terms of auto attack damage only behind the fully unlocked [[Jungle Wand]]. 
+| history       = 
+| immobile       = no
+|range=7|manacost=+10}}

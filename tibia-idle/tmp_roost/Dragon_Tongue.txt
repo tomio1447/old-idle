@@ -1,0 +1,22 @@
+{{Infobox Object|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name          = Dragon Tongue
+| actualname    = dragon tongue
+| plural        = dragon tongue
+| itemid        = 24938
+| objectclass   = Plants, Animal Products, Food and Drink
+| primarytype   = Creature Products
+| implemented   = 11.02.4128
+| task_item     = yes
+| immobile      = no
+| walkable      = yes
+| pickupable    = yes
+| weight        = 5.50
+| stackable     = yes
+| marketable    = yes
+| droppedby     = {{Dropped By|Ice Dragon|Gelidrazah the Frozen|Kalyassa|Soul of Dragonking Zyrtarch|Tazhadur}}
+| value         = Negotiable
+| npcvalue      = 550
+| npcprice      = 0
+| buyfrom       = --
+| sellto        = Yasir
+}}

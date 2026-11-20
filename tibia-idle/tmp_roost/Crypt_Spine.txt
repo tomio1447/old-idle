@@ -1,0 +1,35 @@
+{{Infobox Object|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name          = Crypt Spine
+| itemid        = 52332
+| article       = a
+| actualname    = crypt spine
+| implemented   = 15.20.7a5cc9
+| weight        = 44.00
+| objectclass   = Weapons
+| primarytype   = Distance Weapons
+| slot          = Both Hands
+| secondarytype = Bows
+| flavortext    = Used by silent assassins of bygone aeons, once known as Deathwhisper, this bow carries the last sighs of those who fell to its arrows. One of the creations of a mysterious soul-smith.
+| attrib        = distance fighting +3
+| resist        = ice +5%
+| range         = 6
+| atk_mod       = 8
+| hit_mod       = +5
+| imbueslots    = 3
+| pickupable    = yes
+| droppedby     = {{Dropped By|}}
+| usable        = no
+| levelrequired = 450
+| vocrequired   = paladins
+| hands         = Two
+| upgradeclass  = 4
+| marketable    = yes
+| value         = Negotiable
+| npcvalue      = 0
+| npcprice      = 0
+| buyfrom       = --
+| sellto        = --
+| notes         = 
+| history       = 
+| immobile       = no
+}}

@@ -154,8 +154,8 @@ MOBS_LOOKITEM = {
     "wraithfire": 52441,
 }
 
-# NPC Dragon Ancestor Spirit — dragão espírito (looktype 1899).
-NPC_PORTRAIT = ("dragon-ancestor-spirit", 1899)
+# NPC Dragon Ancestor Spirit — dragão espectral (looktype 1883; 1899 era a Night Harpy).
+NPC_PORTRAIT = ("dragon-ancestor-spirit", 1883)
 
 
 def ids_do_mapa(path):

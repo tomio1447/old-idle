@@ -1,0 +1,35 @@
+{{Infobox Creature|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name            = Bone Overlord
+| article         = a
+| implemented     = 15.20.7a5cc9
+| plural          = 
+| hp              = 
+| exp             =
+| race_id         = 2771	
+| sounds          = {{Sound List|MY RULE OVER LIFE AND DEATH WILL BE UNCHALLENGED!|MY VICTORY WILL BE GLORIOUS!|BEHOLD THE LAST OF THE TRUE BONELORDS!|YOU SHORT LIVED VESSELS OF DEATH WILL ONLY FUEL MY POWER!|YOU PUNY CREATURES CAN'T STOP ME!|I WILL BECOME A 001!|I DEATH YOU WILL BECOME MY PUPPETS!|BY THE ELDRITCH POWERS THAT I COMMAND - I WILL CRUSH YOU!|THE SOULS ARE MINE!|I DON'T NEED THE SHIRON'FAL!|DEATH AWAITS THOSE WHO DEFY ME!|YOU ONLY DELAY THE INNEVITABLE!|ALL DRAGON SOULS BELONG TO ME!|ALL OF THIS IS ONLY A MINOR SETBACK!|IN THE END VICTORY WILL BE MINE NONTHELESS!}}
+| senseinvis      = 
+| paraimmune      = 
+| isboss          = yes
+| spawntype      = Triggered
+| bestiaryname    = boneoverlordbosstiary
+| bestiarytext    = 
+| bestiaryclass   = 
+| bestiarylevel   = 
+| loot            = <!-- Loot is in Bonelord's Phylactery -->
+| physicalDmgMod  = 100%?
+| earthDmgMod     = 100%?
+| fireDmgMod      = 100%?
+| deathDmgMod     = 100%?
+| energyDmgMod    = 100%?
+| holyDmgMod      = 100%?
+| iceDmgMod       = 100%?
+| hpDrainDmgMod   = 100%?
+| drownDmgMod     = 100%?
+| healMod         = 100%?
+| bosstiaryclass  = Archfoe
+| cooldown        = 20
+| maxbattlelength = 900
+| location        = Below [[Draconia]], in the [[Forgotten Crypt]], {{Mapper Coords|128.157|124.35|11|4|text=here}}.
+| notes           = Final boss of [[The Roost of the Graveborn Quest]]. While it can be a daily boosted boss or can be boosted via [[Bosstiary]], it is not an actual creature, with its loot coming from killing the [[Bonelords's Phylactery]]. Its cooldown can be reset by using a {{ilink|Soul Trap}} [[Soul Trap]].
+| convince       = --
+}}

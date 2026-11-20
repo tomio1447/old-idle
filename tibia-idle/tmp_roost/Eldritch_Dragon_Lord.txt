@@ -1,0 +1,56 @@
+{{Infobox Creature|List={{{1|}}}|GetValue={{{GetValue|}}}
+| name           = Eldritch Dragon Lord
+| article        = an
+| implemented    = 15.20.7a5cc9
+| plural         = 
+| hp             = 
+| exp            = 750000
+| race_id        = 2739	
+| sounds         = {{Sound List|}}
+| senseinvis     = 
+| paraimmune     = 
+| isboss         = yes
+| spawntype      = Triggered
+| bestiaryname   = eldritchdragonlord
+| bestiarytext   = 
+| bestiaryclass  = 
+| bestiarylevel  = 
+| location       = [[Pits of Inferno Dragon Lair]] ({{Mapper Coords|127.243|126.52|12|8|text=here}}).
+| loot           = {{Loot Table
+ |{{Loot Item|32-60|Crystal Coin|common}}
+ |{{Loot Item|11-24|Ultimate Spirit Potion|common}}
+ |{{Loot Item|25-38|Ultimate Health Potion|common}}
+ |{{Loot Item|1-2|Dragon Tongue|common}}
+ |{{Loot Item|1-2|Wand of Inferno|common}}
+ |{{Loot Item|35-70|Great Mana Potion|common}}
+ |{{Loot Item|3-10|Red Gem|common}}
+ |{{Loot Item|62-92|Strong Mana Potion|common}}
+ |{{Loot Item|3-10|Yellow Gem|common}}
+ |{{Loot Item|1-3|Blue Gem|uncommon}}
+ |{{Loot Item|2-4|Dragon Ham|uncommon}}
+ |{{Loot Item|Dragonbone Staff|uncommon}}
+ |{{Loot Item|Dragon Shield|uncommon}}
+ |{{Loot Item|Fire Sword|uncommon}}
+ |{{Loot Item|12-14|Supreme Health Potion|uncommon}}
+ |{{Loot Item|13-24|Ultimate Mana Potion|uncommon}}
+ |{{Loot Item|2-3|Giant Amethyst|uncommon}}
+ |{{Loot Item|33-54|Great Spirit Potion|uncommon}}
+ |{{Loot Item|Dragon Slayer|uncommon}}
+ |{{Loot Item|Golden Claw|rare}}
+ |{{Loot Item|Fiery Crypt Rune|rare}}
+}}
+| physicalDmgMod = 100%?
+| earthDmgMod    = 100%?
+| fireDmgMod     = 100%?
+| deathDmgMod    = 100%?
+| energyDmgMod   = 100%?
+| holyDmgMod     = 100%?
+| iceDmgMod      = 100%?
+| hpDrainDmgMod  = 100%?
+| drownDmgMod    = 100%?
+| healMod        = 100%?
+| bosstiaryclass = Archfoe
+| cooldown       = 20
+| notes          = Part of [[The Roost of the Graveborn Quest]]. [[Fiery Crypt Rune]] can drop only after the quest has been fully completed. Its cooldown can be reset by using a {{ilink|Golden Claw}} [[Golden Claw]].
+| convince       = --
+}}
