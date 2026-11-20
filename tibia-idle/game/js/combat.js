@@ -108,6 +108,8 @@ function arenaBossBindMechanics(c, now) {
     heartBossInit(c, player);
   if (id === "brain-head" && typeof brainheadBossInit === "function" && !c.brainHead)
     brainheadBossInit(c, player);
+  if (id === "adventurer-group" && typeof adventurerGroupBossInit === "function" && !c.ag)
+    adventurerGroupBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -1884,6 +1886,13 @@ function applyResist(mob, element, dano, piercePct) {
   return Math.max(pc >= 100 ? 0 : 1, Math.floor(dano * escala));
 }
 
+/* Multiplicador de dano SOFRIDO do mob (def.damageTakenMul) — usado pelos
+ * avatares do Adventurer Group (sofrem menos dano). Espelho do servidor. */
+function mobTakenMul(mob, dmg) {
+  const mul = mob && mob.def && Number(mob.def.damageTakenMul);
+  return (mul > 0 && mul !== 1) ? Math.max(1, Math.floor(dmg * mul)) : dmg;
+}
+
 /* Bonus de dano dos charms da Cyclopedia, por elemento.
  * Aplicado ANTES da resistencia, como no servidor: o charm aumenta o golpe
  * e o monstro resiste ao total. */
@@ -2219,7 +2228,7 @@ function playerAttack(c, p, target) {
         const mDmg = Math.max(1, Math.floor(pr.mult * (p.level || 1)));
         const mFinal = Math.max(1, applyMonsterMitigation(target, pr.el,
           applyResist(target, pr.el, mDmg, playerPiercePct(p, pr.el))));
-        target.hp -= mFinal;
+        target.hp -= mobTakenMul(target, mFinal);
         c.stats.damage += mFinal;
         c.events.push({ t: "hit", dmg: mFinal, x: target.x, y: target.y,
                         targetId: target.id, el: pr.el, fx: pr.el });
@@ -2269,7 +2278,7 @@ function playerAttack(c, p, target) {
       const elemFinal = mobAbsorbElement(target, parte2, unwelcomeAbsorbDeath(target, parte2, Math.max(1,
         applyResist(target, parte2, applyCharmDamage(p, parte2, elemBruto),
                          playerPiercePct(p, parte2))), c), c);
-      target.hp -= fisBruto + elemFinal;
+      target.hp -= mobTakenMul(target, fisBruto + elemFinal);
       c.stats.damage += fisBruto + elemFinal;
       // dano fisico: efeito da raca (sangue / hit-area / veneno), nao slash cinza
       c.events.push({ t: "hit", dmg: fisBruto, x: target.x, y: target.y, targetId:target.id,
@@ -2284,7 +2293,7 @@ function playerAttack(c, p, target) {
                       fx: (ELEMENTS[parte2] || ELEMENTS.physical).fx });
     } else {
       const effRaw = unwelcomeAbsorbDeath(target, element, raw, c);
-      target.hp -= effRaw;
+      target.hp -= mobTakenMul(target, effRaw);
       c.stats.damage += effRaw;
       const race = target.def && target.def.race;
       const hitFx = ammo && ammo.areaFx
@@ -4161,6 +4170,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     if (trMul !== 1) raw = Math.max(1, Math.floor(raw * trMul));
   }
   raw = Math.max(1, Math.floor(raw));
+  // Avatares do Adventurer Group (Roost): crítico em TODOS os ataques.
+  if (mob && mob.critAll) raw = Math.max(1, Math.round(raw * 1.3));
   if (c.buffs.shield && c.buffs.shield > 0) {
     const absorbed = Math.min(raw, c.buffs.shield);
     c.buffs.shield -= absorbed;
@@ -4514,6 +4525,7 @@ function mobAttack(c, p, mob) {
     raw *= hatredBossOutgoingDamageMultiplier(c, mob, p);
   if (typeof soulwarTaintDamageMultiplier === "function")
     raw *= soulwarTaintDamageMultiplier(c, p);
+  if (mob.critAll) raw *= 1.3;
   const agora = Date.now();
   // Exeta (Challenge / Chivalrous Challenge) do Knight: monstro marcado
   // causa 20% MENOS dano ao knight enquanto o Challenge durar.
@@ -4579,7 +4591,7 @@ function mobAttack(c, p, mob) {
   if (chm && chm.reflete &&
       (typeof bossCanTakePlayerDamage !== "function" || bossCanTakePlayerDamage(c, mob))) {
     const volta = Math.max(1, Math.floor(raw * chm.reflete / 100));
-    mob.hp -= volta;
+    mob.hp -= mobTakenMul(mob, volta);
     c.stats.damage += volta;
   }
   // ATENCAO A ORDEM: o `p.hp -= raw` ficava AQUI, antes das reducoes abaixo.
@@ -5197,6 +5209,7 @@ function combatTick(c, p, dt, now) {
   if (typeof ratmiralBossTick === "function" && ratmiralBossTick(c, now) === false) return;
   if (typeof heartBossTick === "function" && heartBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
+  if (typeof adventurerGroupBossTick === "function" && adventurerGroupBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof echoRaidTick === "function") echoRaidTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
@@ -5392,7 +5405,7 @@ function combatTick(c, p, dt, now) {
       if (mob && mob.hp > 0 &&
           (typeof bossCanTakePlayerDamage !== "function" || bossCanTakePlayerDamage(c, mob))) {
         const dmg = unwelcomeAbsorbDeath(mob, h.el, Math.max(1, h.dmg), c);
-        mob.hp -= dmg;
+        mob.hp -= mobTakenMul(mob, dmg);
         c.stats.damage += dmg;
         c.events.push({ t: "hit", dmg: dmg, x: mob.x, y: mob.y, targetId:mob.id,
                         screen: true, el: h.el, fx: h.fx || "death-echo" });

@@ -21,10 +21,24 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ### Bosses (fichas oficiais 15.20)
 
-- **Adventurer Group** — race 2773, `lookItem 52836` (encounter de 5
-  aventureiros modelado como boss único); loot oficial do **Fatal Bug**:
-  Ancient Crypt Rune + Worn Guide Book (rare). HP/XP ocultos —
-  520k/750k estimados.
+- **Adventurer Group** (The First Dragon, `first_dragon.otbm`,
+  center {1029,1031} / bossspawn {1030,1027} / playerspawn {1029,1034}) —
+  encontro oficial **multi-membro**: a sala abre com **5 aventureiros
+  por vocação** (Yorik=Knight 2712, Percy=Paladin 2713, Grendel=Druid
+  2714, Fiona=Sorcerer 2715, Nigel=Monk 2716 — HP só Nigel é oficial,
+  155k) + uma **Bright Crystal** estática (oficial: explode em Mana
+  Drain AoE raio 2 ao morrer — drena 35% da mana máx.).
+  - **Transformação oficial**: membro em vida vermelha (≤30%) vira o
+    **avatar da vocação** — Steel 1593 / Light 1594 / Storm 1595 /
+    Nature 1596 / Balance 1823 — que acerta **crítico em todos os
+    ataques** (+30%) e **sofre 30% menos dano**
+    (`def.damageTakenMul`, funnel único em `applyOutgoingDamage`;
+    `mob.critAll` no melee + skills). Ordem de abate livre — a
+    estratégia oficial é um avatar por vez.
+  - Os 5 caem → **Fatal Bug** (race 2773, `lookItem 52836`, voices
+    oficiais "BRRRRMM"/"I'm bugged!") entra na sala; matá-lo encerra e
+    credita `adventurer-group`. Loot oficial dele: Ancient Crypt Rune
+    + Worn Guide Book (rare). HP/XP ocultos — 520k/750k estimados.
 - **Eldritch Dragon Lord** — race 2739, looktype 1879, exp 750.000,
   680k hp; fire imune (oficial: se cura com fogo).
 - **Ice Horror** — race 2733, looktype 1881, **hp oficial 542.700**,

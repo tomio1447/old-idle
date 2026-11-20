@@ -253,6 +253,35 @@ for (const slug of ["eldritch-dragon-lord", "the-gravedigger", "ice-horror"])
   must(caCtx.CREATURE_ANCHORS && caCtx.CREATURE_ANCHORS[slug],
     slug + ": âncora CREATURE_ANCHORS ausente");
 
+/* -------- Adventurer Group: encontro oficial multi-membro -------- */
+const AG_MEMBERS = ["yorik-youngbook", "percy-peacetinker", "grendel-greenlunch",
+  "fiona-firstdream", "nigel-neverguess"];
+const AV_MAP = { "yorik-youngbook": "avatar-of-steel", "percy-peacetinker": "avatar-of-light",
+  "grendel-greenlunch": "avatar-of-nature", "fiona-firstdream": "avatar-of-storm",
+  "nigel-neverguess": "avatar-of-balance" };
+for (const s of [...AG_MEMBERS, ...Object.values(AV_MAP), "bright-crystal"]) {
+  must(M[s], s + " ausente do ROOST_MONSTERS");
+  must(ctx.MOBSHEETS[s] && ctx.MOBSHEETS[s].cols === 9 && ctx.MOBSHEETS[s].rows === 4 &&
+    fs.existsSync(path.join(game, "assets", "mob", s + ".png")), s + " sheet ausente");
+  must(E.MONSTERS[s], "engine: " + s + " ausente do MONSTERS");
+  must(caCtx.CREATURE_ANCHORS[s], s + " âncora ausente");
+}
+must(M["adventurer-group"].name === "Fatal Bug" && M["adventurer-group"].raceId === 2773,
+  "entidade final deve ser o Fatal Bug (race 2773)");
+for (const [m, a] of Object.entries(AV_MAP)) {
+  must(M[m].agTransform === a, m + " agTransform ≠ " + a);
+  must(Number(M[a].damageTakenMul) < 1, a + " sem damageTakenMul<1");
+}
+must(M["bright-crystal"].noAttack === true && M["bright-crystal"].exp === 0,
+  "bright-crystal deve ser estático/noAttack");
+const combatSrc = fs.readFileSync(path.join(js, "combat.js"), "utf8");
+must(combatSrc.includes("adventurerGroupBossInit") && combatSrc.includes("adventurerGroupBossTick") &&
+  combatSrc.includes("mob.critAll") && combatSrc.includes("mobTakenMul"),
+  "cliente combat.js sem hooks do encontro");
+const roostSrc = fs.readFileSync(path.join(js, "roost-graveborn.js"), "utf8");
+must(roostSrc.includes("AG_MEMBER_SPAWNS") && roostSrc.includes("adventurerGroupBossTick"),
+  "roost module sem mecânica do encontro");
+
 /* ---------------- engine ---------------- */
 for (const slug of BOSSES) {
   must(E.MONSTERS[slug], "engine: " + slug + " ausente do MONSTERS");
@@ -265,6 +294,10 @@ must(engineSrc.includes('"roost-graveborn.js"'),
   "engine não carrega roost-graveborn.js no sandbox de itens");
 must(engineSrc.includes('require("../game/js/roost-graveborn.js")'),
   "engine sem require/registerMonsters do patch");
+must(engineSrc.includes("tickAdventurerGroup") && engineSrc.includes("agCrystal") &&
+  engineSrc.includes("agMember") && engineSrc.includes("damageTakenMul") &&
+  engineSrc.includes("mob.critAll") && engineSrc.includes('auth.bossId==="adventurer-group"'),
+  "engine sem mecânica do encontro Adventurer Group");
 
 /* ---------------- OTBMs: bounds, spawns, caminhabilidade ---------------- */
 const tfCtx = { console }; tfCtx.window = tfCtx; vm.createContext(tfCtx);
@@ -371,6 +404,64 @@ must(html.includes("js/roost-graveborn.js?v="),
   "roost-graveborn.js não carregado no index");
 must(html.indexOf("js/make-believe-quest.js") < html.indexOf("js/roost-graveborn.js"),
   "roost-graveborn deve carregar depois do make-believe (roleta)");
+
+/* -------- Adventurer Group: simulação autoritativa completa -------- */
+{
+  const bmap = OTBM.read(fs.readFileSync(
+    path.join(game, "maps", "first_dragon.otbm")).buffer
+      .slice(0), { z: 7 });
+  const min = bmap.sourceBounds;
+  const L = (ax, ay) => ({ cx: ax - min.minX, cy: ay - min.minY });
+  const bcell = L(1030, 1027), pcell = L(1029, 1034);   // coords oficiais do enunciado
+  const lvl = 500;
+  const player = { id: "1", name: "T", voc: "knight", level: lvl,
+    exp: engine.expForLevel(lvl), hp: 300000, mp: 20000, gold: 0,
+    skills: { sword: 120 }, ml: 20, equip: {}, supplies: {}, lootPouch: {},
+    kills: {}, bosses: {}, config: {} };
+  const desc = { v: 1, savedAt: 1000, kind: "boss", huntId: null,
+    bossId: "adventurer-group", instanceMode: "boss", activeCharacterId: "1",
+    members: [{ id: "1", p: player }],
+    state: { players: [{ id: "1", p: player, cx: pcell.cx, cy: pcell.cy, x: .5, y: .5 }],
+      mobs: [{ id: "boss-1", slug: "adventurer-group", boss: true,
+        cx: bcell.cx, cy: bcell.cy, x: .5, y: .5 }], events: [] } };
+  let auth = engine.initializeAuthority(desc, "a".repeat(64), 1000);
+  const adv = (ms) => JSON.parse(engine.advanceAuthorityState(
+    JSON.stringify(auth), ms, Number(auth.authority.clock) + ms).state);
+  auth = adv(6000);   // atravessa o spawn delay de 5s
+  must(auth.authority.ag && auth.authority.ag.pendingBoss,
+    "Fatal Bug deve ficar retido (pendingBoss) até os 5 caírem");
+  must(!auth.authority.mobs.some((m) => m.boss),
+    "Fatal Bug não deve estar em mobs durante a fase de grupo");
+  const members = auth.authority.mobs.filter((m) => m.agMember);
+  must(members.length === 5, "5 membros do Adventurer Group não spawnaram: " +
+    auth.authority.mobs.map((m) => m.slug).join(","));
+  must(auth.authority.mobs.some((m) => m.agCrystal), "Bright Crystal não spawnou");
+  /* Red HP → transforma no avatar (critAll + damageTakenMul). */
+  const m0 = members[0];
+  m0.hp = m0.maxHp * 0.25;
+  auth = adv(400);
+  const tr = auth.authority.mobs.find((m) => m.id === m0.id);
+  must(tr && tr.agTransformed && /^avatar-of-/.test(tr.slug) && tr.critAll &&
+    Number(tr.def.damageTakenMul) < 1, "membro não virou avatar em vida vermelha");
+  /* Todos os 5 caem → Fatal Bug entra. */
+  for (const m of auth.authority.mobs) if (m.agMember) m.hp = 0;
+  const mpBefore = auth.authority.players[0].p.mp;
+  auth = adv(400);
+  must(auth.authority.mobs.some((m) => m.boss && m.hp > 0 && m.slug === "adventurer-group"),
+    "Fatal Bug não entrou após os 5 membros caírem");
+  /* Crystal (no raio do player spawn oficial) deve ter explodido. */
+  const cry = auth.authority.mobs.find((m) => m.agCrystal);
+  if (cry && cry.hp <= 0) must(auth.authority.players[0].p.mp < mpBefore,
+    "Bright Crystal não drenou mana ao explodir");
+  /* Mata o Fatal Bug → bossDefeated + crédito adventurer-group. */
+  const fb = auth.authority.mobs.find((m) => m.boss);
+  fb.hp = 0;
+  auth = adv(400);
+  must(auth.authority.bossDefeated === true &&
+    Number(auth.authority.players[0].p.bosses["adventurer-group"] &&
+      auth.authority.players[0].p.bosses["adventurer-group"].kills) === 1,
+    "crédito do boss adventurer-group não registrado");
+}
 
 console.log("OK — Roost of the Graveborn Quest 450+: 5 bossrooms OTBM " +
   "z=7 (spawn/boss validados), cadeia sequencial M1 5000 kills → " +

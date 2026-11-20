@@ -56,6 +56,21 @@ MOBS_LOOKTYPE = {
     "eldritch-dragon-lord": 1879,
     "the-gravedigger": 1880,
     "ice-horror": 1881,
+    # Adventurer Group — 5 membros (looktypes estimados do lote 15.20;
+    # atribuição por sprite: cavaleiro/paladino/druida/feiticeira/monge).
+    "nigel-neverguess": 1882,
+    "fiona-firstdream": 1884,
+    "percy-peacetinker": 1888,
+    "grendel-greenlunch": 1889,
+    "yorik-youngbook": 1895,
+    # Avatares das vocações (outfits oficiais como looktype de criatura).
+    "avatar-of-steel": 1593,
+    "avatar-of-light": 1594,
+    "avatar-of-storm": 1595,
+    "avatar-of-nature": 1596,
+    "avatar-of-balance": 1823,
+    # Bright Crystal — objeto hostil estático (sprite 4x1 do lote 15.20).
+    "bright-crystal": 1902,
 }
 
 # Bosses "lookItem": a entidade oficial aparece como objeto (cid). O sheet

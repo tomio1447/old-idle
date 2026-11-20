@@ -2449,6 +2449,10 @@ function applyOutgoingDamage(mob,element,dmg,now,piercePct){
   let out=applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,piercePct||0,now));
   if(mob&&mob.boss&&Number(mob.spiteDamageTakenMul)>0&&Number(mob.spiteDamageTakenMul)!==1)
     out=Math.max(1,Math.floor(out*Number(mob.spiteDamageTakenMul)));
+  /* Avatares do Adventurer Group (Roost): sofrem menos dano — multiplicador
+   * declarado no def trocado na transformação (def.damageTakenMul). */
+  const agMul=Number(mob&&mob.def&&mob.def.damageTakenMul);
+  if(agMul>0&&agMul!==1)out=Math.max(1,Math.floor(out*agMul));
   return out;
 }
 function itemTypeOf(it){return String((it&&(it.t||it.type))||"");}
@@ -4509,7 +4513,9 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
       }
       continue;
     }
-    const raw=sk.min<sk.max?roll(auth,Number(sk.min)||0,Number(sk.max)||0):Number(sk.min)||0;
+    let raw=sk.min<sk.max?roll(auth,Number(sk.min)||0,Number(sk.max)||0):Number(sk.min)||0;
+    /* Avatar do Adventurer Group: crítico em todos os ataques (incl. skills). */
+    if(mob.critAll)raw=Math.round(raw*1.3);
     const cells=mobSkillCells(mob,sk,victim,auth);
     const victims=cells.length?(auth.players||[]).filter((item)=>item.p&&item.p.hp>0&&!item.downUntil&&mobSkillHitsTarget(mob,sk,item,auth)):[victim];
     for(const item of victims)hitPlayer(item,sk,raw,el);
@@ -6526,6 +6532,30 @@ function arenaBossBindMechanics(auth,now){
     auth.oberon={lives:4};
     boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
   }
+  /* Adventurer Group (Roost of the Graveborn): a sala abre com os 5
+   * aventureiros + a Bright Crystal — o Fatal Bug (o bossMob) só entra
+   * quando todos os membros/avatares caem. */
+  if(auth.bossId==="adventurer-group"&&!auth.ag){
+    auth.ag={pendingBoss:boss};
+    auth.mobs=auth.mobs.filter((m)=>m!==boss);
+    const bx=Number(boss.cx)||0,by=Number(boss.cy)||0;
+    const AG_SPAWNS=[["yorik-youngbook",0,0],["fiona-firstdream",2,0],
+      ["grendel-greenlunch",-2,0],["percy-peacetinker",1,2],["nigel-neverguess",-1,2]];
+    const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+    const place=(mob,dx,dy)=>{
+      const cell=claimSpawnCell(auth,bx+dx,by+dy);
+      mob.cx=cell.cx;mob.cy=cell.cy;mob.x=(mob.cx+.5)/w;mob.y=(mob.cy+.5)/h;
+      mob.sx=mob.x;mob.sy=mob.y;auth.mobs.unshift(mob);
+      auth.events.push({t:"spawn",slug:mob.slug,x:mob.x,y:mob.y,
+        targetId:String(mob.id),screen:true,ts:now});
+    };
+    for(const [slug,dx,dy] of AG_SPAWNS){
+      const m=makeMob(auth,slug,false);if(!m)continue;
+      m.agMember=true;place(m,dx,dy);
+    }
+    const cry=makeMob(auth,"bright-crystal",false);
+    if(cry){cry.agCrystal=true;place(cry,-1,6);}
+  }
   syncBossImmunityFlags(auth);
   return true;
 }
@@ -6547,6 +6577,66 @@ function arenaBossSpawnTick(auth,now){
   }
   return true;
 }
+/* Adventurer Group (Roost of the Graveborn): enquanto auth.ag vive,
+ * membros em vida vermelha (<=30%) viram o avatar da vocação (crítico em
+ * todos os ataques + sofrem menos dano via def.damageTakenMul), a Bright
+ * Crystal explode em Mana Drain ao morrer e o Fatal Bug entra quando os
+ * 5 caem. Espelho do cliente (roost-graveborn.js). */
+const AG_TRANSFORM_PCT=0.30,AG_CRYSTAL_MANA_DRAIN_PCT=35,AG_CRYSTAL_RADIUS=2;
+function tickAdventurerGroup(auth,now){
+  const st=auth&&auth.ag;if(!st||auth.ended)return;
+  const mobs=auth.mobs||[];
+  for(const m of mobs){
+    if(!m.agMember||!(m.hp>0)||m.agTransformed)continue;
+    const to=m.def&&m.def.agTransform;if(!to)continue;
+    if(m.hp/Math.max(1,m.maxHp)<=AG_TRANSFORM_PCT){
+      const def=monsterDef(to);
+      m.agTransformed=true;
+      if(def){m.slug=to;m.def=def;
+        m.damage=Math.max(0,Number(def.damage)||m.damage);
+        m.armor=Math.max(0,Number(def.armor)||m.armor);
+        m.attackSpeed=Math.max(500,Number(def.attackSpeed)||m.attackSpeed);}
+      m.critAll=true;
+      const pos=entityPosition(m,.5,.5);
+      auth.events.push({t:"effect",x:pos.x,y:pos.y,targetId:String(m.id),
+        fx:"magic-yellow",screen:true,ts:now});
+    }
+  }
+  /* Bright Crystal: quando morre explode em Mana Drain (raio 2) — oficial:
+   * "explodirá, causando dano de Mana Drain aos jogadores próximos". */
+  const cry=mobs.find((m)=>m.agCrystal&&!m.agExploded);
+  if(cry&&cry.hp<=0){
+    cry.agExploded=true;
+    auth.events.push({t:"effect",x:Number(cry.x)||.5,y:Number(cry.y)||.5,
+      screen:true,fx:"magic-blue",ts:now});
+    for(const item of auth.players||[]){
+      if(!item||!item.p||item.p.hp<=0||item.downUntil)continue;
+      if(authorityVisualDistance(cry,item,auth)>AG_CRYSTAL_RADIUS)continue;
+      const max=Math.max(0,Number(maxStats(item.p).mp)||0);
+      const drain=Math.min(Math.max(0,Number(item.p.mp)||0),
+        Math.max(500,Math.round(max*AG_CRYSTAL_MANA_DRAIN_PCT/100)));
+      item.p.mp=Math.max(0,(Number(item.p.mp)||0)-drain);
+      const pos=entityPosition(item,.13,.6);
+      auth.events.push({t:"taken",dmg:drain,x:pos.x,y:pos.y,
+        targetId:String(item.id),sx:Number(cry.x)||.5,sy:Number(cry.y)||.5,
+        el:"manadrain",fx:"magic-blue",screen:true,ts:now});
+    }
+  }
+  /* Todos os 5 (membros+avatares = mesma entidade) mortos → Fatal Bug. */
+  if(st.pendingBoss&&!mobs.some((m)=>m.agMember&&m.hp>0)){
+    const boss=st.pendingBoss;st.pendingBoss=null;
+    const cell=claimSpawnCell(auth,Number(boss.cx)||0,Number(boss.cy)||0);
+    boss.cx=cell.cx;boss.cy=cell.cy;
+    const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+    boss.x=(boss.cx+.5)/w;boss.y=(boss.cy+.5)/h;boss.sx=boss.x;boss.sy=boss.y;
+    mobs.unshift(boss);
+    auth.events.push({t:"spawn",slug:boss.slug,x:boss.x,y:boss.y,
+      targetId:String(boss.id),screen:true,ts:now});
+  }
+  if(!st.pendingBoss&&!mobs.some((m)=>m.agMember&&m.hp>0)&&
+     !mobs.some((m)=>m.boss&&m.hp>0))auth.ag=null;
+}
+
 const MEGA_PERSONAL_MIN_MS=10000,MEGA_PERSONAL_MAX_MS=25000;
 const MEGA_QTE_TYPES=["scarlett","spite"];
 const MEGA_SCARLETT_KEYS=["up","down","left","right"];
@@ -8105,7 +8195,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);
@@ -8547,6 +8637,7 @@ function step(auth,now,opts){if(auth.ended)return;
           auth.events.push({t:"miss",x:missPos.x,y:missPos.y,targetId:String(victim.id),dodge:true,screen:true,fx:"poff",ts:mobVisualTs});
         }else{
         let damage=mobDamage(auth,mob,victim.p);
+        if(mob.critAll)damage=Math.round(damage*1.3);
         const target=entityPosition(victim,.13,.6),source=entityPosition(mob,.5,.5);
         const el=mob.def&&mob.def.element||"physical";
         const ranged=(Number(mob.def&&mob.def.targetDistance)||1)>1;

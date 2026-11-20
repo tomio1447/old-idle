@@ -132,7 +132,10 @@ const ROOST_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h oficiais
  * HP/XP ocultos oficialmente — estimados pela progressão da cadeia
  * (abaixo do Eldritch DL). */
 const ADVENTURER_GROUP = {
-  name: "Adventurer Group",
+  /* Entidade final do encontro (oficial): o Fatal Bug só aparece depois
+   * que os 5 aventureiros e seus avatares caem. O nome do BOSS (UI) fica
+   * em ROOST_BOSS_META; aqui vai o nome real da criatura. */
+  name: "Fatal Bug",
   hp: 520000, exp: 750000,
   speed: 250, armor: 150, defense: 140,
   damage: 1250, element: "physical", attackSpeed: 2000, mitigation: 3.0,
@@ -383,8 +386,112 @@ const BONELORDS_PHYLACTERY = {
   grupo: "quests",
 };
 
+/* ── Adventurer Group — encontro oficial multi-membro ─────────────────
+ * Oficial (tibiawiki): a sala tem 5 criaturas, uma por vocação. Quando
+ * QUALQUER uma chega à vida vermelha (~30%), ela se transforma no avatar
+ * da sua vocação: todos os ataques viram críticos e ela sofre menos dano.
+ * A Bright Crystal estática explode em Mana Drain AoE ao ser atingida até
+ * a morte. Só depois dos 5 (membros+avatares) mortos surge o Fatal Bug.
+ * race_ids oficiais: yorik 2712, percy 2713, grendel 2714, fiona 2715,
+ * nigel 2716. HP só é público para Nigel (155.000) — os demais usam o
+ * mesmo patamar (estimado). exp 0 oficial: o XP do encontro (750.000)
+ * vem todo do Fatal Bug. looktypes dos avatares = outfits oficiais das
+ * vocações (Steel 1593, Light 1594, Storm 1595, Nature 1596, Balance 1823).
+ * looktypes dos membros: lote 15.20 — atribuição por sprite (estimada). */
+const AG_TRANSFORM_PCT = 0.30;
+const AG_MEMBER_BASE = {
+  hp: 155000, exp: 0, speed: 210, armor: 90, defense: 80,
+  damage: 800, attackSpeed: 2000, mitigation: 2.0, targetDistance: 1,
+  imune: ["paralyze", "invisible"], loot: [], grupo: "quests",
+};
+function agMember(name, raceId, looktype, avatar, skills, extra) {
+  return Object.assign({}, AG_MEMBER_BASE, {
+    name, raceId, looktype, agTransform: avatar,
+    skills: skills.slice(),
+  }, extra || {});
+}
+function agAvatar(name, looktype, skills, extra) {
+  return Object.assign({}, AG_MEMBER_BASE, {
+    name, looktype,
+    /* Avatar oficial: crítico em todos os ataques + sofre menos dano. */
+    damageTakenMul: 0.70,
+    skills: skills.slice(),
+  }, extra || {});
+}
+const YORIK_YOUNGBOOK = agMember("Yorik Youngbook", 2712, 1895, "avatar-of-steel", [
+  { el: "physical", min: 800, max: 1400, int: 2000, ch: 45, range: 1 },
+  { el: "physical", min: 700, max: 1200, int: 5000, ch: 30, radius: 2,
+    fx: "groundshaker", miss: "physical" },
+]);
+const PERCY_PEACETINKER = agMember("Percy Peacetinker", 2713, 1888, "avatar-of-light", [
+  { el: "physical", min: 700, max: 1200, int: 2000, ch: 45, range: 7,
+    miss: "holy", alvo: 1 },
+  { el: "holy",     min: 600, max: 1100, int: 4500, ch: 30, radius: 3,
+    fx: "holy-area", miss: "holy" },
+]);
+const GRENDEL_GREENLUNCH = agMember("Grendel Greenlunch", 2714, 1889, "avatar-of-nature", [
+  { el: "earth",    min: 700, max: 1200, int: 3000, ch: 40, radius: 3,
+    fx: "poison-area", miss: "poison" },
+  { el: "ice",      min: 600, max: 1000, int: 5000, ch: 30, range: 7,
+    miss: "ice", alvo: 1 },
+]);
+const FIONA_FIRSTDREAM = agMember("Fiona Firstdream", 2715, 1884, "avatar-of-storm", [
+  { el: "fire",     min: 700, max: 1300, int: 3000, ch: 40, radius: 3,
+    fx: "fire-area", miss: "fire" },
+  { el: "energy",   min: 800, max: 1400, int: 5000, ch: 30, range: 7,
+    miss: "energy", alvo: 1 },
+]);
+const NIGEL_NEVERGUESS = agMember("Nigel Neverguess", 2716, 1882, "avatar-of-balance", [
+  { el: "physical", min: 800, max: 1400, int: 2000, ch: 45, range: 1 },
+  { el: "energy",   min: 600, max: 1000, int: 4500, ch: 30, radius: 2,
+    fx: "energy-area", miss: "energy" },
+]);
+const AVATAR_OF_STEEL  = agAvatar("Avatar of Steel",  1593, YORIK_YOUNGBOOK.skills,
+  { raceId: 2712 });
+const AVATAR_OF_LIGHT  = agAvatar("Avatar of Light",  1594, PERCY_PEACETINKER.skills,
+  { raceId: 2713 });
+const AVATAR_OF_NATURE = agAvatar("Avatar of Nature", 1596, GRENDEL_GREENLUNCH.skills,
+  { raceId: 2714 });
+const AVATAR_OF_STORM  = agAvatar("Avatar of Storm",  1595, FIONA_FIRSTDREAM.skills,
+  { raceId: 2715 });
+const AVATAR_OF_BALANCE= agAvatar("Avatar of Balance",1823, NIGEL_NEVERGUESS.skills,
+  { raceId: 2716 });
+/* Bright Crystal: objeto hostil estático da sala. Não ataca nem anda;
+ * quando recebe dano suficiente explode em Mana Drain AoE (raio 2) —
+ * tratado em tickAdventurerGroup. looktype estimado 1902 (sprite estático
+ * do lote 15.20). */
+const BRIGHT_CRYSTAL = {
+  name: "Bright Crystal", hp: 30000, exp: 0,
+  speed: 0, armor: 0, defense: 0, damage: 0, attackSpeed: 2000,
+  targetDistance: 1, noAttack: true, looktype: 1902,
+  loot: [], grupo: "quests", imune: ["paralyze", "invisible"],
+};
+/* Slots fixos dos membros ao redor do bossspawn oficial {1030,1027} —
+ * vira cx/cy relativos no init (o spawn absoluto depende do room). */
+const AG_MEMBER_SPAWNS = [
+  { slug: "yorik-youngbook",    dx: 0,  dy: 0  },
+  { slug: "fiona-firstdream",   dx: 2,  dy: 0  },
+  { slug: "grendel-greenlunch", dx: -2, dy: 0  },
+  { slug: "percy-peacetinker",  dx: 1,  dy: 2  },
+  { slug: "nigel-neverguess",   dx: -1, dy: 2  },
+];
+const AG_CRYSTAL_OFFSET = { dx: -1, dy: 6 }; // {1029,1033} — ao lado do player spawn
+const AG_CRYSTAL_MANA_DRAIN_PCT = 35;   // % da mana máxima drenada
+const AG_CRYSTAL_RADIUS = 2;
+
 const ROOST_MONSTERS = {
   "adventurer-group": ADVENTURER_GROUP,
+  "fiona-firstdream": FIONA_FIRSTDREAM,
+  "grendel-greenlunch": GRENDEL_GREENLUNCH,
+  "nigel-neverguess": NIGEL_NEVERGUESS,
+  "percy-peacetinker": PERCY_PEACETINKER,
+  "yorik-youngbook": YORIK_YOUNGBOOK,
+  "avatar-of-steel": AVATAR_OF_STEEL,
+  "avatar-of-light": AVATAR_OF_LIGHT,
+  "avatar-of-nature": AVATAR_OF_NATURE,
+  "avatar-of-storm": AVATAR_OF_STORM,
+  "avatar-of-balance": AVATAR_OF_BALANCE,
+  "bright-crystal": BRIGHT_CRYSTAL,
   "eldritch-dragon-lord": ELDRITCH_DRAGON_LORD,
   "ice-horror": ICE_HORROR,
   "the-gravedigger": THE_GRAVEDIGGER,
@@ -395,7 +502,7 @@ const ROOST_MONSTERS = {
  * caminhabilidade — ver tools/test_roost_graveborn.js) ── */
 const ROOST_ROOMS = {
   "adventurer-group": { otbm: "first_dragon",
-    spawn: { x: 1027, y: 1037, z: 7 }, boss: { x: 1028, y: 1031, z: 7 } },
+    spawn: { x: 1029, y: 1034, z: 7 }, boss: { x: 1030, y: 1027, z: 7 } },
   "eldritch-dragon-lord": { otbm: "eldritch_dl",
     spawn: { x: 1017, y: 1036, z: 7 }, boss: { x: 1021, y: 1028, z: 7 } },
   "ice-horror": { otbm: "ice_horror",
@@ -744,9 +851,122 @@ function roostBindExchange() {
   }
 })();
 
+/* ── Mecânica do encontro (cliente — espelho do tickAdventurerGroup do
+ * servidor em authoritative_engine.js) ── */
+function agBossFight(c) { return !!(c && c.boss && c.boss.id === "adventurer-group"); }
+function agFreeCell(c, wantX, wantY) {
+  const taken = new Set((c.mobs || []).filter((m) => m && m.hp > 0)
+    .map((m) => m.cx + ":" + m.cy));
+  const occ = typeof buildOccupancy === "function" ? buildOccupancy(c, null) : null;
+  const walk = (x, y) => {
+    if (x < 0 || y < 0 || x >= (c.gridW || 30) || y >= (c.gridH || 30)) return false;
+    if (taken.has(x + ":" + y) || (occ && occ.has && occ.has(x + ":" + y))) return false;
+    if (c.huntMap && typeof huntMapBlocked === "function" &&
+        huntMapBlocked(c.huntMap, x, y)) return false;
+    return true;
+  };
+  if (walk(wantX, wantY)) return { x: wantX, y: wantY };
+  for (let r = 1; r <= 6; r++)
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (walk(wantX + dx, wantY + dy)) return { x: wantX + dx, y: wantY + dy };
+      }
+  return null;
+}
+function agMakeMob(c, slug, cx, cy) {
+  const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+    GAMEDATA.monsters[slug];
+  if (!def) return null;
+  const cell = agFreeCell(c, cx, cy); if (!cell) return null;
+  const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+    : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+  const hp = Math.max(1, Number(def.hp) || 1);
+  const mob = { slug, def, hp, maxHp: hp, agMember: slug !== "bright-crystal",
+    agCrystal: slug === "bright-crystal",
+    atkCd: 400 + Math.random() * 1200,
+    id: "ag-" + slug + "-" + Date.now().toString(36) + "-" +
+      Math.random().toString(36).slice(2, 7),
+    cx: cell.x, cy: cell.y, x: pos.x, y: pos.y, sx: pos.x, sy: pos.y,
+    dir: "w", moving: false, attackAnim: 0, speed: .000055,
+    spawnAt: Date.now() };
+  c.mobs = c.mobs || []; c.mobs.unshift(mob);
+  c.events = c.events || [];
+  c.events.push({ t: "spawn", slug, x: mob.x, y: mob.y, targetId: mob.id, screen: true });
+  return mob;
+}
+function adventurerGroupBossInit(c, player) {
+  if (!agBossFight(c)) return c;
+  const boss = (c.mobs || []).find((m) => m && m.boss);
+  if (!boss) return c;
+  c.ag = { pendingBoss: boss };
+  c.mobs = c.mobs.filter((m) => m !== boss);
+  const bx = Number(boss.cx) || 0, by = Number(boss.cy) || 0;
+  for (const s of AG_MEMBER_SPAWNS) agMakeMob(c, s.slug, bx + s.dx, by + s.dy);
+  agMakeMob(c, "bright-crystal", bx + AG_CRYSTAL_OFFSET.dx, by + AG_CRYSTAL_OFFSET.dy);
+  if (typeof resolveSQMOccupancy === "function") resolveSQMOccupancy(c);
+  if (typeof addLog === "function")
+    addLog("info", "Derrote os 5 membros do <b>Adventurer Group</b> — em vida vermelha eles viram avatares!");
+  return c;
+}
+function adventurerGroupBossTick(c, now) {
+  const st = c && c.ag; if (!st || c.ended) return true;
+  const mobs = c.mobs || [];
+  for (const m of mobs) {
+    if (!m.agMember || !(m.hp > 0) || m.agTransformed) continue;
+    const to = m.def && m.def.agTransform; if (!to) continue;
+    if (m.hp / m.maxHp <= AG_TRANSFORM_PCT) {
+      const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+        GAMEDATA.monsters[to];
+      m.agTransformed = true;
+      if (def) { m.slug = to; m.def = def; }
+      m.critAll = true;
+      c.events.push({ t: "effect", x: m.x, y: m.y, screen: true, fx: "magic-yellow" });
+      if (typeof addLog === "function")
+        addLog("death", `${m.def.name}: transformação em <b>${to}</b> — críticos em todos os ataques!`);
+    }
+  }
+  const cry = mobs.find((m) => m.agCrystal && !m.agExploded);
+  if (cry && cry.hp <= 0) {
+    cry.agExploded = true;
+    c.events.push({ t: "effect", x: cry.x, y: cry.y, screen: true, fx: "magic-blue" });
+    const p = (c.player && c.player.p) || c.player;
+    const dist = p && cry ? Math.max(Math.abs((p.cx || 0) - cry.cx), Math.abs((p.cy || 0) - cry.cy)) : 99;
+    if (p && dist <= AG_CRYSTAL_RADIUS) {
+      const max = (typeof maxStats === "function" && maxStats(p).mp) || p.maxMp || p.mp || 0;
+      const drain = Math.min(Math.max(0, p.mp || 0), Math.round(max * AG_CRYSTAL_MANA_DRAIN_PCT / 100) || 500);
+      p.mp = Math.max(0, (p.mp || 0) - drain);
+      c.events.push({ t: "taken", dmg: drain, x: c.player.x, y: c.player.y,
+        targetId: "player", sx: cry.x, sy: cry.y, el: "mana", fx: "magic-blue", screen: true });
+      if (typeof addLog === "function")
+        addLog("death", `O <b>Bright Crystal</b> explodiu — Mana Drain de ${drain}!`);
+    }
+  }
+  if (st.pendingBoss && !mobs.some((m) => m.agMember && m.hp > 0)) {
+    const boss = st.pendingBoss; st.pendingBoss = null;
+    const cell = agFreeCell(c, Number(boss.cx) || 0, Number(boss.cy) || 0);
+    if (cell) {
+      const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+        : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+      boss.cx = cell.x; boss.cy = cell.y;
+      boss.x = pos.x; boss.y = pos.y; boss.sx = pos.x; boss.sy = pos.y;
+    }
+    mobs.unshift(boss);
+    c.events.push({ t: "spawn", slug: boss.slug, x: boss.x, y: boss.y,
+      targetId: boss.id, screen: true });
+    if (typeof addLog === "function")
+      addLog("death", "<b>Fatal Bug</b> surgiu na sala!");
+    if (typeof resolveSQMOccupancy === "function") resolveSQMOccupancy(c);
+  }
+  return true;
+}
+function adventurerGroupBossCleanup(c) { if (c && c.ag) delete c.ag; }
+
 const ROOST_DATA = {
   CRYPT_RUNES, CRYPT_WEAPONS, ROOST_ITEMS, ROOST_MONSTERS,
   ROOST_ROOMS, ROOST_MISSION_DEFS, ROOST_QUEST_ID,
+  AG_MEMBER_SPAWNS, AG_CRYSTAL_OFFSET, AG_TRANSFORM_PCT,
+  AG_CRYSTAL_MANA_DRAIN_PCT, AG_CRYSTAL_RADIUS,
   monsterSlugs: Object.keys(ROOST_MONSTERS),
   roostRollWeapon, roostCanExchange, roostState,
   registerMonsters(monsters) {
