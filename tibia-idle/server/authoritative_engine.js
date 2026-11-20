@@ -7318,7 +7318,11 @@ function authMarkPlayerDeath(auth,item,now,opts){
   const ts=Number(now)||Number(auth&&auth.clock)||Date.now();
   const wasDown=item.p.hp<=0&&(item.permadead||item.downUntil);
   const hadBless=!!item.p.blessed;
-  item.p.hp=0;item.p.blessed=false;
+  item.p.hp=0;
+  /* A bless NÃO é consumida em morte individual — só quando a PT inteira
+   * morre (fullWipe é quem cobra a bless e revoga o flag). */
+  const stillAlive=(auth.players||[]).some((pl)=>pl&&pl.p&&pl!==item&&pl.p.hp>0&&!pl.downUntil&&!pl.permadead);
+  if(!stillAlive)item.p.blessed=false;
   if(opts.permadead||(authIsBossFight(auth)&&!authIsWorldBoss(auth))){
     item.permadead=true;
     item.downUntil=ts+365*86400000;
@@ -7999,6 +8003,9 @@ function tickAuthSpawnQueue(auth,now){
 }
 function respawn(auth,now){spawnHuntWave(auth,now,{force:true,keepPack:true});}
 function fullWipe(auth){
+  // Wipe = custo da bless: o flag comprado é consumido aqui (não em morte
+  // individual). Os caminhos de revive pago re-setam blessed=true abaixo.
+  for(const item of auth.players||[]){if(item&&item.p)item.p.blessed=false;}
   // World Boss: wipe só se todos estiverem caídos — encerra a warzone (fail).
   if(authIsWorldBoss(auth)){
     auth.ended=true;auth.terminalReason="party-wipe";return;

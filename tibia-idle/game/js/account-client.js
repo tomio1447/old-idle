@@ -2067,8 +2067,8 @@ function accountStopServerHealthMonitor(){
   if(ACCOUNT_SERVER_HEALTH_TIMER){clearTimeout(ACCOUNT_SERVER_HEALTH_TIMER);ACCOUNT_SERVER_HEALTH_TIMER=null;}
 }
 
-async function accountRegister(login, password, email) {
-  const r = await _api("POST", "/api/register", { login, password, email: email || "" });
+async function accountRegister(login, password, email, displayName) {
+  const r = await _api("POST", "/api/register", { login, password, email: email || "", displayName: displayName || "" });
   if (r.data.ok) return { ok:true, msg:"Conta criada!" };
   if (r.code === 409 || r.data.error === "ACCOUNT_EXISTS")
     return { ok:false, exists:true, msg:"Conta já existe. Use a aba Entrar." };

@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   login         VARCHAR(32)  NOT NULL UNIQUE,
   password_hash VARCHAR(128) NOT NULL,
   email         VARCHAR(128) DEFAULT NULL,
+  display_name  VARCHAR(24)  DEFAULT NULL UNIQUE,   -- nome público (chat/ranking/perfil)
+  level         INT UNSIGNED NOT NULL DEFAULT 1,    -- level da CONTA (compartilhado)
+  exp           BIGINT UNSIGNED NOT NULL DEFAULT 0, -- exp da CONTA
   role          ENUM('user','admin') NOT NULL DEFAULT 'user',
   coins         INT UNSIGNED NOT NULL DEFAULT 0,   -- Tibia Coins da conta
   friends       MEDIUMTEXT   DEFAULT NULL,          -- friendlist social [{charId,name,muted}]

@@ -6979,6 +6979,8 @@ function initAccountLogin() {
         <span style="flex:1"></span><button class="sm" id="acc-register-cancel">✕</button>
       </div>
       <form class="panel-body account-flow-body" id="acc-register-form" method="post" action="#" onsubmit="return false;">
+        <div class="field"><label for="acc-new-name">Nome da conta (exibido no jogo)</label>
+          <input id="acc-new-name" maxlength="24" placeholder="ex: Zamba Knight" autocomplete="nickname"></div>
         <div class="field"><label for="acc-new-login">Login</label>
           <input id="acc-new-login" name="username" maxlength="32" placeholder="escolha um login" autocomplete="username"></div>
         <div class="field"><label for="acc-new-password">Senha</label>
@@ -6993,15 +6995,17 @@ function initAccountLogin() {
     $("#acc-register-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       if (register.disabled) return;
+      const displayName = ($("#acc-new-name").value || "").trim();
       const login = ($("#acc-new-login").value || "").trim();
       const pass = $("#acc-new-password").value || "";
       const email = ($("#acc-new-email").value || "").trim();
       const status = $("#acc-register-msg");
+      if (!displayName) { status.textContent = "Informe o nome da conta."; return; }
       if (!login || !pass) { status.textContent = "Informe login e senha."; return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { status.textContent = "Informe um e-mail válido."; return; }
       register.disabled = true; status.textContent = "Criando conta...";
       try {
-        const result = await accountRegister(login, pass, email);
+        const result = await accountRegister(login, pass, email, displayName);
         if (!result.ok) { status.textContent = result.msg || "Falha ao criar conta."; return; }
         closeAccountModal();
         $("#acc-login").value = login; $("#acc-password").value = "";

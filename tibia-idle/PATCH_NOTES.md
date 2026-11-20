@@ -4,6 +4,25 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Progresso por CONTA: level/exp, nome público, bless no wipe
+
+- **Level e EXP passam a ser da conta, não do personagem**: todos os
+  personagens da conta compartilham o mesmo nível — a leitura injeta
+  `accounts.level/exp` no snapshot de cada char e todo save (cidade,
+  checkpoint de hunt, compras) só faz o progresso da conta AVANÇAR.
+  Migração automática: `accounts.level/exp` = maior char existente.
+- **Nome da conta no registro**: criar conta agora exige um nome público
+  (3-24 caracteres, único) exibido no chat, ranking e perfil — o
+  nickname do chat passa a ser esse nome, não mais o do personagem.
+- **Ranking por jogador**: cada linha é uma conta (nome público); clicar
+  no nome expande a lista de personagens daquele jogador com vocação
+  e nível.
+- **Bless cobrada só no wipe da PT**: morte individual não consome mais
+  o flag de bless — o custo acontece quando o grupo inteiro morre
+  (revive pago ou carga da Store), como antes no wipe.
+
+---
+
 ## 2026-11-20 — Wheel of Destiny: pontos persistem durante a hunt
 
 - **Fix — pontos da roda não salvavam**: durante uma hunt ativa o

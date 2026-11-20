@@ -807,10 +807,10 @@ async function chatSend(db,body){
   // aplica a lista completa na exibição.
   text=filterHardObscenity(text);
   if(text.length>CHAT_MAX_TEXT)text=text.slice(0,CHAT_MAX_TEXT);
-  const level=Math.max(1,Math.floor(Number(character.level)||1));
+  const level=Math.max(1,Math.floor(Number(acc.level||character.level)||1));
   const voc=String(character.voc||"none");
   const msg=CHAT_BUS.post({
-    channel,type,nickname:String(character.name||"?"),voc,vocShort:vocShort(voc),
+    channel,type,nickname:String(acc.display_name||character.name||"?"),voc,vocShort:vocShort(voc),
     level,accountId:Number(acc.id),charId:Number(character.id),text,toName,
     guildId:guildMember?Number(guildMember.guild_id):0,
     guildRank:guildMember?String(guildMember.rank||"member"):null,
@@ -887,6 +887,8 @@ function accountPublicView(acc){
   const vipUntil=Math.max(0,Math.floor(Number(acc&&acc.vip_until)||0));
   return {
     id:acc.id, login:acc.login, role:acc.role, coins:acc.coins||0,
+    displayName:String(acc.display_name||acc.login||""),
+    level:Math.max(1,Math.floor(Number(acc.level)||1)),
     email:String(acc&&acc.email||""),
     emailVerified:!!(acc&&acc.email_verified),
     gold:Math.max(0,Math.floor(Number(acc.gold)||0)),
@@ -943,22 +945,34 @@ async function ensureTestAccounts(db) {
 
 /* ------------------------------ rotas ------------------------------ */
 
+const DISPLAY_NAME_RE = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 .'-]{2,23}$/;
 async function register(db, body) {
   const login = String(body.login || "").trim();
   const password = String(body.password || "");
   const email = String(body.email || "").trim().slice(0, 120);
+  const displayName = String(body.displayName || body.name || "").trim().slice(0, 24);
   if (login.length < 1 || login.length > 32) return { code: 400, body: { ok: false, msg: "Login inválido (1-32 caracteres)" } };
   if (password.length < 1) return { code: 400, body: { ok: false, msg: "Senha obrigatória" } };
   if (email && !EMAIL_RE.test(email)) return { code: 400, body: { ok: false, msg: "E-mail inválido" } };
+  // Nome público da conta (chat/ranking/perfil) — único e obrigatório.
+  if (!DISPLAY_NAME_RE.test(displayName))
+    return { code: 400, body: { ok: false, error: "BAD_DISPLAY_NAME",
+      msg: "Nome da conta inválido (3-24 caracteres; comece com letra)" } };
   const exist = await db.findAccountByLogin(login);
   // Duplicidade é erro de formulário, não falha de transporte. Responder
   // 200 evita o falso "Failed to load resource" no console; `ok:false`
   // continua impedindo sobrescrever ou acessar a conta existente.
   if (exist) return { code: 200, body: { ok: false, error: "ACCOUNT_EXISTS",
     msg: "Conta já existe. Use a aba Entrar." } };
+  if (typeof db.findAccountByDisplayName === "function") {
+    const nameTaken = await db.findAccountByDisplayName(displayName);
+    if (nameTaken) return { code: 200, body: { ok: false, error: "NAME_TAKEN",
+      msg: "Nome da conta já está em uso." } };
+  }
   const hash = bcrypt.hashSync(password, SALT_ROUNDS);
-  const acc = await db.createAccount(login, hash, "user", 0, email);
-  return { code: 201, body: { ok: true, id: acc.id, login: acc.login, role: acc.role } };
+  const acc = await db.createAccount(login, hash, "user", 0, email, displayName);
+  return { code: 201, body: { ok: true, id: acc.id, login: acc.login,
+    displayName: acc.display_name, role: acc.role } };
 }
 
 function accountCharacterSummary(character, accGold) {
@@ -1499,6 +1513,14 @@ async function saveCharacter(db, body, id) {
   const result=await db.saveCharactersVersioned(acc.id,[prepared.save],lease);
   if(!result.ok)return saveConflictResponse(result,acc);
   const updated=result.characters[0];
+  // Level/exp da CONTA: o save do char atualiza o progresso compartilhado
+  // (só avança — um save de char mais novo nunca regride a conta).
+  try{
+    if(typeof db.setAccountLevelExp==="function"){
+      const d=typeof updated.data==="string"?JSON.parse(updated.data):(updated.data||{});
+      await db.setAccountLevelExp(acc.id,updated.level,d.exp);
+    }
+  }catch(e){}
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,
     adminGrant?"admin-grant":"save",updated,!!adminGrant);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),

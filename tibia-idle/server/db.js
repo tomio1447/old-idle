@@ -130,6 +130,8 @@ function JsonStore() {
   this.calendarEvents = Array.isArray(this._load("calendar_events.json", [])) ? this._load("calendar_events.json", []) : [];
   this._storeOrderSeq = this.storeOrders.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   this._coinLedgerSeq = this.coinLedger.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
+  // Backfill do progresso da CONTA (display_name + level/exp do maior char).
+  this._backfillAccountProgress();
   // Cap histórico inchado de runs anteriores antes do primeiro _save do boot.
   const snapBefore = (this.snapshots || []).length;
   this._pruneSnapshots();
@@ -667,16 +669,64 @@ JsonStore.prototype.instancePvpResume = function (accountId, instanceId, state, 
   row.state=state;row.version=Number(row.version)+1;row.saved_at=iso;row.worker_cursor_at=iso;row.updated_at=iso;
   this._saveRuntime(false,true);return {ok:true};
 };
-JsonStore.prototype.createAccount = function (login, hash, role, coins, email) {
+JsonStore.prototype.createAccount = function (login, hash, role, coins, email, displayName) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
                 email: String(email || "").slice(0, 120),
+                display_name: String(displayName || login).slice(0, 24),
                 email_verified: 0, email_code: "", email_code_expires: 0,
                 role: role || "user", coins: coins || 0, gold: 0, gold_migrated: true,
+                level: 1, exp: 0,
                 vip_until: 0, market_gold: 0, cosmetics: {},
                 created_at: new Date().toISOString() };
   this.accounts.push(acc);
   this._save();
   return acc;
+};
+JsonStore.prototype.findAccountByDisplayName = function (name) {
+  const dn = String(name || "").toLowerCase();
+  return (this.accounts || []).find((a) => String(a.display_name || "").toLowerCase() === dn) || null;
+};
+JsonStore.prototype.setAccountLevelExp = function (accountId, level, exp) {
+  const a = this.findAccountById(accountId); if (!a) return null;
+  const lvl = Math.max(1, Math.floor(Number(level) || 1));
+  if (lvl >= (Number(a.level) || 1)) {
+    a.level = lvl; a.exp = Math.max(0, Math.floor(Number(exp) || 0)); this._save();
+  }
+  return a;
+};
+/* Level/exp da CONTA injetados no snapshot do char — paridade com o
+ * _applyAccountLevel do MySQL. */
+JsonStore.prototype._applyAccountLevel = function (row, acc) {
+  if (!row || !acc) return row;
+  const level = Math.max(1, Math.floor(Number(acc.level) || 1));
+  const exp = Math.max(0, Math.floor(Number(acc.exp) || 0));
+  row.level = level;
+  let data = row.data, parsed = null;
+  if (typeof data === "string") { try { parsed = JSON.parse(data); } catch (e) {} }
+  else if (data && typeof data === "object") parsed = data;
+  if (parsed) { parsed.level = level; parsed.exp = exp; row.data = typeof data === "string" ? JSON.stringify(parsed) : parsed; }
+  return row;
+};
+/* Backfill único: display_name = login; level/exp = maior char da conta. */
+JsonStore.prototype._backfillAccountProgress = function () {
+  let changed = false;
+  for (const a of this.accounts || []) {
+    if (!a.display_name) { a.display_name = a.login; changed = true; }
+    if (a.level === undefined || a.exp === undefined) {
+      const chars = (this.characters || []).filter((c) => Number(c.account_id) === Number(a.id));
+      let lvl = 1, exp = 0;
+      for (const c of chars) {
+        const cl = Math.max(1, Math.floor(Number(c.level) || 1));
+        if (cl >= lvl) {
+          lvl = cl;
+          let d = c.data; if (typeof d === "string") { try { d = JSON.parse(d); } catch (e) { d = {}; } }
+          exp = Math.max(0, Math.floor(Number(d && d.exp) || 0));
+        }
+      }
+      a.level = lvl; a.exp = exp; changed = true;
+    }
+  }
+  if (changed) this._save();
 };
 JsonStore.prototype.updateCoins = function (id, coins) {
   const a = this.findAccountById(id);
@@ -1347,13 +1397,16 @@ JsonStore.prototype.syncAccountGoldFromCharacters = function (projections) {
   if (byAccount.size) this._save();
 };
 JsonStore.prototype.charactersOf = function (accountId) {
-  return this.characters.filter((c) => c.account_id === Number(accountId));
+  const acc = this.findAccountById(accountId);
+  return this.characters.filter((c) => c.account_id === Number(accountId))
+    .map((c) => this._applyAccountLevel(c, acc));
 };
 JsonStore.prototype.findCharacterByName = function (name) {
   return this.characters.find((c) => c.name.toLowerCase() === String(name).toLowerCase()) || null;
 };
 JsonStore.prototype.findCharacter = function (id) {
-  return this.characters.find((c) => c.id === Number(id)) || null;
+  const c = this.characters.find((c) => c.id === Number(id)) || null;
+  return c ? this._applyAccountLevel(c, this.findAccountById(c.account_id)) : null;
 };
 
 /* ------------------------------------------------------- admin (bans) --- */
@@ -1515,6 +1568,13 @@ JsonStore.prototype.saveCharactersVersioned = function (accountId, saves, lease)
     if(extra.max_hp!==undefined)row.max_hp=extra.max_hp;
     if(extra.max_mp!==undefined)row.max_mp=extra.max_mp;
     row.updated_at=new Date().toISOString();
+    // Level/exp da CONTA: o char salvo carrega o progresso compartilhado.
+    const acc=this.findAccountById(accountId);
+    if(acc){
+      const lvl=Math.max(1,Math.floor(Number(save.level)||1));
+      let exp=0;try{const d=JSON.parse(save.data);exp=Math.max(0,Math.floor(Number(d.exp)||0));}catch(e){}
+      if(lvl>=(Number(acc.level)||1)){acc.level=lvl;acc.exp=exp;}
+    }
   });
   this._save();
   return {ok:true,characters:rows};
@@ -1707,14 +1767,30 @@ JsonStore.prototype.rankings = function (by, limit) {
   if (by === "dist") by = "distance";
   const chars = Array.isArray(this.characters) ? this.characters
     : Object.keys(this.characters || {}).map((k) => this.characters[k]);
-  let rows = chars.map((c) => {
-    const value = this._rankingMetric(c, by);
-    const row = { id: c.id, name: c.name, voc: c.voc, level: Math.floor(Number(c.level) || 1), value };
-    if (by === "kills") row.totalKills = value;
-    return row;
-  });
+  /* Ranking por CONTA: 1 linha por jogador (display_name); métrica = melhor
+   * char (level = accounts.level); `chars` detalha o roster no clique. */
+  const byAcc = new Map();
+  for (const c of chars) {
+    const accId = Number(c.account_id);
+    const acc = this.findAccountById(accId);
+    if (!acc) continue;
+    let entry = byAcc.get(accId);
+    if (!entry) {
+      entry = { id: accId, accountId: accId,
+        name: String(acc.display_name || acc.login || "?"),
+        level: Math.max(1, Math.floor(Number(acc.level) || 1)), value: 0, chars: [] };
+      byAcc.set(accId, entry);
+    }
+    entry.chars.push({ id: c.id, name: c.name, voc: c.voc, level: Math.floor(Number(c.level) || 1) });
+    const v = by === "level" ? entry.level : this._rankingMetric(c, by);
+    if (v > entry.value) entry.value = v;
+    if (by === "level") entry.value = entry.level;
+  }
+  let rows = Array.from(byAcc.values());
   rows.sort((a, b) => (b.value - a.value) || (b.level - a.level) || String(a.name).localeCompare(String(b.name)));
-  return rows.slice(0, limit);
+  rows = rows.slice(0, limit);
+  if (by === "kills") rows.forEach((r) => { r.totalKills = r.value; });
+  return rows;
 };
 
 /* Contagem pública: personagens online (lease ativo) + stub offlineHunting. */
@@ -2852,6 +2928,12 @@ async function MysqlStore() {
         [save.voc,save.level,save.data,next.zone,next.hp,next.mp,next.max_hp,next.max_mp,
          Number(save.id),Number(accountId)]);
       updated.push(Object.assign({},row,save,next,{save_version:Number(row.save_version)+1}));
+      // Level/exp da CONTA: o char salvo carrega o progresso compartilhado.
+      let exp=0;try{const d=JSON.parse(save.data);exp=Math.max(0,Math.floor(Number(d.exp)||0));}catch(e){}
+      await conn.query(
+        "UPDATE accounts SET level=?, exp=? WHERE id=? AND ? >= level",
+        [Math.max(1,Math.floor(Number(save.level)||1)),exp,Number(accountId),
+         Math.max(1,Math.floor(Number(save.level)||1))]);
     }
     return {ok:true,characters:updated};
   }
@@ -2869,15 +2951,29 @@ async function MysqlStore() {
       const rows = await this.query("SELECT * FROM accounts WHERE id = ?", [Number(id)]);
       return hydrateAccount(rows[0] || null);
     },
-    async createAccount(login, hash, role, coins, email) {
+    async createAccount(login, hash, role, coins, email, displayName) {
       const em = String(email || "").slice(0, 120);
+      const dn = String(displayName || login).slice(0, 24);
       const r = await this.run(
-        "INSERT INTO accounts (login, password_hash, email, role, coins, gold, gold_migrated, vip_until, missions, missions_done, tutorial, cosmetics) VALUES (?, ?, ?, ?, ?, 0, 1, 0, '{}', '{}', '{}', '{}')",
-        [login, hash, em, role || "user", coins || 0]);
-      return { id: r.insertId, login, password_hash: hash, email: em,
+        "INSERT INTO accounts (login, password_hash, email, display_name, role, coins, gold, gold_migrated, vip_until, missions, missions_done, tutorial, cosmetics) VALUES (?, ?, ?, ?, ?, ?, 0, 1, 0, '{}', '{}', '{}', '{}')",
+        [login, hash, em, dn, role || "user", coins || 0]);
+      return { id: r.insertId, login, password_hash: hash, email: em, display_name: dn,
         email_verified: 0, email_code: "", email_code_expires: 0,
-        role: role || "user", coins: coins || 0,
+        role: role || "user", coins: coins || 0, level: 1, exp: 0,
         gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {}, tutorial: {}, cosmetics: {} };
+    },
+    async findAccountByDisplayName(name) {
+      const rows = await this.query("SELECT * FROM accounts WHERE display_name = ?", [String(name || "").slice(0, 24)]);
+      return hydrateAccount(rows[0] || null);
+    },
+    /* EXP/level da CONTA: todo save de personagem grava o progresso na conta;
+     * a leitura (findCharacter/charactersOf) injeta os valores da conta no
+     * snapshot do char — todos os personagens compartilham o mesmo nível. */
+    async setAccountLevelExp(accountId, level, exp) {
+      // Só avança: um save de char mais novo que o da conta nunca regride.
+      await this.run("UPDATE accounts SET level = ?, exp = ? WHERE id = ? AND ? >= level",
+        [Math.max(1, Math.floor(Number(level) || 1)), Math.max(0, Math.floor(Number(exp) || 0)),
+         Number(accountId), Math.max(1, Math.floor(Number(level) || 1))]);
     },
     async accountWardrobe(accountId, recipeId, alternative) {
       const W = require("./wardrobe");
@@ -3248,18 +3344,43 @@ async function MysqlStore() {
       }
     },
     async charactersOf(accountId) {
-      return this.query(
+      const rows = await this.query(
         "SELECT id, account_id, name, voc, level, data, save_version, created_at, updated_at FROM characters WHERE account_id = ?",
         [Number(accountId)]);
+      const acc = await this.findAccountById(accountId);
+      return rows.map((row) => this._applyAccountLevel(row, acc));
     },
-    async findCharacterByName(name) {
-      const rows = await this.query(
-        "SELECT * FROM characters WHERE LOWER(name) = LOWER(?)", [String(name)]);
-      return rows[0] || null;
+    /* Level/exp da CONTA sobre o snapshot do char: level column + data.level/
+     * data.exp passam a refletir accounts.level/exp — todos os chars da conta
+     * compartilham o mesmo progresso. */
+    _applyAccountLevel(row, acc) {
+      if (!row || !acc) return row;
+      const level = Math.max(1, Math.floor(Number(acc.level) || 1));
+      const exp = Math.max(0, Math.floor(Number(acc.exp) || 0));
+      row.level = level;
+      let data = row.data;
+      let parsed = null;
+      if (typeof data === "string") { try { parsed = JSON.parse(data); } catch (e) {} }
+      else if (data && typeof data === "object") parsed = data;
+      if (parsed) { parsed.level = level; parsed.exp = exp; row.data = typeof data === "string" ? JSON.stringify(parsed) : parsed; }
+      return row;
     },
     async findCharacter(id) {
-      const rows = await this.query("SELECT * FROM characters WHERE id = ?", [Number(id)]);
-      return rows[0] || null;
+      const rows = await this.query(
+        `SELECT c.*, a.level AS acc_level, a.exp AS acc_exp
+           FROM characters c LEFT JOIN accounts a ON a.id = c.account_id WHERE c.id = ?`, [Number(id)]);
+      const row = rows[0] || null;
+      if (!row) return null;
+      const level = Math.max(1, Math.floor(Number(row.acc_level) || 1));
+      const exp = Math.max(0, Math.floor(Number(row.acc_exp) || 0));
+      delete row.acc_level; delete row.acc_exp;
+      row.level = level;
+      let data = row.data;
+      let parsed = null;
+      if (typeof data === "string") { try { parsed = JSON.parse(data); } catch (e) {} }
+      else if (data && typeof data === "object") parsed = data;
+      if (parsed) { parsed.level = level; parsed.exp = exp; row.data = typeof data === "string" ? JSON.stringify(parsed) : parsed; }
+      return row;
     },
     /* Busca cross-account para o painel admin (edição de terceiros). */
     async adminSearchCharacters(query, limit) {
@@ -4261,39 +4382,52 @@ async function MysqlStore() {
         axe: "$.skills.axe",
         distance: "$.skills.dist",
       };
-      if (by === "kills") {
-        const rows = await this.query(
-          `SELECT id, name, voc, level,
-                  FLOOR(COALESCE(JSON_EXTRACT(data, '$.totalKills'), 0)) AS value
-           FROM characters ORDER BY value DESC, level DESC, name ASC LIMIT ?`,
-          [limit]);
-        return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
-          value: Number(r.value) || 0, totalKills: Number(r.value) || 0 }));
+      /* Ranking por CONTA: 1 linha por jogador (display_name); o valor da
+       * métrica é o melhor char da conta; `chars` detalha o roster para o
+       * clique do cliente. */
+      const metric = by === "kills"
+        ? "FLOOR(COALESCE(JSON_EXTRACT(c.data, '$.totalKills'), 0))"
+        : by === "magic"
+          ? "FLOOR(COALESCE(JSON_EXTRACT(c.data, '$.ml'), 0))"
+          : skillPath[by]
+            ? `FLOOR(COALESCE(JSON_EXTRACT(c.data, '${skillPath[by]}'), 10))`
+            : null;
+      let rows;
+      if (metric) {
+        rows = await this.query(
+          `SELECT a.id AS accountId, COALESCE(a.display_name, a.login) AS name,
+                  MAX(${metric}) AS value
+           FROM characters c JOIN accounts a ON a.id = c.account_id
+           GROUP BY a.id, name ORDER BY value DESC, a.id ASC LIMIT ?`, [limit]);
+      } else {
+        rows = await this.query(
+          `SELECT a.id AS accountId, COALESCE(a.display_name, a.login) AS name,
+                  a.level AS value
+           FROM accounts a
+           WHERE EXISTS (SELECT 1 FROM characters c WHERE c.account_id = a.id)
+           ORDER BY a.level DESC, a.id ASC LIMIT ?`, [limit]);
       }
-      if (by === "magic") {
-        const rows = await this.query(
-          `SELECT id, name, voc, level,
-                  FLOOR(COALESCE(JSON_EXTRACT(data, '$.ml'), 0)) AS value
-           FROM characters ORDER BY value DESC, level DESC, name ASC LIMIT ?`,
-          [limit]);
-        return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
-          value: Number(r.value) || 0 }));
+      const accIds = rows.map((r) => Number(r.accountId));
+      let chars = [];
+      if (accIds.length) {
+        const ph = accIds.map(() => "?").join(",");
+        chars = await this.query(
+          `SELECT id, account_id, name, voc, level FROM characters WHERE account_id IN (${ph}) ORDER BY level DESC, name ASC`,
+          accIds);
       }
-      if (skillPath[by]) {
-        const rows = await this.query(
-          `SELECT id, name, voc, level,
-                  FLOOR(COALESCE(JSON_EXTRACT(data, '${skillPath[by]}'), 10)) AS value
-           FROM characters ORDER BY value DESC, level DESC, name ASC LIMIT ?`,
-          [limit]);
-        return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
-          value: Number(r.value) || 0 }));
+      const byAcc = new Map();
+      for (const ch of chars) {
+        const list = byAcc.get(Number(ch.account_id)) || [];
+        list.push({ id: ch.id, name: ch.name, voc: ch.voc, level: Number(ch.level) || 1 });
+        byAcc.set(Number(ch.account_id), list);
       }
-      const rows = await this.query(
-        `SELECT id, name, voc, level, level AS value
-         FROM characters ORDER BY level DESC, updated_at ASC, name ASC LIMIT ?`,
-        [limit]);
-      return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
-        value: Number(r.level) || 1 }));
+      return rows.map((r) => ({
+        id: Number(r.accountId), accountId: Number(r.accountId), name: r.name,
+        level: metric ? Math.max(...(byAcc.get(Number(r.accountId)) || [{ level: 1 }]).map((c) => c.level), 1) : Number(r.value) || 1,
+        value: Number(r.value) || (metric ? 0 : 1),
+        totalKills: by === "kills" ? Number(r.value) || 0 : undefined,
+        chars: byAcc.get(Number(r.accountId)) || [],
+      }));
     },
 
     /* Contagem pública: leases ativos → personagens online; offlineHunting=0 (stub). */
@@ -5606,7 +5740,23 @@ async function ensureSchema(pool) {
     "ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0",
     "ADD COLUMN email_code CHAR(6) DEFAULT NULL",
     "ADD COLUMN email_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0",
+    /* Identidade pública (chat/ranking/perfil) + progresso da CONTA. */
+    "ADD COLUMN display_name VARCHAR(24) DEFAULT NULL",
+    "ADD COLUMN level INT UNSIGNED NOT NULL DEFAULT 1",
+    "ADD COLUMN exp BIGINT UNSIGNED NOT NULL DEFAULT 0",
   ]) { try { await pool.query("ALTER TABLE accounts " + col); } catch (e) { /* já existe */ } }
+  try { await pool.query("ALTER TABLE accounts ADD UNIQUE KEY uq_accounts_display_name (display_name)"); }
+  catch (e) { /* já existe */ }
+  // Backfill (uma vez): display_name = login; level/exp = maior char da conta.
+  try {
+    await pool.query("UPDATE accounts SET display_name = login WHERE display_name IS NULL");
+    await pool.query(
+      `UPDATE accounts a SET
+         a.level = (SELECT COALESCE(MAX(c.level),1) FROM characters c WHERE c.account_id = a.id),
+         a.exp = COALESCE((SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(c2.data,'$.exp')) AS UNSIGNED)
+           FROM characters c2 WHERE c2.account_id = a.id ORDER BY c2.level DESC LIMIT 1),0)
+       WHERE a.level = 1 AND a.exp = 0`);
+  } catch (e) { /* backfill best-effort */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     account_id INT UNSIGNED NOT NULL,

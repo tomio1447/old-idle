@@ -1750,6 +1750,13 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .ranking-voc { color:#a8c0d8; }
 .ranking-value { text-align:right; font-variant-numeric:tabular-nums; color:#9ce84a; font-weight:700; }
 .ranking-table th:last-child, .ranking-table td.ranking-value { text-align:right; }
+.ranking-player-row { cursor:pointer; }
+.ranking-player-row.active { background:rgba(255,230,128,.08); }
+.ranking-player-row.active .ranking-name { text-decoration:underline; }
+.ranking-chars { margin-top:8px; border-top:1px solid #3a372f; padding:6px 4px 2px; }
+.ranking-char-row { display:flex; gap:10px; align-items:center; padding:3px 6px; }
+.ranking-char-row .ranking-voc { margin-left:auto; }
+.ranking-char-row .tiny.dim { min-width:44px; text-align:right; }
 .ranking-status { padding:16px; text-align:center; }
 #hunts-modal-list { display:grid; grid-template-columns:1fr; gap:6px; }
 #npcs-modal-list,

@@ -391,29 +391,51 @@ function renderRankingList(rows, by) {
   const valueHeader = by === "level" ? tt("char.level", "Nível") : tt("ranking.col.value", "Valor");
   const body = rows.map((row, index) => {
     const value = row.value != null ? row.value : (by === "level" ? row.level : "—");
-    return `<tr>
+    return `<tr class="ranking-player-row" data-ranking-acc="${row.accountId || row.id}">
       <td class="ranking-pos">${index + 1}</td>
       <td class="ranking-name">${rankingEscape(row.name)}</td>
-      <td class="ranking-voc">${rankingEscape(rankingVocLabel(row.voc))}</td>
       <td class="ranking-value">${rankingEscape(value)}</td>
     </tr>`;
   }).join("");
   root.innerHTML = `<section class="hunt-modal-section ranking-modal-section">
-    <div class="hunt-cat-title">${tt("ranking.catalogTitle", "Ranking de personagens")}</div>
+    <div class="hunt-cat-title">${tt("ranking.catalogTitle", "Ranking de jogadores")}</div>
     <div class="ranking-table-wrap">
       <table class="ranking-table">
         <thead>
           <tr>
             <th>${tt("ranking.col.rank", "#")}</th>
-            <th>${tt("ranking.col.name", "Nome")}</th>
-            <th>${tt("ranking.col.voc", "Vocação")}</th>
+            <th>${tt("ranking.col.name", "Jogador")}</th>
             <th>${valueHeader}</th>
           </tr>
         </thead>
         <tbody>${body}</tbody>
       </table>
     </div>
+    <div id="ranking-char-list"></div>
   </section>`;
+  /* Clique no jogador → lista os personagens da conta. */
+  root.querySelectorAll("[data-ranking-acc]").forEach((tr) => {
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => {
+      const row = rows.find((r) => String(r.accountId || r.id) === tr.dataset.rankingAcc);
+      const box = root.querySelector("#ranking-char-list");
+      if (!box) return;
+      const open = box.dataset.openAcc === tr.dataset.rankingAcc;
+      root.querySelectorAll(".ranking-player-row.active").forEach((el) => el.classList.remove("active"));
+      if (open || !row) { box.dataset.openAcc = ""; box.innerHTML = ""; return; }
+      box.dataset.openAcc = tr.dataset.rankingAcc;
+      tr.classList.add("active");
+      const chars = Array.isArray(row.chars) ? row.chars : [];
+      box.innerHTML = `<div class="ranking-chars">
+        <div class="tiny dim" style="margin:6px 0 4px">${rankingEscape(row.name)} — ${tt("ranking.chars", "Personagens")}</div>
+        ${chars.length ? chars.map((c) => `<div class="ranking-char-row">
+          <span class="ranking-name">${rankingEscape(c.name)}</span>
+          <span class="ranking-voc">${rankingEscape(rankingVocLabel(c.voc))}</span>
+          <span class="tiny dim">Lv ${rankingEscape(c.level)}</span>
+        </div>`).join("") : `<div class="tiny dim">${tt("ranking.empty", "Nenhum personagem.")}</div>`}
+      </div>`;
+    });
+  });
 }
 
 function renderNpcsCatalog() {
