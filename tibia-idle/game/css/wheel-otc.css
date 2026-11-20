@@ -75,16 +75,20 @@
   background-size: 208px 16px; background-repeat: no-repeat;
   image-rendering: pixelated; pointer-events: none;
 }
-/* estados: disponivel=borda verde | travado=apagado | cheio=cor do quadrante */
-.wheel-node.locked { opacity: .5; }
+/* estados: disponivel=glow verde | travado=apagado | cheio=cor do quadrante
+ * | selecionada=borda/glow ciano (mockup wod) */
+.wheel-node { border-radius: 50%; background: rgba(16,18,24,.82); border-color: #494e59; }
+.wheel-node.locked { opacity: .42; filter: grayscale(.7); }
 .wheel-node.locked .wn-med { filter: grayscale(.75); }
-.wheel-node.can { border-color: #9ce84a; }
+.wheel-node.can { border-color: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,.35), inset 0 0 8px rgba(0,0,0,.55); }
 .wheel-node.w-green.full  { border-color: #4ade80; }
 .wheel-node.w-red.full    { border-color: #f87171; }
 .wheel-node.w-blue.full   { border-color: #60a5fa; }
 .wheel-node.w-purple.full { border-color: #c084fc; }
-.wheel-node.can:hover,
-.wheel-node.sel { transform: translate(-50%,-50%) scale(1.18); border-color: #ffe680; box-shadow: 0 0 8px rgba(255,230,128,.55), inset 0 0 8px rgba(0,0,0,.55); z-index: 6; }
+.wheel-node.can:hover { transform: translate(-50%,-50%) scale(1.18); border-color: #f2c96b; z-index: 10; }
+.wheel-node.sel { transform: translate(-50%,-50%) scale(1.15); z-index: 9; border-color: #38bdf8; box-shadow: 0 0 14px rgba(56,189,248,.75), inset 0 0 8px rgba(0,0,0,.55); }
+/* mini contador pts/max abaixo do icone */
+.wod-node-pts { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); background: #101216; border: 1px solid #3c404a; color: #d6d9e0; font-size: 9px; font-weight: 700; line-height: 1; padding: 1px 4px; border-radius: 3px; pointer-events: none; white-space: nowrap; z-index: 1; }
 
 /* ── SEQUÊNCIA DE EVOLUÇÃO ──
  * .wheel-paths: arestas do grafo de perks (trilha). .wp-on: aresta do
@@ -215,3 +219,105 @@
   width: min(1020px, calc(100vw - 16px));
   height: min(92vh, 700px);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+ * Mockup "wod" — workspace 2 colunas: palco circular da roda + inspetor
+ * ══════════════════════════════════════════════════════════════════ */
+.wheel-body.wod-workspace {
+  gap: 20px;
+  padding: 16px 18px;
+  background: #17191e;
+  align-items: stretch;
+}
+/* Palco escuro da roda */
+.wod-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: radial-gradient(circle at center, #222630 0%, #111317 75%);
+  border: 1px solid #2f333d;
+  border-radius: 6px;
+  box-shadow: inset 0 0 30px rgba(0,0,0,.75);
+}
+/* Container circular com borda dourada metálica — mascara as bordas
+ * irregulares da arte da roda */
+.wod-wheel-container {
+  border-radius: 50%;
+  border: 2px solid #755b29;
+  background: #0d0f13;
+  box-shadow: 0 0 25px rgba(0,0,0,.85), inset 0 0 18px rgba(0,0,0,.9);
+}
+.wheel-canvas-area { border-radius: 50%; overflow: hidden; }
+
+/* Coluna direita: inspetor + controles */
+.wod-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: #1e2128;
+  border: 1px solid #323640;
+  border-radius: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+.wod-inspector-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.wod-inspector-body::-webkit-scrollbar { width: 5px; }
+.wod-inspector-body::-webkit-scrollbar-track { background: #0d0f14; }
+.wod-inspector-body::-webkit-scrollbar-thumb { background: #323640; border-radius: 3px; }
+
+.wod-summary-btn {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e4e7ec;
+  background: #2b303a;
+  border: 1px solid #444b59;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.wod-summary-btn:hover { background: #363c48; border-color: #e6b84c; }
+
+.wod-slice-card {
+  padding: 12px;
+  background: #15171c;
+  border: 1px solid #2d313a;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wod-slice-card .wheel-sel { background: transparent; border: none; padding: 0; margin: 0; }
+.wod-slice-card .wheel-sel .wheel-sec-title { display: none; }
+.wod-slice-empty { text-align: center; }
+
+/* -1 / +1 / MAX logo abaixo dos detalhes da fatia */
+.wod-alloc-controls { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; }
+.wod-ctrl-btn {
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid #3f4552;
+  background: #262a33;
+  color: #e2e8f0;
+  cursor: pointer;
+}
+.wod-ctrl-btn:disabled { opacity: .45; cursor: default; }
+.wod-ctrl-btn.is-plus:hover:not(:disabled) { background: #1f4d36; border-color: #4ade80; color: #4ade80; }
+.wod-ctrl-btn.is-max { background: #332b19; border-color: #8c6d32; color: #f2c96b; }
+.wod-ctrl-btn.is-max:hover:not(:disabled) { background: #473b21; }
+
+/* OK (Aplicar) / Reset fixos na base do inspetor */
+.wod-commit-bar { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+.wod-commit-btn { padding: 10px; font-size: 12px; font-weight: 700; border-radius: 4px; cursor: pointer; }
+.wod-commit-btn.is-confirm { background: linear-gradient(180deg, #b8892d 0%, #835e18 100%); border: 1px solid #f2c96b; color: #fff8e7; }
+.wod-commit-btn.is-confirm:hover { background: linear-gradient(180deg, #bf8b2a 0%, #8a6016 100%); }
+.wod-commit-btn.is-reset { background: #2b2224; border: 1px solid #6e3b42; color: #f87171; }
+.wod-commit-btn.is-reset:hover { background: #3a2a2d; }
+
+/* a roda embutida ocupa todo o espaco disponivel do workspace */
+.chard-wheel-embed .wod-stage { min-width: 0; }
+.chard-wheel-embed .wheel-canvas-wrap { overflow: hidden; }

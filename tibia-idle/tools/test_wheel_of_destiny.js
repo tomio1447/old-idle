@@ -10,12 +10,12 @@ function must(ok, msg) { if (!ok) throw Error(msg); }
 
 const root = path.join(__dirname, "../game");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
-must(html.includes("js/wheeldata.js?v=wheel-otc-v2"), "index sem wheeldata cache-bust v2");
+must(html.includes("js/wheeldata.js?v=wheel-seq-v1"), "index sem wheeldata cache-bust");
 must(html.includes("js/wheel-gems.js?v=wheel-otc-v2"), "index sem wheel-gems cache-bust v2");
-must(html.includes("js/wheel.js?v=wheel-otc-v2"), "index sem wheel.js cache-bust v2");
-must(html.includes("js/wheel-ui.js?v=wheel-otc-v2"), "index sem wheel-ui cache-bust v2");
-must(html.includes("css/wheel-otc.css?v=wheel-otc-v1"), "index sem wheel-otc.css cache-bust");
-must(!html.includes("js/wheel.js?v=wheel-otc-v1"), "wheel.js ainda com cache wheel-otc-v1");
+must(html.includes("js/wheel.js?v=wheel-active-v1"), "index sem wheel.js cache-bust");
+must(html.includes("js/wheel-ui.js?v=wod-modal-v1"), "index sem wheel-ui cache-bust wod-modal");
+must(html.includes("css/wheel-otc.css?v=wod-modal-v1"), "index sem wheel-otc.css cache-bust wod-modal");
+must(!html.includes("js/wheel-ui.js?v=wheel-fit-screen-v1"), "wheel-ui ainda com cache antigo");
 
 const redecl = /\b(?:var|let|const)\s+WHEEL_(?:SLOTS|POS|CONNECTED|ROOTS|CONFIG|HP|MP|CAP|SKILL|LEECH|MIT_PER_POINT|STAGE_ABILITY|SPELL_UPGRADES|COLORS)\b/;
 for (const name of ["wheel.js", "wheel-gems.js", "wheel-ui.js"]) {
@@ -117,7 +117,7 @@ const smash = wg.wheelDestroyGem(p, buy.gem.id, function () { return 0; });
 must(smash.ok && smash.kind === "lesser" && smash.amount >= 1, "dismantle não deu fragments");
 
 const css = fs.readFileSync(path.join(root, "css/wheel-otc.css"), "utf8");
-must(css.includes("wheel-largebonus") && css.includes("background-size: contain"),
+must(css.includes("wheel-largebonus") && css.includes("wheel-slice-fill") && css.includes("wod-wheel-container"),
   "CSS sem overlays/bordas oficiais");
 
 console.log("OK: wheel OTC assets, gem atelier, fragments, augments client+server.");

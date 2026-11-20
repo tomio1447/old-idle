@@ -4,6 +4,25 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Wheel of Destiny: novo layout do modal (wod)
+
+- **Palco circular** — a roda fica contida em um palco com gradiente
+  radial e borda dourada metálica (`#755b29`), escondendo as bordas
+  irregulares da arte original.
+- **Nós claros** — ícones circulares com estados distintos:
+  disponível = glow verde `#4ade80`; selecionada = borda/glow ciano
+  `#38bdf8` + escala; bloqueada = apagada/grayscale. Cada nó exibe um
+  mini-contador `pts/max` abaixo do ícone.
+- **Inspetor direito** — painel lateral com botão "Show bonus
+  summary", card da fatia selecionada (nome, progresso, descrição) e
+  os controles **−1 / +1 / MAX** logo abaixo dos detalhes.
+- **Ações fixas na base** — **OK (Aplicar)** dourado e **Reset**
+  vermelho sempre visíveis no rodapé do inspetor.
+- Layout 2 colunas com coordenadas percentuais — redimensiona junto
+  com a janela; todos os ids/handlers originais preservados.
+
+---
+
 ## 2026-11-20 — Sprite da Wand of Defiance + preços oficiais de NPC
 
 - **Wand of Defiance** — ícone reimportado do client (cid 16096,

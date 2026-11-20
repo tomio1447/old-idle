@@ -172,6 +172,7 @@ function wheelNodeHtml(p, slotId) {
     '<span class="wn-med" style="background-position:' + (-ic[0] * 30) + 'px 0"></span>' +
     '<span class="wn-small" style="left:calc(50% + ' + o.sdx + 'px);top:calc(50% + ' + o.sdy + 'px);' +
       'background-position:' + (-ic[1] * 16) + 'px 0"></span>' +
+    '<span class="wod-node-pts">' + pts + '/' + spec.max + '</span>' +
     '</div>';
 }
 
@@ -355,28 +356,25 @@ function renderWheelModal(p, opts) {
     var selPts = selSpec ? wheelSlotPoints(p, selId) : 0;
     var canAdd = !!(selSpec && wheelCanAllocate(p, selId));
     var canSub = !!(selSpec && selPts > 0);
-    var ctl = '<div class="wheel-ctl-col">' +
-      '<button class="sm wheel-add-btn" id="wheel-add-sel" title="Adicionar +1 ponto na fatia selecionada"' +
+    var ctl = '<div class="wod-alloc-controls">' +
+      '<button type="button" class="wod-ctrl-btn" id="wheel-sub-sel" title="Remover 1 ponto da fatia selecionada"' +
+        (canSub ? '' : ' disabled') + '>\u22121</button>' +
+      '<button type="button" class="wod-ctrl-btn is-plus" id="wheel-add-sel" title="Adicionar +1 ponto na fatia selecionada"' +
         (canAdd ? '' : ' disabled') + '>' +
         (selSpec ? selPts + '/' + selSpec.max + ' +1' : '+1') + '</button>' +
-      '<button class="sm wheel-sub-btn" id="wheel-sub-sel" title="Remover 1 ponto da fatia selecionada"' +
-        (canSub ? '' : ' disabled') + '>\u22121</button>' +
-      '<button class="sm wheel-max-btn" id="wheel-max-sel" title="Gastar todos os pontos disponíveis nesta fatia até o limite"' +
+      '<button type="button" class="wod-ctrl-btn is-max" id="wheel-max-sel" title="Gastar todos os pontos disponíveis nesta fatia até o limite"' +
         (canAdd ? '' : ' disabled') + '>MAX</button>' +
       '</div>';
 
     h += '<div class="wheel-top-info">' +
-      '<span class="wheel-avail">Available: ' + fmtFull(avail) + ' / ' + fmtFull(total) + ' (' + fmtFull(spent) + ' spent)</span>' +
+      '<span class="wheel-avail">Pontos: ' + fmtFull(avail) + ' disp / ' + fmtFull(total) + ' total (' + fmtFull(spent) + ' alocados)</span>' +
       '<span style="flex:1"></span>' +
-      ctl +
-      '<button class="sm" id="wheel-ok" title="Salvar os pontos alocados na roda">OK</button>' +
-      '<button class="sm" id="wheel-reset" title="Remove todos os pontos da roda">Reset</button>' +
       '</div>';
 
     if (locked) h += '<div class="tiny" style="padding:4px 10px;color:#f87171">Locked until level <b>' + WHEEL_CONFIG.minLevel + '</b>. You are level ' + p.level + '.</div>';
 
-    h += '<div class="wheel-body">' +
-      '<div class="wheel-canvas-wrap"><div class="wheel-canvas-area">' +
+    h += '<div class="wheel-body wod-workspace">' +
+      '<div class="wod-stage"><div class="wheel-canvas-wrap wod-wheel-container"><div class="wheel-canvas-area">' +
         '<img class="wheel-stage-img" src="assets/wheel/backdrop_skillwheel.png?v=wheel-otc-v1" alt="" draggable="false">';
     for (var sid0 in WHEEL_SLOTS) h += wheelSliceHtml(p, sid0);
     h += '<img class="wheel-voc-img" src="' + wheelVocImage(p.voc) + '?v=wheel-otc-v1" alt="" draggable="false">' +
@@ -384,17 +382,27 @@ function renderWheelModal(p, opts) {
         wheelFocusOverlays(p) +
         wheelPathsHtml(p);
     for (var id in WHEEL_SLOTS) h += wheelNodeHtml(p, id);
-    h += '</div></div><div class="wheel-right">';
-    if (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel && WHEEL_SLOTS[WHEEL_UI.sel])
-      h += wheelSelectionHtml(p, WHEEL_UI.sel);
-    if (showSummary) {
-      h += wheelSummaryHtml(p);
-      h += '<div class="wheel-summary-toggle"><button class="sm" data-wsummary="0">Hide summary</button></div>';
+    h += '</div></div></div><aside class="wheel-right wod-inspector">' +
+      '<div class="wod-inspector-top">' +
+        '<button type="button" class="wod-summary-btn" data-wsummary="' + (showSummary ? "0" : "1") + '">' +
+          (showSummary ? "Hide bonus summary" : "Show bonus summary") + '</button>' +
+      '</div>' +
+      '<div class="wod-inspector-body">';
+    if (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel && WHEEL_SLOTS[WHEEL_UI.sel]) {
+      h += '<div class="wod-slice-card">' + wheelSelectionHtml(p, WHEEL_UI.sel) + ctl + '</div>';
     } else {
-      h += '<div class="wheel-summary-toggle"><button class="sm" data-wsummary="1">Show bonus summary</button></div>';
-      h += '<div class="tiny dim" style="padding:10px;text-align:center">Select a slice to allocate points.</div>';
+      h += '<div class="wod-slice-card wod-slice-empty">' +
+        '<div class="wsel-name" style="color:#9ca3af">Nenhuma fatia selecionada</div>' +
+        '<div class="tiny dim">Clique em um ícone da roda para ver detalhes e alocar pontos.</div>' +
+        ctl + '</div>';
     }
-    h += '</div></div>';
+    if (showSummary) h += wheelSummaryHtml(p);
+    h += '</div>' +
+      '<div class="wod-commit-bar">' +
+        '<button type="button" class="wod-commit-btn is-confirm" id="wheel-ok" title="Salvar os pontos alocados na roda">OK (Aplicar)</button>' +
+        '<button type="button" class="wod-commit-btn is-reset" id="wheel-reset" title="Remove todos os pontos da roda">Reset</button>' +
+      '</div>' +
+    '</aside></div>';
   } else if (tab === "gem") {
     h += renderGemAtelier(p);
   } else if (tab === "frag") {
@@ -550,7 +558,7 @@ function wheelFitCanvas(root) {
   // so desconta o painel direito quando ele esta lado a lado (mesma linha)
   var rightW = 0;
   var rp = host && host.querySelector ? host.querySelector(".wheel-right") : null;
-  if (rp && Math.abs(rp.offsetTop - wrap.offsetTop) < 10) rightW = rp.offsetWidth + gapX;
+  if (rp && Math.abs(rp.offsetTop - wrap.offsetTop) < 100) rightW = rp.offsetWidth + gapX;
   var availW = host && host.clientWidth > 0 ? host.clientWidth - padX - rightW : 0;
   var availH = 0;
   if (embedded) {

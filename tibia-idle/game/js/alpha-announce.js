@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "20/11/2026 às 14:15";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Wheel of Destiny com novo visual: palco circular com borda dourada, nós com estados claros (verde/ciano) e controles −1/+1/MAX + OK/Reset no painel direito",
   "NOVO — The Order of the Stag Quest (350+): Stag Bastion, Arean Outskirts e Court Warlock — outfit Royal Bounacean Advisor (addons 1+2) e Mariner's Compass (+3 arm no extra slot)",
   "NOVO — The Roost of the Graveborn Quest (450+): 500 kills na Unhallowed Crypt liberam a cadeia de 5 bossrooms; Phylactery rende as 5 Crypt Runes",
   "NOVO — NPC Dragon Ancestor Spirit: troca 1 de cada Crypt Rune por uma arma Crypt aleatória — modal dedicado com roleta",
