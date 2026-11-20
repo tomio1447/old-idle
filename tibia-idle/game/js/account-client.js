@@ -2748,6 +2748,21 @@ async function accountPreyCardsRequest(token, packId) {
   }
   return r.data || { ok: false, msg: "Falha ao processar Prey Cards." };
 }
+
+/* 3º slot de prey permanente (conta inteira) — compra com Prey Cards. */
+async function accountPreySlotRequest(token) {
+  const r = await _api("POST", "/api/store/prey-slot", { token });
+  if (r.data && r.data.ok) {
+    const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+    if (acc && r.data.cosmetics) {
+      acc.cosmetics = Object.assign({}, acc.cosmetics || {}, {
+        preyCards: r.data.cosmetics.preyCards || 0,
+        preySlot: r.data.cosmetics.preySlot || 0 });
+      sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+    }
+  }
+  return r.data || { ok: false, msg: "Falha ao desbloquear o slot." };
+}
 async function storeBuyBless(token) {
   const r = await _api("POST", "/api/store/bless", { token });
   if (r.data && r.data.ok) {

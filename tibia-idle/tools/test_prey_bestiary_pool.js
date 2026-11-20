@@ -74,6 +74,60 @@ must(lista.length === 9, "reroll gera 9");
 must(lista.every(preyIsEligibleSlug), "reroll só elegíveis");
 must(!lista.some((s) => MONSTERDATA[s] && MONSTERDATA[s].boss), "reroll sem bosses");
 
+/* Seleção paga por Prey Card: qualquer elegível, mesmo fora da grade de
+ * 9 — e isPreyExclusive entra só nesse pool (ListAll_Cards). */
+const { preyIsCardEligible, preyIsCardEligibleSlug, preyCardPool, preySelectAny } = ctx;
+must(typeof preyIsCardEligible === "function" && typeof preyCardPool === "function" &&
+     typeof preySelectAny === "function" && typeof preyIsCardEligibleSlug === "function",
+     "funções de seleção paga ausentes em prey.js");
+const cardPool = preyCardPool();
+const cardSet = new Set(cardPool);
+must(cardPool.length >= pool.length, "pool pago deve cobrir o pool grátis");
+for (const slug of exclusive) {
+  const m = MONSTERDATA[slug];
+  if (!m || !m.best || !(m.exp > 0) || m.boss || m.isPreyable === 0 || m.isPreyable === false) continue;
+  must(preyIsCardEligible(m), "exclusivo não elegível ao card: " + slug);
+  must(cardSet.has(slug), "exclusivo fora do pool pago: " + slug);
+}
+must(!preyIsCardEligible({ name: "X", best: {}, exp: 10, boss: 1 }), "boss elegível ao card");
+must(!preyIsCardEligible({ name: "X", exp: 10 }), "sem bestiário elegível ao card");
+must(!preyIsCardEligible({ name: "X", best: {}, exp: 10, isPreyable: 0 }), "não preyable ao card");
+
+const p2 = { level: 50, gold: 0, prey: { slots: [
+  { unlocked: true, creatures: ["rat"], rerollAt: 0, selected: null },
+  { unlocked: true, creatures: [], rerollAt: 0, selected: null },
+  { unlocked: true, creatures: [], rerollAt: 0, selected: null },
+] } };
+const foraDaGrade = cardPool.find((s) => s !== "rat");
+must(foraDaGrade, "nenhuma criatura fora da grade disponível");
+const selAny = preySelectAny(p2, 0, foraDaGrade);
+must(selAny.ok, "preySelectAny falhou: " + (selAny.msg || ""));
+must(p2.prey.slots[0].selected.creature === foraDaGrade, "criatura paga não aplicada");
+must(selAny.value > 0, "bônus não rolado na seleção paga");
+must(p2.prey.slots[0].selected.until > Date.now(), "timer de 2h ausente");
+must(!preySelectAny(p2, 0, "the-monster").ok, "boss não pode entrar via card");
+must(!preySelectAny({ level: 1, gold: 0, prey: { slots: [
+  { unlocked: true, creatures: [], rerollAt: 0, selected: null },
+  { unlocked: true, creatures: [], rerollAt: 0, selected: null },
+  { unlocked: false, creatures: [], rerollAt: 0, selected: null }] } }, 2, "rat").ok,
+  "slot bloqueado não aceita seleção paga");
+
+/* 3º slot por CONTA (compra da Store): cosmetics.preySlot destrava o
+ * slot 2 em ensurePrey; sem a compra ele segue travado. */
+ctx.sessionAccount = () => ({ cosmetics: { preySlot: 1 } });
+const p3 = { level: 50, gold: 0, prey: { slots: [
+  { unlocked: true, creatures: [], rerollAt: 0, selected: null },
+  { unlocked: true, creatures: [], rerollAt: 0, selected: null },
+  { unlocked: false, creatures: [], rerollAt: 0, selected: null },
+] } };
+ensurePrey(p3);
+must(p3.prey.slots[2].unlocked, "cosmetics.preySlot deveria destravar o slot 3");
+ctx.sessionAccount = () => ({ cosmetics: {} });
+const p4 = { level: 50, gold: 0, prey: {} };
+ensurePrey(p4);
+must(p4.prey.slots[2] && !p4.prey.slots[2].unlocked, "sem compra o slot 3 segue travado");
+delete ctx.sessionAccount;
+
 const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
 must(html.includes("js/prey.js?v="), "cache-bust prey.js");
 must(html.includes("js/prey-ui.js?v="), "cache-bust prey-ui.js");

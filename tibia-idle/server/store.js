@@ -34,6 +34,8 @@ const PREY_PACKS = [
   { id: "prey50", cards: 50, coins: 60 },
   { id: "prey100", cards: 100, coins: 100 },
 ];
+/* 3º slot de prey permanente, por CONTA — pago com Prey Cards. */
+const PREY_SLOT_CARDS = 50;
 
 async function changePreys(db, body, consume) {
   const acc = await db.findAccountByToken(body && body.token);
@@ -50,6 +52,28 @@ async function changePreys(db, body, consume) {
     msg: consume ? "Prey Card utilizado." : pack.cards + " Prey Cards adicionados à conta!" } };
 }
 
+/* 3º slot de prey permanente (conta inteira): débito atômico de cards +
+ * grant no mesmo UPDATE via db.buyPreySlot — sem janela entre consumir
+ * o card e marcar a posse. */
+async function buyPreySlot(db, body) {
+  const acc = await db.findAccountByToken(body && body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const cos = typeof acc.cosmetics === "string"
+    ? (function () { try { return JSON.parse(acc.cosmetics); } catch (e) { return {}; } })()
+    : (acc.cosmetics || {});
+  if (cos.preySlot) return { code: 409, body: { ok: false, msg: "3º slot de prey já desbloqueado." } };
+  if (typeof db.buyPreySlot !== "function")
+    return { code: 500, body: { ok: false, msg: "Indisponível neste storage." } };
+  if (!await db.buyPreySlot(acc.id, PREY_SLOT_CARDS))
+    return { code: 409, body: { ok: false, msg: "Prey Cards insuficientes (precisa de " + PREY_SLOT_CARDS + ")." } };
+  const fresh = await db.findAccountById(acc.id);
+  await addLedger(db, { accountId: acc.id, login: acc.login, kind: "purchase",
+    delta: 0, coinsAfter: fresh.coins, brlCents: 0, ref: "prey-slot",
+    note: "3º Prey Slot permanente (" + PREY_SLOT_CARDS + " cards)" });
+  return { code: 200, body: { ok: true, coins: fresh.coins, cosmetics: fresh.cosmetics,
+    msg: "3º slot de prey desbloqueado para toda a conta!" } };
+}
+
 function mpConfigured() { return !!MP_ACCESS_TOKEN; }
 function packById(id) { return COIN_PACKS.find((p) => p.id === String(id || "")) || null; }
 function vipById(id) { return VIP_PACKS.find((p) => p.id === String(id || "")) || null; }
@@ -64,6 +88,7 @@ function catalog() {
     packs: COIN_PACKS.map((p) => Object.assign({}, p, { total: packTotalCoins(p) })),
     vip: VIP_PACKS.slice(),
     preys: PREY_PACKS.map((p) => Object.assign({}, p)),
+    preySlotCards: PREY_SLOT_CARDS,
   };
 }
 
@@ -642,7 +667,7 @@ async function recordGrant(db, acc, amount, after) {
 
 module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
-  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, PREY_PACKS,
+  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, buyPreySlot, PREY_PACKS, PREY_SLOT_CARDS,
   COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE, BLESS_PRICE,
   buyImbuement, IMBUEMENT_TIER_COINS,
 };

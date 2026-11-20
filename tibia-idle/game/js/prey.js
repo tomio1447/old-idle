@@ -57,6 +57,9 @@ function ensurePrey(p) {
     pr.slots.push({ unlocked: pr.slots.length < 2, creatures: [],
                     rerollAt: 0, selected: null });
   }
+  // 3º slot permanente comprado na Store é por CONTA — aplica em todo char.
+  if (pr.slots[2] && !pr.slots[2].unlocked && preyAccountSlot())
+    pr.slots[2].unlocked = true;
   pr.wildcards = Math.max(0, Number(pr.wildcards) || 0);
   const agora = Date.now();
   for (const s of pr.slots) {
@@ -118,6 +121,21 @@ function preyIsEligibleSlug(slug) {
   return preyIsEligible(preyMonsterLookup(slug));
 }
 
+/* Elegibilidade da seleção PAGA (ListAll_Cards do client): admite
+ * criaturas isPreyExclusive — elas só entram na lista comprada com
+ * Prey Card. As demais regras do Canary seguem iguais. */
+function preyIsCardEligible(mob) {
+  if (!mob || !mob.name) return false;
+  if (!mob.best) return false;
+  if (mob.boss) return false;
+  if (!(Number(mob.exp) > 0)) return false;
+  if (mob.isPreyable === 0 || mob.isPreyable === false) return false;
+  return true;
+}
+function preyIsCardEligibleSlug(slug) {
+  return preyIsCardEligible(preyMonsterLookup(slug));
+}
+
 /* Pool de prey = SOMENTE monstros que aparecem nas hunts do jogo (o
  * jogador só deve receber presa do que dá pra caçar de fato). O bestiário
  * inteiro ficava sugerindo criatura sem hunt (Efreet, Cult Believer...).
@@ -142,6 +160,34 @@ function preyMonsterPool() {
   if (src) {
     for (const slug in src) {
       if (preyIsEligible(src[slug])) slugs.push(slug);
+    }
+  }
+  return slugs;
+}
+
+/* Pool da seleção PAGA por Prey Card: mesma regra do pool grátis (só
+ * criaturas caçáveis), mas admite isPreyExclusive — é pra isso que serve
+ * o card. Não exclui o que já está nas grades: o jogador pode querer a
+ * mesma criatura em 2 slots. */
+function preyCardPool() {
+  const slugs = [];
+  const seen = new Set();
+  const hunts = (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts) || {};
+  for (const huntId in hunts) {
+    for (const entry of (hunts[huntId].monsters || [])) {
+      const slug = typeof entry === "string" ? entry : (entry && entry.slug);
+      if (!slug || seen.has(slug) || !preyIsCardEligibleSlug(slug)) continue;
+      seen.add(slug);
+      slugs.push(slug);
+    }
+  }
+  if (slugs.length) return slugs;
+  const src = (typeof MONSTERDATA !== "undefined" && MONSTERDATA)
+    ? MONSTERDATA
+    : (typeof GAMEDATA !== "undefined" ? GAMEDATA.monsters : null);
+  if (src) {
+    for (const slug in src) {
+      if (preyIsCardEligible(src[slug])) slugs.push(slug);
     }
   }
   return slugs;
@@ -240,6 +286,60 @@ function preySelect(p, slotIdx, creature, tipoForcado) {
   };
   return { ok: true, bonus: roll.tipo, step: roll.step,
            value: preyBonusValue(roll.tipo, roll.step) };
+}
+
+/* Seleção paga (1 Prey Card): a criatura NÃO precisa estar na grade de 9
+ * — o card é o mecanismo oficial de escolher qualquer criatura elegível.
+ * Rola um bônus novo como na seleção normal. */
+function preySelectAny(p, slotIdx, creature) {
+  ensurePrey(p);
+  const slot = p.prey.slots[slotIdx];
+  if (!slot || !slot.unlocked) return { ok: false, msg: "Slot bloqueado." };
+  if (!preyIsCardEligibleSlug(creature))
+    return { ok: false, msg: "Criatura não disponível na prey." };
+  const roll = preyRollBonus();
+  slot.selected = {
+    creature: creature,
+    bonus: roll.tipo,
+    step: roll.step,
+    until: Date.now() + PREY_DURATION_MS,
+  };
+  return { ok: true, bonus: roll.tipo, step: roll.step,
+           value: preyBonusValue(roll.tipo, roll.step) };
+}
+
+/* Consome 1 card (wildcard local primeiro, depois o card da conta) e
+ * ativa a prey na criatura escolhida — mesmo fora da grade. */
+async function preySelectWithCard(p, slotIdx, creature) {
+  if (PREY_CARD_PENDING.has(p)) return { ok: false, msg: "Aguarde a utilização do card." };
+  ensurePrey(p);
+  const slot = p.prey.slots[slotIdx];
+  if (!slot || !slot.unlocked) return { ok: false, msg: "Slot bloqueado." };
+  if (!preyIsCardEligibleSlug(creature))
+    return { ok: false, msg: "Criatura não disponível na prey." };
+  if ((p.prey.wildcards || 0) > 0) {
+    p.prey.wildcards--;
+    return preySelectAny(p, slotIdx, creature);
+  }
+  if (typeof accountPreyCardsRequest !== "function" ||
+      typeof accountApiConfigured !== "function" || !accountApiConfigured())
+    return { ok: false, msg: "Sem wildcards." };
+  PREY_CARD_PENDING.add(p);
+  try {
+    const result = await accountPreyCardsRequest(sessionToken());
+    if (!result.ok) return result;
+    return preySelectAny(p, slotIdx, creature);
+  } catch (e) {
+    return { ok: false, msg: "Não foi possível confirmar o uso do card. Atualize o saldo antes de tentar novamente." };
+  } finally { PREY_CARD_PENDING.delete(p); }
+}
+
+/* 3º slot permanente por CONTA (compra da Store): cosmetics.preySlot. */
+function preyAccountSlot() {
+  try {
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    return !!(acc && acc.cosmetics && acc.cosmetics.preySlot);
+  } catch (e) { return false; }
 }
 
 /* Usa um Prey Wildcard: melhora o step (+1) e pode trocar o tipo. */
@@ -364,6 +464,8 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PREY_SLOT_COUNT, PREY_LIST_SIZE, PREY_BONUSES,
     ensurePrey, preyMonsterPool, preyIsEligible, preyIsEligibleSlug,
+    preyIsCardEligible, preyIsCardEligibleSlug, preyCardPool,
+    preySelectAny, preySelectWithCard, preyAccountSlot,
     preyRerollList, preyReroll, preySelect, preyBonusValue,
   };
 }

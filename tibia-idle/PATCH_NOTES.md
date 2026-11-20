@@ -4,6 +4,34 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Prey Cards: seleção paga de criatura + 3º slot na Store
+
+### Prey
+
+- **SELECIONAR (qualquer criatura)** — novo botão em cada slot de prey
+  (ativo ou inativo) abre o picker com todas as criaturas caçáveis,
+  com busca: escolhe qualquer uma — mesmo fora da grade de 9 — por
+  **1 Prey Card** (o `ListAll_Cards` oficial; `isPreyExclusive` só entra
+  nesse pool). O bônus rola normalmente e o timer de 2h começa. Serve
+  também para trocar a criatura de uma prey ativa.
+- **3º slot de prey por conta** — compra permanente na **Store → Preys**
+  por **50 Prey Cards** (`/api/store/prey-slot`, débito + grant em um
+  único UPDATE atômico). Desbloqueia o slot 3 em todos os personagens
+  da conta via `cosmetics.preySlot` (o unlock por 250k de gold por
+  personagem segue valendo).
+
+### Fix
+
+- **Make Believe — Illuminated Warrior/Radiant Nimbus** — os claims
+  persistiam só `missionsDone` no servidor enquanto o cosmético ficava
+  no sessionStorage; `wardrobe.migrate()` agora deriva os cosméticos por
+  conta dos claims (outfit com addons 1+2, montaria) em toda leitura do
+  wardrobe — cura retroativa de quem já resgatou.
+- `test_store.js` — `adminSummary` exige role admin real (TEST_SERVER
+  não é bypass); assert desatualizado corrigido.
+
+---
+
 ## 2026-11-19 (v2) — Savestate global sem desconexão + visual gótico do login
 
 ### Server save → savestate global

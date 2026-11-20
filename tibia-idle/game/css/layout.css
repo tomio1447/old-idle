@@ -6304,3 +6304,13 @@ body.quest-lobby-open #party-panel { display:none !important; }
     flex-direction: column; gap: 6px;
   }
 }
+
+/* Picker da seleção paga de prey: grid rolável com todas as criaturas. */
+.prey-picker-grid {
+  max-height: 320px; overflow-y: auto; margin-top: 0;
+  padding-right: 3px;
+}
+#prey-picker-search {
+  background: #1a1813; border: 1px solid #3a372f; color: #ddd;
+  padding: 6px 8px; border-radius: 4px; font-family: inherit;
+}

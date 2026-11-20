@@ -89,9 +89,46 @@ must(cat.cardSurcharge === 1.1, "cartão +10%");
 
   const denied = await store.adminSummary(db, "tok");
   must(denied.code === 403, "jogador comum não vê faturamento");
+  // O resumo exige role admin de verdade — TEST_SERVER não é bypass
+  // (produção roda TEST_SERVER=1, então o bypass antigo era um furo).
+  db.accounts[0].role = "admin";
   const adminOk = await store.adminSummary(db, "tok", { testServer: true });
+  db.accounts[0].role = "user";
   must(adminOk.code === 200 && adminOk.body.totals.revenueBrl === 10, "faturamento R$ 10 do pacote 100");
   must(adminOk.body.totals.coinsSold === 100 && adminOk.body.totals.coinsSpent === 25, "totais sold/spent");
+
+  // 3º slot de prey: débito atômico de cards + grant por conta
+  const slotDb = {
+    findAccountByToken: async (t) => t === "tok" ? slotAcc : null,
+    findAccountById: async () => slotAcc,
+    buyPreySlot: async (id, cost) => {
+      const cos = slotAcc.cosmetics;
+      if (cos.preySlot || cos.preyCards < cost) return false;
+      cos.preyCards -= cost; cos.preySlot = 1;
+      return true;
+    },
+    coinLedgerAdd: async (row) => row,
+  };
+  const slotAcc = { id: 7, login: "p", coins: 0, cosmetics: { preyCards: 60 } };
+  const slotR = await store.buyPreySlot(slotDb, { token: "tok" });
+  must(slotR.code === 200 && slotR.body.ok, "buyPreySlot falhou: " + JSON.stringify(slotR.body));
+  must(slotAcc.cosmetics.preySlot === 1, "slot não marcado na conta");
+  must(slotAcc.cosmetics.preyCards === 60 - store.PREY_SLOT_CARDS, "débito de cards errado");
+  must(slotR.body.cosmetics && slotR.body.cosmetics.preySlot === 1, "resposta sem cosmetics");
+  const dup = await store.buyPreySlot(slotDb, { token: "tok" });
+  must(dup.code === 409 && !dup.body.ok, "recompra do slot deveria falhar");
+  const poorAcc = { id: 8, login: "p", coins: 0, cosmetics: { preyCards: 1 } };
+  const poorDb = Object.assign({}, slotDb, {
+    findAccountByToken: async (t) => t === "tok" ? poorAcc : null,
+    findAccountById: async () => poorAcc,
+    buyPreySlot: async () => false,
+  });
+  const poor = await store.buyPreySlot(poorDb, { token: "tok" });
+  must(poor.code === 409 && poor.body.msg.includes("insuficientes"), "saldo baixo deveria recusar");
+  const guest = await store.buyPreySlot(slotDb, { token: "bad" });
+  must(guest.code === 401, "token inválido deveria dar 401");
+  const cat2 = store.catalog();
+  must(cat2.preySlotCards === store.PREY_SLOT_CARDS, "catalog sem preySlotCards");
 
   const hook = await store.webhook(db, {}, { get: () => null });
   must(hook.code === 200 && hook.body.ignored, "webhook sem id é ignorado");
@@ -108,7 +145,7 @@ must(cat.cardSurcharge === 1.1, "cartão +10%");
   for (const route of [
     "/api/store/catalog", "/api/store/checkout", "/api/store/orders/",
     "/api/store/simulate", "/api/store/vip", "/api/store/history",
-    "/api/store/admin", "/api/store/mp/webhook",
+    "/api/store/admin", "/api/store/mp/webhook", "/api/store/prey-slot",
   ]) must(server.includes(route), "servidor sem rota " + route);
   must(server.includes('require("./store")'), "server.js não carrega store.js");
   must(server.includes("store.recordGrant"), "grant admin não entra no ledger");

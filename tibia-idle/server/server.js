@@ -6058,6 +6058,11 @@ async function main() {
         const r = await store.changePreys(db, body, url === "/api/prey/card");
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/store/prey-slot") {
+        const body = await readBody(req);
+        const r = await store.buyPreySlot(db, body);
+        return send(res, r.code, r.body);
+      }
       if (req.method === "POST" && url === "/api/store/bless") {
         const body = await readBody(req);
         const r = await store.buyBless(db, body);

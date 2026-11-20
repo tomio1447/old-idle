@@ -127,6 +127,17 @@ function preyBonusRerollBoxHtml(i) {
     </button>`;
 }
 
+/* Caixa SELECIONAR: escolhe QUALQUER criatura elegível — mesmo fora da
+ * grade de 9 — gastando 1 Prey Card (seleção paga do client oficial). */
+function preyCardSelectBoxHtml(i, cards) {
+  return `<button type="button" class="prey-act-box" id="prey-cardselect-${i}" ${cards > 0 ? "" : "disabled"}
+      title="Escolher qualquer criatura caçável — mesmo fora da lista (1 Prey Card)">
+      <img class="prey-act-img" src="assets/ui/prey/prey_wildcard.png" alt="Qualquer criatura">
+      <span class="prey-act-title">SELECIONAR</span>
+      <span class="prey-act-sub">qualquer criatura · 1 card</span>
+    </button>`;
+}
+
 /* Botões de loja Perm / Temp (slot bloqueado) — replicam o LockedPreyPanel. */
 function preyStoreBtnHtml(i) {
   return `<div class="prey-store-buttons">
@@ -179,8 +190,9 @@ function renderPreyModal(p) {
   if (!box) return;
   ensurePrey(p);
   const agora = Date.now();
+  const cards = preyCardCount(p);
   let h = `<div class="prey-wallet">
-      <span><img class="prey-wc-icon" src="assets/ui/prey/prey_wildcard.png" alt=""> Prey Wildcards: <b style="color:#ffd65a">${preyCardCount(p)}</b></span>
+      <span><img class="prey-wc-icon" src="assets/ui/prey/prey_wildcard.png" alt=""> Prey Wildcards: <b style="color:#ffd65a">${cards}</b></span>
       <span class="dim tiny">3 slots de prey · bônus por 2h · reroll grátis a cada 20h</span>
     </div>
     <div class="prey-slots">`;
@@ -197,7 +209,8 @@ function renderPreyModal(p) {
           </div>
         </div>
         ${preyStoreBtnHtml(i)}
-        <div class="prey-locked-msg tiny dim">Desbloqueie permanentemente (ou use um slot temporário) para caçar com bônus.</div>
+        <div class="prey-locked-msg tiny dim">Desbloqueie permanentemente (ou use um slot temporário) para caçar com bônus.
+          Na Store → Preys dá pra liberar o slot para a conta inteira com Prey Cards.</div>
       </div>`;
       continue;
     }
@@ -234,10 +247,11 @@ function renderPreyModal(p) {
         <div class="prey-timer-fill" style="width:${preyTimerPct(sel)}%"></div>
         <span>${preyTempoRestante(sel)}</span>
       </div>
-      <!-- caixas de ação: bonus reroll / reroll de lista -->
+      <!-- caixas de ação: bonus reroll / reroll de lista / selecionar qq criatura -->
       <div class="prey-act-boxes">
         ${preyBonusRerollBoxHtml(i)}
         ${preyRerollBoxHtml(i, custoReroll)}
+        ${preyCardSelectBoxHtml(i, cards)}
       </div>`;
     } else {
       // ---- InactivePreyPanel: grade de criaturas + caixas de escolha
@@ -253,6 +267,7 @@ function renderPreyModal(p) {
         <div class="prey-act-boxes">
           ${preyRerollBoxHtml(i, custoReroll)}
           ${preyChooseBoxHtml(i, slot._pending)}
+          ${preyCardSelectBoxHtml(i, cards)}
         </div>`;
     }
     h += `</div>`;
@@ -316,6 +331,9 @@ function renderPreyModal(p) {
       toast(`Wildcard: ${PREY_BONUSES[r.bonus].nome} +${r.value}%`);
       renderPreyModal(p);
     });
+    // Selecionar qualquer criatura (1 Prey Card): abre o picker completo
+    const cs = $("#prey-cardselect-" + i);
+    if (cs) cs.addEventListener("click", () => renderPreyCardPicker(p, i));
     // Store Perm (prey_perm_test) -> compra o slot permanente
     const buy = $("#prey-buy-" + i);
     if (buy) buy.addEventListener("click", () => {
@@ -348,6 +366,97 @@ function renderPreyModal(p) {
       slot._pending = el.dataset.preyCreature;
       renderPreyModal(p);
     });
+  });
+}
+
+/* ----------------------------------------------------------------------
+ * Picker da seleção paga (1 Prey Card): grade com TODAS as criaturas
+ * elegíveis do pool (inclusive isPreyExclusive), com busca. Clique marca;
+ * o botão ATIVAR gasta o card e aplica preySelectWithCard.
+ * ---------------------------------------------------------------------- */
+const PREY_PICKER_LIMIT = 80;
+let _preyPickerSel = null;
+
+function preyPickerGridHtml(pool, filtro) {
+  const f = String(filtro || "").trim().toLowerCase();
+  const lista = f
+    ? pool.filter((s) => preyMonsterName(s).toLowerCase().includes(f))
+    : pool;
+  const vis = lista.slice(0, PREY_PICKER_LIMIT);
+  return vis.map((slug) =>
+    `<div class="prey-creature ${_preyPickerSel === slug ? "sel" : ""}" data-prey-pick="${slug}">
+      <div class="prey-creature-sprite">${typeof mobImg === "function" ? mobImg(slug, 44) : ""}</div>
+      <span class="tiny">${preyMonsterName(slug)}</span>
+    </div>`).join("") +
+    (lista.length > PREY_PICKER_LIMIT
+      ? `<div class="tiny dim" style="grid-column:1/-1;padding:6px">+${lista.length - PREY_PICKER_LIMIT} — refine a busca</div>` : "");
+}
+
+function renderPreyCardPicker(p, slotIdx) {
+  const box = $("#prey-content");
+  if (!box) return;
+  ensurePrey(p);
+  const slot = p.prey.slots[slotIdx];
+  if (!slot || !slot.unlocked) { renderPreyModal(p); return; }
+  const pool = (typeof preyCardPool === "function" ? preyCardPool() : [])
+    .slice().sort((a, b) => preyMonsterName(a).localeCompare(preyMonsterName(b)));
+  _preyPickerSel = null;
+  box.innerHTML = `<div class="prey-wallet">
+      <span><img class="prey-wc-icon" src="assets/ui/prey/prey_wildcard.png" alt=""> Prey Wildcards: <b style="color:#ffd65a">${preyCardCount(p)}</b></span>
+      <span class="dim tiny">Prey Slot ${slotIdx + 1} — escolha paga</span>
+    </div>
+    <div class="prey-select-hint tiny dim">Selecione qualquer criatura caçável (1 Prey Card — inclusive fora da grade):</div>
+    <input id="prey-picker-search" class="mb4" style="width:100%" placeholder="Buscar criatura…" autocomplete="off">
+    <div class="prey-grid prey-picker-grid" id="prey-picker-grid"></div>
+    <div class="prey-act-boxes mt4">
+      <button type="button" class="prey-act-box" id="prey-picker-back" title="Voltar">
+        <span class="prey-act-title">VOLTAR</span>
+        <span class="prey-act-sub">sem gastar card</span>
+      </button>
+      <button type="button" class="prey-act-box" id="prey-picker-confirm" disabled
+        title="Ativa a prey na criatura marcada (1 Prey Card)">
+        <img class="prey-act-img" src="assets/ui/prey/prey_wildcard.png" alt="">
+        <span class="prey-act-title">ATIVAR PREY</span>
+        <span class="prey-act-sub" id="prey-picker-sub">1 card · marque uma criatura</span>
+      </button>
+    </div>`;
+
+  const grid = $("#prey-picker-grid");
+  const search = $("#prey-picker-search");
+  const confirm = $("#prey-picker-confirm");
+  const repaint = () => {
+    if (grid) grid.innerHTML = preyPickerGridHtml(pool, search ? search.value : "");
+  };
+  repaint();
+  if (search) {
+    search.addEventListener("input", repaint);
+    try { search.focus(); } catch (e) {}
+  }
+  const back = $("#prey-picker-back");
+  if (back) back.addEventListener("click", () => { _preyPickerSel = null; renderPreyModal(p); });
+  if (grid) grid.addEventListener("click", (ev) => {
+    const el = ev.target && ev.target.closest ? ev.target.closest("[data-prey-pick]") : null;
+    if (!el) return;
+    _preyPickerSel = el.dataset.preyPick;
+    const sub = $("#prey-picker-sub");
+    if (sub) sub.textContent = "1 card · " + preyMonsterName(_preyPickerSel);
+    if (confirm) confirm.disabled = false;
+    repaint();
+  });
+  if (confirm) confirm.addEventListener("click", async () => {
+    const slug = _preyPickerSel;
+    if (!slug) return;
+    confirm.disabled = true;
+    const r = await preySelectWithCard(p, slotIdx, slug);
+    if (!r.ok) {
+      toast(r.msg || "Não foi possível ativar a prey.", "bad");
+      confirm.disabled = false;
+      return;
+    }
+    _preyPickerSel = null;
+    toast(`Prey ativa: ${preyMonsterName(slug)} — ${PREY_BONUSES[r.bonus].nome} +${r.value}% por 2h!`);
+    renderPreyModal(p);
+    renderAll();
   });
 }
 

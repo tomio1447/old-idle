@@ -202,10 +202,22 @@ async function renderStorePreys(main) {
   if (!cat.ok) { main.textContent = cat.msg || "Não foi possível carregar os pacotes."; return; }
   const acc = sessionAccount();
   const cards = Math.max(0, Number(acc && acc.cosmetics && acc.cosmetics.preyCards) || 0);
+  const slotOwned = !!(acc && acc.cosmetics && acc.cosmetics.preySlot);
+  const slotCost = Math.max(1, Number(cat.preySlotCards) || 50);
   main.innerHTML = `<div class="tiny mb8">Prey Cards da conta: <b>${cards}</b>.
-    Saldo compartilhado entre todos os personagens. Cada utilização de Wildcard ou Bonus Reroll consome 1 card.
+    Saldo compartilhado entre todos os personagens. Cada utilização de Wildcard, Bonus Reroll ou
+    seleção de criatura fora da lista consome 1 card. O 3º slot desbloqueado vale para a conta inteira.
     Wildcards antigos do personagem são utilizados primeiro.</div>
-    <div class="store-pack-grid">${(cat.preys || []).map((p) => `
+    <div class="store-pack-grid">
+      <div class="store-pack">
+        <img src="assets/ui/prey/prey_perm_test.png" width="32" height="32" alt="3º Prey Slot">
+        <div class="store-pack-label">3º Slot de Prey</div>
+        <div class="tiny dim">permanente · toda a conta</div>
+        <div class="store-pack-price"><img src="assets/ui/prey/prey_wildcard.png" width="16" height="16" alt="" style="vertical-align:-3px"> ${slotCost} cards</div>
+        <button type="button" class="sm primary full" id="store-prey-slot" ${slotOwned ? "disabled" : ""}>
+          ${slotOwned ? "Desbloqueado" : "Desbloquear"}</button>
+      </div>
+      ${(cat.preys || []).map((p) => `
       <div class="store-pack">
         <img src="assets/ui/prey/prey_wildcard.png" width="32" height="32" alt="Prey Card">
         <div class="store-pack-label">${p.cards} cards</div>
@@ -229,6 +241,23 @@ async function renderStorePreys(main) {
         button.disabled = false;
       }
     });
+  });
+  const slotBtn = main.querySelector("#store-prey-slot");
+  if (slotBtn) slotBtn.addEventListener("click", async () => {
+    if (slotBtn.dataset.confirm !== "yes") {
+      slotBtn.dataset.confirm = "yes";
+      slotBtn.textContent = `Confirmar (${slotCost} cards)`;
+      return;
+    }
+    slotBtn.disabled = true;
+    try {
+      const r = await accountPreySlotRequest(sessionToken());
+      toast(r.msg || (r.ok ? "Slot desbloqueado." : "Falha ao desbloquear."), r.ok ? "level" : "bad");
+      if (main.isConnected && _storeTab === "preys") openStoreModal("preys");
+    } catch (e) {
+      toast("Não foi possível confirmar a compra. Confira o saldo antes de tentar novamente.", "bad");
+      slotBtn.disabled = false;
+    }
   });
 }
 
