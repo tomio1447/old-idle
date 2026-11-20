@@ -6,10 +6,15 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "11/11/2026 às 22:50";
+const ALPHA_UPDATE_AT = "20/11/2026 às 14:15";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — The Order of the Stag Quest (350+): Stag Bastion, Arean Outskirts e Court Warlock — outfit Royal Bounacean Advisor (addons 1+2) e Mariner's Compass (+3 arm no extra slot)",
+  "NOVO — The Roost of the Graveborn Quest (450+): 500 kills na Unhallowed Crypt liberam a cadeia de 5 bossrooms; Phylactery rende as 5 Crypt Runes",
+  "NOVO — NPC Dragon Ancestor Spirit: troca 1 de cada Crypt Rune por uma arma Crypt aleatória — modal dedicado com roleta",
+  "NOVO — Badge \"!\" nas Quests: avisa quando há recompensa de missão pronta a coletar (botão QUESTS + card da quest)",
+  "FIX — Loot de boss: o item agora aparece na mochila na hora ao coletar do Reward Chest, sem trocar de personagem",
   "NOVO — World Boss BAKRAGORE: lobby de até 5 jogadores (nível 600+) no catálogo de World Bosses",
   "NOVO — Bakragore's Burden: no lobby, cada jogador adiciona suas Taints de Murcion, Vemiath, Chagorz e Ichgahal — cada taint invoca +1 Elder Bloodjaw e aumenta o HP do boss em 5%",
   "NOVO — Derrotar Bakragore conclui a Blood Rotten Quest (agora em World Quests) e libera a recompensa 1x por personagem: Figurine of Bakragore + Bag You Covet",
@@ -52,10 +57,14 @@ function alphaDiscordLinkHtml(label) {
 
 function renderAlphaAnnounceUpdates(host) {
   if (!host) return;
-  const items = ALPHA_ANNOUNCE_UPDATES.map((line) =>
-    `<li>${String(line).replace(/</g, "&lt;")}</li>`
-  ).join("");
-  host.innerHTML = items ? `<ul class="alpha-announce-list">${items}</ul>` : "";
+  const items = ALPHA_ANNOUNCE_UPDATES.map((raw) => {
+    const line = String(raw).replace(/</g, "&lt;");
+    const m = line.match(/^(NOVO|FIX)\s*—\s*(.*)$/);
+    return m
+      ? `<li class="gi-patch-item"><span class="gi-new-badge${m[1] === "FIX" ? " is-fix" : ""}">${m[1]}</span><span class="gi-item-text">${m[2]}</span></li>`
+      : `<li class="gi-patch-item"><span class="gi-item-text">${line}</span></li>`;
+  }).join("");
+  host.innerHTML = items ? `<ul class="gi-patch-list">${items}</ul>` : "";
 }
 
 function closeAlphaAnnounceModal() {
@@ -69,7 +78,7 @@ function openAlphaAnnounceModal() {
   const modal = document.getElementById("alpha-announce-modal");
   if (!modal) return false;
   const at = document.getElementById("alpha-announce-update-at");
-  if (at) at.textContent = `🕐 Atualizado em ${ALPHA_UPDATE_AT} (horário de Brasília)`;
+  if (at) at.textContent = `📅 Atualizado em ${ALPHA_UPDATE_AT} (horário de Brasília)`;
   renderAlphaAnnounceUpdates(document.getElementById("alpha-announce-updates"));
   modal.classList.add("show");
   modal.setAttribute("aria-hidden", "false");

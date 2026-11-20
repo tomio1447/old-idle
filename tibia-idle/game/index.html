@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=quest-reward-notify-v1">
+  <link rel="stylesheet" href="css/layout.css?v=patch-modal-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-voc-v1">
@@ -77,23 +77,27 @@
 
 <!-- Aviso alpha (pré-login, todo page load) -->
 <div class="modal-bg" id="alpha-announce-modal" role="dialog" aria-modal="true" aria-labelledby="alpha-announce-title" aria-hidden="true">
-  <div class="modal panel alpha-announce-box">
-    <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">🚀 BETA OFICIAL — GLOBAL-IDLE</div>
-    <div class="panel-body">
-      <div class="brand-logo-wrap alpha-brand-logo">
-        <img class="brand-logo" src="assets/brand-logo.png?v=brand-v2" width="96" height="96" alt="Global Idle">
+  <div class="gi-patch-modal">
+    <header class="gi-modal-header">
+      <span class="gi-beta-tag" id="alpha-announce-title" data-i18n="alpha.title">🚀 BETA OFICIAL — GLOBAL-IDLE</span>
+    </header>
+    <div class="gi-modal-content">
+      <div class="gi-welcome-block">
+        <img src="assets/brand-logo.png?v=brand-v2" alt="Global Idle Logo" class="gi-hero-logo">
+        <p class="gi-welcome-text" data-i18n="alpha.warn">
+          Bem-vindo ao beta oficial! Reporte bugs e sugira melhorias no Discord ou no grupo do WhatsApp.
+        </p>
       </div>
-      <p class="small center mb8" data-i18n="alpha.warn">
-        Bem-vindo ao beta oficial! Reporte bugs e sugira melhorias no Discord ou no grupo do WhatsApp.
-      </p>
-      <div class="small dim mb4" data-i18n="alpha.updatesTitle">Patch notes — atualizações recentes</div>
-      <div id="alpha-announce-update-at" class="alpha-update-at tiny"></div>
-      <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
-      <button class="primary full mt8" id="alpha-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
-      <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
-        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
-      </p>
+      <div class="gi-notes-section">
+        <h3 class="gi-section-title" data-i18n="alpha.updatesTitle">Patch notes — atualizações recentes</h3>
+        <div class="gi-timestamp-bar" id="alpha-announce-update-at"></div>
+        <div id="alpha-announce-updates"></div>
+      </div>
     </div>
+    <footer class="gi-modal-footer">
+      <button type="button" class="gi-ok-btn" id="alpha-announce-ok" data-i18n="alpha.ok">OK</button>
+      <p class="gi-copyright" data-i18n="brand.credits">© Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados</p>
+    </footer>
   </div>
 </div>
 
@@ -720,7 +724,7 @@
 <script src="js/ui.js?v=deploy-1711-v1"></script>
 <script src="js/helper-presets.js?v=autosell-sync-v1"></script>
 <script src="js/i18n.js?v=cfg-logout-v1"></script>
-<script src="js/alpha-announce.js?v=deploy-1111-v1"></script>
+<script src="js/alpha-announce.js?v=patch-modal-v1"></script>
 <script src="js/settings.js?v=cfg-logout-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>

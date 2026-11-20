@@ -4,6 +4,20 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Modal de patch notes redesenhado
+
+- O aviso pré-login (`alpha-announce`) agora usa o layout `gi-patch-*`:
+  faixa "BETA OFICIAL" no topo, logo hero, bloco de boas-vindas, barra
+  dourada de data/hora, lista com badges **NOVO**/**FIX** parseados do
+  prefixo de cada bullet, footer com botão OK dourado e copyright.
+- Itens sem prefixo renderizam como texto puro (sem badge). Badge FIX
+  em azul, NOVO em vermelho.
+- Conteúdo atualizado: timestamp 20/11 e os 5 updates mais recentes
+  (Order of the Stag, Roost of the Graveborn, Dragon Ancestor Spirit,
+  badge "!" de quests, fix do loot de boss) no topo da lista.
+
+---
+
 ## 2026-11-20 — Notificação "!" de recompensa de quest a coletar
 
 - Sempre que uma missão de quest está concluída e a recompensa ainda
