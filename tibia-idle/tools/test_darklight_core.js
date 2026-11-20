@@ -138,10 +138,10 @@ for (const slug of lootSlugs) {
     slug + ": ícone inválido");
 }
 // Preços oficiais confirmados (TibiaWiki): produtos de criatura vendem
-// para o Yasir; unstable e yellow darklight matter são itens de quest
-// sem comprador NPC (0).
+// para o Yasir; unstable e yellow darklight matter: itens de
+// quest — npcvalue 5000 (valor confirmado).
 for (const [slug, price] of Object.entries({
-  "unstable-darklight-matter": 0, "yellow-darklight-matter": 0,
+  "unstable-darklight-matter": 5000, "yellow-darklight-matter": 5000,
   "dark-obsidian-splinter": 4400, "darklight-matter": 5500,
   "darklight-basalt-chunk": 3800, "darklight-core": 4100,
   "magma-clump": 570, "crystalline-armor": 16000, "white-gem": 12000,

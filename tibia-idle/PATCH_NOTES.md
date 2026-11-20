@@ -4,6 +4,22 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Sprite da Wand of Defiance + preços oficiais de NPC
+
+- **Wand of Defiance** — ícone reimportado do client (cid 16096,
+  32×32): o sprite anterior estava quebrado/truncado.
+- **Preços corrigidos** (npcvalue oficial TibiaWiki, venda ao Yasir):
+  Brooch of Embracement 0 → **14.000** · Crown 0 → **2.700** ·
+  Vibrant Heart 0 → **2.100** · Telescope Eye 0 → **1.600** ·
+  Vibrant Robe 0 → **1.200**.
+- **Rotten Blood** (valores confirmados): Unstable Darklight Matter
+  0 → **5.000** · Yellow Darklight Matter 0 → **5.000** ·
+  Darklight Obsidian Axe 0 → **8.000**.
+- Verificados já corretos: Dark Obsidian Splinter 4.400 e
+  Darklight Basalt Chunk 3.800.
+
+---
+
 ## 2026-11-20 — Modal de patch notes redesenhado
 
 - O aviso pré-login (`alpha-announce`) agora usa o layout `gi-patch-*`:

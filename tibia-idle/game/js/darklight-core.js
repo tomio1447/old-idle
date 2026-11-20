@@ -11,8 +11,7 @@
  * Loot:
  *   - 7 produtos de criatura/itens novos com cids reais do client 15.x e
  *     preços oficiais de NPC (TibiaWiki). Unstable e Yellow Darklight
- *     Matter são itens de quest sem comprador NPC → sell 0, igual aos
- *     ectoplasms/lichen gobbler.
+ *     Matter: itens de quest — npcvalue 5000 (valor confirmado).
  *   - Drops "muito raro" ausentes do dump Canary (patch oficial):
  *     +Crystalline Armor no Darklight Source, +White Gem no Darklight
  *     Striker e +Dwarven Ring no Walking Pillar — mesma banda de chance
@@ -25,8 +24,8 @@
 
 const DARKLIGHT_CORE = (() => {
   const items = {
-    "unstable-darklight-matter": { n: "unstable darklight matter", s: null, t: "loot", cid: 43779, w: 1.00, sell: 0, npcSell: 0 },
-    "yellow-darklight-matter":   { n: "yellow darklight matter", s: null, t: "loot", cid: 43780, w: 1.00, sell: 0, npcSell: 0 },
+    "unstable-darklight-matter": { n: "unstable darklight matter", s: null, t: "loot", cid: 43779, w: 1.00, sell: 5000, npcSell: 5000 },
+    "yellow-darklight-matter":   { n: "yellow darklight matter", s: null, t: "loot", cid: 43780, w: 1.00, sell: 5000, npcSell: 5000 },
     "dark-obsidian-splinter":    { n: "dark obsidian splinter", s: null, t: "loot", cid: 43850, w: 1.00, sell: 4400, npcSell: 4400 },
     "darklight-matter":          { n: "darklight matter", s: null, t: "loot", cid: 43851, w: 1.00, sell: 5500, npcSell: 5500 },
     "darklight-basalt-chunk":    { n: "darklight basalt chunk", s: null, t: "loot", cid: 43852, w: 1.00, sell: 3800, npcSell: 3800 },

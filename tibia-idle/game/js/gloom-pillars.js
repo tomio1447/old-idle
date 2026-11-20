@@ -10,8 +10,8 @@
  *
  * Loot:
  *   - 3 itens novos com cids reais do client 15.x: darklight obsidian
- *     axe (43781, item de quest da Rotten Blood sem comprador NPC →
- *     sell 0), basalt crumbs (43858, Yasir 3000) e basalt core (43859,
+ *     axe (43781, item de quest da Rotten Blood — npcvalue
+ *     confirmado 8000), basalt crumbs (43858, Yasir 3000) e basalt core (43859,
  *     Yasir 5800).
  *   - Correção de paridade: zaoan armor/shoes tinham no catálogo do
  *     cliente valores antigos do yasir-prices.js (12000/6000); os
@@ -27,7 +27,7 @@
 
 const GLOOM_PILLARS = (() => {
   const items = {
-    "darklight-obsidian-axe": { n: "darklight obsidian axe", s: null, t: "loot", cid: 43781, w: 1.00, sell: 0, npcSell: 0 },
+    "darklight-obsidian-axe": { n: "darklight obsidian axe", s: null, t: "loot", cid: 43781, w: 1.00, sell: 8000, npcSell: 8000 },
     "basalt-crumbs":          { n: "basalt crumbs", s: null, t: "loot", cid: 43858, w: 1.00, sell: 3000, npcSell: 3000 },
     "basalt-core":            { n: "basalt core", s: null, t: "loot", cid: 43859, w: 1.00, sell: 5800, npcSell: 5800 },
     // Paridade de preço oficial (Esrik): o cliente trazia valores antigos.

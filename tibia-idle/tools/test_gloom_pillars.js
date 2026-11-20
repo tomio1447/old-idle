@@ -140,10 +140,10 @@ for (const slug of lootSlugs) {
     slug + ": ícone inválido");
 }
 // Preços oficiais confirmados (TibiaWiki): basalt crumbs/core vendem para
-// o Yasir; darklight obsidian axe é item de quest sem comprador NPC (0);
+// o Yasir; darklight obsidian axe: item de quest — npcvalue 8000 (valor confirmado);
 // zaoan armor/shoes usam o preço oficial do Esrik (paridade corrigida).
 for (const [slug, price] of Object.entries({
-  "darklight-obsidian-axe": 0, "basalt-crumbs": 3000, "basalt-core": 5800,
+  "darklight-obsidian-axe": 8000, "basalt-crumbs": 3000, "basalt-core": 5800,
   "zaoan-armor": 14000, "zaoan-shoes": 5000, "might-ring": 250,
   "ultimate-mana-potion": 0, "lightning-legs": 11000, "green-gem": 5000,
 })) for (const items of [catalog.GAMEDATA.items, E.ITEMS])
