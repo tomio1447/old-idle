@@ -179,4 +179,62 @@ must(gated.authority.scarlett.immune&&gatedBoss.hp>=Math.ceil(gatedBoss.maxHp*0.
 must(engine.initializeAuthority(bossDesc(player(),"ferumbras-mortal-shell"),"e".repeat(64),1000).authority.bossId===
   "ferumbras-mortal-shell","Ferumbras não inicializa no engine");
 
-console.log("OK: Reward Chest objeto+pacote, loot por chance, Hatred/Scarlett/Greed online e mácula Soul War.");
+// --- Claim de boss: bundle removido IN-PLACE (ref compartilhada entre membros) ---
+{
+  const lead=player({id:7}),member=player({id:8});
+  engine.rewardChestAdd(lead.p?lead:lead,"gold-coin",10,{bundleId:"b1",bossId:"the-monster",name:"Rat"});
+  engine.rewardChestAdd(lead,"gold-coin",5,{bundleId:"b2",bossId:"the-monster",name:"Rat"});
+  // shareInstanceContainers unifica por REFERÊNCIA: o array do membro é o do líder.
+  member.rewardChestBundles=lead.rewardChestBundles;
+  member.rewardChest=lead.rewardChest;
+  member.lootPouch=lead.lootPouch;
+  const sharedRef=lead.rewardChestBundles;
+  must(engine.rewardChestClaimBundle(member,"b1")===1,"claim em membro não-líder falhou");
+  must(member.rewardChestBundles===sharedRef&&sharedRef.length===1&&sharedRef[0].id==="b2",
+    "bundle removido trocou a REF do array (ressuscitaria nos demais membros)");
+  must(member.rewardChest["gold-coin"]===5&&member.lootPouch["gold-coin"]===10,
+    "claim não creditou a pouch compartilhada");
+  must(engine.rewardChestClaimAll(member)===5,"claimAll não recolheu o restante");
+  must(sharedRef.length===0,"claimAll deixou bundles na ref compartilhada");
+}
+// --- Claim dentro de instância: _pouchBase rebased → sem dupla contagem no split ---
+{
+  must(serverSource.includes("entry.p._pouchBase=Object.assign({},entry.p.lootPouch||{})"),
+    "patch do claim não rebaseia _pouchBase (delta contado 2x no split terminal)");
+  must(serverSource.includes("entry.p.lootPouch===item.p.lootPouch"),
+    "rebase do claim não cobre os membros com pouch por referência");
+}
+// --- Apply client-side: pouch/inventory repintados (item aparece sem trocar de char) ---
+{
+  must(rewardJs.includes("function rewardChestApplyServer"),
+    "rewardChestApplyServer ausente");
+  const applyBody=rewardJs.slice(rewardJs.indexOf("function rewardChestApplyServer"),
+    rewardJs.indexOf("function rewardChestOnlineClaim"));
+  for(const fn of ["renderLootPouch","renderInventory","renderSupplyStash","renderRewardButton"])
+    must(applyBody.includes(fn),"rewardChestApplyServer não repinta "+fn+" — item some até renderAll");
+  must(applyBody.includes("data.supplyStash"),"rewardChestApplyServer ignora supplyStash do claim");
+}
+// rewardChestApplyServer aplicado num sandbox mínimo atualiza p e repinta.
+{
+  const vm=require("vm");
+  const calls={loot:0,inv:0,stash:0,badge:0};
+  const sandbox={GAMEDATA:{items:{}},console,
+    renderLootPouch:()=>calls.loot++,renderInventory:()=>calls.inv++,
+    renderSupplyStash:()=>calls.stash++,renderRewardButton:()=>calls.badge++,
+    itemImg:()=>"",mobImg:()=>"",bossMobImg:()=>"",fmtFull:(n)=>String(n),
+    itemClsBorder:()=>"",toast:()=>{},hideTip:()=>{},save:()=>{},addLootPouch:()=>true,
+    freeCapacity:()=>100,itemUnitWeight:()=>1,accountApiConfigured:()=>false,
+    sessionToken:()=>null,bindFullItemTooltip:()=>{},renderCidadeRewardNotify:()=>{},
+    $:()=>({classList:{remove(){},add(){}},addEventListener(){},innerHTML:""}),
+    $$:()=>[],document:{getElementById:()=>null},G:{p:null}};
+  vm.createContext(sandbox);
+  vm.runInContext(rewardJs+";globalThis.__t={rewardChestApplyServer,rewardChestEnsureShape};",sandbox);
+  const p={rewardChest:{sword:2},rewardChestBundles:[{id:"b1",items:{sword:2}}],lootPouch:{},supplyStash:{}};
+  sandbox.__t.rewardChestApplyServer(p,{rewardChest:{},rewardChestBundles:[],
+    lootPouch:{sword:2},supplyStash:{potion:5}});
+  if(!(p.lootPouch.sword===2&&p.supplyStash.potion===5&&!p.rewardChest.sword&&
+    !p.rewardChestBundles.length&&calls.loot===1&&calls.inv===1&&calls.stash===1))
+    throw Error("rewardChestApplyServer não aplicou/renderizou o estado do claim");
+}
+
+console.log("OK: Reward Chest objeto+pacote, loot por chance, Hatred/Scarlett/Greed online, mácula Soul War, claim in-place + rebase de pouch + repaint da Loot Pouch.");

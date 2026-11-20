@@ -4,6 +4,33 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Reward Chest: loot de boss aparece na Loot Pouch na hora + correções de integridade
+
+- **Bug corrigido**: ao recolher o loot de boss online, o item não
+  aparecia na Loot Pouch até trocar de personagem. `rewardChestApplyServer`
+  atualizava os dados mas nunca repintava o painel `#lootpouch` (na cidade
+  não há loop de render — só `renderAll` o atualizava). Agora repinta
+  Loot Pouch, mochila e Supply Stash no ato do claim.
+- **Duplicação corrigida (servidor)**: o patch do claim dentro de
+  instância ativa não rebasiava `_pouchBase` — o split
+  terminal/dirty via `pouchDelta` somava o MESMO delta de novo e os
+  itens entravam duplicados no shared. O patch agora rebasia a
+  baseline de todos os membros que compartilham a pouch por
+  referência (mesmo padrão de `syncInstancePouchCopies`).
+- **Ressurreição de bundles corrigida**: `rewardChestBundles` é array
+  compartilhado por referência entre os membros da conta na instância
+  (`shareInstanceContainers`). Remover bundle via `filter()` trocava a
+  ref só no personagem que clicou — o tick seguinte ressuscitava o
+  pacote nos demais. Remoções agora são `splice` in-place
+  (`rewardChestRemoveBundleIfEmpty`/`rewardChestCompactBundles`), com
+  paridade no cliente.
+- `tools/test_boss_reward_online.js` cobre: remoção in-place com ref
+  compartilhada, rebase de `_pouchBase`, repaint e aplicação do estado
+  do claim (pouch/stash/chest) num sandbox.
+- `game/js/reward-chest.js` → `?v=reward-claim-repaint-v1`.
+
+---
+
 ## 2026-11-20 — Modal de hunts: Ferumbras Ascendant movido para HUNTS 250+
 
 - As 3 hunts de Ferumbras Ascendant (**Ferumbras Ascendant Way**,

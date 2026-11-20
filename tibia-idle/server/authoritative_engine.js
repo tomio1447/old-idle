@@ -5184,7 +5184,18 @@ function rewardChestAdd(p,slug,count,source){
 }
 function rewardChestRemoveBundleIfEmpty(p,bundle){
   if(!bundle||Object.keys(bundle.items||{}).some((slug)=>bundle.items[slug]>0))return;
-  p.rewardChestBundles=(p.rewardChestBundles||[]).filter((b)=>b!==bundle);
+  /* splice in-place (não filter+reatribuir): dentro de instância o array é
+   * REF COMPARTILHADA entre os membros da conta (shareInstanceContainers).
+   * Um array novo só valia no p clameado — a ref antiga ressuscitava o
+   * bundle no próximo tick para os demais personagens. */
+  const arr=p.rewardChestBundles||[];const i=arr.indexOf(bundle);
+  if(i>=0)arr.splice(i,1);
+}
+function rewardChestCompactBundles(p){
+  const arr=p.rewardChestBundles||[];
+  for(let i=arr.length-1;i>=0;i--){const b=arr[i];
+    if(!b||!b.items||!Object.keys(b.items).some((k)=>b.items[k]>0))arr.splice(i,1);}
+  return arr;
 }
 function rewardChestAddPouch(p,slug,count){
   if(!p||!slug||!(count>0))return 0;
@@ -5630,7 +5641,7 @@ function rewardChestClaimOne(p,slug,bundleId){
       if(bundle.items[slug]<=0)delete bundle.items[slug];
       remaining-=take;
     }
-    p.rewardChestBundles=(p.rewardChestBundles||[]).filter((b)=>b&&b.items&&Object.keys(b.items).some((k)=>b.items[k]>0));
+    rewardChestCompactBundles(p);
   }
   p.rewardChest[slug]=Math.max(0,(Number(p.rewardChest[slug])||0)-n);
   if(!p.rewardChest[slug])delete p.rewardChest[slug];
@@ -5700,7 +5711,7 @@ function rewardChestClaimAll(p){
     }
     total+=n;
   }
-  p.rewardChestBundles=(p.rewardChestBundles||[]).filter((b)=>b&&b.items&&Object.keys(b.items).some((k)=>b.items[k]>0));
+  rewardChestCompactBundles(p);
   return total;
 }
 /* Goshnar's Taints — port do soulwar.js (idle). Só atuam em Soul War zones /

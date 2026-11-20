@@ -1770,6 +1770,16 @@ async function claimRewardChest(db,body){
         if(!item||!item.p)return null;
         claimedCount=applyRewardChestClaim(item.p,body);
         claimedPlayer=cloneJson(item.p);
+        /* Rebase da pouch no descriptor: o delta do claim já é extraído por
+         * persistClaimedPlayer (clone acima, com a baseline antiga). Sem o
+         * rebase, o split terminal/dirty via pouchDelta somava o MESMO delta
+         * de novo — cada claim dentro de instância duplicava os itens. A
+         * pouch é ref compartilhada entre membros da conta
+         * (shareInstanceContainers): rebaseia todos que apontam para ela. */
+        for(const entry of (descriptor.authority&&descriptor.authority.players)||[]){
+          if(entry&&entry.p&&entry.p.lootPouch===item.p.lootPouch)
+            entry.p._pouchBase=Object.assign({},entry.p.lootPouch||{});
+        }
         descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
       },lease);
       last=result;

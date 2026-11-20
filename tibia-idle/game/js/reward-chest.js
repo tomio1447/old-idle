@@ -95,8 +95,14 @@ function rewardChestApplyServer(p, data) {
   if (data.rewardChest && typeof data.rewardChest === "object") p.rewardChest = data.rewardChest;
   if (Array.isArray(data.rewardChestBundles)) p.rewardChestBundles = data.rewardChestBundles;
   if (data.lootPouch && typeof data.lootPouch === "object") p.lootPouch = data.lootPouch;
+  if (data.supplyStash && typeof data.supplyStash === "object") p.supplyStash = data.supplyStash;
   rewardChestEnsureShape(p);
   if (typeof renderRewardButton === "function") renderRewardButton(p);
+  // A Loot Pouch é um painel fixo: sem repintar aqui o item recolhido só
+  // aparecia depois de qualquer outro renderAll (ex.: trocar de personagem).
+  if (typeof renderLootPouch === "function") renderLootPouch(p);
+  if (typeof renderInventory === "function") renderInventory(p);
+  if (typeof renderSupplyStash === "function") renderSupplyStash(p);
 }
 
 function rewardChestOnlineClaim(p, opts) {
@@ -133,7 +139,11 @@ function rewardChestAdd(p, slug, count, source) {
 
 function rewardChestRemoveBundleIfEmpty(p, bundle) {
   if (!bundle || Object.keys(bundle.items || {}).some((slug) => bundle.items[slug] > 0)) return;
-  p.rewardChestBundles = (p.rewardChestBundles || []).filter((b) => b !== bundle);
+  // splice in-place — paridade com o engine: a ref do array pode estar
+  // compartilhada com outras views do mesmo personagem.
+  const arr = p.rewardChestBundles || [];
+  const i = arr.indexOf(bundle);
+  if (i >= 0) arr.splice(i, 1);
 }
 
 /* Coleta um item. Com bundleId, coleta somente o drop daquela batalha. */
@@ -152,7 +162,11 @@ function rewardChestClaimOne(p, slug, bundleId) {
     count = p.rewardChest[slug] || 0;
     if (!count) return false;
     for (const bundle of rewardChestBundleList(p)) delete bundle.items[slug];
-    p.rewardChestBundles = rewardChestBundleList(p);
+    const oneArr = p.rewardChestBundles || [];
+    for (let i = oneArr.length - 1; i >= 0; i--) {
+      const b = oneArr[i];
+      if (!b || !b.items || !Object.keys(b.items).some((k) => b.items[k] > 0)) oneArr.splice(i, 1);
+    }
   }
   if (typeof addLootPouch === "function") addLootPouch(p, slug, count);
   p.rewardChest[slug] = Math.max(0, (p.rewardChest[slug] || 0) - count);
@@ -245,7 +259,11 @@ function rewardChestClaimAll(p) {
     }
     total += n;
   }
-  p.rewardChestBundles = (p.rewardChestBundles || []).filter((b) => b && b.items && Object.keys(b.items).some((k) => b.items[k] > 0));
+  const rcArr = p.rewardChestBundles || [];
+  for (let i = rcArr.length - 1; i >= 0; i--) {
+    const b = rcArr[i];
+    if (!b || !b.items || !Object.keys(b.items).some((k) => b.items[k] > 0)) rcArr.splice(i, 1);
+  }
   if (typeof save === "function") save();
   if (typeof renderRewardButton === "function") renderRewardButton(p);
   return total;
@@ -273,7 +291,9 @@ function rewardChestDeleteBundle(p, bundleId) {
   if (!p || !bundleId) return;
   const bundle = rewardChestFindBundle(p, bundleId);
   if (!bundle) return;
-  p.rewardChestBundles = (p.rewardChestBundles || []).filter((b) => b !== bundle);
+  const delArr = p.rewardChestBundles || [];
+  const delIdx = delArr.indexOf(bundle);
+  if (delIdx >= 0) delArr.splice(delIdx, 1);
   if (typeof save === "function") save();
   if (typeof renderRewardButton === "function") renderRewardButton(p);
 }
