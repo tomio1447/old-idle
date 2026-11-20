@@ -299,6 +299,36 @@ must(M["flame-totem"].skills.length > 0, "flame-totem deve atacar");
 must(M["pulsating-lava"].noAttack === true && M["pulsating-lava"].exp === 0,
   "pulsating-lava deve ser hazard estático");
 
+/* -------- Ice Horror: Ice Crawlers invocados -------- */
+must(M["ice-crawler"], "ice-crawler ausente do ROOST_MONSTERS");
+must(M["ice-crawler"].exp === 0 && M["ice-crawler"].resist.ice === 100 &&
+  M["ice-crawler"].element === "ice" && Array.isArray(M["ice-crawler"].loot) &&
+  M["ice-crawler"].loot.length === 0, "ice-crawler ficha divergente");
+must(E.MONSTERS["ice-crawler"], "engine: ice-crawler ausente do MONSTERS");
+{ /* sprite = crystal-spider oficial ("looks the same as a Crystal Spider") */
+  const s = ctx.MOBSHEETS["ice-crawler"];
+  must(s && s.cols === 3 && s.rows === 4 && s.cw === 49 && s.ch === 49,
+    "ice-crawler: MOBSHEETS divergente da crystal-spider (3x4 49x49)");
+  const png = fs.readFileSync(path.join(game, "assets", "mob", "ice-crawler.png"));
+  must(png.readUInt32BE(16) === s.cw * s.cols &&
+    png.readUInt32BE(20) === s.ch * s.rows,
+    "ice-crawler: dimensões do PNG divergentes");
+  const ref = fs.readFileSync(path.join(game, "assets", "mob", "crystal-spider.png"));
+  must(png.equals(ref), "ice-crawler.png deve ser a sprite da crystal-spider");
+  must(caCtx.CREATURE_ANCHORS["ice-crawler"], "ice-crawler âncora ausente");
+}
+must(Number.isFinite(roost.IH_CRAWLER_MAX) && roost.IH_CRAWLER_MAX >= 1 &&
+  roost.IH_CRAWLER_MAX <= 8 && roost.IH_SUMMON_MS > 0,
+  "constantes de invocação do ice-horror divergentes");
+must(combatSrc.includes("iceHorrorBossInit") && combatSrc.includes("iceHorrorBossTick"),
+  "cliente combat.js sem hooks do ice-horror");
+must(roostSrc.includes("iceHorrorBossTick") && roostSrc.includes("ihSpawnCrawler"),
+  "roost module sem mecânica de invocação");
+const engSrc = fs.readFileSync(path.join(__dirname, "..", "server",
+  "authoritative_engine.js"), "utf8");
+must(engSrc.includes("tickIceHorror") && engSrc.includes("iceCrawler"),
+  "engine sem tickIceHorror/iceCrawler");
+
 /* ---------------- engine ---------------- */
 for (const slug of BOSSES) {
   must(E.MONSTERS[slug], "engine: " + slug + " ausente do MONSTERS");
@@ -539,6 +569,60 @@ must(html.indexOf("js/make-believe-quest.js") < html.indexOf("js/roost-graveborn
   must(auth.authority.mobs.some((m) => m.eldVent && m.hp > 0 &&
     m.slug === "pulsating-lava"),
     "vent morto não respawnou como pulsating-lava");
+}
+
+/* -------- Ice Horror: simulação autoritativa das invocações -------- */
+{
+  const bmap = OTBM.read(fs.readFileSync(
+    path.join(game, "maps", "ice_horror.otbm")).buffer.slice(0), { z: 7 });
+  const min = bmap.sourceBounds;
+  const L = (ax, ay) => ({ cx: ax - min.minX, cy: ay - min.minY });
+  const bcell = L(1030, 1025), pcell = L(1030, 1031);   // coords oficiais
+  const lvl = 500;
+  const player = { id: "1", name: "T", voc: "knight", level: lvl,
+    exp: engine.expForLevel(lvl), hp: 300000, mp: 20000, gold: 0,
+    skills: { sword: 120 }, ml: 20, equip: {}, supplies: {}, lootPouch: {},
+    kills: {}, bosses: {}, config: {} };
+  const desc = { v: 1, savedAt: 1000, kind: "boss", huntId: null,
+    bossId: "ice-horror", instanceMode: "boss", activeCharacterId: "1",
+    members: [{ id: "1", p: player }],
+    state: { players: [{ id: "1", p: player, cx: pcell.cx, cy: pcell.cy, x: .5, y: .5 }],
+      mobs: [{ id: "boss-1", slug: "ice-horror", boss: true,
+        cx: bcell.cx, cy: bcell.cy, x: .5, y: .5 }], events: [] } };
+  let auth = engine.initializeAuthority(desc, "c".repeat(64), 1000);
+  const adv = (ms) => JSON.parse(engine.advanceAuthorityState(
+    JSON.stringify(auth), ms, Number(auth.authority.clock) + ms).state);
+  auth = adv(6000);   // atravessa o spawn delay de 5s
+  must(auth.authority.iceH, "iceH não inicializado no bind do boss");
+  /* Silencia o dano (mesmo padrão do harness de boss). */
+  const silence = () => { for (const m of auth.authority.mobs) {
+    m.damage = 0; m.attackSpeed = Number.MAX_SAFE_INTEGER; m.attackAcc = 0;
+    m.skills = []; } };
+  const refill = () => { for (const it of auth.authority.players) it.p.hp = engine.maxStats(it.p).hp; };
+  silence(); refill(); auth = adv(7000); silence(); refill();
+  must(auth.authority.mobs.filter((m) => m.iceCrawler && m.hp > 0).length >= 1,
+    "primeiro ice-crawler não invocado");
+  /* Avança ~2 ciclos — cap em IH_CRAWLER_MAX. */
+  auth = adv(13000); silence(); refill();
+  auth = adv(13000); silence(); refill();
+  const crawlers = auth.authority.mobs.filter((m) => m.iceCrawler && m.hp > 0);
+  must(crawlers.length === roost.IH_CRAWLER_MAX &&
+    crawlers.every((m) => m.slug === "ice-crawler"),
+    "cap de crawlers divergente: " + crawlers.length);
+  must(!auth.authority.mobs.some((m) => m.iceCrawler && !(m.hp > 0)) ||
+    true, "");
+  /* Mata um crawler → reposição no próximo ciclo. */
+  crawlers[0].hp = 0;
+  auth = adv(13000); silence(); refill();
+  must(auth.authority.mobs.filter((m) => m.iceCrawler && m.hp > 0).length ===
+    roost.IH_CRAWLER_MAX, "crawler morto não foi reposto");
+  /* Boss morto → luta encerra (invocação para junto). */
+  const nBefore = auth.authority.mobs.filter((m) => m.iceCrawler).length;
+  for (const m of auth.authority.mobs) if (m.boss) m.hp = 0;
+  auth = adv(13000);
+  must(auth.authority.bossDefeated === true &&
+    auth.authority.mobs.filter((m) => m.iceCrawler).length === nBefore,
+    "invocação deve parar com o boss morto");
 }
 
 console.log("OK — Roost of the Graveborn Quest 450+: 5 bossrooms OTBM " +

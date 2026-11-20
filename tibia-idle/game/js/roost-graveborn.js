@@ -516,6 +516,31 @@ const ELD_VENT_SPAWNS = [       // offsets vs bossspawn oficial {1021,1024}
 const AG_CRYSTAL_MANA_DRAIN_PCT = 35;   // % da mana máxima drenada
 const AG_CRYSTAL_RADIUS = 2;
 
+/* ── Ice Horror — Ice Crawlers invocados ──────────────────────────────
+ * Oficial (tibiawiki): "Ele invoca Ice Crawlers para a batalha" e a ficha
+ * do Ice Crawler diz "looks the same as a Crystal Spider" → a sprite é a
+ * da crystal-spider clássica (png copiada p/ ice-crawler.png, mesma
+ * âncora). Stats oficiais ocultos (monstro do encontro, hp/exp "?") →
+ * estimados para um add de boss 450+; cap/intervalo de invocação não são
+ * publicados → IH_CRAWLER_MAX/IH_SUMMON_MS documentados como design. */
+const IH_CRAWLER_MAX = 3;        // máx. crawlers vivos simultâneos
+const IH_SUMMON_MS = 12000;      // intervalo entre invocações
+const ICE_CRAWLER = {
+  name: "Ice Crawler",
+  hp: 25000, exp: 0,
+  speed: 115, armor: 43, defense: 0,
+  damage: 800, element: "ice", attackSpeed: 2000, mitigation: 0,
+  resist: { ice: 100 },
+  skills: [
+    { el: "ice", min: 400, max: 700, int: 3500, ch: 30, radius: 2,
+      fx: "ice-area", miss: "ice" },
+  ],
+  targetDistance: 1, staticAttack: 90,
+  imune: ["paralyze", "invisible"],
+  voices: { int: 5000, ch: 10, list: [{ t: "Chrrrk!" }] },
+  loot: [], grupo: "quests",
+};
+
 const ROOST_MONSTERS = {
   "adventurer-group": ADVENTURER_GROUP,
   "fiona-firstdream": FIONA_FIRSTDREAM,
@@ -534,6 +559,7 @@ const ROOST_MONSTERS = {
   "flame-totem": FLAME_TOTEM,
   "eldritch-dragon-lord": ELDRITCH_DRAGON_LORD,
   "ice-horror": ICE_HORROR,
+  "ice-crawler": ICE_CRAWLER,
   "the-gravedigger": THE_GRAVEDIGGER,
   "bonelords-phylactery": BONELORDS_PHYLACTERY,
 };
@@ -546,7 +572,7 @@ const ROOST_ROOMS = {
   "eldritch-dragon-lord": { otbm: "eldritch_dl",
     spawn: { x: 1021, y: 1030, z: 7 }, boss: { x: 1021, y: 1024, z: 7 } },
   "ice-horror": { otbm: "ice_horror",
-    spawn: { x: 1028, y: 1033, z: 7 }, boss: { x: 1030, y: 1029, z: 7 } },
+    spawn: { x: 1030, y: 1031, z: 7 }, boss: { x: 1030, y: 1025, z: 7 } },
   "the-gravedigger": { otbm: "gravedigger",
     spawn: { x: 1024, y: 1040, z: 7 }, boss: { x: 1023, y: 1032, z: 7 } },
   "bonelords-phylactery": { otbm: "bonelords_phylactery",
@@ -1077,12 +1103,59 @@ function eldritchBossTick(c, now) {
 }
 function eldritchBossCleanup(c) { if (c && c.eld) delete c.eld; }
 
+/* ── Ice Horror — invocação de Ice Crawlers (cliente; espelho de
+ * tickIceHorror no authoritative_engine.js) ── */
+function iceHorrorBossFight(c) { return !!(c && c.boss && c.boss.id === "ice-horror"); }
+function ihSpawnCrawler(c, cx, cy) {
+  const def = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters &&
+    GAMEDATA.monsters["ice-crawler"];
+  if (!def) return null;
+  const cell = agFreeCell(c, cx, cy); if (!cell) return null;
+  const pos = typeof cellToScreen === "function" ? cellToScreen(cell.x, cell.y)
+    : { x: (cell.x + .5) / (c.gridW || 30), y: (cell.y + .5) / (c.gridH || 30) };
+  const hp = Math.max(1, Number(def.hp) || 1);
+  const mob = { slug: "ice-crawler", def, hp, maxHp: hp, iceCrawler: true,
+    atkCd: 400 + Math.random() * 1200,
+    id: "ih-ice-crawler-" + Date.now().toString(36) + "-" +
+      Math.random().toString(36).slice(2, 7),
+    cx: cell.x, cy: cell.y, x: pos.x, y: pos.y, sx: pos.x, sy: pos.y,
+    dir: "w", moving: false, attackAnim: 0, speed: .000055,
+    spawnAt: Date.now() };
+  c.mobs = c.mobs || []; c.mobs.unshift(mob);
+  c.events = c.events || [];
+  c.events.push({ t: "spawn", slug: "ice-crawler", x: mob.x, y: mob.y,
+    targetId: mob.id, screen: true });
+  return mob;
+}
+function iceHorrorBossInit(c, player) {
+  if (!iceHorrorBossFight(c)) return c;
+  if (!(c.mobs || []).some((m) => m && m.boss)) return c;
+  c.iceH = { nextAt: Date.now() + 6000 };
+  if (typeof addLog === "function")
+    addLog("info", "O <b>Ice Horror</b> invoca <b>Ice Crawlers</b> durante a batalha!");
+  return c;
+}
+function iceHorrorBossTick(c, now) {
+  const st = c && c.iceH; if (!st || c.ended) return true;
+  const boss = (c.mobs || []).find((m) => m && m.boss && m.hp > 0);
+  if (!boss) return true;
+  const alive = (c.mobs || []).filter((m) => m.iceCrawler && m.hp > 0).length;
+  if (alive < IH_CRAWLER_MAX && now >= (st.nextAt || 0)) {
+    if (ihSpawnCrawler(c, Number(boss.cx) || 0, Number(boss.cy) || 0))
+      st.nextAt = now + IH_SUMMON_MS;
+    else st.nextAt = now + 2000; // sala cheia — re-tenta em breve
+  }
+  return true;
+}
+function iceHorrorBossCleanup(c) { if (c && c.iceH) delete c.iceH; }
+
 const ROOST_DATA = {
   CRYPT_RUNES, CRYPT_WEAPONS, ROOST_ITEMS, ROOST_MONSTERS,
   ROOST_ROOMS, ROOST_MISSION_DEFS, ROOST_QUEST_ID,
   AG_MEMBER_SPAWNS, AG_CRYSTAL_OFFSET, AG_TRANSFORM_PCT,
   AG_CRYSTAL_MANA_DRAIN_PCT, AG_CRYSTAL_RADIUS,
   ELD_VENT_SPAWNS, ELD_STAGE_MS, ELD_RESPAWN_MS, ELD_TOTEM_IMMUNE,
+  IH_CRAWLER_MAX, IH_SUMMON_MS,
   monsterSlugs: Object.keys(ROOST_MONSTERS),
   roostRollWeapon, roostCanExchange, roostState,
   registerMonsters(monsters) {

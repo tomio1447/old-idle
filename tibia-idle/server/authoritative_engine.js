@@ -6576,6 +6576,10 @@ function arenaBossBindMechanics(auth,now){
       auth.eld.vents.push({cx:cell.cx,cy:cell.cy,respawnAt:0});
     });
   }
+  /* Ice Horror (Roost): invoca Ice Crawlers durante a batalha —
+   * até IH_CRAWLER_MAX vivos, um a cada IH_SUMMON_MS. */
+  if(auth.bossId==="ice-horror"&&!auth.iceH)
+    auth.iceH={nextAt:now+6000};
   syncBossImmunityFlags(auth);
   return true;
 }
@@ -6698,6 +6702,31 @@ function tickEldritch(auth,now){
   const totems=mobs.filter((m)=>m.eldVent&&m.hp>0&&m.slug==="flame-totem").length;
   if(boss)boss.eldritchImmune=totems>=ELD_TOTEM_IMMUNE;
   if(!boss&&!st.vents.length)auth.eld=null;
+}
+
+/* Ice Horror (Roost): "Ele invoca Ice Crawlers para a batalha" — até
+ * IH_CRAWLER_MAX crawlers vivos, um por IH_SUMMON_MS. Espelho do cliente
+ * (iceHorrorBossTick em roost-graveborn.js). */
+const IH_CRAWLER_MAX=3,IH_SUMMON_MS=12000;
+function tickIceHorror(auth,now){
+  const st=auth&&auth.iceH;if(!st||auth.ended)return;
+  const boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+  if(!boss){if(arenaBossSpawnPending(auth))return;auth.iceH=null;return;}
+  const alive=(auth.mobs||[]).filter((m)=>m.iceCrawler&&m.hp>0).length;
+  if(alive<IH_CRAWLER_MAX&&now>=(Number(st.nextAt)||0)){
+    const m=makeMob(auth,"ice-crawler",false);
+    if(m){
+      m.iceCrawler=true;
+      const cell=claimSpawnCell(auth,Number(boss.cx)||0,Number(boss.cy)||0);
+      const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+      m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;m.sx=m.x;m.sy=m.y;
+      auth.mobs.unshift(m);
+      auth.events=auth.events||[];
+      auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
+        targetId:String(m.id),screen:true,ts:now});
+      st.nextAt=now+IH_SUMMON_MS;
+    }else st.nextAt=now+2000;
+  }
 }
 
 const MEGA_PERSONAL_MIN_MS=10000,MEGA_PERSONAL_MAX_MS=25000;
@@ -8258,7 +8287,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);

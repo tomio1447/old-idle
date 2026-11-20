@@ -112,6 +112,8 @@ function arenaBossBindMechanics(c, now) {
     adventurerGroupBossInit(c, player);
   if (id === "eldritch-dragon-lord" && typeof eldritchBossInit === "function" && !c.eld)
     eldritchBossInit(c, player);
+  if (id === "ice-horror" && typeof iceHorrorBossInit === "function" && !c.iceH)
+    iceHorrorBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -5214,6 +5216,7 @@ function combatTick(c, p, dt, now) {
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof adventurerGroupBossTick === "function" && adventurerGroupBossTick(c, now) === false) return;
   if (typeof eldritchBossTick === "function" && eldritchBossTick(c, now) === false) return;
+  if (typeof iceHorrorBossTick === "function" && iceHorrorBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof echoRaidTick === "function") echoRaidTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);

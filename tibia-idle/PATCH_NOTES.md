@@ -52,6 +52,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
   objectID público → lava vent 391.
 - **Ice Horror** — race 2733, looktype 1881, **hp oficial 542.700**,
   exp 259.000; ice 0% (imune), Death Ring 950+, Great Energy Wave 1300+.
+  Sala `ice_horror.otbm` nas coords oficiais (center {1030,1029},
+  boss {1030,1025}, player {1030,1031}). **Invoca Ice Crawlers**
+  durante a batalha — sprite da Crystal Spider oficial ("looks the
+  same as a Crystal Spider"), até 3 vivos, um a cada 12s
+  (`tickIceHorror` no engine + `iceHorrorBossInit/BossTick/Cleanup`
+  no cliente).
 - **The Gravedigger** — race 2721, looktype 1880, exp 750.000;
   Fire Ball 600–800, Bonelord Totem → área de morte.
 - **Bonelord's Phylactery** — race 2771, `lookItem 52831`, exp
