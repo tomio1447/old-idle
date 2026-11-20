@@ -509,8 +509,93 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
     "night-harpy não registrado no engine");
 }
 
+/* ==================== Order of the Stag Quest (350+) ==================== */
+{
+  /* Missões registradas nos hunts existentes. */
+  const m1 = ctx.MISSION_DEFS["stag-bastion"];
+  must(m1 && m1.tasks.length === 1 && m1.tasks[0].counter === "kills" &&
+    m1.tasks[0].target === 500, "M1: 500 kills na Stag Bastion ausente");
+  must(m1.completeReward && m1.completeReward.items &&
+    m1.completeReward.items.some((r) =>
+      r.slug === "mariners-compass-from-the-antoinette" && r.count === 1),
+    "M1: recompensa Mariner's Compass ausente");
+  const m2 = ctx.MISSION_DEFS["arean-outskirts"];
+  must(m2 && m2.tasks.length === 1 && m2.tasks[0].monster === "night-harpy" &&
+    m2.tasks[0].target === 50, "M2: 50 Night Harpies ausente");
+  must(m2.completeReward && m2.completeReward.bossAccess === "court-warlock",
+    "M2: recompensa de acesso ao Court Warlock ausente");
+
+  /* Compass: extra slot + arm 3, cid oficial 52759, sem comprador. */
+  const comp = I["mariners-compass-from-the-antoinette"];
+  must(comp && comp.s === "extra" && comp.arm === 3,
+    "compass: extra slot + arm 3 ausentes");
+  must(comp.cid === 52759, "compass: cid oficial 52759");
+  must(comp.sell === 0 && comp.npcSell === 0,
+    "compass: npcvalue oficial 0 (sem comprador)");
+  const cpng = path.join(game, "assets", "item",
+    "mariners-compass-from-the-antoinette.png");
+  must(fs.existsSync(cpng) && fs.statSync(cpng).size > 0,
+    "compass: ícone ausente");
+
+  /* Quest card + gate do boss. */
+  const q = ctx.QUEST_DEFS["order-of-the-stag-quest"];
+  must(q && q.level === 350 && q.questType === "boss" &&
+    typeof q.renderDetail === "function" && q.bossSprite === "court-warlock",
+    "QUEST_DEFS Order of the Stag ausente/errada");
+  const req = ctx.BOSS_DEFS["court-warlock"].requirement;
+  must(req && req.level === 400 && req.enforced &&
+    req.mission === "arean-outskirts" && req.access === "court-warlock",
+    "CW: gate missão 2 (arean-outskirts + access) ausente");
+
+  /* Royal Bounacean Advisor: outfit oficial m=1436/f=1437 no appearancedata. */
+  const appSrc = fs.readFileSync(path.join(js, "appearancedata.js"), "utf8");
+  must(appSrc.includes('"royal-bounacean-advisor-m"') &&
+    appSrc.includes('"royal-bounacean-advisor-f"'),
+    "outfit royal-bounacean-advisor ausente do appearancedata");
+
+  /* Estado derivado: progresso por hunt counter. */
+  const p = { level: 350, missions: {}, missionsDone: {}, bosses: {} };
+  let st = ctx.stagQuestState(p);
+  must(!st.m1.done && !st.m2.done && !st.m3.done && st.reqLevel,
+    "stagQuestState vazio deve estar incompleto");
+  p.missions["stag-bastion"] = { progress: { kills: 499 } };
+  st = ctx.stagQuestState(p);
+  must(!st.m1.done && st.m1.kills === 499, "M1 499/500 não deve concluir");
+  p.missions["stag-bastion"].progress.kills = 500;
+  p.missions["arean-outskirts"] = { progress: { "night-harpy": 50,
+    "raubritter-skirmisher": 300 } };
+  st = ctx.stagQuestState(p);
+  must(st.m1.done && st.m2.done && st.m2.kills === 50,
+    "M1 500 + M2 50 harpies devem concluir (só night-harpy conta)");
+  p.bosses["court-warlock"] = { kills: 1 };
+  st = ctx.stagQuestState(p);
+  must(st.m3.done && st.complete && !st.outfitClaimed,
+    "M3 kill do Court Warlock deve concluir a quest");
+
+  /* Grant da outfit: ambos os sexos, addons 1+2, idempotente. */
+  ctx.stagGrantOutfit(p);
+  ctx.stagClaim(p, "outfit");
+  must(p.wardrobe.outfits["royal-bounacean-advisor-m"] === 2 &&
+    p.wardrobe.outfits["royal-bounacean-advisor-f"] === 2,
+    "outfit m/f com addons não concedida");
+  must(p.missionsDone["order-of-stag:outfit"] === true,
+    "claim order-of-stag:outfit não persistido");
+  must(ctx.stagQuestState(p).outfitClaimed,
+    "outfitClaimed deve evitar re-grant");
+
+  /* Gate real: bossReadyInfo equivalente — sem acesso/missão → bloqueado. */
+  const pLock = { level: 400, missions: {}, missionsDone: {}, bosses: {},
+    bossAccess: {} };
+  must(!pLock.bossAccess["court-warlock"],
+    "acesso ao CW não pode existir antes da Missão 2");
+  pLock.bossAccess["court-warlock"] = true;
+  must(pLock.bossAccess["court-warlock"], "access flag da Missão 2");
+}
+
 console.log("OK: Court Warlock — ficha oficial 2741/lt1903/120k, " +
   "raubritters + enraged, Stag Set + Marionette, sala/hazard OTBM, " +
   "engine + hooks, sim autoritativa (waves→transform→falcons→boss→crédito). " +
   "Stag Bastion 400+: 3 raubritters oficiais, pack 8-10, retângulo de " +
-  "spawn validado, loot oficial com preços, sprites + seção modal.");
+  "spawn validado, loot oficial com preços, sprites + seção modal. " +
+  "Order of the Stag 350+: M1 500 kills→compass extra+3arm, " +
+  "M2 50 harpies→acesso CW, M3 CW→Royal Bounacean Advisor addons.");

@@ -711,8 +711,9 @@ function courtWarlockBossCleanup(c) { if (c && c.cw) delete c.cw; }
       hp: COURT_WARLOCK.hp, exp: COURT_WARLOCK.exp,
       damage: COURT_WARLOCK.damage, armor: COURT_WARLOCK.armor,
       defense: COURT_WARLOCK.defense,
-      requirement: { level: 400, enforced: true,
-        text: "Requer nível 400+ (The Order of the Stag)" },
+      requirement: { level: 400, mission: "arean-outskirts",
+        access: "court-warlock", enforced: true,
+        text: "Complete a Missão 2 da Order of the Stag (50 Night Harpies nas Arean Outskirts)" },
       cooldown: CW_COOLDOWN_MS,
     };
     if (typeof BOSS_MODAL_SECTIONS !== "undefined") {
@@ -723,8 +724,188 @@ function courtWarlockBossCleanup(c) { if (c && c.cw) delete c.cw; }
   }
 })();
 
+/* ═══ The Order of the Stag Quest (350+) — 3 missões ═══
+ * M1: 500 kills na Stag Bastion → The Mariner's Compass from the
+ *     Antoinette (extra slot, arm 3; itemid oficial 52759, npcvalue 0 →
+ *     sem comprador → sell 0).
+ * M2: 50 Night Harpies (Arean Outskirts) → acesso ao Court Warlock.
+ * M3: derrotar o Court Warlock → Royal Bounacean Advisor Outfit
+ *     (addons 1+2; looktypes oficiais m=1436/f=1437).
+ * O progresso das missões vive no registro genérico de hunts
+ * (p.missions[huntId].progress) — o engine incrementa .kills e
+ * .progress[slug] em cada kill do hunt ativo. */
+const STAG_QUEST_ID = "order-of-the-stag-quest";
+const STAG_COMPASS = "mariners-compass-from-the-antoinette";
+const STAG_OUTFIT = { base: "royal-bounacean-advisor", addons: 3 };
+const STAG_QUEST_ITEMS = {
+  [STAG_COMPASS]: { n: "the mariner's compass from the antoinette",
+    s: "extra", t: "armor", cid: 52759, w: 30, arm: 3,
+    sell: 0, npcSell: 0 },
+};
+const STAG_MISSION_DEFS = {
+  "stag-bastion": {
+    title: "Missão: Order of the Stag — Stag Bastion",
+    tasks: [{
+      counter: "kills", target: 500,
+      label: "Eliminar 500 monstros na Stag Bastion",
+    }],
+    completeReward: { items: [{ slug: STAG_COMPASS, count: 1 }] },
+  },
+  "arean-outskirts": {
+    title: "Missão: Order of the Stag — Night Harpies",
+    tasks: [{
+      monster: "night-harpy", target: 50,
+      label: "Eliminar 50 Night Harpies",
+    }],
+    completeReward: { bossAccess: "court-warlock", bossName: "Court Warlock" },
+  },
+};
+
+function stagMissionKills(p, huntId, slug) {
+  const st = p && p.missions && p.missions[huntId];
+  const prog = (st && st.progress) || {};
+  if (slug === "kills" && Number(prog.kills) > 0) return Number(prog.kills);
+  if (slug !== "kills" && Number(prog[slug]) > 0) return Number(prog[slug]);
+  if (slug !== "kills") return 0;
+  let sum = 0;
+  for (const v of Object.values(prog)) sum += Number(v) || 0;
+  return sum;
+}
+
+function stagQuestState(p) {
+  const bosses = (p && p.bosses) || {};
+  const cwDead = Number(bosses["court-warlock"] && bosses["court-warlock"].kills) > 0;
+  const m1k = stagMissionKills(p, "stag-bastion", "kills");
+  const m2k = stagMissionKills(p, "arean-outskirts", "night-harpy");
+  const done = (p && p.missionsDone) || {};
+  const m2done = m2k >= 50 ||
+    !!(p && p.bossAccess && p.bossAccess["court-warlock"]) ||
+    !!(typeof isMissionComplete === "function" &&
+       isMissionComplete(p, "arean-outskirts"));
+  return {
+    reqLevel: (p && Number(p.level)) >= 350,
+    m1: { done: m1k >= 500, kills: Math.min(m1k, 500), target: 500 },
+    m2: { done: m2done, kills: Math.min(m2k, 50), target: 50 },
+    m3: { done: cwDead, kills: cwDead ? 1 : 0, target: 1 },
+    outfitClaimed: !!done["order-of-stag:outfit"],
+    complete: cwDead,
+  };
+}
+
+function stagClaim(p, key, value) {
+  p.missionsDone = p.missionsDone || {};
+  p.missionsDone["order-of-stag:" + key] = value === undefined ? true : value;
+  if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(p);
+}
+
+function stagGrantOutfit(p) {
+  if (typeof ensureWardrobe === "function") ensureWardrobe(p);
+  p.wardrobe = p.wardrobe || {};
+  p.wardrobe.outfits = p.wardrobe.outfits || {};
+  // 2 = addon 1 + addon 2 (ownedAddonMask: count>=2 → mask 3).
+  p.wardrobe.outfits["royal-bounacean-advisor-m"] = 2;
+  p.wardrobe.outfits["royal-bounacean-advisor-f"] = 2;
+  try {
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    if (acc) {
+      acc.cosmetics = acc.cosmetics || {};
+      acc.cosmetics.outfits = acc.cosmetics.outfits || {};
+      acc.cosmetics.outfits["royal-bounacean-advisor"] = 2;
+      sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+    }
+  } catch (e) { /* offline */ }
+}
+
+function renderStagQuestDetail(q, ui) {
+  if (typeof mbStopRoulettes === "function") mbStopRoulettes();
+  const p = G.p;
+  if (typeof pullAccountMissions === "function") pullAccountMissions(p);
+  let st = stagQuestState(p);
+  /* Missão 3 concluída → Royal Bounacean Advisor (addons 1+2),
+   * automaticamente. */
+  if (p && st.m3.done && !st.outfitClaimed) {
+    stagGrantOutfit(p);
+    stagClaim(p, "outfit");
+    if (typeof addLog === "function")
+      addLog("level", "The Order of the Stag: recebeu a outfit <b>Royal Bounacean Advisor</b> (addon 1+2)!");
+    if (typeof toast === "function")
+      toast("Recompensa: Royal Bounacean Advisor Outfit!", "level");
+  }
+  st = stagQuestState(p);
+  const fmtK = (n) => (typeof fmtFull === "function" ? fmtFull(n) : String(n));
+  const reqRow = (label, ok) =>
+    `<div class="shop-row"><span class="info">${label}</span><b style="color:${ok ? "#9ce84a" : "#ff9a6a"}">${ok ? "✓" : "✗"}</b></div>`;
+  const mobThumbs = (slugs) => `<span class="mb-mission-mobs">` +
+    (slugs || []).map((s) => typeof mobImg === "function" ? mobImg(s, 30) : "").join("") + `</span>`;
+  const mission = (num, label, m, reward, mobs) =>
+    `<div class="mb-mission${m.done ? " done" : ""}">
+      <div class="mb-mission-head"><span class="mb-mission-title">${mobThumbs(mobs)}<span class="info">Missão ${num} — ${label}</span></span>
+        <b class="mb-mission-prog">${m.done ? "✓ " : ""}${fmtK(m.kills)}/${fmtK(m.target)}</b></div>
+      <div class="mb-mission-bar"><div class="mb-mission-fill" style="width:${Math.min(100, Math.round(100 * m.kills / m.target))}%"></div></div>
+      <div class="mb-mission-reward">Recompensa: ${reward}</div>
+    </div>`;
+  const compass = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[STAG_COMPASS]) || {};
+  const compassIcon = typeof mbItemIcon === "function" ? mbItemIcon(STAG_COMPASS, 26) : "";
+  const outfitPrev = typeof questOutfitPreviewHtml === "function"
+    ? questOutfitPreviewHtml(STAG_OUTFIT, 56) : "";
+
+  ui.body.innerHTML = `<div class="panel-title">${q.name} — Level ${q.level}+<span class="spacer"></span><button class="sm" id="boss-quest-close">Fechar</button></div>
+    <div class="panel-body quest-detail-body">
+      <p class="tiny dim" style="margin:4px 0 10px">${q.description || ""}</p>
+      ${reqRow("Nível 350+", st.reqLevel)}
+      ${mission(1, "Stag Bastion", st.m1,
+        `${compassIcon} ${compass.n || STAG_COMPASS} — extra slot, arm ${compass.arm || 3}`,
+        ["raubritter-skirmisher", "raubritter-chastener", "raubritter-marksman"])}
+      ${mission(2, "Night Harpies (Arean Outskirts)", st.m2,
+        "Acesso ao boss Court Warlock", ["night-harpy"])}
+      ${mission(3, "Court Warlock", st.m3,
+        "Royal Bounacean Advisor Outfit (addon 1 + 2)", ["court-warlock"])}
+      ${outfitPrev ? `<div class="mb-outfit-granted">${outfitPrev}${st.outfitClaimed ? `<span class="tiny" style="color:#9ce84a">✓ Resgatada — Royal Bounacean Advisor (addon 1+2)</span>` : ""}</div>` : ""}
+    </div>`;
+  const close = ui.body.querySelector("#boss-quest-close");
+  if (close) close.addEventListener("click", () => { if (ui && ui.close) ui.close(); });
+}
+
+(function registerStagQuest() {
+  if (typeof GAMEDATA !== "undefined") {
+    const items = GAMEDATA.items || (GAMEDATA.items = {});
+    for (const slug in STAG_QUEST_ITEMS) {
+      const def = STAG_QUEST_ITEMS[slug];
+      if (!items[slug]) items[slug] = def;
+      else {
+        if (def.sell != null) items[slug].sell = def.sell;
+        if (def.npcSell != null) items[slug].npcSell = def.npcSell;
+        if (def.arm != null && items[slug].arm == null) items[slug].arm = def.arm;
+        if (def.cid != null && items[slug].cid == null) items[slug].cid = def.cid;
+        if (def.w != null && items[slug].w == null) items[slug].w = def.w;
+        if (def.n && !items[slug].n) items[slug].n = def.n;
+        if (def.s && !items[slug].s) items[slug].s = def.s;
+      }
+    }
+  }
+  if (typeof MISSION_DEFS !== "undefined")
+    Object.assign(MISSION_DEFS, STAG_MISSION_DEFS);
+  if (typeof QUEST_DEFS !== "undefined") {
+    QUEST_DEFS[STAG_QUEST_ID] = {
+      id: STAG_QUEST_ID,
+      name: "The Order of the Stag Quest",
+      level: 350,
+      questType: "boss",
+      worldQuest: true,
+      playable: false,
+      icon: "small-treasure-chest",
+      bossSprite: "court-warlock",
+      description: "A quest que coroa a Order of the Stag: prove seu valor na Stag Bastion eliminando 500 Raubritters para receber o Mariner's Compass da Antoinette (extra slot, +3 armadura), cace 50 Night Harpies nas Arean Outskirts para ganhar acesso ao Court Warlock e, ao derrotá-lo, vista-se como Royal Bounacean Advisor (addons 1 e 2).",
+      renderDetail: renderStagQuestDetail,
+    };
+  }
+})();
+
 const CW_DATA = {
   CW_ROOM, CW_ITEMS, CW_MONSTERS, CW_RAUB_TYPES, CW_RAUB_SLUGS,
+  STAG_QUEST_ID, STAG_COMPASS, STAG_OUTFIT, STAG_QUEST_ITEMS,
+  STAG_MISSION_DEFS, stagQuestState, stagMissionKills,
+  renderStagQuestDetail, stagGrantOutfit, stagClaim,
   CW_HAZARD_OFFSETS, CW_HAZARD_DMG, CW_HAZARD_MS, CW_WAVE_MS,
   CW_WAVE_SIZE, CW_WAVES, CW_TRANSFORM_AT, CW_TELEPORT_MS,
   CW_FALCON_COUNT, CW_BOSS_HP_PER_TRANSFORM,

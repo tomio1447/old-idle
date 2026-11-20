@@ -71,6 +71,8 @@ ITEM_ICONS = {
     "ring-of-green-plasma": 23531, "ring-of-orange-plasma": 50150,
     # Arean Outskirts — Night Harpy Feathers (cid oficial).
     "night-harpy-feathers": 52633,
+    # Order of the Stag — Mariner's Compass (cid oficial, extra slot).
+    "mariners-compass-from-the-antoinette": 52759,
 }
 
 # Bosses com looktype real (2 grupos: idle + walk, 4 dirs x 8 fases).

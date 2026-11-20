@@ -4,6 +4,47 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — The Order of the Stag Quest (350+) — 3 missões
+
+A quest que amarra a região da Isle of Ada: duas missões de caça nos
+hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
+
+### Missões (registradas como MISSION_DEFS dos hunts)
+
+- **M1 — Stag Bastion**: eliminar **500 monstros** na hunt.
+  Recompensa: **The Mariner's Compass from the Antoinette** ×1 —
+  item oficial `itemid 52759`, `w 30`, **extra slot com arm 3**
+  (a pedido do jogador; oficialmente é um extra-slot item).
+  `npcvalue 0` → **sem comprador NPC → sell 0**.
+- **M2 — Arean Outskirts**: eliminar **50 Night Harpies**
+  (contador `monster:"night-harpy"` — só harpias contam).
+  Recompensa: **acesso ao Court Warlock** (`bossAccess`); o
+  requirement do boss agora é `level 400 + mission arean-outskirts
+  + access court-warlock` — com migração automática para quem já
+  tiver a missão completa.
+- **M3 — Court Warlock**: derrotar o boss. Recompensa: **Royal
+  Bounacean Advisor Outfit (addon 1 + 2)** — looktypes oficiais
+  m=1436 / f=1437 (já presentes no `appearancedata`), concedida
+  automaticamente ao abrir a quest após o kill
+  (`missionsDone["order-of-stag:outfit"]`).
+
+### Detalhes
+
+- `QUEST_DEFS["order-of-the-stag-quest"]`: level 350, `questType:
+  "boss"`, renderDetail próprio com barras de progresso das 3
+  missões, ícone do compass, preview da outfit e requisito 350+.
+- Paridade: progresso por hunt counter (`p.missions[huntId].progress`)
+  — engine incrementa `.kills` e `.progress[slug]` a cada kill;
+  claims/recompensas pelo fluxo genérico de missões
+  (`tryCompleteMissionRewards`) + `missionsDone` sincronizado à conta.
+- Kills já registrados nos hunts (progress acumulado desde o
+  lançamento) contam retroativamente — mesmo comportamento da
+  missão de 5.000 da Unhallowed Crypt.
+- `game/js/court-warlock.js` (`?v=order-of-stag-v1`), ícone
+  `assets/item/mariners-compass-from-the-antoinette.png` (cid 52759).
+
+---
+
 ## 2026-11-20 — Court Warlock — boss 400+ final da The Order of the Stag (update 15.20)
 
 ### Ficha oficial
