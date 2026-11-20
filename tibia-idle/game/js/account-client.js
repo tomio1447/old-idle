@@ -2512,7 +2512,7 @@ async function accountAddVipDays(token, days, clear) {
 }
 async function accountUpdateMissions(token, missions, missionsDone) {
   const r = await _api("POST", "/api/account/missions", { token, missions, missionsDone });
-  return r.data.ok ? { ok: true, missions: r.data.missions, missionsDone: r.data.missionsDone } : { ok: false };
+  return r.data.ok ? { ok: true, missions: r.data.missions, missionsDone: r.data.missionsDone, cosmetics: r.data.cosmetics } : { ok: false };
 }
 
 /* Hazard level (Gnomprona, por conta): espelha {kills, level, sel} em

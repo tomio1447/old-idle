@@ -414,7 +414,22 @@ async function updateAccountMissions(db,body){
     acc.missions=mergedMissions;acc.missionsDone=mergedDone;
     if(typeof db._save==="function")db._save();
   }
-  return {code:200,body:{ok:true,missions:mergedMissions,missionsDone:mergedDone}};
+  /* Recompensas cosméticas por CONTA de quests (Make Believe): o claim
+   * persiste só a flag; wardrobe.migrate deriva o cosmético da whitelist.
+   * Roda accountWardrobe aqui apenas quando falta o grant — persiste já e
+   * devolve cosmetics para a sessão espelhar (o cliente só tinha escrito
+   * sessionStorage, que o próximo accountMe sobrescrevia). */
+  let cosmetics=null;
+  if(typeof db.accountWardrobe==="function"){
+    const needOutfit=!!mergedDone["make-believe:outfit"],needMount=!!mergedDone["make-believe:mount"];
+    if(needOutfit||needMount){
+      const cos=typeof acc.cosmetics==="string"?(function(){try{return JSON.parse(acc.cosmetics);}catch(e){return{};}}()):(acc.cosmetics||{});
+      const missing=(needOutfit&&!(cos.outfits&&cos.outfits["illuminated-warrior"]!==undefined))
+        ||(needMount&&!(cos.mounts&&cos.mounts["radiant-nimbus"]));
+      if(missing){try{const w=await db.accountWardrobe(acc.id);cosmetics=(w&&w.cosmetics)||null;}catch(e){/* não-fatal */}}
+    }
+  }
+  return {code:200,body:{ok:true,missions:mergedMissions,missionsDone:mergedDone,cosmetics:cosmetics||undefined}};
 }
 /* Hazard level (Gnomprona, por CONTA): espelhado em
  * accounts.cosmetics.hazard = {kills, level, sel}. Merge: kills/level

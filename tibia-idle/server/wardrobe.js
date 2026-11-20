@@ -44,6 +44,15 @@ function migrate(account, characters) {
   }
   for (const [id, owned] of Object.entries(object(account.mounts)))
     if (owned && mounts.has(id)) cosmetics.mounts[id] = true;
+  // Recompensas cosméticas por CONTA derivadas de missionsDone (autoridade).
+  // O claim via /api/account/missions persiste só a flag; os cosméticos
+  // derivam daqui — cura retroativa de claims feitos antes do grant ser
+  // durável no servidor (o cliente só escrevia sessionStorage).
+  const done = object(account.missionsDone);
+  if (done["make-believe:outfit"])
+    cosmetics.outfits["illuminated-warrior"] =
+      Math.max(2, Number(cosmetics.outfits["illuminated-warrior"]) || 0);
+  if (done["make-believe:mount"]) cosmetics.mounts["radiant-nimbus"] = true;
   for (const [id, count] of Object.entries(cosmetics.outfits)) {
     const mask = Number(count) >= 2 ? 3 : Number(count) >= 1 ? 1 : 0;
     cosmetics.addonBits[id] = (Number(cosmetics.addonBits[id]) || 0) | mask;

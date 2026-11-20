@@ -1118,6 +1118,9 @@ function syncMissionsToAccount(p) {
           // cache da sessão e no char ativo para convergir com outros chars.
           acc.missions = r.missions;
           acc.missionsDone = r.missionsDone || acc.missionsDone;
+          // Cosméticos derivados de claims (ex.: outfit/montaria da Make
+          // Believe) vêm autoritativos do servidor — espelha na sessão.
+          if (r.cosmetics && typeof r.cosmetics === "object") acc.cosmetics = r.cosmetics;
           try { sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc)); } catch (e) {}
           if (p) {
             p.missions = mergeMissionMaps(p.missions, acc.missions);

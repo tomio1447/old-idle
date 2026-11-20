@@ -90,6 +90,29 @@ test("tutorial completion grants Landsailer but skipping does not", () => {
   assert.equal(W.migrate({ tutorial: { rewardGranted: true, skipped: true } }, []).mounts.landsailer, undefined);
 });
 
+test("Make Believe claims derive account cosmetics from missionsDone", () => {
+  // Sem claim: nada é concedido.
+  const none = W.migrate({ missionsDone: {} }, []);
+  assert.equal(none.outfits["illuminated-warrior"], undefined);
+  assert.equal(none.mounts["radiant-nimbus"], undefined);
+  // Outfit claim: outfit por conta com os dois addons (count 2 → mask 3).
+  const outfit = W.migrate({ missionsDone: { "make-believe:outfit": true } }, []);
+  assert.equal(outfit.outfits["illuminated-warrior"], 2);
+  assert.equal(outfit.addonBits["illuminated-warrior"], 3);
+  // Mount claim: montaria por conta.
+  const mount = W.migrate({ missionsDone: { "make-believe:mount": true } }, []);
+  assert.equal(mount.mounts["radiant-nimbus"], true);
+  // Idempotente e nunca rebaixa grants maiores (ex.: loja com count 3).
+  const again = W.migrate({ missionsDone: { "make-believe:outfit": true, "make-believe:mount": true } }, []);
+  assert.equal(again.outfits["illuminated-warrior"], 2);
+  const higher = W.migrate({ missionsDone: { "make-believe:outfit": true },
+    cosmetics: { outfits: { "illuminated-warrior": 3 } } }, []);
+  assert.equal(higher.outfits["illuminated-warrior"], 3);
+  // missionsDone como string JSON (linha do MySQL) também funciona.
+  const fromMysql = W.migrate({ missionsDone: JSON.stringify({ "make-believe:mount": true }) }, []);
+  assert.equal(fromMysql.mounts["radiant-nimbus"], true);
+});
+
 test("future hazard and missing client art are not exchangeable", () => {
   assert.equal(W.exchange({}, [], { bag: {} }, "mount:noxious-ripptor", 0).ok, false);
   assert.equal(W.exchange({}, [], { bag: { "demon-in-a-golden-box": 1 } }, "mount:alpha-demonosaur", 0).ok, false);
