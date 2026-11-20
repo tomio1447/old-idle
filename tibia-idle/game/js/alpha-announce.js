@@ -6,11 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "20/11/2026 às 20:40";
+const ALPHA_UPDATE_AT = "20/11/2026 às 20:50";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
-  "NOVO — Topbar redesenhada: botões PERSONAGEM e STORE quadrados com glow dourado no canto superior direito",
+  "NOVO — Topbar redesenhada: botões PERSONAGEM e STORE quadrados 78px com glow dourado no canto superior direito",
   "NOVO — Non-Transferable Tibia Coins (NT TC): saldo separado que só gasta na STORE — não pode ser vendido no Market",
   "NOVO — Cupons de streamer na aba Vouchers da STORE: DRUWELL e buto__pvp dão VIP, montaria exclusiva e NT TC",
   "NOVO — Painel Admin → aba VOUCHERS: veja usos por código e pause/exclua cupons",

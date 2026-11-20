@@ -7,10 +7,10 @@ Histórico de alterações do jogo, mais recentes primeiro.
 ## 2026-11-20 — Topbar: PERSONAGEM e STORE quadrados com glow
 
 - Os botões **Personagem** e **STORE** saíram da faixa de botões e agora
-  ocupam o canto superior direito da topbar como quadrados 58×58 com
+  ocupam o canto superior direito da topbar como quadrados **78×78** com
   moldura e glow dourados (`.topbar-hero-*`) — mais destaque visual.
 - Personagem mostra o retrato do char + nome; STORE mostra o coin + label.
-- Fallback responsivo para telas <640px (quadrados 46×46).
+- Fallback responsivo para telas <640px (quadrados 62×62).
 - Modal de patch notes (`alpha-announce.js`) atualizado com a data da
   release e as novidades da sessão.
 
