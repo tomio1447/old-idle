@@ -38,6 +38,8 @@ MAPS = [
     ("bossesroom/court_room.otbm", "court_room.otbm"),
     # Stag Bastion — hunt 400+ dos Raubritters (15.20).
     ("bossesroom/stag_bastion.otbm", "stag_bastion.otbm"),
+    # Arean Outskirts — hunt 400+ mista (Raubritters + Night Harpy).
+    ("bossesroom/Arean Outskirts.otbm", "arean_outskirts.otbm"),
 ]
 
 # 7 armas Crypt + 5 Crypt Runes (cids oficiais update 15.20, tibia.gg).
@@ -67,6 +69,8 @@ ITEM_ICONS = {
     "cuirass-plate": 52663, "bottle-of-raubritter-lager": 52745,
     "marinated-sturgeon": 52638, "crystalline-arrow": 15793,
     "ring-of-green-plasma": 23531, "ring-of-orange-plasma": 50150,
+    # Arean Outskirts — Night Harpy Feathers (cid oficial).
+    "night-harpy-feathers": 52633,
 }
 
 # Bosses com looktype real (2 grupos: idle + walk, 4 dirs x 8 fases).
@@ -118,6 +122,8 @@ MOBS_LOOKTYPE = {
     "raubritter-skirmisher": 1908,
     "raubritter-chastener": 1920,
     "raubritter-marksman": 1889,
+    # Arean Outskirts — Night Harpy (ave negra do lote livre — estimado).
+    "night-harpy": 1901,
 }
 
 # Bosses "lookItem": a entidade oficial aparece como objeto (cid). O sheet

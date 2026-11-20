@@ -68,6 +68,19 @@ Histórico de alterações do jogo, mais recentes primeiro.
   (23531/50150→8k); placeholders de preço corrigidos ao oficial
   (shockwave amulet 3k, magma amulet 1,5k, gold ingot 5k).
 
+### Arean Outskirts — hunt 400+ (mesma sessão)
+
+- `arean_outskirts.otbm` (39×41, z=7): spawn rect oficial
+  {1015,1014}–{1023,1020} (63/63 caminhável), center {1020,1018},
+  respawn 8–10 — hunt mista Isle of Ada.
+- **Night Harpy** (ficha oficial): hp 14.000, exp 21.000, armor 90,
+  mit 3.92, speed 190, Bird/Hard — resistente earth 40%/fire 30%,
+  fraca a ice/death/holy; loot oficial: potions 8-12, **night harpy
+  feathers** (52633→5k), gems gigantes e 100cc very rare.
+- + os 3 Raubritters (mesma área oficial da Isle of Ada).
+- Correções de preço: 5 giant gems placeholder → npcvalue oficial
+  (50k–90k).
+
 ### Correções de looktype (staticdata do client 15.20)
 
 - Adventurer Group: yorik 268 · percy 137 · grendel 144 ·

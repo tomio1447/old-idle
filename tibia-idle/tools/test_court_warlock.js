@@ -438,10 +438,75 @@ must(html.indexOf("js/roost-graveborn.js") < html.indexOf("js/court-warlock.js")
   const sectSrc = fs.readFileSync(path.join(js, "hunt-sections.js"), "utf8");
   must(sectSrc.includes('"stag-bastion"'),
     "stag-bastion ausente da seção HUNTS 400+");
+  must(sectSrc.includes('"arean-outskirts"'),
+    "arean-outskirts ausente da seção HUNTS 400+");
   must(engine.MONSTERS["raubritter-skirmisher"] &&
     engine.MONSTERS["raubritter-chastener"] &&
     engine.MONSTERS["raubritter-marksman"],
     "raubritters de hunt não registrados no engine");
+}
+
+/* ==================== Arean Outskirts — hunt 400+ ==================== */
+{
+  const hunt = ctx.GAMEDATA.hunts["arean-outskirts"];
+  must(hunt && hunt.cat === "hard" && hunt.level === 400,
+    "arean-outskirts: hunt 400+ ausente");
+  must(hunt.packMin === 8 && hunt.packMax === 10, "pack 8-10 ausente");
+  must(hunt.otbm === "arean_outskirts" && hunt.otbmFloor === 7,
+    "otbm divergente");
+  must(hunt.otbmSpawn.x === 1020 && hunt.otbmSpawn.y === 1018 &&
+    hunt.otbmSpawn.z === 7, "centerroom divergente");
+  must(hunt.otbmMobBounds.x === 1015 && hunt.otbmMobBounds.y === 1014 &&
+    hunt.otbmMobBounds.w === 9 && hunt.otbmMobBounds.h === 7,
+    "spawn rect divergente do oficial {1015,1014}-{1023,1020}");
+  must(hunt.monsters.length === 4, "hunt deve ter 4 monstros");
+
+  /* Night Harpy — ficha oficial: hp 14000, exp 21000, armor 90,
+   * mit 3.92, speed 190, Bird. */
+  const nh = M["night-harpy"];
+  must(nh && nh.hp === 14000 && nh.exp === 21000 && nh.armor === 90 &&
+    nh.mitigation === 3.92 && nh.speed === 190,
+    "night-harpy: ficha oficial divergente");
+  must(nh.resist.earth === 40 && nh.resist.fire === 30 &&
+    nh.resist.ice === -12 && nh.resist.death === -9,
+    "night-harpy: resists oficiais divergentes");
+  must(nh.imune.includes("paralyze") && nh.imune.includes("invisible"),
+    "night-harpy: imunes ausentes");
+  must(nh.loot.length === 10, "night-harpy: loot oficial incompleto");
+  for (const l of nh.loot) must(I[l.item], "loot sem item " + l.item);
+  must(nh.loot.some((l) => l.item === "night-harpy-feathers" && l.max === 10),
+    "feathers 5-10 ausente do loot");
+  for (const g of ["giant-sapphire", "giant-topaz", "giant-emerald",
+    "giant-ruby", "giant-amethyst"])
+    must(nh.loot.some((l) => l.item === g), "loot sem " + g);
+  must(fs.existsSync(path.join(game, "assets", "mob", "night-harpy.png")) &&
+    ctx.MOBSHEETS["night-harpy"], "night-harpy sprite ausente");
+
+  /* Item novo + gems corrigidas ao npcvalue oficial. */
+  const feathers = I["night-harpy-feathers"];
+  must(feathers && feathers.cid === 52633 && feathers.sell === 5000,
+    "night-harpy-feathers: cid 52633 / npcvalue 5000");
+  must(fs.existsSync(path.join(game, "assets", "item",
+    "night-harpy-feathers.png")), "ícone feathers ausente");
+  const GEMS = { "giant-emerald": 90000, "giant-amethyst": 60000,
+    "giant-sapphire": 50000, "giant-topaz": 80000, "giant-ruby": 70000 };
+  for (const g in GEMS)
+    must(I[g] && I[g].sell === GEMS[g],
+      g + ": npcvalue oficial " + GEMS[g] + " ≠ " + (I[g] && I[g].sell));
+
+  /* OTBM: spawn rect 100% caminhável + center. */
+  const ob = fs.readFileSync(path.join(game, "maps", "arean_outskirts.otbm"));
+  const omap = OTBM.read(ob.buffer.slice(ob.byteOffset, ob.byteOffset + ob.byteLength), { z: 7 });
+  const omin = omap.sourceBounds;
+  let w2 = 0;
+  for (let ax = 1015; ax <= 1023; ax++)
+    for (let ay = 1014; ay <= 1020; ay++)
+      if ((omap.cells[(ax - omin.minX) + "," + (ay - omin.minY)] || {}).g) w2++;
+  must(w2 === 63, "spawn rect deve ser 63/63 caminhável: " + w2);
+  must((omap.cells[(1020 - omin.minX) + "," + (1018 - omin.minY)] || {}).g,
+    "centerroom não caminhável");
+  must(engine.MONSTERS["night-harpy"],
+    "night-harpy não registrado no engine");
 }
 
 console.log("OK: Court Warlock — ficha oficial 2741/lt1903/120k, " +

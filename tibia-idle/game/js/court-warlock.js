@@ -378,6 +378,80 @@ const SB_MONSTERS = {
   "raubritter-marksman": RAUB_MARKSMAN,
 };
 
+/* ── Arean Outskirts — hunt 400+ mista (Raubritters + Night Harpy,
+ * Isle of Ada 15.20). ── */
+const AO_ITEMS = {
+  /* Creature product oficial: npcvalue 5.000 (wikitext). */
+  "night-harpy-feathers": { n: "night harpy feathers", s: null, t: "loot",
+    cid: 52633, w: 7.5, sell: 5000, npcSell: 5000 },
+};
+/* Gems gigantes — npcvalue oficial (estavam placeholder sell=1). */
+const AO_PRICE_FIX = {
+  "giant-emerald": 90000, "giant-amethyst": 60000,
+  "giant-sapphire": 50000, "giant-topaz": 80000, "giant-ruby": 70000,
+};
+
+/* Night Harpy — ficha OFICIAL: hp 14.000, exp 21.000, armor 90,
+ * mitigation 3.92, speed 190, Bird/Hard, "attack in flocks and with
+ * swift precision" → melee rápido. dmgMods oficiais → resist. */
+const NIGHT_HARPY = Object.assign({}, HUNT_RAUB_BASE, {
+  name: "Night Harpy", hp: 14000, exp: 21000,
+  armor: 90, defense: 85, mitigation: 3.92, speed: 190, damage: 750,
+  looktype: 1901,   // ave negra do lote livre 15.20 (estimado)
+  resist: { physical: 0, earth: 40, fire: 30, death: -9, energy: 0,
+            holy: -9, ice: -12 },
+  skills: [
+    { el: "physical", min: 450, max: 900, int: 1500, ch: 45, range: 1 },
+    { el: "physical", min: 400, max: 800, int: 3500, ch: 30, radius: 2,
+      fx: "physical", miss: "physical" },
+    { el: "energy",   min: 400, max: 750, int: 5000, ch: 25, range: 7,
+      miss: "energy", alvo: 1 },
+  ],
+  voices: { int: 5000, ch: 15, list: [ { t: "WHEEE!!! WHEEE!!!" } ] },
+  loot: [
+    { item: "great-mana-potion", chance: 40, max: 12 },
+    { item: "strong-mana-potion", chance: 40, max: 12 },
+    { item: "great-spirit-potion", chance: 40, max: 8 },
+    { item: "night-harpy-feathers", chance: 6, max: 10 },
+    { item: "giant-sapphire", chance: 1, max: 1 },
+    { item: "giant-topaz", chance: 1, max: 1 },
+    { item: "giant-emerald", chance: 1, max: 1 },
+    { item: "crystal-coin", chance: 1, max: 100 },
+    { item: "giant-ruby", chance: 1, max: 1 },
+    { item: "giant-amethyst", chance: 1, max: 1 },
+  ],
+});
+SB_MONSTERS["night-harpy"] = NIGHT_HARPY;
+
+(function registerAreanOutskirts() {
+  if (typeof GAMEDATA === "undefined") return;
+  const items = GAMEDATA.items || (GAMEDATA.items = {});
+  for (const slug in AO_ITEMS) if (!items[slug]) items[slug] = AO_ITEMS[slug];
+  for (const slug in AO_PRICE_FIX) {
+    const it = items[slug];
+    if (!it) continue;
+    if (it.sell == null || it.sell <= 1) it.sell = AO_PRICE_FIX[slug];
+    if (it.npcSell == null || it.npcSell <= 1) it.npcSell = AO_PRICE_FIX[slug];
+  }
+  GAMEDATA.hunts = GAMEDATA.hunts || {};
+  GAMEDATA.hunts["arean-outskirts"] = {
+    name: "Arean Outskirts",
+    level: 400, minLevel: 400, cat: "hard",
+    pack: 9, packMin: 8, packMax: 10,
+    monsters: ["night-harpy", "raubritter-skirmisher",
+               "raubritter-chastener", "raubritter-marksman"],
+    spawnWeights: { "night-harpy": 20, "raubritter-skirmisher": 20,
+                    "raubritter-chastener": 20,
+                    "raubritter-marksman": 20 },
+    color: "#2a2a3a", scene: "crypt",
+    otbm: "arean_outskirts", otbmFloor: 7,
+    otbmSpawn: { x: 1020, y: 1018, z: 7 },            // centerroom
+    otbmMobBounds: { x: 1015, y: 1014, w: 9, h: 7, z: 7 },  // spawn rect
+    avgHp: 11375, avgExp: 12006, avgDamage: 900, avgArmor: 90,
+    avgGold: 500, respawn: 1,
+  };
+})();
+
 /* ── Registro da hunt Stag Bastion ── */
 (function registerStagBastion() {
   if (typeof GAMEDATA === "undefined") return;
