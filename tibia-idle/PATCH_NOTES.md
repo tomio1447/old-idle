@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Modal de hunts: Ferumbras Ascendant movido para HUNTS 250+
+
+- As 3 hunts de Ferumbras Ascendant (**Ferumbras Ascendant Way**,
+  **Grounds of Damnation/Tafariel** e **Grounds of Destruction/
+  Apocalypse** — todas minLevel 250) saíram da seção dedicada
+  "FERUMBRAS ASCENDANT" e entram em **HUNTS 250+** no modal.
+- `game/js/hunt-sections.js` → `?v=ferumbras-250-v1`. A `cat`
+  `ferumbras-ascendant` dos hunts permanece (só a seção mudou).
+
+---
+
 ## 2026-11-20 — The Roost of the Graveborn Quest — informações in-game atualizadas
 
 A página da quest (QUEST_DEFS `roost-of-the-graveborn-quest`) agora
