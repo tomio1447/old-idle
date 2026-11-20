@@ -30,7 +30,7 @@ const RECEIPT_MIME = { "image/jpeg": ".jpg", "image/png": ".png", "application/p
 const RMT_DEFAULTS = {
   RMT_ENABLED: "1",
   RATE_UNIT_TC: "1000",            // 1.000 TC =
-  RATE_VALUE_CENTS: "1000",        // R$ 10,00
+  RATE_VALUE_CENTS: "5000",        // R$ 50,00
   MINIMUM_SELL_AMOUNT: "1000",
   MAXIMUM_SELL_AMOUNT: "0",        // 0 = sem teto
   FEE_PERCENT: "0",                // % sobre o bruto

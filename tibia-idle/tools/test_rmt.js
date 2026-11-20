@@ -135,7 +135,7 @@ async function mk(opts) {
   r = await rmt.playerCreate(db, { token: TOK, tc_amount: 50000, client_nonce: "n2" }, {});
   assert.strictEqual(r.code, 201);
   assert.strictEqual(r.body.request.status, "pending");
-  assert.strictEqual(r.body.request.netCents, 50000);
+  assert.strictEqual(r.body.request.netCents, 250000); // 50k TC × R$50/1000
   assert.strictEqual(db._state.accounts.get(TOK).coins, 50000);
   assert.strictEqual(db._state.ledger[0].kind, "rmt_reserve");
 
@@ -149,8 +149,8 @@ async function mk(opts) {
   r = await rmt.playerCreate(db, { token: TOK, tc_amount: 1000, client_nonce: "n3",
     gross_amount_cents: 999999999, rate_value_cents: 1, net_amount_cents: 999999999 }, {});
   assert.strictEqual(r.code, 201);
-  assert.strictEqual(r.body.request.netCents, 1000); // 1000 TC = R$10,00 = 1000 cents
-  assert.strictEqual(r.body.request.rateValueCents, 1000);
+  assert.strictEqual(r.body.request.netCents, 5000); // 1000 TC = R$50,00 = 5000 cents
+  assert.strictEqual(r.body.request.rateValueCents, 5000);
 
   /* ── cancelar devolve exatamente 1x ── */
   const reqId = r.body.request.id;
@@ -174,7 +174,7 @@ async function mk(opts) {
   r = await rmt.playerCreate(db, { token: TOK, tc_amount: 1000, client_nonce: "x2" }, {});
   await db.rmtSettingsSet("RATE_VALUE_CENTS", "500"); // admin muda a cotação depois
   const snap = await db.rmtRequestGet(r.body.request.id);
-  assert.strictEqual(Number(snap.net_amount_cents), 1000); // request conserva a original
+  assert.strictEqual(Number(snap.net_amount_cents), 5000); // request conserva a original
 
   /* ── fluxo admin: review → approve → payment → receipt → confirm ── */
   const rid = r.body.request.id;
