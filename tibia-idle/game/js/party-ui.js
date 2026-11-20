@@ -267,6 +267,9 @@ function renderPartyPanel(p) {
   if (count) count.textContent = String(Math.max(0, membros.length - 1));
   if (arrow) arrow.textContent = PARTY_PANEL_OPEN ? "▾" : "▸";
   body.classList.toggle("collapsed", !PARTY_PANEL_OPEN);
+  // Recolhido: o painel encolhe pra esquerda e vira um chip mínimo
+  // (só 👥 + contador) no canto — tira o máximo de info da tela.
+  panel.classList.toggle("collapsed", !PARTY_PANEL_OPEN);
 
   if (membros.length === 1) {
     body.innerHTML = `<div class="party-panel-empty">Você está sem party.<br>

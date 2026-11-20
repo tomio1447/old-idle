@@ -217,21 +217,62 @@ test("itens de troca do Lothar/Addoner têm definição e sprite", () => {
   const html = fs.readFileSync(path.join(__dirname, "../game/index.html"), "utf8");
   for (const m of html.matchAll(/src="(js\/[a-z0-9._-]+\.js)/g))
     try { vm.runInContext(fs.readFileSync(path.join(__dirname, "../game", m[1]), "utf8"), ctx, { filename: m[1] }); } catch (e) {}
-  // frostheart-shard/mermaid-comb não existem no client 15.20: sem def e sem
-  // sprite — aparecem como nome-only até um client mais novo trazer a arte.
-  const semSprite = new Set(["frostheart-shard", "mermaid-comb"]);
+  // frostheart-shard/mermaid-comb são itens custom (não existem no client
+  // 15.x): ganharam def própria + sprite emprestada de ice shard/coral comb.
   const slugs = new Set();
   for (const r of recipes) for (const alt of r.alternatives || [])
     for (const c of alt) slugs.add(c.slug);
   const missing = [];
   for (const slug of slugs) {
     const it = ctx.GAMEDATA.items[slug];
-    if (!it) { if (!semSprite.has(slug)) missing.push(slug + ":sem def"); continue; }
-    if (!semSprite.has(slug) && !fs.existsSync(
+    if (!it) { missing.push(slug + ":sem def"); continue; }
+    if (!fs.existsSync(
       path.join(__dirname, "../game/assets/item", slug + ".png")))
       missing.push(slug + ":sem png");
   }
   assert.deepEqual(missing, []);
+});
+
+test("exchange aceita itens da Loot Pouch e mistura com a Bag", () => {
+  // Item só na pouch: a troca confirma (caso do marinated sturgeon do usuário).
+  const acc = {}, shared = { bag: {}, lootPouch: { "marinated-sturgeon": 1 } };
+  assert.equal(W.exchange(acc, [], shared, "mount:battlefrazzle", 0).ok, true);
+  assert.equal(shared.lootPouch["marinated-sturgeon"], undefined);
+  assert.equal(acc.cosmetics.mounts.battlefrazzle, true);
+  // Mesmo item nos dois containers: consome da bag primeiro, completa da pouch.
+  const acc2 = {}, shared2 = { bag: { "spectral-horseshoe": 2, "spectral-saddle": 1 },
+    lootPouch: { "spectral-horseshoe": 2, "spectral-horse-tack": 1 } };
+  assert.equal(W.exchange(acc2, [], shared2, "mount:phantasmal-jade", 0).ok, true);
+  assert.deepEqual(shared2.bag, {});
+  assert.deepEqual(shared2.lootPouch, {});
+  assert.equal(acc2.cosmetics.mounts["phantasmal-jade"], true);
+  // Instâncias de item só saem pela parte consumida da Bag.
+  const acc3 = {}, shared3 = { bag: { "legion-helmet": 1 },
+    lootPouch: { "chicken-feather": 100, honeycomb: 50 },
+    itemInstances: [{ id: "a", slug: "legion-helmet", loc: "bag" }, { id: "b", slug: "harness", loc: "bag" }] };
+  assert.equal(W.exchange(acc3, [], shared3, "addon:citizen:2", 0).ok, true);
+  assert.equal(shared3.itemInstances.length, 1);
+  assert.equal(shared3.itemInstances[0].id, "b");
+  // Insuficiente somando os dois containers: nada é consumido.
+  const shared4 = { bag: { harness: 1 }, lootPouch: {} };
+  assert.equal(W.exchange({}, [], shared4, "mount:dragonling", 0).ok, false);
+  assert.equal(shared4.bag.harness, 1);
+});
+
+test("catalog com shared expõe enough/have autoritativos por alternativa", () => {
+  const shared = { bag: { "marinated-sturgeon": 3 }, lootPouch: { "marinated-sturgeon": 17 } };
+  const catalog = W.catalog({}, [], shared);
+  const entry = catalog.find((r) => r.id === "mount:battlefrazzle");
+  assert.equal(entry.have["marinated-sturgeon"], 20);
+  assert.deepEqual(entry.enough, [true]);
+  const gryphon = catalog.find((r) => r.id === "mount:gryphon");
+  assert.equal(gryphon.have["the-regalia-of-suon"], 0);
+  assert.equal(gryphon.have["gryphon-mask"], 0);
+  assert.deepEqual(gryphon.enough, [false]);
+  // Sem shared: catalogo antigo, sem os campos (fallback do cliente).
+  const plain = W.catalog({}, []).find((r) => r.id === "mount:battlefrazzle");
+  assert.equal(plain.enough, undefined);
+  assert.equal(plain.have, undefined);
 });
 
 test("client equips account unlocks on both sexes and does not enable unowned addon layers", () => {

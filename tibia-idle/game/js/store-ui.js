@@ -1,13 +1,10 @@
-/* store-ui.js — Gamestore: Obter Coins (Mercado Pago), VIP, vender TC (beta). */
+/* store-ui.js — Gamestore: Home, VIP, Obter Coins (Mercado Pago), cosméticos, bless, preys, vouchers e histórico. */
 "use strict";
 
 let _storeTab = "home";
 let _storeCatalog = null;
 let _storePoll = null;
 let _storePayView = null; /* { order, pack, method } */
-let _storeSellQty = "";
-let _storeSellPrice = "";
-let _storeSellAnon = false;
 let _storeEmail = "";
 
 function storeEsc(s) {
@@ -19,7 +16,10 @@ function storeCoinIcon() {
 }
 function storeCoinBalanceHtml() {
   const coins = accountCoins();
-  return storeCoinIcon() + " " + storeEsc(typeof fmtFull === "function" ? fmtFull(coins) : coins);
+  const nt = typeof accountCoinsNt === "function" ? accountCoinsNt() : 0;
+  const base = storeCoinIcon() + " " + storeEsc(typeof fmtFull === "function" ? fmtFull(coins) : coins);
+  /* Non-transferable coins aparecem ao lado (só gastáveis na STORE). */
+  return nt > 0 ? base + ` <span title="NT Coins: só gastáveis na STORE (não podem ir ao market/RMT)" style="color:#9fd6f0">+ ${typeof fmtFull === "function" ? fmtFull(nt) : nt} NT</span>` : base;
 }
 function storeBrl(n) {
   const v = Number(n) || 0;
@@ -93,7 +93,6 @@ function renderStoreNav() {
     { id: "home", nome: "Home" },
     { id: "vip", nome: "VIP" },
     { id: "coins", nome: "Obter Coins" },
-    { id: "sell", nome: "Vender Coins", beta: true },
     { id: "outfits", nome: "Outfits" },
     { id: "mounts", nome: "Mounts" },
     { id: "bless", nome: "BLESS" },
@@ -130,7 +129,6 @@ async function renderStoreTab() {
   if (_storeTab === "home") return renderStoreHome(main);
   if (_storeTab === "vip") return renderStoreVip(main);
   if (_storeTab === "coins") return renderStoreBuy(main);
-  if (_storeTab === "sell") return renderStoreSell(main);
   if (_storeTab === "outfits") return renderStoreCosmetics(main, "outfit");
   if (_storeTab === "mounts") return renderStoreCosmetics(main, "mount");
   if (_storeTab === "bless") return renderStoreBless(main);
@@ -159,10 +157,6 @@ function renderStoreHome(main) {
       <button type="button" class="store-home-card" data-store-go="vip">
         <b>VIP</b>
         <span class="tiny dim">1, 7 ou 30 dias com Tibia Coins</span>
-      </button>
-      <button type="button" class="store-home-card" data-store-go="sell">
-        <b>Vender Coins <span class="store-beta">BETA</span></b>
-        <span class="tiny dim">Trocar TC por gold com outros jogadores</span>
       </button>
     </div>`;
   $$("#store-main [data-store-go]").forEach((b) =>
@@ -419,77 +413,6 @@ function renderStorePay(main, view) {
       renderStoreTab();
     }
   }, 3000);
-}
-
-async function renderStoreSell(main) {
-  const tok = sessionToken();
-  const coins = accountCoins();
-  const p = typeof G !== "undefined" && G ? G.p : { name: "Anônimo" };
-  if (typeof marketBank === "function") marketBank(tok).then((r) => { if (r.ok) _mBank = r.bank; });
-  main.innerHTML = `
-    <div class="tiny mb4" style="color:#ffd65a">BETA — venda player-to-player no Market. Os TC ficam retidos na oferta; se cancelar, voltam para a conta.</div>
-    <div class="small mb4" style="color:#ffe680">${typeof fmtFull === "function" ? fmtFull(coins) : coins} TC na conta</div>
-    <div class="row mb4" style="gap:6px;flex-wrap:wrap">
-      <input id="store-sell-qty" type="number" min="1" placeholder="Qtd TC" value="${storeEsc(_storeSellQty)}" style="width:90px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      <span class="tiny dim">TC por</span>
-      <input id="store-sell-price" type="number" min="1" placeholder="gp total" value="${storeEsc(_storeSellPrice)}" style="width:110px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      <span class="tiny dim">gp</span>
-      <label class="toggle"><input type="checkbox" id="store-sell-anon" ${_storeSellAnon ? "checked" : ""}> Anônimo</label>
-      <button type="button" class="sm primary" id="store-sell-go">Ofertar TC (30 dias)</button>
-    </div>
-    <div class="tiny dim mb4" id="store-sell-fee"></div>
-    <div class="tiny dim mb4">Ofertas ativas de Tibia Coins</div>
-    <div id="store-sell-list" class="tiny dim">Carregando...</div>`;
-  const qtyEl = $("#store-sell-qty");
-  const priceEl = $("#store-sell-price");
-  const feeEl = $("#store-sell-fee");
-  const refreshFee = () => {
-    const price = Math.floor(Number(priceEl.value) || 0);
-    feeEl.textContent = price > 0 && typeof marketFee === "function"
-      ? "Taxa do Market: " + (typeof fmtFull === "function" ? fmtFull(marketFee(price)) : marketFee(price)) + " gp (do banco)"
-      : "";
-  };
-  if (qtyEl) qtyEl.addEventListener("input", (e) => { _storeSellQty = e.target.value; });
-  if (priceEl) priceEl.addEventListener("input", (e) => { _storeSellPrice = e.target.value; refreshFee(); });
-  $("#store-sell-anon").addEventListener("change", (e) => { _storeSellAnon = e.target.checked; });
-  refreshFee();
-  $("#store-sell-go").addEventListener("click", async () => {
-    const qty = Math.floor(Number(_storeSellQty) || 0);
-    const price = Math.floor(Number(_storeSellPrice) || 0);
-    if (qty <= 0 || price <= 0) { toast("Informe quantidade e preço"); return; }
-    if (qty > coins) { toast("Tibia Coins insuficientes"); return; }
-    const r = await marketCreateOffer({
-      token: tok, kind: "coins", qty, price, price_tc: 0,
-      seller_name: _storeSellAnon ? "Anônimo" : (p && p.name) || "Jogador",
-    });
-    if (!r.ok) { toast(r.msg || "Falha", "bad"); return; }
-    if (Number.isFinite(Number(r.bank))) _mBank = Number(r.bank);
-    if (Number.isFinite(Number(r.coinBalance))) storeApplyCoins(r.coinBalance);
-    toast("Oferta criada", "level");
-    _storeSellQty = ""; _storeSellPrice = "";
-    renderStoreSell(main);
-  });
-  const list = $("#store-sell-list");
-  const offers = await marketListOffers({ kind: "coins" });
-  if (!offers.ok) { list.innerHTML = `<div class="tiny" style="color:#ff9a6a">${storeEsc(offers.msg)}</div>`; return; }
-  const rows = offers.offers || [];
-  if (!rows.length) { list.innerHTML = `<div class="tiny dim">Nenhuma oferta de TC no momento.</div>`; return; }
-  list.innerHTML = `<div class="list" style="max-height:280px">` + rows.map((o) => `
-    <div class="shop-row">
-      <div style="flex:1;min-width:0">
-        <div class="small" style="color:#ffe680">${o.qty} Tibia Coins</div>
-        <div class="tiny dim">${storeEsc(o.seller_name)} · ${typeof marketTimeLeft === "function" ? marketTimeLeft(o) : ""} restante</div>
-      </div>
-      <button type="button" class="sm primary" data-store-buy="${o.id}">${typeof fmtFull === "function" ? fmtFull(o.price) : o.price} gp</button>
-    </div>`).join("") + `</div>`;
-  $$("#store-sell-list [data-store-buy]").forEach((b) =>
-    b.addEventListener("click", async () => {
-      const r = await marketBuyOffer({ token: tok, offer_id: b.dataset.storeBuy, buyer_name: (p && p.name) || "Jogador" });
-      if (!r.ok) { toast(r.msg || "Falha", "bad"); return; }
-      if (r.data && Number.isFinite(Number(r.data.coinBalance))) storeApplyCoins(r.data.coinBalance);
-      toast("Compra concluída", "level");
-      renderStoreSell(main);
-    }));
 }
 
 async function renderStoreHistory(main) {
@@ -846,6 +769,9 @@ function renderStoreVouchers(main) {
         input.value = "";
         const cc = $("#store-coin-count");
         if (cc) cc.innerHTML = storeCoinBalanceHtml();
+        // Vouchers de divulgação trazem um modal próprio (recompensas +
+        // agradecimento/links do criador) — ex.: cupom de streamer.
+        if (r.modal && typeof r.modal === "object") openStoreVoucherModal(r);
       } else {
         setMsg("✖ " + ((r && r.msg) || "Falha ao resgatar voucher"), "#ff9a6a");
       }
@@ -862,6 +788,82 @@ function renderStoreVouchers(main) {
   btn.addEventListener("click", redeem);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") redeem(); });
   input.focus();
+}
+
+/* Modal de recompensa do voucher — o servidor manda `modal` + `rewards`
+ * (vouchers de divulgação, ex.: cupom de streamer). Montaria usa o primeiro
+ * frame do sheet via background; logos sociais são SVG inline (sem asset). */
+const VOUCHER_SOCIAL_ICONS = {
+  instagram: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none"><defs><linearGradient id="vig" x1="0" y1="24" x2="24" y2="0"><stop offset="0" stop-color="#feda75"/><stop offset=".4" stop-color="#fa7e1e"/><stop offset=".7" stop-color="#d62976"/><stop offset="1" stop-color="#962fbf"/></linearGradient></defs><rect x="1.5" y="1.5" width="21" height="21" rx="5.5" fill="url(#vig)"/><circle cx="12" cy="12" r="5" stroke="#fff" stroke-width="2.2"/><circle cx="17.3" cy="6.7" r="1.4" fill="#fff"/></svg>`,
+  twitch: `<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#9146FF" d="M4.3 1 1.8 5v17h5v3h2.5l3-3h4.3l5.2-5.5V1H4.3zm15 14-3.8 4h-4l-3 3v-3H4.8V3h14.5v12z"/><rect x="14" y="6.5" width="2.2" height="6" fill="#9146FF"/><rect x="9" y="6.5" width="2.2" height="6" fill="#9146FF"/></svg>`,
+};
+
+function voucherRewardIcon(rw) {
+  const kind = rw && rw.kind;
+  if (kind === "mount") {
+    const id = String(rw.mount || "");
+    const data = (typeof APPEARANCE_DATA !== "undefined" ? APPEARANCE_DATA
+      : (typeof window !== "undefined" && window.APPEARANCES) || {});
+    const m = (data.mounts || []).find((x) => String(x.id) === id) || {};
+    const cw = Number(m.cw) || 64, ch = Number(m.ch) || 64;
+    const cols = Number(m.cols) || 9, rows = Number(m.rows) || 4;
+    const box = 56;
+    return `<div class="voucher-rw-sprite" style="width:${box}px;height:${box}px;` +
+      `background-image:url('assets/appearance/mount/${id}.base.png');` +
+      `background-size:${cw * cols}px ${ch * rows}px;background-position:0 0;` +
+      `background-repeat:no-repeat;image-rendering:pixelated"></div>`;
+  }
+  if (kind === "vip")
+    return `<svg viewBox="0 0 24 24" width="30" height="30"><path fill="#f6d57e" stroke="#8a6b1f" stroke-width=".8" d="M2.5 19.5 4 7l4.8 4.2L12 4l3.2 7.2L20 7l1.5 12.5h-19z"/><circle cx="4" cy="5" r="1.6" fill="#f6d57e"/><circle cx="12" cy="2.5" r="1.6" fill="#f6d57e"/><circle cx="20" cy="5" r="1.6" fill="#f6d57e"/></svg>`;
+  if (kind === "coinsNt")
+    return `<span style="position:relative;display:inline-block"><img src="assets/ui/coins/tibia-coins.gif" style="width:30px;height:30px;image-rendering:pixelated" alt=""><b style="position:absolute;right:-4px;bottom:-3px;font-size:9px;color:#7dd3fc;text-shadow:0 1px 2px #000">NT</b></span>`;
+  if (kind === "coins")
+    return `<img src="assets/ui/coins/tibia-coins.gif" style="width:30px;height:30px;image-rendering:pixelated" alt="">`;
+  return `<span style="font-size:26px;line-height:1">📦</span>`;
+}
+
+function voucherSocialIcon(link) {
+  const name = String((link && link.name) || "").toLowerCase();
+  if (name.indexOf("insta") >= 0) return VOUCHER_SOCIAL_ICONS.instagram;
+  if (name.indexOf("twitch") >= 0) return VOUCHER_SOCIAL_ICONS.twitch;
+  return `<span style="font-size:18px">🔗</span>`;
+}
+
+function openStoreVoucherModal(r) {
+  const old = document.getElementById("voucher-reward-backdrop");
+  if (old) old.remove();
+  const m = r.modal || {};
+  const rewards = Array.isArray(r.rewards) ? r.rewards : [];
+  const social = m.social && typeof m.social === "object" ? m.social : null;
+
+  const bd = document.createElement("div");
+  bd.id = "voucher-reward-backdrop";
+  bd.className = "voucher-reward-backdrop";
+  bd.innerHTML = `
+    <div class="voucher-reward-card" role="dialog" aria-modal="true">
+      <div class="voucher-reward-title">${m.title || "Voucher resgatado!"}
+        <button type="button" class="sm voucher-reward-close" aria-label="Fechar">✕</button>
+      </div>
+      ${m.intro ? `<div class="voucher-reward-intro">${m.intro}</div>` : ""}
+      ${rewards.length ? `<div class="voucher-reward-list">` +
+        rewards.map((rw) => `<div class="voucher-reward-row">
+          <span class="voucher-reward-ico">${voucherRewardIcon(rw)}</span>
+          <span class="voucher-reward-label">${rw.label || ""}</span>
+        </div>`).join("") + `</div>` : ""}
+      ${social ? `<div class="voucher-reward-social">
+        <div class="voucher-reward-social-label">${social.label || ""}</div>
+        ${(Array.isArray(social.links) ? social.links : []).map((l) => `
+          <a class="voucher-reward-link" href="${l.url || "#"}" target="_blank" rel="noopener noreferrer">
+            ${voucherSocialIcon(l)}
+            <span class="voucher-reward-link-name">${l.name || ""}</span>
+            <span class="voucher-reward-link-handle">${l.handle || l.url || ""}</span>
+          </a>`).join("")}
+      </div>` : ""}
+    </div>`;
+  document.body.appendChild(bd);
+  const close = () => bd.remove();
+  bd.addEventListener("click", (e) => { if (e.target === bd) close(); });
+  bd.querySelector(".voucher-reward-close").addEventListener("click", close);
 }
 
 function bootStoreFromQuery() {

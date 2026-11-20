@@ -1049,7 +1049,8 @@ function updateCombatMovement(c, p, dt) {
       x: pl.x + 0.012 * Math.min(i, 3),
       y: clamp(pl.y + (i - (c.mobs.length - 1) / 2) * 0.055, 0.26, 0.76),
     };
-    const mobSpeed = m.speed == null ? 0.00005 : Number(m.speed);
+    const mobSpeed = (m.speed == null ? 0.00005 : Number(m.speed))
+      * ((m.slowUntil && m.slowUntil > Date.now()) ? (m.slowMul || 0.5) : 1);
     if (mobSpeed > 0 && !m.fixedSpawn) movePoint(m, laneTarget, mobSpeed, dt, range * 0.90);
     else m.moving = false;
     if (!m.moving) m.dir = faceDir(m, pl);
@@ -1640,7 +1641,9 @@ function monsterMissile(mob) {
     if (!sk.miss || (sk.range || 1) <= 1) continue;
     if (!base || (sk.max || 0) > (base.max || 0)) base = sk;
   }
-  if (base) return base.miss;
+  /* `miss` pode vir com nome de elemento ("physical") em vez de sprite —
+   * resolve via ELEMENT_MISSILE antes de virar nome de arquivo. */
+  if (base) return ELEMENT_MISSILE[base.miss] || base.miss;
   // 2) Monstro sem habilidades importadas: heuristicas antigas.
   if (!def.ranged) return null;
   const slug = mob.slug || "";
@@ -2125,12 +2128,25 @@ function playerAttack(c, p, target) {
     }
   }
 
-  // ---- charms defensivos/utilitarios da Cyclopedia
-  const ch = typeof charmTotals === "function" ? charmTotals(p) : null;
+  // ---- charms defensivos/utilitarios da Cyclopedia (só contra a raça associada)
+  const ch = typeof charmTotals === "function" ? charmTotals(p, target && target.slug) : null;
   if (ch && ch.vampirismo) {
     const mx = maxStats(p);
-    p.hp = Math.min(mx.hp, p.hp + Math.max(1,
-      Math.floor(raw * ch.vampirismo / 100)));
+    const h = Math.min(mx.hp - p.hp, Math.max(1, Math.floor(raw * ch.vampirismo / 100)));
+    if (h > 0) {
+      p.hp += h;
+      c.events.push({ t: "charm", id: "vampiric", heal: h, slug: (target && target.slug) || null,
+                      whoId: String(p.id || ""), x: pos.x, y: pos.y });
+    }
+  }
+  if (ch && ch.manaLeech) {
+    const mx = maxStats(p);
+    const h = Math.min(mx.mp - p.mp, Math.max(1, Math.floor(raw * ch.manaLeech / 100)));
+    if (h > 0) {
+      p.mp += h;
+      c.events.push({ t: "charm", id: "voidcall", mana: h, slug: (target && target.slug) || null,
+                      whoId: String(p.id || ""), x: pos.x, y: pos.y });
+    }
   }
 
   // ---- imbuements do 15.x (usado abaixo: leech, elemental, strike)
@@ -2153,6 +2169,7 @@ function playerAttack(c, p, target) {
   if (forgeOnslaught) {
     extraPct += (forgeOnslaught.bonusPct || 60);
     fatalou = true;
+    c.events.push({ t: "forge", nome: "onslaught", whoId: String(p.id || "") });
   }
 
   // Transcendence (avatar): todos os ataques viram críticos com +15% extra.
@@ -2269,7 +2286,7 @@ function playerAttack(c, p, target) {
     forgeRegisterOffensiveAction(p, Date.now());
     if (typeof forgeTryTranscendence === "function") {
       const tr = forgeTryTranscendence(p, Date.now());
-      if (tr) c.events.push({ t: "buff", nome: "Transcendence" });
+      if (tr) c.events.push({ t: "buff", nome: "Transcendence", whoId: String(p.id || "") });
     }
   }
   if (raw > 0) {
@@ -2322,6 +2339,34 @@ function playerAttack(c, p, target) {
                       projectile: isDist || isMagic, el: element, crit: critou, fatal: fatalou,
                       race: race, fx: hitFx,
                       missile: (isDist || isMagic) ? playerMissile(p, element) : null });
+    }
+    // Charms ofensivos (Canary): procs elementais só no ALVO PRINCIPAL —
+    // cleave/area não disparam (mesmo gate do afterPlayerHit do servidor).
+    if (target.slug && typeof charmOffensiveProc === "function") {
+      const procs = charmOffensiveProc(p, target.slug,
+        Math.max(1, Number(target.maxHp) || Number(target.def && target.def.hp) || 1),
+        p.level || 1);
+      for (const pr of (procs || [])) {
+        const d = Math.max(1, applyMonsterMitigation(target, pr.elemento || pr.element,
+          applyResist(target, pr.elemento || pr.element, pr.dmg,
+            playerPiercePct(p, pr.elemento || pr.element))));
+        target.hp -= mobTakenMul(target, d);
+        c.stats.damage += d;
+        c.events.push({ t: "charm", id: pr.id, dmg: d, el: pr.elemento || pr.element,
+                        slug: target.slug, whoId: String(p.id || ""),
+                        x: target.x, y: target.y, screen: true,
+                        fx: (ELEMENTS[pr.elemento || pr.element] || ELEMENTS.physical).fx });
+      }
+      // Cripple (minor): chance de paralisar — no idle vira slow pesado.
+      const chOff = typeof charmTotals === "function" ? charmTotals(p, target.slug) : null;
+      if (chOff && chOff.lentidao && Math.random() * 100 < chOff.lentidao
+          && !(target.def && target.def.imune && target.def.imune.indexOf("paralyze") >= 0)) {
+        target.slowUntil = Date.now() + 3000;
+        target.slowMul = 0.5;
+        c.events.push({ t: "charm", id: "cripple", aplicado: 1, slug: target.slug,
+                        whoId: String(p.id || ""), x: target.x, y: target.y,
+                        screen: true, fx: "poff" });
+      }
     }
     // 15.25: as crippling stances do Sorcerer aplicam Sap Strength /
     // Expose Weakness em qualquer golpe que acerte (auto attack incluso)
@@ -2640,13 +2685,13 @@ function castSpellById(c, p, target, now, id) {
   if (s.aggr || s.type === "attack") entCdSet(c, p, "offensiveCd", now + 2000);
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
-    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
   }
   if (s.aggr || s.type === "attack") {
     if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
     if (typeof forgeTryTranscendence === "function") {
       const tr = forgeTryTranscendence(p, now);
-      if (tr) c.events.push({ t: "buff", nome: "Transcendence" });
+      if (tr) c.events.push({ t: "buff", nome: "Transcendence", whoId: String(p.id || "") });
     }
   }
 
@@ -2800,6 +2845,7 @@ function castSpellById(c, p, target, now, id) {
   const armaElemento = (typeof spellWeaponElement === "function")
     ? spellWeaponElement(p) : null;
   const forgeOnslaughtSpell = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
+  if (forgeOnslaughtSpell) c.events.push({ t: "forge", nome: "onslaught", whoId: String(p.id || "") });
   const transcendSpellPct = (typeof forgeTranscendenceDamagePct === "function")
     ? forgeTranscendenceDamagePct(p, now) : 0;
 
@@ -3145,9 +3191,10 @@ function tryUseRune(c, p, target, now, forcada) {
   if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
   if (typeof forgeTryTranscendence === "function") {
     const tr = forgeTryTranscendence(p, now);
-    if (tr) c.events.push({ t: "buff", nome: "Transcendence" });
+    if (tr) c.events.push({ t: "buff", nome: "Transcendence", whoId: String(p.id || "") });
   }
   const forgeOnslaughtRune = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
+  if (forgeOnslaughtRune) c.events.push({ t: "forge", nome: "onslaught", whoId: String(p.id || "") });
   const transcendRunePct = (typeof forgeTranscendenceDamagePct === "function")
     ? forgeTranscendenceDamagePct(p, now) : 0;
   // Crit/Fatal da runa: um roll por uso — em área vale para todos os alvos.
@@ -3447,7 +3494,7 @@ function tryHeal(c, p, now) {
       cdStart(p, idCura, s, now);
       if (typeof forgeTryMomentum === "function") {
         const momentum = forgeTryMomentum(p, now);
-        if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+        if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
       }
       p.mp -= _curaMana;
       addManaSpent(p, combatManaSkillGain(c, _curaMana));
@@ -3514,7 +3561,7 @@ function tryHeal(c, p, now) {
       else entCdSet(c, p, "potionCd", now + 1000);
       if (typeof forgeTryMomentum === "function") {
         const momentum = forgeTryMomentum(p, now);
-        if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+        if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
       }
       c.events.push({ t: "heal", amount: amount, targetId:p.id||"player", rune: s.name,
                       mana: manaAmount, supply: best, drunk: s.kind !== "rune",
@@ -3568,7 +3615,7 @@ function tryHaste(c, p, now) {
   cdStart(p, escolhida, sp, now);
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
-    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
   }
   if (!p.buffs) p.buffs = {};
   p.buffs[escolhida] = now + (HASTEDATA[escolhida].dur || 30000);
@@ -3596,7 +3643,7 @@ function tryBuff(c, p, now) {
   cdStart(p, chave, s, now);
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
-    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
   }
   applyBuff(p, chave, now);
   entCdSet(c, p, "buffCd", now + Math.max(1000, s.cd || 2000));
@@ -3631,7 +3678,7 @@ function tryCureCondition(c, p, now) {
     cdStart(p, def.cure, s, now);
     if (typeof forgeTryMomentum === "function") {
       const momentum = forgeTryMomentum(p, now);
-      if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+      if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
     }
     clearCondition(p, tipo);
     entCdSet(c, p, "cureCd", now + 1000);
@@ -3792,7 +3839,7 @@ function tryMana(c, p, now) {
   entCdSet(c, p, "potionCd", now + 1000);   // cooldown por personagem (party combat)
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
-    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
   }
   c.events.push({ t: "mana", amount: amount, supply: slug,
                   heal: healAmount, drunk: 1 });
@@ -4249,7 +4296,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   }
 
   const bolt = !sk.radius && !sk.areaPattern && ((sk.range || 1) > 1 || !!sk.length);
-  const miss = sk.miss || ELEMENT_MISSILE[sk.el || "physical"] || null;
+  const miss = (sk.miss && (ELEMENT_MISSILE[sk.miss] || sk.miss)) ||
+    ELEMENT_MISSILE[sk.el || "physical"] || null;
   if (raw <= 0) {
     c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                     screen: true, mantra: true, fx: "block-hit",
@@ -4497,10 +4545,12 @@ function mobAttack(c, p, mob) {
     c.events.push({ t: "miss", x: pl.x, y: pl.y, dazzle: true, fx: "poff" });
     return 0;
   }
-  // charm Dodge: esquiva total do golpe
-  const chm = typeof charmTotals === "function" ? charmTotals(p) : null;
+  // charm Dodge: esquiva total do golpe (só contra a raça associada)
+  const chm = typeof charmTotals === "function" ? charmTotals(p, mob.slug) : null;
   if (chm && chm.esquiva && Math.random() * 100 < chm.esquiva) {
-    c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, fx: "poff" });
+    c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, charm: "dodge",
+                    mitigated: Math.max(0, Math.floor(raw)),
+                    targetId: (tgt && tgt.id) || (p && p.id) || "player", fx: "poff" });
     return 0;
   }
   if (typeof wheelTotals === "function" && p.wheel) {
@@ -4514,7 +4564,8 @@ function mobAttack(c, p, mob) {
   if (typeof forgeTryRuse === "function") {
     const ruse = forgeTryRuse(p);
     if (ruse) {
-      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, ruse: true });
+      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, ruse: true,
+                      targetId: (tgt && tgt.id) || (p && p.id) || "player" });
       return 0;
     }
   }
@@ -4605,6 +4656,8 @@ function mobAttack(c, p, mob) {
     const volta = Math.max(1, Math.floor(raw * chm.reflete / 100));
     mob.hp -= mobTakenMul(mob, volta);
     c.stats.damage += volta;
+    c.events.push({ t: "charm", id: "parry", dmg: volta, slug: mob.slug,
+                    whoId: String(p.id || ""), x: mob.x, y: mob.y, screen: true });
   }
   // ATENCAO A ORDEM: o `p.hp -= raw` ficava AQUI, antes das reducoes abaixo.
   // O resultado e que Protector e protecao de imbuement mudavam so o numero
@@ -4692,6 +4745,38 @@ function mobAttack(c, p, mob) {
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                   screen: true, projectile: monsterAttackRange(mob) > 0.16,
                   missile: monsterMissile(mob) });
+  // Charms reativos (Canary): procs ao SOFRER o golpe da raça associada.
+  if (chm) {
+    const agora = Date.now();
+    // Numb: chance de paralisar o agressor após ele te atacar.
+    if (chm.numb && Math.random() * 100 < chm.numb
+        && !(mob.def && mob.def.imune && mob.def.imune.indexOf("paralyze") >= 0)
+        && mob.hp > 0) {
+      mob.slowUntil = agora + 3000;
+      mob.slowMul = 0.5;
+      c.events.push({ t: "charm", id: "numb", aplicado: 1, slug: mob.slug,
+                      whoId: String(p.id || ""), x: mob.x, y: mob.y,
+                      screen: true, fx: "poff" });
+    }
+    // Adrenaline Burst: chance de ganhar haste ao ser atingido.
+    if (chm.adrenaline && Math.random() * 100 < chm.adrenaline) {
+      p.buffs = p.buffs || {};
+      p.buffs["utani-hur"] = agora + 10000;
+      c.events.push({ t: "charm", id: "adrenaline", aplicado: 1, slug: mob.slug,
+                      whoId: String(p.id || ""), x: pl.x, y: pl.y,
+                      screen: true, fx: "haste" });
+    }
+    // Cleanse: chance de remover UMA condition negativa ao ser atingido.
+    if (chm.cleanse && p.conditions && Math.random() * 100 < chm.cleanse) {
+      const neg = Object.keys(p.conditions)[0];
+      if (neg) {
+        delete p.conditions[neg];
+        c.events.push({ t: "charm", id: "cleanse", aplicado: 1, removido: neg,
+                        slug: mob.slug, whoId: String(p.id || ""),
+                        x: pl.x, y: pl.y, screen: true, fx: "holy-effect" });
+      }
+    }
+  }
   if (typeof tryEbbFearOnHit === "function") tryEbbFearOnHit(c, p, mob);
   return raw;
 }
@@ -4784,6 +4869,28 @@ function rollLoot(c, p, mob) {
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });
+  }
+  // Charm Gut (Canary): % de chance de dropar UM creature product extra
+  // da tabela da criatura associada (não conta currency/supply/equip).
+  const chGut = typeof charmTotals === "function" ? charmTotals(p, mob.slug) : null;
+  if (chGut && chGut.gut && !mob.boss && Math.random() * 100 < chGut.gut) {
+    const elegiveis = (mob.def.loot || []).filter((l) => {
+      const it = GAMEDATA.items[l.item];
+      return it && !it.s && it.s !== "ammo" && !SUPPLIES[l.item]
+        && !currencyValue(l.item) && l.item !== "gold-coin";
+    });
+    if (elegiveis.length) {
+      const extra = elegiveis[Math.floor(Math.random() * elegiveis.length)];
+      const ok = (typeof routeLootItem === "function")
+        ? routeLootItem(p, extra.item, 1)
+        : addLootPouch(p, extra.item, 1);
+      if (ok) {
+        c.stats.loot[extra.item] = (c.stats.loot[extra.item] || 0) + 1;
+        got.push({ item: extra.item, count: 1 });
+        c.events.push({ t: "charm", id: "gut", extra: 1, item: extra.item,
+                        slug: mob.slug, whoId: String(p.id || "") });
+      }
+    }
   }
   // Prey de LOOT (TibiaWiki/Prey_System): com bônus de X%, há X% de chance
   // de o monstro gerar OUTRO conjunto de loot (como se matasse dois).

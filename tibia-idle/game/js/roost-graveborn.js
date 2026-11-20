@@ -423,7 +423,7 @@ function agAvatar(name, looktype, skills, extra) {
 const YORIK_YOUNGBOOK = agMember("Yorik Youngbook", 2712, 268, "avatar-of-steel", [
   { el: "physical", min: 800, max: 1400, int: 2000, ch: 45, range: 1 },
   { el: "physical", min: 700, max: 1200, int: 5000, ch: 30, radius: 2,
-    fx: "groundshaker", miss: "physical" },
+    fx: "groundshaker" },
 ]);
 const PERCY_PEACETINKER = agMember("Percy Peacetinker", 2713, 137, "avatar-of-light", [
   { el: "physical", min: 700, max: 1200, int: 2000, ch: 45, range: 7,
@@ -644,17 +644,17 @@ const SPIRIT_BASE = {
 const ZHARVORINS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
   name: "Zharvorin's Spirit", looktype: 1884, boCond: "rooted", boCageSlug: "zharvorins-soulcage",
   skills: SPIRIT_BASE.skills.concat([
-    { el: "earth", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "root", miss: "rooting-effect" }]),
+    { el: "earth", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "root" }]),
 });
 const MYZARETHS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
   name: "Myzareth's Spirit", looktype: 1886, boCond: "feared", boCageSlug: "myzareths-soulcage",
   skills: SPIRIT_BASE.skills.concat([
-    { el: "death", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "fear", miss: "mort-area" }]),
+    { el: "death", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "fear", miss: "death", fx: "mort-area" }]),
 });
 const SCARITHS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
   name: "Scarith's Spirit", looktype: 1905, boCond: "drunk", boCageSlug: "scariths-soulcage",
   skills: SPIRIT_BASE.skills.concat([
-    { el: "ice", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "drunk", miss: "ice-attack" }]),
+    { el: "ice", min: 0, max: 0, int: 15000, ch: 40, range: 7, n: "drunk", miss: "ice", fx: "ice-attack" }]),
 });
 const ELYRAXS_SPIRIT = Object.assign({}, SPIRIT_BASE, {
   name: "Elyrax's Spirit", looktype: 1904, boCond: "slowed", boCageSlug: "elyraxs-soulcage",

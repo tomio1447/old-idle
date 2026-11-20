@@ -588,6 +588,9 @@ function normalizePlayer(p) {
   const oldPouch = p.lootPouch || {};
   p.lootPouch = p.lootPouch || {};
   if (typeof bindAccountLootPouch === "function") bindAccountLootPouch(p);
+  // Charms: unlocks e pontos são DA CONTA (accessor igual gold/pouch);
+  // só o assign p.charmRace continua por personagem.
+  if (typeof bindAccountCharms === "function") bindAccountCharms(p);
   if (typeof accountSetLootPouch === "function") {
     const currentPouch = accountLootPouch() || {};
     if (Object.keys(oldPouch).length && !Object.keys(currentPouch).length) {
@@ -6699,7 +6702,13 @@ function initAccountLogin() {
         paintCreatorLook();
       }));
   }
+  const ACCOUNT_MAX_CHARS = 4; // igual ao ACCOUNT_MAX_CHARS do servidor
   function showCharacterCreator(token, account, characters) {
+    characters = Array.isArray(characters) ? characters : [];
+    if (characters.length >= ACCOUNT_MAX_CHARS) {
+      msg(`Limite de ${ACCOUNT_MAX_CHARS} personagens por conta.`);
+      return;
+    }
     const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
     if (!openAccountModal(`
       <div class="panel-title">Criar personagem
@@ -6895,10 +6904,14 @@ function initAccountLogin() {
         ${characters.length?`<div class="gi-divider-hint"><span>Arraste os personagens para ordenar a party — o 1º da lista é o líder</span></div>`:""}
         <div class="account-character-list">${cards}</div>
         <footer class="gi-modal__footer">
-          <button class="gi-btn gi-btn--primary" id="acc-open-create-char">Criar personagem</button>
+          ${characters.length < ACCOUNT_MAX_CHARS
+            ? `<button class="gi-btn gi-btn--primary" id="acc-open-create-char">Criar personagem</button>`
+            : `<button class="gi-btn gi-btn--danger" id="acc-logout">Logout</button>`}
           ${account.emailVerified ? "" : `<button class="gi-btn gi-btn--secondary" id="acc-verify-email">✉️ Confirmar e-mail</button>`}
           <button class="gi-btn gi-btn--secondary" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
-          <button class="gi-btn gi-btn--danger" id="acc-logout">Logout</button>
+          ${characters.length < ACCOUNT_MAX_CHARS
+            ? `<button class="gi-btn gi-btn--danger" id="acc-logout">Logout</button>`
+            : ""}
         </footer>
       </div>`, true)) return;
     $("#modal-body").classList.add("gi-picker");
@@ -6963,7 +6976,8 @@ function initAccountLogin() {
       _partyList.addEventListener("dragover",(e)=>{if(_dragCard)e.preventDefault();});
       _paintOrder();
     }
-    $("#acc-open-create-char").onclick = () => showCharacterCreator(token, account, characters);
+    const createCharBtn = $("#acc-open-create-char");
+    if (createCharBtn) createCharBtn.onclick = () => showCharacterCreator(token, account, characters);
     const verifyEmail = $("#acc-verify-email");
     if (verifyEmail) verifyEmail.onclick = () => showEmailVerify(token, account, characters);
     const customize=$("#acc-customize-char");

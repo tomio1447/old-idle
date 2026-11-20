@@ -112,7 +112,62 @@ function normalizeSharedInventory(s) {
    * os personagens). null = ainda não migrado — o primeiro personagem
    * com p.prey preenchido semeia o estado compartilhado no apply. */
   s.prey = (s.prey && typeof s.prey === "object" && !Array.isArray(s.prey)) ? s.prey : null;
+  /* Charms DA CONTA: charm points e runas desbloqueadas (major+minor)
+   * são do pool da conta. Só o assign (p.charmRace) e os marcos já
+   * pagos (p.charmsPagos) continuam por personagem — assim dois chars
+   * podem associar runas diferentes à MESMA criatura. */
+  s.charms = (s.charms && typeof s.charms === "object" && !Array.isArray(s.charms)) ? s.charms : {};
+  s.charmPoints = Math.max(0, Math.floor(Number(s.charmPoints) || 0));
   return s;
+}
+
+/* Migração: charms eram por personagem — o pool da conta nasce da UNIÃO
+ * dos desbloqueios + SOMA dos pontos não gastos (cada char tinha pool
+ * próprio). Idempotente; a flag charmsSharedDone é marcada pelo caller. */
+function seedSharedCharms(shared, characters) {
+  shared = normalizeSharedInventory(shared);
+  for (const character of Array.isArray(characters) ? characters : []) {
+    const p = charDataOf(character);
+    if (!p) continue;
+    if (p.charms && typeof p.charms === "object" && !Array.isArray(p.charms)) {
+      for (const id of Object.keys(p.charms)) if (p.charms[id]) shared.charms[id] = true;
+    }
+    shared.charmPoints += Math.max(0, Math.floor(Number(p.charmPoints) || 0));
+  }
+  return shared;
+}
+
+/* Aplica o pool de charms da conta no player (espelho). charmRace e
+ * charmsPagos NÃO são tocados — são por personagem. _charmPointsBase
+ * guarda a baseline pro merge por delta. */
+function applySharedCharms(p, shared) {
+  if (!p || typeof p !== "object") return p;
+  if (shared.charmsSharedDone) {
+    p.charms = Object.assign({}, shared.charms);
+    p.charmPoints = Math.max(0, Math.floor(Number(shared.charmPoints) || 0));
+  } else if ((p.charms && typeof p.charms === "object") || Number(p.charmPoints) > 0) {
+    // pré-migração: o próprio char semeia o pool (primeiro hidratado)
+    for (const id of Object.keys(p.charms || {})) if (p.charms[id]) shared.charms[id] = true;
+    shared.charmPoints = Math.max(shared.charmPoints, Math.max(0, Math.floor(Number(p.charmPoints) || 0)));
+    p.charmPoints = shared.charmPoints;
+  }
+  p._charmPointsBase = Math.max(0, Math.floor(Number(p.charmPoints) || 0));
+  return p;
+}
+
+/* Merge do espelho do char no pool da conta: desbloqueios = união
+ * (nunca perde unlock); pontos = DELTA contra _charmPointsBase (ganhos
+ * de marcos do bestiário e gastos de desbloqueio somam sobre o pool sem
+ * reverter operações de outro caminho/cópia). */
+function mergeSharedCharms(p, shared) {
+  if (p.charms && typeof p.charms === "object" && !Array.isArray(p.charms)) {
+    for (const id of Object.keys(p.charms)) if (p.charms[id]) shared.charms[id] = true;
+  }
+  const cur = Math.floor(Number(p.charmPoints) || 0);
+  const base = Number(p._charmPointsBase);
+  if (Number.isFinite(base)) shared.charmPoints = Math.max(0, shared.charmPoints + (cur - Math.floor(base)));
+  else if (Number.isFinite(Number(p.charmPoints))) shared.charmPoints = Math.max(0, cur);
+  return shared;
 }
 
 function charDataOf(character) {
@@ -240,6 +295,7 @@ function applySharedToPlayer(p, shared) {
    * lazy — o primeiro char hidratado leva o estado para a conta). */
   if (shared.prey) p.prey = shared.prey;
   else if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
+  applySharedCharms(p, shared);
   applySharedStamina(p, shared);
   p._sharedInv = 1;
   return p;
@@ -382,6 +438,7 @@ function extractSharedFromPlayer(p, shared) {
     .map((i) => Object.assign({}, i));
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
   if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
+  mergeSharedCharms(p, shared);
   extractSharedStamina(p, shared);
   p.bag = {};
   p.lootPouch = {};
@@ -431,7 +488,18 @@ function mergeSharedFromPlayer(p, shared, opts) {
     if (!inst || typeof inst !== "object" || !inst.slug) continue;
     if (String(inst.loc || "").startsWith("equip:")) continue;
     const id = String(inst.id || "");
-    if (id && byId.has(id)) continue;
+    const prev = id ? byId.get(id) : null;
+    if (prev) {
+      /* União por id mantém a identidade/posição do shared (depot/market
+       * movem `loc` no servidor), mas campos authored pelo player precisam
+       * mergear: `tier` sai da Exaltation Forge (fusão/transfer e grant do
+       * painel admin) e `charges` é o consumo de acessórios chargeables.
+       * Sem isso o save regra o campo para o valor velho do espelho. */
+      for (const k of ["tier", "charges"]) {
+        if (inst[k] !== undefined && inst[k] !== prev[k]) prev[k] = inst[k];
+      }
+      continue;
+    }
     const copy = Object.assign({}, inst);
     byId.set(id, copy);
     shared.itemInstances.push(copy);
@@ -439,6 +507,7 @@ function mergeSharedFromPlayer(p, shared, opts) {
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
   forgeResourcesDelta(shared, p, true);
   if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
+  mergeSharedCharms(p, shared);
   extractSharedStamina(p, shared);
   return normalizeSharedInventory(shared);
 }
@@ -457,6 +526,9 @@ module.exports = {
   mergeCharForgeResources,
   applySharedToPlayer,
   extractSharedFromPlayer,
+  seedSharedCharms,
+  applySharedCharms,
+  mergeSharedCharms,
   forgeResourcesDelta,
   pouchDelta,
   mergeSharedFromPlayer,

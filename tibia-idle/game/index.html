@@ -9,14 +9,14 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=wardrobe-gi-v1">
+  <link rel="stylesheet" href="css/layout.css?v=party-chip-tr-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wod-modal-v1">
   <link rel="stylesheet" href="css/proficiency.css?v=proficiency-v4">
   <link rel="stylesheet" href="css/client-background.css?v=deploy-1911-v1">
   <link rel="stylesheet" href="css/mobile.css?v=char-details-v1">
-  <link rel="stylesheet" href="css/chat.css?v=chat-mod-v2">
+  <link rel="stylesheet" href="css/chat.css?v=chat-dock-v1">
   <script>
   /* Aplica modo salvo antes do paint para evitar flash. */
   (function () {
@@ -284,12 +284,22 @@
     </div>
     <span class="spacer"></span>
     <div class="topbar-btns">
+    <button class="sm topbar-sys-btn btn-switch-portrait gi-char-hero-btn" id="btn-switch" title="Detalhes do personagem — trocar, outfit e roda" data-i18n-title="btn.switch">
+      <span id="btn-switch-portrait" class="btn-switch-avatar" aria-hidden="true"></span>
+      <span class="gi-char-hero-meta" aria-hidden="true">
+        <strong class="gi-char-hero-name" id="btn-switch-name">—</strong>
+        <small class="gi-char-hero-sub">Personagem</small>
+      </span>
+      <span class="topbar-btn-label" data-i18n="btn.switch">Personagem</span>
+    </button>
+    <span class="gi-toolbar-divider" aria-hidden="true"></span>
     <button class="sm topbar-sys-btn" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin"><span class="topbar-btn-emoji" aria-hidden="true">🛠</span><span class="topbar-btn-label" data-i18n="btn.admin">Admin</span></button>
     <button class="sm topbar-sys-btn" id="btn-calendar" title="Calendário — eventos e metas do servidor">
       <span class="topbar-btn-emoji" aria-hidden="true">📅</span>
       <span class="topbar-btn-label">CALENDÁRIO</span>
     </button>
     <button class="sm topbar-sys-btn" id="btn-config" type="button" data-i18n-title="config.title"><span class="topbar-btn-emoji" aria-hidden="true">⚙</span><span class="topbar-btn-label" data-i18n="config.btn">CONFIG</span></button>
+    <span class="gi-toolbar-divider" aria-hidden="true"></span>
     <button class="sm topbar-sys-btn" id="btn-cyclo"><img src="assets/item/spellbook-of-ancient-arcana.png?v=guild-v1" alt="" class="topbar-btn-icon" width="18" height="18"><span class="topbar-btn-label" data-i18n="btn.cyclo">Cyclopedia</span></button>
     <button class="sm topbar-sys-btn" id="btn-guild" title="Guilds — clãs por conta com tasks diárias" data-i18n-title="title.guild">
       <span class="topbar-btn-icon guild-btn-icon" aria-hidden="true"></span><span class="topbar-btn-label">Guild</span>
@@ -297,14 +307,9 @@
     <button class="sm topbar-sys-btn" id="btn-pvp" title="PvP — Guerras agendadas entre guilds (requer guild)">
       <span class="topbar-btn-icon pvp-btn-icon" aria-hidden="true"></span><span class="topbar-btn-label">PVP</span>
     </button>
-    <button class="sm primary topbar-sys-btn" id="btn-city" data-i18n-title="btn.city"><span class="topbar-btn-emoji" aria-hidden="true">🏛</span><span class="topbar-btn-label" data-i18n="btn.city">Ir para a cidade</span></button>
     <button class="sm topbar-sys-btn" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
       <span class="topbar-btn-emoji" aria-hidden="true">👥</span>
       <span data-i18n="btn.party">PARTY</span><span id="party-badge" style="display:none;color:#9ce84a;font-weight:bold;margin-left:3px"></span>
-    </button>
-    <button class="sm topbar-sys-btn btn-switch-portrait" id="btn-switch" title="Detalhes do personagem — trocar, outfit e roda" data-i18n-title="btn.switch">
-      <span id="btn-switch-portrait" class="btn-switch-avatar" style="transform:scale(1.35);transform-origin:center;margin:0 4px" aria-hidden="true"></span>
-      <span class="topbar-btn-label" data-i18n="btn.switch">Personagem</span>
     </button>
     <button class="sm topbar-sys-btn" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura" data-i18n-title="title.prey">
       <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="topbar-btn-icon prey-btn-gif">
@@ -318,6 +323,8 @@
       <img src="assets/ui/coins/tibia-coins.gif" alt="" class="topbar-btn-icon coin-gif" width="18" height="18">
       <span data-i18n="btn.store">STORE</span>
     </button>
+    <span class="gi-toolbar-divider" aria-hidden="true"></span>
+    <button class="sm topbar-sys-btn" id="btn-city" data-i18n-title="btn.city"><span class="topbar-btn-emoji" aria-hidden="true">🏛</span><span class="topbar-btn-label" data-i18n="btn.city">Ir para a cidade</span></button>
     </div>
   </div>
   <div class="layout">
@@ -417,7 +424,7 @@
              mana; clicar num membro da sua conta troca de personagem. -->
         <div id="party-panel" class="party-panel" style="display:none">
           <div class="party-panel-head" id="party-panel-head">
-            <span>👥 PARTY</span>
+            <span class="pp-title">👥<span class="pp-label"> PARTY</span></span>
             <span class="spacer" style="flex:1"></span>
             <span class="party-panel-count" id="party-panel-count"></span>
             <span class="party-panel-arrow" id="party-panel-arrow">▾</span>
@@ -426,6 +433,11 @@
         </div>
         <div id="player-states-strip" hidden aria-hidden="true" style="display:none"></div>
       </div>
+
+      <!-- chat dockado: o #global-chat é montado aqui pelo chat.js —
+           bloco fixo SEMPRE aberto entre a tela do jogo e o helper,
+           em vez de overlay dentro do scene-wrap. -->
+      <div id="chat-dock"></div>
 
       <!-- barra de cooldown, no mesmo formato do cliente oficial:
            grupos sempre visiveis a esquerda, magias em cooldown a direita -->
@@ -642,7 +654,7 @@
 <script src="js/client-background.js?v=beta-launch-v1"></script>
 <script src="js/canarydata.js"></script>
 <script src="js/spelldata.js"></script>
-<script src="js/appearancedata.js?v=lothar-mounts-v1"></script>
+<script src="js/appearancedata.js?v=nt-coins-v1"></script>
 <script src="js/avatardata.js"></script>
 <script src="js/supplydata.js?v=start-set-v1"></script>
 <script src="js/runedata.js"></script>
@@ -697,7 +709,7 @@
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
 <script src="js/player.js?v=lootcfg-icons-v1"></script>
 <script src="js/accessories.js?v=depot-authority-v1"></script>
-  <script src="js/combat.js?v=arean-outfits-v1"></script>
+  <script src="js/combat.js?v=forge-analyser-v1"></script>
 <script src="js/city.js?v=stamina-regen-v1"></script>
 <script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
 <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
@@ -719,17 +731,17 @@
 <script src="js/hard-hunts.js?v=deploy-1711-v1"></script>
 <script src="js/soulwar.js?v=soulbag-standard-v1"></script>
 <script src="js/yasir-prices.js?v=plasma-collars-v1"></script>
-<script src="js/cyclopedia.js?v=cyclo-nochar-v1"></script>
+<script src="js/cyclopedia.js?v=gi-charms-v1"></script>
 <script src="js/bosstiary.js?v=primal-mount-claim-v1"></script>
 <script src="js/hunt-sections.js?v=ferumbras-250-v1"></script>
-<script src="js/ui.js?v=deploy-1711-v1"></script>
+<script src="js/ui.js?v=palette-random-v1"></script>
 <script src="js/helper-presets.js?v=autosell-sync-v1"></script>
 <script src="js/i18n.js?v=cfg-logout-v1"></script>
 <script src="js/alpha-announce.js?v=wod-modal-v1"></script>
 <script src="js/settings.js?v=cfg-logout-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>
-<script src="js/cyclopedia-ui.js?v=account-wardrobe-v1"></script>
+<script src="js/cyclopedia-ui.js?v=gi-charms-v1"></script>
 <script src="js/forgedata.js?v=forge-canary-procs-v1"></script>
 <script src="js/forge.js?v=depot-authority-v1"></script>
 <script src="js/imbuement-ui.js?v=imbue-slots-v1"></script>
@@ -737,8 +749,8 @@
 <script src="js/prey.js?v=prey-card-select-v1"></script>
 <script src="js/prey-ui.js?v=prey-card-select-v1"></script>
 <script src="js/party.js?v=stamina-account-v1"></script>
-<script src="js/party-ui.js?v=outfit-flicker-v1"></script>
-<script src="js/analyzers.js?v=stack-count-frames-v2"></script>
+<script src="js/party-ui.js?v=party-collapse-v1"></script>
+<script src="js/analyzers.js?v=forge-analyser-v1"></script>
 <script src="js/wheeldata.js?v=wheel-seq-v1"></script>
 <script src="js/wheelotcdata.js?v=wheel-otc-v1"></script>
 <script src="js/wheel-gems.js?v=wheel-otc-v2"></script>
@@ -746,17 +758,17 @@
 <script src="js/wheel-ui.js?v=wod-save-v1"></script>
 <script src="js/proficiencydata.js?v=proficiency-v4"></script>
 <script src="js/proficiency.js?v=proficiency-v2"></script>
-<script src="js/tibiacoin.js"></script>
+<script src="js/tibiacoin.js?v=nt-coins-v1"></script>
 <script src="js/server-config.js"></script>
 <script src="js/announce.js?v=gm-panel-v1"></script>
 <script src="js/daily-boost.js?v=daily-boost-v2"></script>
 <script src="js/player-profile.js?v=guild-req-tab-v1"></script>
-<script src="js/account-client.js?v=acc-recovery-v1"></script>
-<script src="js/chat.js?v=social-v2"></script>
+<script src="js/account-client.js?v=forge-admin-v1"></script>
+<script src="js/chat.js?v=chat-dock-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js?v=deploy-1911-v1"></script>
 <script src="js/rmt-ui.js?v=rmt-v1"></script>
-<script src="js/store-ui.js?v=prey-card-select-v1"></script>
+<script src="js/store-ui.js?v=store-rm-sell-v1"></script>
 <script src="js/market-local.js"></script>
 <script src="js/reward-chest.js?v=reward-claim-repaint-v1"></script>
 <script src="js/training.js?v=stamina-account-v1"></script>
@@ -771,10 +783,10 @@
 <script src="js/cosmetic-npcs-data.js?v=lothar-pouch-v1"></script>
 <script src="js/cosmetic-npcs.js?v=lothar-pouch-v1"></script>
 <script src="js/calendar.js?v=calendar-v1"></script>
-<script src="js/guild-ui.js?v=pvp-wars-v9"></script>
+<script src="js/guild-ui.js?v=guild-redesign-v1"></script>
 <script src="js/pvp-ui.js?v=pvp-wars-v9"></script>
 <script src="js/preload.js?v=deploy-1911-v1"></script>
-<script src="js/game.js?v=acc-recovery-v1"></script>
+<script src="js/game.js?v=gi-charms-v1"></script>
 <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v1"></script>
 <script src="js/feast-of-souls.js?v=paleworm-fov-v1"></script>
@@ -826,8 +838,8 @@
 <script src="js/norcferatus-fortress.js?v=arean-outfits-v1"></script>
 <script src="js/unhallowed-crypt.js?v=unhallowed-crypt-v1"></script>
 <script src="js/make-believe-quest.js?v=quest-reward-notify-v1"></script>
-<script src="js/roost-graveborn.js?v=arean-outfits-v1"></script>
-<script src="js/court-warlock.js?v=lothar-mounts-v1"></script>
+<script src="js/roost-graveborn.js?v=party-limit-v1"></script>
+<script src="js/court-warlock.js?v=party-limit-v1"></script>
 <script src="js/jade-roots.js?v=deploy-1911-v1"></script>
 <script src="js/putrefactory.js?v=putrefactory-v1"></script>
 <script src="js/darklight-core.js?v=item-prices-2011-v1"></script>
@@ -871,7 +883,7 @@
 <script src="js/wheel-data.js?v=wheel-data-monk-v1"></script>
 <script src="js/wheel-planner.js?v=wheel-planner-active-v1"></script>
 <script src="js/wheel-modal.js?v=wheel-real-v1"></script>
-<script src="js/char-details.js?v=wardrobe-gi-v1"></script>
+<script src="js/char-details.js?v=palette-random-v1"></script>
 <script src="js/tutorial.js?v=tutorial-choice-v1"></script>
 <script src="js/daily-reward.js?v=training-all-chars-v1"></script>
 </body>

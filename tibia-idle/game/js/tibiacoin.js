@@ -21,8 +21,13 @@ function accountLoad() {
     acc = { v: 1, coins: 0, gold: 0, goldMigrated: false, lootPouch: {} };
   }
   acc.coins = Math.max(0, Math.floor(acc.coins) || 0);
+  /* coinsNt: Tibia Coins NÃO transferíveis — só gastáveis na STORE
+   * (nunca market/RMT). O servidor é autoritativo online. */
+  acc.coinsNt = Math.max(0, Math.floor(acc.coinsNt) || 0);
   acc.gold = Math.max(0, Math.floor(acc.gold) || 0);
   if (!acc.lootPouch || typeof acc.lootPouch !== "object") acc.lootPouch = {};
+  if (!acc.charms || typeof acc.charms !== "object" || Array.isArray(acc.charms)) acc.charms = {};
+  acc.charmPoints = Math.max(0, Math.floor(acc.charmPoints) || 0);
   return acc;
 }
 
@@ -33,6 +38,18 @@ function accountSave(acc) {
 /* Saldo total de Tibia Coins da conta. */
 function accountCoins() {
   return accountLoad().coins;
+}
+
+/* Saldo de Tibia Coins NÃO transferíveis (só STORE; online vem do
+ * servidor em toda resposta com `coinsNt`). */
+function accountCoinsNt() {
+  return accountLoad().coinsNt;
+}
+function accountSetCoinsNt(n) {
+  const acc = accountLoad();
+  acc.coinsNt = Math.max(0, Math.floor(Number(n) || 0));
+  accountSave(acc);
+  return acc.coinsNt;
 }
 
 // Gold também pertence à conta, tal como Tibia Coins.
@@ -67,6 +84,47 @@ function bindAccountLootPouch(p) {
   Object.defineProperty(p, "lootPouch", { enumerable: true, configurable: true,
     get: () => accountLootPouch(), set: (v) => accountSetLootPouch(v) });
   p._accountPouchBound = true;
+}
+
+/* Charms são DA CONTA: desbloqueios (major+minor) e charm points ficam no
+ * objeto da conta — só o assign (p.charmRace) continua por personagem. */
+function migrateAccountCharms(acc) {
+  /* Lê o roster BRUTO (sem normalizePlayer — evita reentrância) e semeia
+   * a conta com a UNIÃO dos unlocks + SOMA dos pontos não gastos. */
+  acc.charmsMigrated = 1;
+  try {
+    const roster = (typeof readRoster === "function") ? readRoster() : {};
+    for (const id of Object.keys(roster || {})) {
+      const raw = roster[id] && roster[id].p;
+      if (!raw || typeof raw !== "object") continue;
+      if (raw.charms && typeof raw.charms === "object" && !Array.isArray(raw.charms)) {
+        for (const cid of Object.keys(raw.charms)) if (raw.charms[cid]) acc.charms[cid] = true;
+      }
+      acc.charmPoints += Math.max(0, Math.floor(Number(raw.charmPoints) || 0));
+    }
+  } catch (e) {}
+  accountSave(acc);
+}
+function accountCharms() {
+  const acc = accountLoad();
+  if (!acc.charmsMigrated) migrateAccountCharms(acc);
+  return acc.charms;
+}
+function accountCharmPoints() {
+  const acc = accountLoad();
+  if (!acc.charmsMigrated) migrateAccountCharms(acc);
+  return acc.charmPoints;
+}
+function bindAccountCharms(p) {
+  if (!p || p._accountCharmsBound || typeof Object.defineProperty !== "function") return;
+  Object.defineProperty(p, "charms", { enumerable: true, configurable: true,
+    get: () => accountCharms(),
+    set: (v) => { const a = accountLoad();
+      a.charms = (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; accountSave(a); } });
+  Object.defineProperty(p, "charmPoints", { enumerable: true, configurable: true,
+    get: () => accountCharmPoints(),
+    set: (v) => { const a = accountLoad(); a.charmPoints = Math.max(0, Math.floor(Number(v) || 0)); accountSave(a); } });
+  p._accountCharmsBound = true;
 }
 
 /* Adiciona coins à conta (só valores positivos; retorna o novo saldo). */

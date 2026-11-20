@@ -284,11 +284,20 @@ function ensureCyclopedia(p) {
   if (!p || typeof p !== "object") return p;
   if (!p.bestiary || typeof p.bestiary !== "object" || Array.isArray(p.bestiary))
     p.bestiary = {};
-  p.charms = normalizeCharmUnlockMap(p.charms);
+  // p.charms pode ser um ACCESSOR da conta (bindAccountCharms) — só
+  // reatribuir se mudou, senão cada ensure grava localStorage à toa.
+  const curMap = p.charms;
+  const normMap = normalizeCharmUnlockMap(curMap);
+  const dirtyMap = !curMap || typeof curMap !== "object" || Array.isArray(curMap);
+  const curKeys = !dirtyMap ? Object.keys(curMap).filter((k) => curMap[k]) : [];
+  if (dirtyMap || curKeys.length !== Object.keys(normMap).length
+      || curKeys.some((k) => !normMap[k])) p.charms = normMap;
   p.charmRace = normalizeCharmRaceMap(p.charmRace);
-  if (p.charmPoints === undefined || p.charmPoints === null)
-    p.charmPoints = 0;
-  else p.charmPoints = Math.max(0, Number(p.charmPoints) || 0);
+  // charmPoints também é accessor da conta — só escreve se sanitizar algo.
+  const ptsNow = Number(p.charmPoints);
+  if (p.charmPoints === undefined || p.charmPoints === null
+      || !Number.isFinite(ptsNow) || ptsNow < 0)
+    p.charmPoints = Math.max(0, Math.floor(ptsNow) || 0);
   if (!p.charmsPagos || typeof p.charmsPagos !== "object" || Array.isArray(p.charmsPagos))
     p.charmsPagos = {};
   return p;
@@ -419,7 +428,9 @@ function buyCharm(p, id) {
   if ((p.charmPoints || 0) < c.custo)
     return { ok: false, erro: "Charm points insuficientes." };
   p.charmPoints -= c.custo;
-  p.charms[cid] = true;
+  // Reatribui o mapa inteiro — com p.charms bound à conta, a mutation
+  // `p.charms[cid]=true` não dispara o setter e o unlock se perderia.
+  p.charms = Object.assign({}, p.charms, { [cid]: true });
   return { ok: true, id: cid };
 }
 
@@ -454,6 +465,7 @@ function charmTotals(p, slug) {
   const t = {
     dano: {}, reflete: 0, esquiva: 0, vampirismo: 0, manaLeech: 0,
     lentidao: 0, critChance: 0, critExtra: 0, gut: 0,
+    numb: 0, adrenaline: 0, cleanse: 0,
   };
   for (const id of Object.keys(p.charms)) {
     if (!p.charms[id]) continue;
@@ -470,6 +482,9 @@ function charmTotals(p, slug) {
     else if (id === "vampiric") t.vampirismo += c.chance || 1.6;
     else if (id === "voidcall") t.manaLeech += c.chance || 0.8;
     else if (id === "cripple") t.lentidao += c.chance || 6;
+    else if (id === "numb") t.numb += c.chance || 6;
+    else if (id === "adrenaline") t.adrenaline += c.chance || 6;
+    else if (id === "cleanse") t.cleanse += c.chance || 6;
     else if (id === "lowblow") t.critChance += c.chance || 4;
     else if (id === "savage") t.critExtra += c.chance || 20;
     else if (id === "gut") t.gut += c.percent || 20;

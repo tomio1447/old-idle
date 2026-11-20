@@ -3095,7 +3095,7 @@ function charmRaceOf(p,id){
 }
 function charmUnlocked(p,id){if(!p)return false;ensurePlayerCharms(p);const cid=resolveCharmId(id);return !!(cid&&p.charms[cid]);}
 function charmTotals(p,slug){
-  const t={dano:{},reflete:0,esquiva:0,vampirismo:0,manaLeech:0,critChance:0,critExtra:0,gut:0};
+  const t={dano:{},reflete:0,esquiva:0,vampirismo:0,manaLeech:0,critChance:0,critExtra:0,gut:0,numb:0,adrenaline:0,cleanse:0,lentidao:0};
   if(!p||!p.charms||typeof p.charms!=="object")return t;
   p.charmRace=p.charmRace&&typeof p.charmRace==="object"?p.charmRace:{};
   for(const id of Object.keys(p.charms)){
@@ -3109,6 +3109,10 @@ function charmTotals(p,slug){
     else if(id==="lowblow")t.critChance+=c.chance||4;
     else if(id==="savage")t.critExtra+=c.chance||20;
     else if(id==="gut")t.gut+=c.percent||20;
+    else if(id==="cripple")t.lentidao+=c.chance||6;
+    else if(id==="numb")t.numb+=c.chance||6;
+    else if(id==="adrenaline")t.adrenaline+=c.chance||6;
+    else if(id==="cleanse")t.cleanse+=c.chance||6;
   }
   return t;
 }
@@ -3123,7 +3127,16 @@ function tryCharmOffensive(auth,p,mob,now){
   const level=Number(p.level)||1;let total=0;
   for(const id of Object.keys(p.charmRace||{})){
     if(p.charmRace[id]!==slug||!charmUnlocked(p,id))continue;
-    const c=CHARMS[id];if(!c||c.tipo!=="ofensivo"||!c.elemento)continue;
+    const c=CHARMS[id];if(!c||c.tipo!=="ofensivo")continue;
+    if(id==="cripple"){
+      if(random(auth)*100<(c.chance||6)&&!(mob.def&&mob.def.imune&&mob.def.imune.indexOf("paralyze")>=0)){
+        mob.slowUntil=now+3000;mob.slowMul=0.5;
+        auth.events.push({t:"charm",id:"cripple",aplicado:1,slug:slug,whoId:String(p.id||""),
+          x:mob.x,y:mob.y,screen:true,fx:"poff",ts:now});
+      }
+      continue;
+    }
+    if(!c.elemento)continue;
     if(random(auth)*100>=(c.chance||5))continue;
     let dmg;
     if(id==="overpower"){
@@ -3140,7 +3153,7 @@ function tryCharmOffensive(auth,p,mob,now){
     if(dealt>0){mob.hp-=dealt;total+=dealt;}
     const pos=mob.x!=null?{x:mob.x,y:mob.y}:playerPosition(auth,p);
     auth.events.push({t:"charm",id:id,element:c.elemento,dmg:dealt,slug:slug,
-      x:pos.x,y:pos.y,screen:true,ts:now});
+      whoId:String(p.id||""),x:pos.x,y:pos.y,screen:true,ts:now});
   }
   return total;
 }
@@ -3411,7 +3424,10 @@ function imbElementalConvert(p){
   if(!t.elemental||!t.elementalType)return null;
   return {el:t.elementalType,propFisica:1-Math.min(100,t.elemental)/100};
 }
-function applyOutgoingLeech(p,dmg,slug){
+/* Emite evento de charm pro Analyzer/UI: sem auth (caminhos legados) o
+   * efeito mecânico continua valendo — só o telemetry é opcional. */
+function authCharmEvent(auth,e){if(auth&&auth.events)auth.events.push(e);}
+function applyOutgoingLeech(auth,p,dmg,slug,now){
   if(!p||!(dmg>0))return;
   const leech=imbLeechTotals(p),max=maxStats(p);
   if(leech.life>0)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*leech.life/100)));
@@ -3422,15 +3438,21 @@ function applyOutgoingLeech(p,dmg,slug){
     if(wl.manaLeech)p.mp=Math.min(max.mp,p.mp+Math.max(1,Math.floor(dmg*wl.manaLeech/100)));
   }
   const ch=charmTotals(p,slug);
-  if(ch.vampirismo>0)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*ch.vampirismo/100)));
-  if(ch.manaLeech>0)p.mp=Math.min(max.mp,p.mp+Math.max(1,Math.floor(dmg*ch.manaLeech/100)));
+  if(ch.vampirismo>0){
+    const h=Math.min(max.hp-p.hp,Math.max(1,Math.floor(dmg*ch.vampirismo/100)));
+    if(h>0){p.hp+=h;authCharmEvent(auth,{t:"charm",id:"vampiric",heal:h,slug:slug||null,whoId:String(p.id||""),ts:now});}
+  }
+  if(ch.manaLeech>0){
+    const h=Math.min(max.mp-p.mp,Math.max(1,Math.floor(dmg*ch.manaLeech/100)));
+    if(h>0){p.mp+=h;authCharmEvent(auth,{t:"charm",id:"voidcall",mana:h,slug:slug||null,whoId:String(p.id||""),ts:now});}
+  }
   const gl=guildBonusLevel(p,"lifeLeech"),gm=guildBonusLevel(p,"manaLeech");
   if(gl>0)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*gl*0.1/100)));
   if(gm>0)p.mp=Math.min(max.mp,p.mp+Math.max(1,Math.floor(dmg*gm*0.1/100)));
 }
 function afterPlayerHit(auth,p,tgt,dealt,now){
   if(!(dealt>0)||!p)return;
-  applyOutgoingLeech(p,dealt,tgt&&tgt.slug);
+  applyOutgoingLeech(auth,p,dealt,tgt&&tgt.slug,now);
   tryCharmOffensive(auth,p,tgt,now);
 }
 function playerMitigationPct(p){
@@ -3904,10 +3926,12 @@ function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
     }
   }
   const attackerSlug=mob&&mob.slug||null;
-  const dodge=charmTotals(p,attackerSlug).esquiva+(WHEEL_FN?Number(WHEEL_FN.wheelTotals(p).dodge)||0:0)
+  const chDef=charmTotals(p,attackerSlug);
+  const dodge=chDef.esquiva+(WHEEL_FN?Number(WHEEL_FN.wheelTotals(p).dodge)||0:0)
     +guildBonusLevel(p,"dodge")*0.1;
   if(dodge>0&&random(auth)*100<dodge){
-    auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dodge",targetId:String(item.id),screen:true,fx:"poff",ts:now});
+    auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dodge",targetId:String(item.id),screen:true,fx:"poff",ts:now,
+      charm:chDef.esquiva>0?"dodge":null,mitigated:Math.max(0,Math.floor(dmg))});
     return 0;
   }
   if(forgeTryRuse(auth,p)){
@@ -3920,6 +3944,34 @@ function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
     return 0;
   }
   if(dmg>0)consumeAccessoryHitCharge(auth,p,now);
+  /* Parry (charm, Canary): reflete a % do dano recebido de volta no
+   * atacante quando a runa está associada à raça que bateu. */
+  if(chDef.reflete>0&&mob&&mob.hp>0){
+    const volta=Math.max(1,Math.floor(dmg*chDef.reflete/100));
+    mob.hp-=volta;
+    auth.events.push({t:"charm",id:"parry",dmg:volta,slug:attackerSlug,
+      whoId:String(item.id),x:pos.x,y:pos.y,screen:true,ts:now});
+  }
+  /* Charms reativos menores (Canary): procs ao sofrer o golpe da raça
+   * associada — numb paralisa o agressor, adrenaline dá haste, cleanse
+   * remove uma condition negativa. */
+  if(chDef.numb>0&&mob&&mob.hp>0&&random(auth)*100<chDef.numb
+    &&!(mob.def&&mob.def.imune&&mob.def.imune.indexOf("paralyze")>=0)){
+    mob.slowUntil=now+3000;mob.slowMul=0.5;
+    auth.events.push({t:"charm",id:"numb",aplicado:1,slug:attackerSlug,
+      whoId:String(item.id),x:pos.x,y:pos.y,screen:true,fx:"poff",ts:now});
+  }
+  if(chDef.adrenaline>0&&random(auth)*100<chDef.adrenaline){
+    p.buffs=p.buffs||{};p.buffs["utani-hur"]=now+10000;
+    auth.events.push({t:"charm",id:"adrenaline",aplicado:1,slug:attackerSlug,
+      whoId:String(item.id),x:pos.x,y:pos.y,screen:true,fx:"haste",ts:now});
+  }
+  if(chDef.cleanse>0&&p.conditions&&random(auth)*100<chDef.cleanse){
+    const neg=Object.keys(p.conditions)[0];
+    if(neg){delete p.conditions[neg];
+      auth.events.push({t:"charm",id:"cleanse",aplicado:1,removido:neg,slug:attackerSlug,
+        whoId:String(item.id),x:pos.x,y:pos.y,screen:true,fx:"holy-effect",ts:now});}
+  }
   const st=stanceTotals(p);
   if(st.dmgReceived!==1)dmg=Math.max(0,Math.floor(dmg*st.dmgReceived));
   {
@@ -4454,7 +4506,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     const noAlvo=!!sk.alvo||(Number(sk.range)||1)>1,onde=noAlvo?victim:mob;
     const pos=entityPosition(onde,noAlvo?.13:.5,noAlvo?.6:.5),src=entityPosition(mob,.5,.5);
     auth.events.push({t:"effect",x:pos.x,y:pos.y,fx,screen:true,projectile:noAlvo,sx:src.x,sy:src.y,
-      missile:sk.miss||ELEMENT_MISSILE[el]||null,sourceId:String(mob.id),ts:stepTs+mobHitIdx*200});
+      missile:(sk.miss&&(ELEMENT_MISSILE[sk.miss]||sk.miss))||ELEMENT_MISSILE[el]||null,sourceId:String(mob.id),ts:stepTs+mobHitIdx*200});
   };
   const hitPlayer=(item,sk,raw,el)=>{
     if(!item||!item.p||item.p.hp<=0||item.downUntil)return;
@@ -4468,7 +4520,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
       item.p.mp=Math.max(0,(item.p.mp||0)-mana);
       auth.events.push({t:"taken",dmg:mana,x:pos.x,y:pos.y,targetId:String(item.id),
         sx:source.x,sy:source.y,sourceId:String(mob.id),el:"manadrain",screen:true,fx:sk.fx||ELEMENT_FX.manadrain,
-        projectile:!!sk.miss,missile:sk.miss||ELEMENT_MISSILE.manadrain,ts:stepTs+mobHitIdx*200});
+        projectile:!!sk.miss,missile:(sk.miss&&(ELEMENT_MISSILE[sk.miss]||sk.miss))||ELEMENT_MISSILE.manadrain,ts:stepTs+mobHitIdx*200});
       return;
     }
     if(el!=="agony"&&skillUsesMeleeBlock(sk))dmg=mitigateIncoming(auth,dmg,item.p);
@@ -4478,7 +4530,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     if(lifeDrain&&dmg>0)mob.hp=Math.min(mob.maxHp||mob.hp,mob.hp+dmg);
     auth.events.push({t:"taken",dmg:dmg,x:pos.x,y:pos.y,targetId:String(item.id),
       sx:source.x,sy:source.y,sourceId:String(mob.id),el:el,screen:true,fx:sk.fx||ELEMENT_FX[el]||ELEMENT_FX.physical,
-      projectile:!!sk.miss,missile:sk.miss||null,ts:stepTs+mobHitIdx*200});
+      projectile:!!sk.miss,missile:(sk.miss&&(ELEMENT_MISSILE[sk.miss]||sk.miss))||null,ts:stepTs+mobHitIdx*200});
     if(item.p.hp<=0){authMarkPlayerDeath(auth,item,now);
       auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),
         permadead:!!item.permadead,screen:true,ts:stepTs+mobHitIdx*200});}
@@ -5998,6 +6050,29 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
       if(credited&&credited.gold)auth.stats.gold=(Number(auth.stats.gold)||0)+credited.gold;
     }
     auth.stats.loot[entry.item]=(Number(auth.stats.loot[entry.item])||0)+count;
+  }
+  // Charm Gut (Canary): % de chance de dropar UM creature product extra
+  // da tabela da criatura associada (sem currency/supply/ammo/equip).
+  if(!mob.boss){
+    const gutTotals=charmTotals(leader,mob.slug);
+    if(gutTotals.gut>0&&random(auth)*100<gutTotals.gut){
+      const elegiveis=(mob.def.loot||[]).filter((l)=>{
+        const it=ITEMS[l.item];
+        return it&&!(it.s||it.slot)&&!CURRENCY_GOLD[l.item]
+          &&!isSupplyItem(l.item)&&!isAmmoItem(l.item);
+      });
+      if(elegiveis.length){
+        const extra=elegiveis[Math.floor(random(auth)*elegiveis.length)];
+        const credited=creditHuntLoot(leader,extra.item,1);
+        if(credited&&credited.ok&&!credited.skipped&&!credited.discarded){
+          lootDrops.push({item:extra.item,count:1});
+          auth.stats.loot[extra.item]=(Number(auth.stats.loot[extra.item])||0)+1;
+          let who="";for(const x of auth.players||[])if(x&&x.p===leader){who=String(x.id);break;}
+          auth.events.push({t:"charm",id:"gut",extra:1,item:extra.item,slug:mob.slug,
+            whoId:who,ts:stepTs});
+        }
+      }
+    }
   }
   // Boss sem NENHUM drop ainda entrega um BAÚ VAZIO no Reward Chest (o
   // jogador vê que o boss foi derrotado e pode abrir/recolher o bundle).
@@ -8182,7 +8257,9 @@ function authoritySpeedPts(ent,isPlayer,now){
     const hid=hasteActive(p,now);if(hid)spd+=hasteDelta(p,hid);
     return Math.max(10,spd);
   }
-  return Number(ent&&((ent.def&&ent.def.speed)||ent.speedPts||ent.speed))||110;
+  let spd=Number(ent&&((ent.def&&ent.def.speed)||ent.speedPts||ent.speed))||110;
+  if(ent&&Number(ent.slowUntil)>now)spd*=Number(ent.slowMul)||0.5;
+  return spd;
 }
 function playerAttackRangeSQM(p){
   const profile=playerWeaponProfile(p),it=ITEMS[p&&p.equip&&p.equip.weapon&&p.equip.weapon.item];
@@ -8618,7 +8695,7 @@ function tickDelayedHits(auth,now){
     let dmg=Math.max(1,Number(h.dmg)||0);
     dmg=applyOutgoingDamage(mob,h.el||"death",dmg,now,profPiercePctFor(who&&who.p,h.el||"death"));
     if(dmg>0){
-      mob.hp-=dmg;if(who&&who.p)applyOutgoingLeech(who.p,dmg);
+      mob.hp-=dmg;if(who&&who.p)applyOutgoingLeech(auth,who.p,dmg,mob.slug,now);
       const pos=entityPosition(mob,.5,.5);
       auth.events.push({t:"hit",dmg,el:h.el||"death",fx:h.fx||"death-echo-effect",
         x:pos.x,y:pos.y,race:mob.def&&mob.def.race||"blood",mobId:String(mob.id),targetId:String(mob.id),
@@ -8674,6 +8751,7 @@ function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
   const transPct=forgeTranscendenceDamagePct(p,now);
   const isCrit=!!(rolled.crit||transPct);
   const isFatal=forgeRollOnslaught(auth,p);
+  if(isFatal)auth.events.push({t:"forge",nome:"onslaught",whoId:String(item&&item.id||p.id||""),ts:now});
   let runeExtra=0;
   if(rolled.crit)runeExtra+=rolled.extraPct;
   if(transPct>0)runeExtra+=transPct;
@@ -8818,7 +8896,8 @@ function step(auth,now,opts){if(auth.ended)return;
             if(rolled.crit)extraPct+=rolled.extraPct;
             if(transPct>0)extraPct+=transPct;
             const isFatal=forgeRollOnslaught(auth,p);
-            if(isFatal)extraPct+=FORGE_ONSLAUGHT_BONUS_PCT;
+            if(isFatal){extraPct+=FORGE_ONSLAUGHT_BONUS_PCT;
+              auth.events.push({t:"forge",nome:"onslaught",whoId:String(item&&item.id||p.id||""),ts:now});}
             const source=playerPosition(auth,p),visual=spellVisual(s);
             let fx=visual.fx||ELEMENT_FX[el]||ELEMENT_FX.physical;
             fx=stanceDamageFx(p,s,originalEl,el,fx);fx=monkFx(p,fx);fx=knightSpellFx(s,fx);
@@ -8973,6 +9052,7 @@ function step(auth,now,opts){if(auth.ended)return;
         const transPct=forgeTranscendenceDamagePct(p,now);
         const isCrit=!!(rolled.crit||transPct);
         const isFatal=forgeRollOnslaught(auth,p);
+        if(isFatal)auth.events.push({t:"forge",nome:"onslaught",whoId:String(item&&item.id||p.id||""),ts:now});
         let finalDmg=dmg;
         let hitExtraPct=0;
         if(rolled.crit)hitExtraPct+=rolled.extraPct;

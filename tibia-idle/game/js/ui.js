@@ -4346,7 +4346,13 @@ function renderTopbar(p) {
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   $("#gold").textContent = fmtFull(p.gold);
   const cityBtn = $("#btn-city");
-  if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para o templo";
+  if (cityBtn) {
+    const lbl = cityBtn.querySelector(".topbar-btn-label");
+    const ico = cityBtn.querySelector(".topbar-btn-emoji");
+    if (lbl) lbl.textContent = G.training ? "Sair da academia" : "Ir para o templo";
+    if (ico) ico.textContent = G.training ? "🚪" : "🏛";
+    cityBtn.classList.toggle("is-exit", !!G.training);
+  }
 }
 
 /* Atalhos legados (#npc-quick) removidos — use o modal NPCS. */

@@ -13,6 +13,8 @@ const OTC_ANALYSERS = [
   { id: "taken", label: "Damage Taken", title: "Damage Taken Analyser", icon: "🛡" },
   { id: "loot", label: "Loot", title: "Loot Analyser", icon: "🎒" },
   { id: "supply", label: "Supplies", title: "Supply Analyser", icon: "🧪" },
+  { id: "charms", label: "Charms", title: "Charm Analyser", icon: "✦" },
+  { id: "forge", label: "Forge", title: "Forge Bonus Analyser", icon: "⚒" },
   { id: "drops", label: "Monsters", title: "Killed Monsters", icon: "☠" },
 ];
 
@@ -390,6 +392,80 @@ function otcAnalyserIngestBestHits(track, hitEvents, combat, activeId) {
   }
 }
 
+/* Linha de charms de um personagem no charmTrack:
+ * {id, procs, dmg, heal, mana, mitigated, extra, aplicado} por runa. */
+function otcAnalyserEnsureCharmBucket(track, meta, charmId) {
+  const pid = String(meta.id);
+  let row = track.byPlayer[pid];
+  if (!row) row = track.byPlayer[pid] = { id: pid, name: meta.name, voc: meta.voc, charms: {} };
+  if (meta.name) row.name = meta.name;
+  if (meta.voc) row.voc = meta.voc;
+  if (!row.charms || typeof row.charms !== "object") row.charms = {};
+  let rec = row.charms[charmId];
+  if (!rec) rec = row.charms[charmId] =
+    { id: charmId, procs: 0, dmg: 0, heal: 0, mana: 0, mitigated: 0, extra: 0, aplicado: 0 };
+  return rec;
+}
+
+/* t:"charm" carrega dmg/heal/mana/aplicado/extra; o "miss" de dodge traz
+ * `charm:"dodge"` + `mitigated`. whoId = quem proccou; no dodge, quem
+ * esquivou é o targetId. */
+/* ---- Forge Bonus Analyser: contador de ativações por personagem ----
+ * Fontes de verdade por bônus:
+ *   momentum      → t:"buff"  nome:"Momentum"      (whoId = quem proccou)
+ *   transcendence → t:"buff"  nome:"Transcendence" (whoId)
+ *   onslaught     → t:"forge" nome:"onslaught"     (whoId — emitido no roll,
+ *                   NÃO o flag `fatal` do hit, que se repete em cleave/área)
+ *   ruse          → t:"miss"  ruse:true            (targetId = quem esquivou)
+ */
+function otcAnalyserEnsureForgeBucket(track, meta) {
+  const pid = String(meta.id);
+  let row = track.byPlayer[pid];
+  if (!row) row = track.byPlayer[pid] = { id: pid, name: meta.name, voc: meta.voc,
+    momentum: 0, transcendence: 0, onslaught: 0, ruse: 0, total: 0 };
+  if (meta.name) row.name = meta.name;
+  if (meta.voc) row.voc = meta.voc;
+  return row;
+}
+function otcAnalyserForgeEvent(c, e, activeId) {
+  let kind = null, who = null;
+  if (e.t === "forge") {
+    kind = String(e.nome || "").toLowerCase();
+    who = otcAnalyserHitWhoId(e, activeId);
+  } else if (e.t === "buff") {
+    const n = String(e.nome || "").toLowerCase();
+    if (n !== "momentum" && n !== "transcendence") return;
+    kind = n;
+    who = otcAnalyserHitWhoId(e, activeId);
+  } else if (e.t === "miss" && e.ruse) {
+    kind = "ruse";
+    who = e.targetId != null && e.targetId !== "" ? String(e.targetId) : activeId;
+  }
+  if (kind !== "momentum" && kind !== "transcendence"
+      && kind !== "onslaught" && kind !== "ruse") return;
+  const track = otcAnalyserEnsureTrack(c.stats, "forgeTrack");
+  const row = otcAnalyserEnsureForgeBucket(track, otcAnalyserPlayerMeta(c, who));
+  row[kind]++;
+  row.total++;
+}
+
+function otcAnalyserCharmEvent(c, e, activeId) {
+  const id = e.t === "miss" ? String(e.charm || "dodge") : String(e.id || "");
+  if (!id) return;
+  const track = otcAnalyserEnsureTrack(c.stats, "charmTrack");
+  const who = e.t === "miss"
+    ? (e.targetId != null && e.targetId !== "" ? String(e.targetId) : activeId)
+    : otcAnalyserHitWhoId(e, activeId);
+  const rec = otcAnalyserEnsureCharmBucket(track, otcAnalyserPlayerMeta(c, who), id);
+  rec.procs++;
+  if (e.dmg) rec.dmg += Math.max(0, Number(e.dmg) || 0);
+  if (e.heal) rec.heal += Math.max(0, Number(e.heal) || 0);
+  if (e.mana) rec.mana += Math.max(0, Number(e.mana) || 0);
+  if (e.mitigated) rec.mitigated += Math.max(0, Number(e.mitigated) || 0);
+  if (e.extra) rec.extra += Math.max(0, Number(e.extra) || 0);
+  if (e.aplicado) rec.aplicado += 1;
+}
+
 /* Consome hit/taken já emitidos (local ou online). Preferência: whoId no hit
  * e targetId no taken — fallback para o personagem ativo / solo. */
 function otcAnalyserIngestEvents(events, combat) {
@@ -397,12 +473,31 @@ function otcAnalyserIngestEvents(events, combat) {
   if (!c || !c.stats || !events || !events.length) return;
   const damageTrack = otcAnalyserEnsureTrack(c.stats, "damageTrack");
   otcAnalyserEnsureTrack(c.stats, "takenTrack");
+  otcAnalyserEnsureTrack(c.stats, "charmTrack");
+  otcAnalyserEnsureTrack(c.stats, "forgeTrack");
   const activeId = c.player
     ? String(c.player.id !== undefined ? c.player.id : (c.player.p && c.player.p.id) || "")
     : "";
   const hitEvents = [];
   for (const e of events) {
     if (!e) continue;
+    // Forge: procs dedicados + buffs de ativação + ruse (miss sem dmg).
+    if (e.t === "forge" || e.t === "buff" || (e.t === "miss" && e.ruse)) {
+      otcAnalyserForgeEvent(c, e, activeId);
+      continue;
+    }
+    // Eventos de charm (procs/leech/reflect/extra) + dodge mitigado — sem
+    // `dmg` obrigatório: vampiric/voidcall/dodge viajam sem dano.
+    if (e.t === "charm" || (e.t === "miss" && e.charm)) {
+      otcAnalyserCharmEvent(c, e, activeId);
+      // Dano causado por runa (proc ofensivo / parry) conta no Damage Analyser.
+      if (e.t === "charm") {
+        const cd = Math.max(0, Number(e.dmg) || 0);
+        if (cd) otcAnalyserAddToTrack(c, "damageTrack",
+          otcAnalyserHitWhoId(e, activeId), e.el || e.element, cd);
+      }
+      continue;
+    }
     const amount = Math.max(0, Number(e.dmg) || 0);
     if (!amount) continue;
     if (e.t === "hit") {
@@ -454,6 +549,83 @@ function otcAnalyserLootEconBlock(stats) {
     <div class="otc-loot-econ-row"><span>Supply gasto</span><b>${otcAnalyserNumber(supplySpent)} gp</b></div>
     <div class="otc-loot-econ-row ${profitCls}"><span>Profit</span><b>${profit < 0 ? "-" : ""}${otcAnalyserNumber(Math.abs(profit))} gp</b></div>
   </div>`;
+}
+
+/* ---- Charm Analyser: procs e bônus medidos por personagem/runa ---- */
+function otcAnalyserCharmName(id) {
+  const c = (typeof CHARMS !== "undefined" && CHARMS) ? CHARMS[id] : null;
+  return (c && c.nome) || id;
+}
+function otcAnalyserCharmMetric(rec) {
+  const parts = [];
+  if (rec.dmg > 0) parts.push(`<b>${otcAnalyserNumber(rec.dmg)}</b> dano`);
+  if (rec.heal > 0) parts.push(`<b>${otcAnalyserNumber(rec.heal)}</b> curado`);
+  if (rec.mana > 0) parts.push(`<b>${otcAnalyserNumber(rec.mana)}</b> mana`);
+  if (rec.mitigated > 0) parts.push(`<b>${otcAnalyserNumber(rec.mitigated)}</b> mitigado`);
+  if (rec.extra > 0) parts.push(`<b>${otcAnalyserNumber(rec.extra)}</b> itens extras`);
+  return parts.join(" · ");
+}
+function otcAnalyserCharmBody(c) {
+  const track = (c && c.stats && c.stats.charmTrack && typeof c.stats.charmTrack === "object")
+    ? c.stats.charmTrack : { byPlayer: {} };
+  const players = Object.values(track.byPlayer || {})
+    .filter((row) => row && row.charms && Object.keys(row.charms).length)
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+  if (!players.length)
+    return `<div class="tiny dim">Nenhum charm proccou nesta sessão.
+      Associe runas na Cyclopedia para medir.</div>`;
+  return players.map((row) => {
+    const meta = otcAnalyserPlayerMeta(c, row.id);
+    const name = otcAnalyserEscape(row.name || meta.name || "Player");
+    const voc = otcAnalyserVocAbbr(row.voc || meta.voc);
+    const lines = Object.values(row.charms)
+      .sort((a, b) => (Number(b.procs) || 0) - (Number(a.procs) || 0)
+        || String(a.id).localeCompare(String(b.id)))
+      .map((rec) => {
+        const icon = (typeof charmIconHtml === "function") ? charmIconHtml(rec.id, 18) : "✦";
+        const metric = otcAnalyserCharmMetric(rec);
+        return `<div class="otc-analyser-line otc-charm-line">
+          <span class="otc-charm-name">${icon} ${otcAnalyserCharmName(rec.id)}</span>
+          <strong><em>${otcAnalyserNumber(rec.procs)}×</em><i>${metric}</i></strong>
+        </div>`;
+      }).join("");
+    return `<div class="otc-analyser-section-title">${name} <small>${voc}</small></div>${lines}`;
+  }).join("");
+}
+
+/* ---- Forge Bonus body: contagem de ativações por personagem ---- */
+const OTC_FORGE_BONUSES = [
+  { id: "momentum", label: "Momentum" },
+  { id: "onslaught", label: "Onslaught" },
+  { id: "transcendence", label: "Transcendence" },
+  { id: "ruse", label: "Ruse" },
+];
+function otcAnalyserForgeBody(c) {
+  const track = (c && c.stats && c.stats.forgeTrack && typeof c.stats.forgeTrack === "object")
+    ? c.stats.forgeTrack : { byPlayer: {} };
+  const players = Object.values(track.byPlayer || {})
+    .filter((row) => row && (Number(row.total) || 0) > 0)
+    .sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0)
+      || String(a.name || "").localeCompare(String(b.name || "")));
+  if (!players.length)
+    return `<div class="tiny dim">Nenhum bônus da forja ativou nesta sessão.
+      Equipe itens com tier de forja para proccar.</div>`;
+  const header = `<div class="otc-death-legend otc-forge-legend">
+      <span>Personagem</span>
+      <span>${OTC_FORGE_BONUSES.map((b) => b.label).join(" · ")}</span>
+    </div>`;
+  const lines = players.map((row) => {
+    const meta = otcAnalyserPlayerMeta(c, row.id);
+    const name = otcAnalyserEscape(row.name || meta.name || "Player");
+    const voc = otcAnalyserVocAbbr(row.voc || meta.voc);
+    const cells = OTC_FORGE_BONUSES.map((b) =>
+      `<i class="${Number(row[b.id]) > 0 ? "on" : ""}" title="${b.label}">${otcAnalyserNumber(row[b.id])}</i>`).join("");
+    return `<div class="otc-analyser-line otc-forge-line">
+      <span><b>${name}</b><small>${voc}</small></span>
+      <strong>${cells}</strong>
+    </div>`;
+  }).join("");
+  return header + lines;
 }
 
 function otcAnalyserDeathSection(c, stats) {
@@ -511,6 +683,8 @@ function otcAnalyserResetSession() {
   c.stats.deathTrack = { startedAt: now, byPlayer: {} };
   c.stats.damageTrack = { startedAt: now, byPlayer: {} };
   c.stats.takenTrack = { startedAt: now, byPlayer: {} };
+  c.stats.charmTrack = { startedAt: now, byPlayer: {} };
+  c.stats.forgeTrack = { startedAt: now, byPlayer: {} };
   c.stats.loot = {};
   c.stats.monsters = {};
   c.stats.supplyUsed = {};
@@ -700,6 +874,9 @@ function otcAnalyserBody(kind, c) {
       <div class="otc-analyser-section-title">Monstros abatidos</div>
       ${monsterRows || '<div class="tiny dim">Aguardando o primeiro abate.</div>'}`;
   }
+
+  if (kind === "charms") return otcAnalyserCharmBody(c);
+  if (kind === "forge") return otcAnalyserForgeBody(c);
 
   if (kind === "damage" || kind === "taken") return otcAnalyserDamageBody(kind, c);
 

@@ -186,6 +186,10 @@ const COSMETIC_ITEM_DEFS = {
   "final-judgement":                   { n: "final judgement", s: null, t: "loot", cid: 31738, w: 3.7, sell: 0, npcSell: 0 },
   "flask-of-warrior-s-sweat":          { n: "flask of warrior's sweat", s: null, t: "loot", cid: 5885, w: 3, sell: 0, npcSell: 0 },
   "four-leaf-clover":                  { n: "four-leaf clover", s: null, t: "loot", cid: 14143, w: 2, sell: 0, npcSell: 0 },
+  /* frostheart-shard/mermaid-comb são itens custom das receitas de addon
+   * (não existem no client 15.x): nome próprio + sprite emprestada de
+   * ice shard (54128) e coral comb (5945). */
+  "frostheart-shard":                  { n: "frostheart shard", s: null, t: "loot", cid: 54128, w: 4, sell: 0, npcSell: 0 },
   "gnomish-voucher-type-ca1":          { n: "gnomish voucher type ca1", s: null, t: "loot", cid: 16256, w: 0.8, sell: 0, npcSell: 0 },
   "gnomish-voucher-type-ca2":          { n: "gnomish voucher type ca2", s: null, t: "loot", cid: 16257, w: 0.8, sell: 0, npcSell: 0 },
   "gnomish-voucher-type-cb":           { n: "gnomish voucher type cb", s: null, t: "loot", cid: 16255, w: 0.8, sell: 0, npcSell: 0 },
@@ -206,6 +210,7 @@ const COSMETIC_ITEM_DEFS = {
   "mandrake":                          { n: "mandrake", s: null, t: "loot", cid: 5014, w: 1.8, sell: 0, npcSell: 0 },
   "melting-horn":                      { n: "melting horn", s: null, t: "loot", cid: 20355, w: 0, sell: 0, npcSell: 0 },
   "menacing-egg":                      { n: "menacing egg", s: null, t: "loot", cid: 23685, w: 8.5, sell: 0, npcSell: 0 },
+  "mermaid-comb":                      { n: "mermaid comb", s: null, t: "loot", cid: 5945, w: 4.5, sell: 0, npcSell: 0 },
   "music-box":                         { n: "music box", s: null, t: "loot", cid: 23677, w: 2, sell: 0, npcSell: 0 },
   "nail-case":                         { n: "nail case", s: null, t: "loot", cid: 19136, w: 2, sell: 0, npcSell: 0 },
   "nightmare-horn":                    { n: "nightmare horn", s: null, t: "loot", cid: 20274, w: 2, sell: 0, npcSell: 0 },

@@ -47,8 +47,9 @@ async function changePreys(db, body, consume) {
   const fresh = await db.findAccountById(acc.id);
   if (!consume) await addLedger(db, { accountId: acc.id, login: acc.login, kind: "purchase",
     delta: -pack.coins, coinsAfter: fresh.coins, brlCents: 0, ref: "preys:" + pack.id,
-    note: pack.cards + " Prey Cards" });
-  return { code: 200, body: { ok: true, coins: fresh.coins, cosmetics: fresh.cosmetics,
+    note: pack.cards + " Prey Cards" + (Math.min(Math.max(0, Number(acc.coins_nt) || 0), pack.coins) > 0
+      ? " (NT " + Math.min(Math.max(0, Number(acc.coins_nt) || 0), pack.coins) + ")" : "") });
+  return { code: 200, body: { ok: true, coins: fresh.coins, coinsNt: fresh.coins_nt || 0, cosmetics: fresh.cosmetics,
     msg: consume ? "Prey Card utilizado." : pack.cards + " Prey Cards adicionados à conta!" } };
 }
 
@@ -133,6 +134,43 @@ function backUrl(req, path) {
   const host = req && (req.headers["x-forwarded-host"] || req.headers.host);
   if (!host) return "";
   return proto + "://" + host + path;
+}
+
+/* ---------------- NON-TRANSFERABLE COINS (coins_nt) -------------------
+ * Pool separado de Tibia Coins que SÓ pode ser gasto na STORE — o market
+ * e o RMT nunca enxergam `coins_nt` (operam exclusivamente em `coins`).
+ * Toda compra de store debita coins_nt primeiro e completa com coins.
+ * Usa db.spendStoreCoins (atômico); em stores sem o método cai para o
+ * read-modify-write clássico. Retorna { ok, coins, coinsNt, ntSpent }. */
+async function spendStoreCoins(db, acc, amount) {
+  const cost = Math.max(0, Math.floor(Number(amount) || 0));
+  const haveNt = Math.max(0, Number(acc.coins_nt) || 0);
+  const have = Math.max(0, Number(acc.coins) || 0);
+  if (haveNt + have < cost) return { ok: false, coins: have, coinsNt: haveNt };
+  if (typeof db.spendStoreCoins === "function") {
+    const r = await db.spendStoreCoins(acc.id, cost);
+    if (!r) return { ok: false };
+    return {
+      ok: true,
+      coins: Math.max(0, Number(r.coins) || 0),
+      coinsNt: Math.max(0, Number(r.coinsNt) || 0),
+      ntSpent: Math.min(haveNt, cost),
+    };
+  }
+  const ntSpent = Math.min(haveNt, cost);
+  if (ntSpent && typeof db.updateCoinsNt === "function")
+    await db.updateCoinsNt(acc.id, haveNt - ntSpent);
+  await db.updateCoins(acc.id, have - (cost - ntSpent));
+  const fresh = await db.findAccountById(acc.id);
+  return {
+    ok: true, ntSpent,
+    coins: Math.max(0, Number(fresh && fresh.coins) || 0),
+    coinsNt: Math.max(0, Number(fresh && fresh.coins_nt) || 0),
+  };
+}
+/* Sufixo do ledger/UX quando parte do pagamento saiu do pool NT. */
+function ntNote(spend) {
+  return spend && spend.ntSpent > 0 ? ` (NT ${spend.ntSpent})` : "";
 }
 
 async function addLedger(db, row) {
@@ -346,11 +384,11 @@ async function buyVip(db, body) {
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const pack = vipById(body.packId);
   if (!pack) return { code: 400, body: { ok: false, msg: "Pacote VIP inválido" } };
-  const have = Number(acc.coins) || 0;
-  if (have < pack.coins)
+  /* Compra de STORE: debita coins_nt primeiro, completa com coins. */
+  const spend = await spendStoreCoins(db, acc, pack.coins);
+  if (!spend.ok)
     return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes" } };
-  const novo = have - pack.coins;
-  await db.updateCoins(acc.id, novo);
+  const novo = spend.coins;
   const now = Date.now();
   const cur = Math.max(0, Math.floor(Number(acc.vip_until) || 0));
   const until = Math.max(cur, now) + pack.days * 24 * 3600 * 1000;
@@ -358,9 +396,9 @@ async function buyVip(db, body) {
   await addLedger(db, {
     accountId: acc.id, login: acc.login, kind: "spend",
     delta: -pack.coins, coinsAfter: novo, brlCents: 0,
-    ref: "vip:" + pack.id, note: pack.label,
+    ref: "vip:" + pack.id, note: pack.label + ntNote(spend),
   });
-  return { code: 200, body: { ok: true, coins: novo, vipUntil: until, vip: until > now, pack } };
+  return { code: 200, body: { ok: true, coins: novo, coinsNt: spend.coinsNt, vipUntil: until, vip: until > now, pack } };
 }
 
 async function myHistory(db, token) {
@@ -370,7 +408,7 @@ async function myHistory(db, token) {
     ? await db.coinLedgerList({ accountId: acc.id, limit: 80 }) : [];
   const orders = typeof db.storeOrdersByAccount === "function"
     ? await db.storeOrdersByAccount(acc.id, 40) : [];
-  return { code: 200, body: { ok: true, coins: acc.coins || 0, vipUntil: acc.vip_until || 0, ledger, orders } };
+  return { code: 200, body: { ok: true, coins: acc.coins || 0, coinsNt: acc.coins_nt || 0, vipUntil: acc.vip_until || 0, ledger, orders } };
 }
 
 async function adminSummary(db, token, opts) {
@@ -412,6 +450,26 @@ async function adminSummary(db, token, opts) {
  * DEPOT da conta (shared_inventory). */
 const VOUCHERS = {
   FREETC: { coins: 1500, label: "1500 Tibia Coins" },
+  /* Voucher de lançamento: VIP + montaria + coins NÃO transferíveis
+   * (só gastáveis na STORE — não podem ir para o market nem para o RMT). */
+  DRUWELL: { coinsNt: 250, vipDays: 3, mount: "roaring-lion",
+    label: "3 dias de VIP + montaria Roaring Lion + 250 NT Tibia Coins" },
+  /* Cupom de divulgação do streamer buto__pvp — além das recompensas,
+   * `modal` instrui o cliente a abrir o pop-up de agradecimento com os
+   * links sociais do criador (render em store-ui.js). */
+  BUTO__PVP: { coinsNt: 250, vipDays: 3, mount: "shock-head",
+    label: "3 dias de VIP + montaria Shock Head + 250 NT Tibia Coins",
+    modal: {
+      title: "Obrigado por apoiar nosso streamer!",
+      intro: "Você recebeu as seguintes recompensas:",
+      social: {
+        label: "Apoie o streamer siga nas plataformas:",
+        links: [
+          { name: "Instagram", handle: "@buto__pvp", url: "https://www.instagram.com/buto__pvp" },
+          { name: "Twitch", handle: "@buto_pvp", url: "https://www.twitch.tv/buto_pvp" },
+        ],
+      },
+    } },
   // futuros: { items: [{ slug: "x", qty: 1, instanced: false, tier: 0 }], label: "..." }
 };
 
@@ -438,6 +496,38 @@ async function redeemVoucher(db, body) {
       delta: v.coins, coinsAfter: coins, brlCents: 0,
       ref: "voucher:" + code, note: "Voucher " + code + " — " + (v.label || "brinde"),
     });
+  }
+
+  /* Coins NÃO transferíveis: pool coins_nt, só gastável na STORE. */
+  let coinsNt = Math.max(0, Number(acc.coins_nt) || 0);
+  if (v.coinsNt) {
+    coinsNt += Math.floor(Number(v.coinsNt));
+    if (typeof db.updateCoinsNt === "function")
+      await db.updateCoinsNt(acc.id, coinsNt);
+    await addLedger(db, {
+      accountId: acc.id, login: acc.login, kind: "grant",
+      delta: 0, coinsAfter: coins, brlCents: 0,
+      ref: "voucher:" + code, note: "Voucher " + code + " — +" + v.coinsNt + " NT Coins (só STORE)",
+    });
+  }
+
+  /* VIP em dias: empilha sobre o vip_until vigente (mesma regra do
+   * pacote VIP da store). */
+  let vipUntil = Math.max(0, Math.floor(Number(acc.vip_until) || 0));
+  if (v.vipDays) {
+    const now = Date.now();
+    vipUntil = Math.max(vipUntil, now) + Math.floor(Number(v.vipDays)) * 24 * 3600 * 1000;
+    if (typeof db.setAccountVipUntil === "function")
+      await db.setAccountVipUntil(acc.id, vipUntil);
+  }
+
+  /* Montaria de voucher vai para a CONTA (accounts.cosmetics.mounts) —
+   * mesma chave usada pelo catálogo de cosméticos da store. */
+  let cosmetics = null;
+  if (v.mount && typeof db.setAccountCosmetics === "function") {
+    cosmetics = sanitizeCosmetics(acc.cosmetics);
+    cosmetics.mounts[String(v.mount)] = true;
+    await db.setAccountCosmetics(acc.id, cosmetics);
   }
 
   // Itens do voucher vão para o DEPOT da conta (shared_inventory), no mesmo
@@ -476,10 +566,25 @@ async function redeemVoucher(db, body) {
     if (entregues.length) await db.setAccountSharedInventory(acc.id, shared);
   }
 
+  /* Lista estruturada de recompensas: o modal do cliente renderiza com
+   * ícone próprio por `kind` (vip/mount/coinsNt/coins/items). O nome da
+   * montaria vem do catálogo de cosméticos (appearancedata). */
+  const mountNome = v.mount && cosmeticCatalog().mounts[String(v.mount)]
+    ? cosmeticCatalog().mounts[String(v.mount)].nome : String(v.mount || "");
+  const rewards = [];
+  if (v.vipDays) rewards.push({ kind: "vip", label: "+" + Math.floor(Number(v.vipDays)) + " dias de VIP" });
+  if (v.mount) rewards.push({ kind: "mount", mount: String(v.mount), label: "Montaria " + mountNome });
+  if (v.coinsNt) rewards.push({ kind: "coinsNt", label: "+" + Math.floor(Number(v.coinsNt)) + " NT Tibia Coins" });
+  if (v.coins) rewards.push({ kind: "coins", label: "+" + Math.floor(Number(v.coins)) + " Tibia Coins" });
+  if (entregues.length) rewards.push({ kind: "items", label: entregues.length + " item(ns) no depot da conta" });
+
   return { code: 200, body: {
-    ok: true, code, coins,
+    ok: true, code, coins, coinsNt, vipUntil, vip: vipUntil > Date.now(),
+    cosmetics,
     label: v.label || "brinde",
     items: entregues,
+    rewards,
+    modal: v.modal || null,
     msg: (v.label || "Brinde") + " resgatado!",
   } };
 }
@@ -560,12 +665,12 @@ async function buyCosmetic(db, body) {
   const owned = kind === "outfit" ? Number(cosmetics.outfits[id]) >= 3 : !!cosmetics.mounts[id];
   if (owned) return { code: 400, body: { ok: false, msg: "Você já possui esse item", cosmetics } };
 
-  const coins = Math.max(0, Number(acc.coins) || 0);
-  if (coins < COSMETIC_PRICE)
-    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins } };
+  /* Compra de STORE: debita coins_nt primeiro, completa com coins. */
+  const spend = await spendStoreCoins(db, acc, COSMETIC_PRICE);
+  if (!spend.ok)
+    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins: spend.coins, coinsNt: spend.coinsNt } };
 
-  const novo = coins - COSMETIC_PRICE;
-  await db.updateCoins(acc.id, novo);
+  const novo = spend.coins;
   if (kind === "outfit") cosmetics.outfits[id] = 3;
   else cosmetics.mounts[id] = true;
   if (typeof db.setAccountCosmetics === "function")
@@ -574,10 +679,10 @@ async function buyCosmetic(db, body) {
     accountId: acc.id, login: acc.login, kind: "cosmetic",
     delta: -COSMETIC_PRICE, coinsAfter: novo, brlCents: 0,
     ref: "cosmetic:" + kind + ":" + id,
-    note: "Store " + kind + ": " + (entry.nome || id),
+    note: "Store " + kind + ": " + (entry.nome || id) + ntNote(spend),
   });
   return { code: 200, body: {
-    ok: true, kind, id, nome: entry.nome, coins: novo, cosmetics,
+    ok: true, kind, id, nome: entry.nome, coins: novo, coinsNt: spend.coinsNt, cosmetics,
     msg: (entry.nome || id) + " desbloqueado para todos os personagens da conta!",
   } };
 }
@@ -589,18 +694,12 @@ async function buyBless(db, body) {
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
 
   const cosmetics = sanitizeCosmetics(acc.cosmetics);
-  const coins = Math.max(0, Number(acc.coins) || 0);
-  if (coins < BLESS_PRICE)
-    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins, cosmetics } };
-
-  // Débito atômico + incremento atômico de bless: sem read-modify-write para
-  // não correr com o checkpoint das instâncias (que aplica blessSpent).
-  if (typeof db.debitCoins === "function") {
-    if (!await db.debitCoins(acc.id, BLESS_PRICE))
-      return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins, cosmetics } };
-  } else {
-    await db.updateCoins(acc.id, coins - BLESS_PRICE);
-  }
+  /* Compra de STORE: NT-first (débito atômico via spendStoreCoins) +
+   * incremento atômico de bless — sem read-modify-write para não correr
+   * com o checkpoint das instâncias (que aplica blessSpent). */
+  const spend = await spendStoreCoins(db, acc, BLESS_PRICE);
+  if (!spend.ok)
+    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins: spend.coins, coinsNt: spend.coinsNt, cosmetics } };
   if (typeof db.bumpAccountBless === "function")
     cosmetics.bless = await db.bumpAccountBless(acc.id, 1);
   else {
@@ -608,15 +707,14 @@ async function buyBless(db, body) {
     if (typeof db.setAccountCosmetics === "function")
       await db.setAccountCosmetics(acc.id, cosmetics);
   }
-  const fresh = typeof db.findAccountById === "function" ? await db.findAccountById(acc.id) : null;
-  const novo = fresh ? Math.max(0, Number(fresh.coins) || 0) : Math.max(0, coins - BLESS_PRICE);
+  const novo = spend.coins;
   await addLedger(db, {
     accountId: acc.id, login: acc.login, kind: "bless",
     delta: -BLESS_PRICE, coinsAfter: novo, brlCents: 0,
-    ref: "cosmetic:bless", note: "Store bless: proteção de party wipe",
+    ref: "cosmetic:bless", note: "Store bless: proteção de party wipe" + ntNote(spend),
   });
   return { code: 200, body: {
-    ok: true, coins: novo, cosmetics, bless: cosmetics.bless,
+    ok: true, coins: novo, coinsNt: spend.coinsNt, cosmetics, bless: cosmetics.bless,
     msg: "Bless ativa! Ela será consumida automaticamente quando a party toda morrer — sem perda de XP ou gold.",
   } };
 }
@@ -633,26 +731,20 @@ async function buyImbuement(db, body) {
   const price = IMBUEMENT_TIER_COINS[tier];
   if (!price) return { code: 400, body: { ok: false, msg: "Tier de imbuement inválido" } };
 
-  const coins = Math.max(0, Number(acc.coins) || 0);
-  if (coins < price)
-    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins } };
-
-  if (typeof db.debitCoins === "function") {
-    if (!await db.debitCoins(acc.id, price))
-      return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins } };
-  } else {
-    await db.updateCoins(acc.id, coins - price);
-  }
-  const fresh = typeof db.findAccountById === "function" ? await db.findAccountById(acc.id) : null;
-  const novo = fresh ? Math.max(0, Number(fresh.coins) || 0) : Math.max(0, coins - price);
+  /* Compra por Tibia Coins: NT-first (só sai de coins se o pool NT
+   * não cobrir). */
+  const spend = await spendStoreCoins(db, acc, price);
+  if (!spend.ok)
+    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins: spend.coins, coinsNt: spend.coinsNt } };
+  const novo = spend.coins;
   await addLedger(db, {
     accountId: acc.id, login: acc.login, kind: "spend",
     delta: -price, coinsAfter: novo, brlCents: 0,
     ref: "imbuement:tier" + tier,
-    note: "Imbuement " + IMBUEMENT_TIER_NAME[tier] + " via Tibia Coins",
+    note: "Imbuement " + IMBUEMENT_TIER_NAME[tier] + " via Tibia Coins" + ntNote(spend),
   });
   return { code: 200, body: {
-    ok: true, coins: novo, tier, price,
+    ok: true, coins: novo, coinsNt: spend.coinsNt, tier, price,
     msg: "Imbuement " + IMBUEMENT_TIER_NAME[tier] + " adquirido por " + price + " TC.",
   } };
 }

@@ -85,15 +85,35 @@ function owned(cosmetics, recipe) {
   return (bits & recipe.addon) === recipe.addon;
 }
 
-function catalog(account, characters) {
+/* Itens de troca valem da Bag OU da Loot Pouch (o loot das hunts cai na
+ * pouch — exigir a mochila fazia o NPC recusar a troca com o item na conta). */
+function sharedCount(shared, slug) {
+  const bag = object(shared && shared.bag), pouch = object(shared && shared.lootPouch);
+  return (Number(bag[slug]) || 0) + (Number(pouch[slug]) || 0);
+}
+
+function catalog(account, characters, shared) {
   const cosmetics = migrate(account, characters);
   return recipes.map((recipe) => {
     const appearance = recipe.kind === "mount" ? mounts.get(recipe.target)
       : appearances.outfits.find((o) => key(o.id) === recipe.target);
     const available = !!appearance && !recipe.requirement;
     const name = appearance ? appearance.nome : recipe.target.split("-").map((s) => s[0].toUpperCase() + s.slice(1)).join(" ");
-    return Object.assign({}, recipe, { name, owned: owned(cosmetics, recipe), available,
+    const entry = Object.assign({}, recipe, { name, owned: owned(cosmetics, recipe), available,
       reason: recipe.requirement ? recipe.label : !appearance ? "Aparência ainda não disponível no cliente" : "" });
+    /* `enough`/`have` autoritativos (shared da conta): o botão Trocar do
+     * modal não depende mais do espelho local G.p.bag, que podia estar
+     * atrasado e deixar a troca impossível com o item na conta. */
+    if (shared) {
+      entry.have = {};
+      for (const items of recipe.alternatives || [])
+        for (const cost of items) entry.have[cost.slug] = sharedCount(shared, cost.slug);
+      if (recipe.catalyst) entry.have[recipe.catalyst] = sharedCount(shared, recipe.catalyst);
+      entry.enough = (recipe.alternatives || []).map((items) =>
+        items.every((i) => sharedCount(shared, i.slug) >= i.count)
+        && (!recipe.catalyst || sharedCount(shared, recipe.catalyst) > 0));
+    }
+    return entry;
   });
 }
 
@@ -108,24 +128,36 @@ function exchange(account, characters, shared, recipeId, alternative) {
   if (!costs) return { ok: false, msg: "Receita inválida." };
   if (recipe.kind === "addon" && recipe.requireBase && cosmetics.outfits[recipe.target] === undefined)
     return { ok: false, msg: "Desbloqueie a outfit base primeiro." };
-  const bag = object(shared.bag);
-  if (recipe.catalyst && !(Number(bag[recipe.catalyst]) > 0))
-    return { ok: false, msg: "Tenha na Bag: " + recipe.catalyst + " (não será consumido)." };
+  const bag = object(shared.bag), pouch = object(shared.lootPouch);
+  if (recipe.catalyst && !(sharedCount(shared, recipe.catalyst) > 0))
+    return { ok: false, msg: "Tenha na Bag ou Loot Pouch: " + recipe.catalyst + " (não será consumido)." };
   for (const cost of costs)
-    if ((Number(bag[cost.slug]) || 0) < cost.count)
-      return { ok: false, msg: "Itens insuficientes na Bag: " + cost.slug + " (" + cost.count + ")." };
+    if (sharedCount(shared, cost.slug) < cost.count)
+      return { ok: false, msg: "Itens insuficientes na Bag ou Loot Pouch: " + cost.slug + " (" + cost.count + ")." };
   for (const cost of costs) {
-    bag[cost.slug] -= cost.count;
-    if (bag[cost.slug] <= 0) delete bag[cost.slug];
+    /* Consome da Bag primeiro; o que faltar sai da Loot Pouch. Instâncias de
+     * item (imbSlots etc.) só existem na Bag — a pouch é stack puro. */
     let remaining = cost.count;
+    const fromBag = Math.min(Number(bag[cost.slug]) || 0, remaining);
+    if (fromBag > 0) {
+      bag[cost.slug] -= fromBag;
+      if (bag[cost.slug] <= 0) delete bag[cost.slug];
+      remaining -= fromBag;
+    }
+    if (remaining > 0) {
+      pouch[cost.slug] = (Number(pouch[cost.slug]) || 0) - remaining;
+      if (pouch[cost.slug] <= 0) delete pouch[cost.slug];
+    }
+    let instLeft = fromBag;
     shared.itemInstances = (shared.itemInstances || []).filter((instance) => {
-      if (remaining > 0 && instance && instance.slug === cost.slug && instance.loc === "bag") {
-        remaining--; return false;
+      if (instLeft > 0 && instance && instance.slug === cost.slug && instance.loc === "bag") {
+        instLeft--; return false;
       }
       return true;
     });
   }
   shared.bag = bag;
+  shared.lootPouch = pouch;
   if (recipe.kind === "mount") cosmetics.mounts[recipe.target] = true;
   else if (recipe.kind === "outfit") cosmetics.outfits[recipe.target] = 0;
   else {

@@ -160,11 +160,10 @@ function questCard(q) {
 function renderQuestsButton(p) {
   const btn = typeof document !== "undefined" && document.getElementById("btn-quests");
   if (!btn) return;
-  let any = false;
   const quests = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS : {};
-  for (const q of Object.values(quests)) {
-    if (questHasPendingReward(p, q)) { any = true; break; }
-  }
+  const names = Object.values(quests)
+    .filter((q) => questHasPendingReward(p, q)).map((q) => q.name);
+  const any = names.length > 0;
   let badge = btn.querySelector(".quests-btn-badge");
   if (!badge) {
     badge = document.createElement("span");
@@ -174,8 +173,9 @@ function renderQuestsButton(p) {
   }
   badge.textContent = "!";
   badge.style.visibility = any ? "visible" : "hidden";
-  btn.title = any ? "Abrir catálogo de Quests — há recompensa a coletar!"
-                  : "Abrir catálogo de Quests";
+  btn.title = any
+    ? "Abrir catálogo de Quests — recompensa a coletar: " + names.join(", ")
+    : "Abrir catálogo de Quests";
 }
 
 /* ---- Quest list modal ---- */
@@ -188,14 +188,27 @@ function openQuestsModal() {
   const quests = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS : {};
   /* Boss quests (incl. as worldQuest — Book World, Bloody Tusks e
    * Make Believe são quests de boss) vão para BOSSES QUESTS. */
-  const worldCards = Object.values(quests).filter((q) => q.questType !== "party" && q.questType !== "boss").map(questCard).join("");
-  const partyCards = Object.values(quests).filter((q) => q.questType === "party").map(questCard).join("");
-  const bossCards = Object.values(quests).filter((q) => q.questType === "boss").map(questCard).join("");
+  const pend = (pred) => Object.values(quests).filter(pred);
+  const pendingNames = (qs) => qs
+    .filter((q) => questHasPendingReward(G.p, q)).map((q) => q.name);
+  const worldQs = pend((q) => q.questType !== "party" && q.questType !== "boss");
+  const partyQs = pend((q) => q.questType === "party");
+  const bossQs = pend((q) => q.questType === "boss");
+  const worldCards = worldQs.map(questCard).join("");
+  const partyCards = partyQs.map(questCard).join("");
+  const bossCards = bossQs.map(questCard).join("");
   /* Abas de categoria — mesmo accordion do modal HUNTS/BOSSES: todas
-   * minimizadas, clicar abre uma e fecha as demais. */
-  const section = (title, cards) => cards
+   * minimizadas, clicar abre uma e fecha as demais. Quando a aba tem
+   * quest com recompensa a coletar, o "!" + nome vão no título —
+   * senão a pendência fica invisível dentro da aba fechada. */
+  const section = (title, cards, qs) => cards
     ? `<section class="hunt-modal-section accordion-section">
-         <div class="hunt-cat-title accordion-head" role="button" tabindex="0" aria-expanded="false">${title}</div>
+         <div class="hunt-cat-title accordion-head" role="button" tabindex="0" aria-expanded="false">${title}${(() => {
+           const names = pendingNames(qs);
+           return names.length
+             ? ` <span class="quest-pending-badge quest-cat-badge" title="${names.join(", ")} — recompensa a coletar">!</span><span class="tiny quest-pending-names">${names.join(", ")}</span>`
+             : "";
+         })()}</div>
          <div class="hunts-group collapsed">${cards}</div>
        </section>`
     : "";
@@ -203,9 +216,9 @@ function openQuestsModal() {
     <img src="assets/item/small-treasure-chest.png" width="20" height="20" style="vertical-align:middle;margin-right:6px" alt="">
     <span>QUESTS</span><button class="sm" id="quests-modal-close">Fechar</button></div>
     <div class="panel-body" id="quests-modal-list">
-      ${section("WORLD QUESTS", worldCards)}
-      ${section("PARTY QUESTS", partyCards)}
-      ${section("BOSSES QUESTS", bossCards)}
+      ${section("WORLD QUESTS", worldCards, worldQs)}
+      ${section("PARTY QUESTS", partyCards, partyQs)}
+      ${section("BOSSES QUESTS", bossCards, bossQs)}
       ${(!worldCards && !partyCards && !bossCards) ? '<span class="dim">Nenhuma quest disponível.</span>' : ""}</div>`;
   if (typeof bindCatalogAccordion === "function")
     bindCatalogAccordion($("#quests-modal-list"), "accordion");

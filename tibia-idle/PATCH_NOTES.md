@@ -4,6 +4,388 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — STORE sem a aba "Vender Coins"
+
+- Removida a aba **Vender Coins (BETA)** da STORE (venda player-to-player
+  de TC por gold): saíram a entrada da navegação, o card da Home e toda a
+  UI `renderStoreSell`. Os endpoints do Market no servidor permanecem
+  intactos — a janela do Market não é afetada.
+- Chip de PARTY recolhido agora fica no canto superior direito do cenário
+  (mesma posição do painel expandido).
+
+---
+
+## 2026-11-20 — Cupom de streamer `buto__pvp` + modal de recompensa
+
+- **Voucher `buto__pvp`** (STORE → VOUCHERS, 1x por conta): concede
+  **+3 dias de VIP** (empilha no `vip_until`), **montaria Shock Head**
+  (catálogo `shock-head`, creditada em `accounts.cosmetics.mounts`) e
+  **+250 Non-Transferable Tibia Coins** (`accounts.coins_nt` — não vai
+  para o `coins` normal, não pode ser vendida no market/RMT).
+- **Resposta enriquecida**: `redeemVoucher` agora devolve `rewards`
+  (lista estruturada por `kind`: vip/mount/coinsNt/coins/items) e `modal`
+  opcional com título, intro e links sociais do criador.
+- **Modal de recompensa**: resgates com `modal` abrem um pop-up
+  (`openStoreVoucherModal` em `store-ui.js`) mostrando as recompensas com
+  ícone próprio (coroa VIP, sprite da montaria via primeiro frame do
+  sheet, coin NT), a mensagem de agradecimento e os links do streamer
+  (Instagram/Twitch com logos em SVG inline). O feedback inline da aba
+  VOUCHERS continua aparecendo como fallback.
+- DRUWELL e demais vouchers futuros continuam funcionando no mesmo
+  fluxo (inline se não definirem `modal`).
+
+---
+
+## 2026-11-20 — Fix: recursos da FORJE do painel admin
+
+- **`accountAdminSaveCharacter` agora aplica `data.sharedInventory`**
+  (`accountApplySharedInventory`) na resposta do grant — o autosave comum
+  já fazia isso via `accountMaybeApplyShared`. Sem o rebase, `p._forgeBase`
+  ficava no valor antigo e o save seguinte re-somava o delta de
+  dust/slivers/exaltedCores: o admin aplicava um valor e o recurso vinha
+  inflado depois (ou parecia não aplicar).
+- **`mergeSharedFromPlayer` mescla `tier`/`charges` por campo** em
+  instâncias já presentes no shared (antes `byId.has(id)` pulava inteiro):
+  grants de tier no painel FORJE dentro de instância ativa (patch no
+  authority → tick grava por merge) agora persistem, assim como consumo de
+  cargas de acessórios. `loc`/`slug` continuam autoridade do shared
+  (movimentos depot/market são server-side).
+
+## 2026-11-20 — Non-Transferable Tibia Coins + voucher DRUWELL
+
+- **Novo pool `coins_nt`** (não transferível): coluna `accounts.coins_nt`
+  (migração MySQL automática) / campo `coins_nt` no JsonStore. Só pode
+  ser gasto na **STORE** — o market e o RMT operam exclusivamente em
+  `coins` e nunca enxergam o pool NT (coberto por teste: `debitCoins`,
+  o mesmo caminho do market, não toca `coins_nt`).
+- **Débito NT-first**: `db.spendStoreCoins` (atômico — MySQL usa a ordem
+  de avaliação do SET, documentada no código) e `changePreyCards` foram
+  convertidos; todas as compras por TC (`buyVip`, `buyCosmetic`,
+  `buyBless`, `buyImbuement`, prey cards) debitam `coins_nt` primeiro e
+  completam com `coins`. Ledger registra o split como ` (NT N)` na nota.
+- **Voucher DRUWELL** (`POST /api/store/voucher`): +3 dias de VIP
+  (empilha sobre vip_until), montaria **Roaring Lion** na conta e
+  **+250 NT Tibia Coins**. `redeemVoucher` agora entende `coinsNt`,
+  `vipDays` e `mount` na definição do voucher.
+- **Montaria `roaring-lion`** registrada no catálogo
+  (`appearancedata.js` + `appearances.json`, mountId 242): art do leão
+  dourado (mesma família do Roaring Lion, looktype 570/571 — sprite
+  `assets/appearance/mount/roaring-lion.base.png`).
+- **Cliente**: `accountCoinsNt()`/`accountSetCoinsNt()` no tibiacoin.js;
+  `storeApplyCoins` aplica o pool NT de todas as respostas de store;
+  login/`accountPublicView` carrega `coinsNt`; header da STORE mostra
+  "TC + N NT" quando houver; resgate de voucher aplica VIP e
+  cosmetics.mounts no sessionStorage (mesma fonte que `ownsMount` lê).
+- `listAccountCoinSummaries` (faturamento admin) inclui `coinsNt`.
+- `tools/test_nt_coins.js` (novo, 6 testes): split NT-first, market não
+  alcança NT, voucher DRUWELL completo e resgate único, montaria no
+  catálogo + sprite.
+- Cache-busters `nt-coins-v1` em `tibiacoin.js`, `account-client.js`,
+  `store-ui.js`, `appearancedata.js`.
+
+---
+
+## 2026-11-20 — Guilds: redesign gi-guild (diretório + painel interno)
+
+- Modal de GUILDS reestruturado no layout `gi-guild-*` (mockup do usuário)
+  na paleta quente do jogo.
+- **Diretório (2 colunas)**: cards `gi-guild-card` com moldura de ícone,
+  pílula de nível, badge **SUA GUILD** dourado e **RECRUTANDO**/**CHEIA**;
+  glow dourado em `is-mine`/`is-selected`, hover com elevação.
+- **Botão duplicado corrigido**: "⚔️ Acessar minha guild" agora é um único
+  CTA (`gi-guild-primary-cta`) na coluna esquerda. No preview à direita só
+  aparece "Ver guild completa" — e apenas para guilds de terceiros.
+- **Barra de EXP**: `gi-exp-track`/`gi-exp-fill` com gradiente âmbar e
+  glow (`box-shadow`), label sobreposto legível — antes era um medidor
+  apagado sem preenchimento luminoso.
+- **Membros**: `gi-member-row` com `is-leader`/`is-vice`, ícone de cargo
+  (👑/⭐), badges `gi-role-tag` coloridos por cargo (líder ouro, vice
+  azul, membro neutro) e `gi-task-pill` de contribuição.
+- **Painel interno**: 8 abas viraram pílulas `gi-gtab` (ativa dourada com
+  glow, PVP com hover avermelhado, blink `has-pending` em solicitações);
+  banner `gi-interior-banner` com avatar emoldurado + stat chips
+  (✨EXP/🪙GP/💎TC); gerenciamento do líder em card `gi-manage-box`
+  (ícone em grade + `gi-dark-input` + botão TC azul `gi-tc-btn`).
+- Ações de membro (promover/rebaixar/expulsar) e aceite/recusa de
+  solicitações viraram `gi-act-btn` compactos com hover por função.
+- Handlers e dados inalterados (`data-guild-*`/`data-char-profile`);
+  helper novo `guildMemberRowHtml`/`guildRoleTag`/`guildRankIcon`
+  compartilhado entre preview e abas MEMBROS/RANKING/SOLICITAÇÕES.
+- Cache-busters `guild-redesign-v1` em `layout.css` e `guild-ui.js`.
+
+---
+
+## 2026-11-20 — Analyzer: aba Forge Bonus (contador de ativações por char)
+
+- Nova aba **⚒ Forge** no Analyser (`OTC_ANALYSERS` + `forgeTrack`):
+  por personagem, contagem de ativações de **Momentum**, **Onslaught**,
+  **Transcendence** e **Ruse**, com legenda e tooltips.
+- Fontes de verdade por bônus (mesmo evento para o floater e o contador):
+  - Momentum/Transcendence → `t:"buff"` `nome:"Momentum"|"Transcendence"`;
+    o cliente agora emite `whoId` nesses eventos (o engine já emitia).
+  - Onslaught → novo `t:"forge"` `nome:"onslaught"` emitido no roll
+    (`forgeTryOnslaught` no cliente, `forgeRollOnslaught` no engine, nos 3
+    call sites de cada: auto attack, spell e runa). O flag `fatal` do hit
+    não servia — se repete em cleave/área e inflaria a contagem.
+  - Ruse → `t:"miss"` `ruse:true` com `targetId` = quem esquivou (o
+    cliente passou a emitir `targetId` no evento).
+- Ingest: `t:"forge"`/`t:"buff"`/`miss ruse` são consumidos antes do
+  filtro de `dmg` (esses eventos não carregam dano). Ativação de
+  Transcendence conta a ATIVAÇÃO (buff), não cada crítico do avatar.
+- Reset de sessão zera o `forgeTrack`; linhas mostram os 4 contadores por
+  personagem (células apagadas quando zero, âmbar quando >0).
+- `tools/test_account_charms.js` cobre a ingest dos 4 bônus por char.
+- Cache-busters `forge-analyser-v1` em `layout.css`, `combat.js`,
+  `analyzers.js`.
+
+---
+
+## 2026-11-20 — Charms: pool por conta, assign por personagem, procs ativos + Analyzer
+
+**Modelo de dados — charms/charm points são DA CONTA:**
+
+- `server/shared_inventory.js`: `shared.charms` (unlocks major+minor) e
+  `shared.charmPoints` entram no normalize; `seedSharedCharms` migra o
+  legado por personagem com **união dos unlocks + soma dos pontos não
+  gastos** (flag `charmsSharedDone` nas duas stores do `db.js`);
+  `applySharedCharms` espelha o pool no char (baseline `_charmPointsBase`);
+  `mergeSharedCharms` faz merge por **delta** (gastos/ganhos somam sobre o
+  pool sem reverter ops de outra cópia) + união dos unlocks.
+- `tibiacoin.js`: `acc.charms`/`acc.charmPoints` + `bindAccountCharms(p)`
+  — accessors `p.charms`/`p.charmPoints` direto na conta (mesmo padrão de
+  gold/lootPouch), com migração lazy `charmsMigrated` lendo o roster bruto.
+  `bindAccountCharms` chamado em `normalizePlayer` (game.js) — vale
+  offline e online (o servidor aplica o espelho via
+  `accountApplySharedInventory`).
+- **`p.charmRace` (assign por criatura) e `p.charmsPagos` continuam POR
+  PERSONAGEM** — dois chars da conta podem associar runas diferentes à
+  mesma criatura e o bônus só vale para quem associou.
+- `buyCharm` reatribui o mapa inteiro (`Object.assign`) — mutation
+  `p.charms[id]=true` não dispara o setter do accessor.
+- `ensureCyclopedia` só escreve nos accessors quando o valor muda
+  (evitava um `accountSave` por ataque no hot path do `charmTotals`).
+
+**Modal de Charms redesign (`gi-charms-panel`):**
+
+- Novo layout em `cyclopedia-ui.js` + `layout.css` seguindo o mockup:
+  topbar com regra + saldo ✦, subtabs Major/Minor, legenda
+  desbloqueada/associada, corpo 2 colunas com grid de cards (ícone, nome,
+  custo, tipo) e inspetor lateral (thumb, descrição, criatura associada,
+  ações) — paleta quente do jogo.
+- **Seletor de personagem** (`#gi-charm-char-sel`, `CYCLO.charmChar`):
+  dropdown com todos os chars da conta ("Aplicar em"); assign/clear
+  operam no `charmRace` do char escolhido — `charmSaveChar` persiste no
+  roster e no servidor (`accountSaveCharacter`) mesmo quando não é o
+  ativo. O saldo/unlocks exibidos são sempre os da conta
+  (`charmPoolSync` espelha o pool do G.p no char selecionado).
+- O inspector mostra "Criatura Associada (**nome do char**)": reforça
+  que o assign é individual.
+
+**Funcionalidades ativadas/auditadas (cliente + engine):**
+
+- **Ofensivos (freeze, wound, enflame, zap, curse, divine, carnage,
+  overpower, overflux):** cliente não proccava — `applyCharmDamage` era
+  no-op e `charmOffensiveProc` nunca era chamado. Agora `playerAttack`
+  dispara os procs no **alvo principal** (auto attack; cleave/área não
+  disparam, paridade Canary/engine) com mitigação/resist do elemento e
+  evento `t:"charm"` por proc.
+- **Vampiric Embrace / Void's Call:** leech agora filtrado por raça
+  (antes `charmTotals(p)` sem slug valia contra QUALQUER criatura — bug),
+  cura capada no max e emite `heal`/`mana` no evento de charm. Engine:
+  `applyOutgoingLeech` ganhou `auth/now` e emite os mesmos eventos.
+- **Dodge:** ambos emitem `charm:"dodge"` + `mitigated` (dano evitado) no
+  evento `miss`; cliente passa a filtrar por raça também.
+- **Parry:** engine NÃO refletia (só somava no totals) — agora reflete
+  `dmg*reflete%` no atacante como o cliente, com evento `dmg`.
+- **Gut:** engine não aplicava; agora ambos rolam % de creature product
+  extra da tabela da raça (filtro: sem currency/supply/ammo/equip) com
+  evento `extra:1`.
+- **Cripple/Numb:** chance de paralisar — no idle vira slow pesado de
+  movimento (`slowUntil`+`slowMul`, 3s, 0.5×) no atacante alvo (cripple,
+  no proc ofensivo) ou no agressor (numb, ao sofrer o golpe); honrado em
+  `authoritySpeedPts` (engine) e `moveMobs` (cliente); respeita
+  `imune:["paralyze"]`.
+- **Adrenaline Burst / Cleanse:** implementados nos dois lados ao sofrer
+  golpe da raça associada — haste `utani-hur` 10s / remove 1 condition.
+- `charmTotals` (cliente+engine) ganhou `numb`/`adrenaline`/`cleanse`.
+- Bless/Scavenge/Fatal/Void Inversion: sem mecânica de skin/flee/
+  mana-drain no jogo — seguem inertes (descrição já diz "quando
+  aplicável").
+
+**Analyzer — nova aba Charms (✦):**
+
+- `analyzers.js`: `OTC_ANALYSERS` + `charmTrack` por personagem — por
+  runa: `procs`, `dmg`, `heal`, `mana`, `mitigated`, `extra`, `aplicado`.
+- Ingest: eventos `t:"charm"` (whoId = quem proccou) e `miss` com
+  `charm:"dodge"` (targetId = quem esquivou + `mitigated`).
+- Dano de charm (procs + parry) também entra no `damageTrack`.
+- Reset da sessão zera o `charmTrack` junto; render lista runas por
+  personagem com procs× e métricas (Life Leech curado, Freeze dano,
+  Dodge vezes+mitigado, Gut itens…).
+
+**Testes:** `tools/test_account_charms.js` (novo) cobre seed/apply/merge
+do pool, assigns independentes na mesma raça, accessor offline
+compartilhado, totals do engine e ingest do Analyzer. Bateria AGENTS
+(charms/hunts/wardrobe) verde. Cache-busters `gi-charms-v1` em
+layout.css, combat.js, cyclopedia.js, cyclopedia-ui.js, analyzers.js,
+account-client.js, tibiacoin.js, game.js.
+
+**Ressalva conhecida:** o servidor valida débito de pontos via merge por
+delta (nunca fica negativo), mas um save de cliente malicioso poderia
+reinvindicar unlocks sem custo — mesma classe de confiança dos demais
+campos client-authored fora da lista `PVP_CLIENT_HEAVY_KEYS`.
+
+---
+
+## 2026-11-20 — Chat dockado: sai da tela do jogo e fica SEMPRE aberto
+
+- O `#global-chat` era overlay `absolute` dentro do `#scene-wrap`
+  (canto inferior esquerdo, cobrindo o jogo). Agora o `chat.js` monta o
+  chat dentro do novo `#chat-dock` — bloco em fluxo na `.col-mid`,
+  logo abaixo do `scene-wrap` e acima da barra de cooldown / painéis.
+- `#global-chat` virou `position: static` com `width:100%` (o overlay
+  tinha `max-height`/largura proporcional à scene); o visual OTC
+  (borda metal, cabeçalho, abas, input) é mantido.
+- **SEMPRE aberto**: removido o botão de minimizar
+  (`#global-chat-toggle`) e o handler de collapse; `applyCollapsed()`
+  virou no-op que só remove a classe `collapsed` (prefs antigas com
+  `collapsed:true` não dobram mais o chat). O pref `collapsed` ainda é
+  lido/salvo mas não tem efeito.
+- `#chat-dock:empty { display:none }` evita gap fantasma no flex antes
+  do login/montagem do chat.
+- Cache-busters `chat-dock-v1` em `chat.css` e `chat.js`.
+
+---
+
+## 2026-11-20 — Painel de party: recolhido encolhe pra esquerda (chip mínimo)
+
+- Antes, recolher o `#party-panel` só escondia o corpo — a barra de
+  200px com "👥 PARTY" continuava no canto superior direito, cobrindo o
+  jogo. Agora `.party-panel.collapsed` vira um **chip mínimo encostado
+  na borda esquerda do scene** (vertical: 👥 + contador + seta), com
+  `top:50%/translateY(-50%)` pra não sobrepor o painel de TREINO no
+  topo esquerdo. O texto " PARTY" (`.pp-label`) e o spacer somem no
+  estado recolhido; clicar no chip reabre o painel normal no canto
+  direito.
+- `party-ui.js`: `renderPartyPanel` passa a alternar `collapsed`
+  também no elemento `#party-panel` (antes só no body).
+- `index.html`: markup do head ganhou `.pp-title`/`.pp-label` pra
+  esconder só o texto sem perder o emoji e o contador.
+- Cache-busters `party-collapse-v1` em `layout.css` e `party-ui.js`.
+
+---
+
+## 2026-11-20 — Topbar: personagem em destaque à esquerda + botões unificados
+
+- **Herói do personagem** (`#btn-switch.gi-char-hero-btn`): movido pro
+  início da faixa de botões — avatar do outfit em pedestal escuro com
+  moldura dourada (30px, canvas proporcional em vez do 20×20 esmagado),
+  **nome do personagem** (`#btn-switch-name`, preenchido no
+  `paintSwitchPortrait`) + sub "Personagem", borda `#e6b84c` com glow
+  suave. O label i18n continua oculto (menu mobile/acessibilidade).
+- **Agrupamento com divisores** (`.gi-toolbar-divider`): [herói] |
+  Admin, Calendário, Config | Cyclopedia, Guild, PVP, Party, Prey,
+  Social, Store | cidade/academia.
+- **Botões unificados**: `.topbar-btns .sm` ganhou quadro metálico
+  escuro (gradiente `#2a2620→#1c1913`, borda `#3a3428`, raio 4px,
+  hover dourado). `#btn-city` perdeu o `primary` estourado — vira
+  `is-exit` discreto só quando `G.training` ("Sair da academia" com
+  ícone 🚪). `#btn-store` com filete dourado, `#btn-pvp` hover avermelhado.
+- **Fix lateral**: `renderTopbar` fazia `textContent =` no `#btn-city`
+  e destruía os spans internos do botão a cada render — agora atualiza
+  só `.topbar-btn-label`/`.topbar-btn-emoji` e alterna `is-exit`.
+- Cache-busters `topbar-hero-v1` em `layout.css`, `ui.js` e
+  `char-details.js`.
+
+---
+
+## 2026-11-20 — Limite de 4 personagens por conta + mísseis mort-area/ice-attack corrigidos
+
+- **Limite de 4 chars por conta**: `ACCOUNT_MAX_CHARS = 4` enforced no
+  servidor (`POST /api/characters` rejeita o 5º com mensagem) e no
+  `showCharacterCreator`. No picker de party, quando a conta atinge o
+  limite o botão "Criar personagem" vira **Logout** (o slot troca de
+  lugar, mantendo sempre exatamente um botão de logout no rodapé).
+- **Fix pré-existente — `db.findCharacterByName` ausente no MySQL**: o
+  endpoint de criação quebrava com 500 (`is not a function`) no
+  adaptador MySQL; só o JsonStore tinha o método. Adicionado
+  `findCharacterByName` (LOWER(name) = LOWER(?), LIMIT 1) — sem ele a
+  checagem de nome duplicado nem chegava a rodar.
+- **Mísseis `mort-area`/`ice-attack` → sprites reais**: os dois nomes
+  são efeitos de **hit** (fx), não projéteis — pediam `mort-area_*.png`
+  inexistentes. CW death strike → `miss:"death"` + `fx:"mort-area"`
+  (oficial, igual ao SPELLFX de death strike); spirits do Roost →
+  `miss:"death"`/`"ice"` com o fx correspondente mantido no impacto.
+- `spear_s.png` confirmado: existe e serve 200 — o `CONNECTION_REFUSED`
+  era o blip do restart, sem relação com sprite faltante.
+
+---
+
+## 2026-11-20 — Guarda-roupa do personagem: novo layout gi-wardrobe (preview + catálogo)
+
+- **Redesign da aba Outfit/Montarias** (`chardTabOutfit`): o layout antigo
+  `.chard-outfit-*` deu lugar ao `.gi-wardrobe` em duas colunas — à
+  esquerda o estúdio de prévia (palco com pedestal, sprite em 84px,
+  **botão ↻ que gira a prévia** pelas 4 direções, nome do outfit +
+  montaria), e à direita o catálogo com abas **Visuais/Montarias com
+  contagem**, busca e grade de cards responsiva.
+- **Addons viraram 2 toggles independentes** (`✓ Addon 1`/`✓ Addon 2`)
+  em vez do seletor de 4 estados; o bitmask interno 0–3 e as regras de
+  posse (`ownedAddonMask`) continuam valendo — pílulas não desbloqueadas
+  ficam desabilitadas com dica no `title`.
+- **Montaria virou switch A pé/Montado**: "A pé" desmonta; "Montado"
+  abre a aba de montarias do catálogo para escolher (clicar num card
+  de montaria continua equipando direto).
+- **Cards do catálogo próprios** (sem depender do `cycloAppearance`):
+  sprite pintado em lotes de 12/frame via `AppearanceRenderer`
+  (outfit com as cores do jogador / montaria virada pro sul), nome,
+  meta (`addons x/y` ou `+vel`), tag **EM USO** no equipado e 🔒 +
+  `Bloqueado` nos não possuídos — clicar num bloqueado mostra toast
+  explicando onde desbloquear (Addoner/Lothar/Store).
+- **Cores preservadas** no painel esquerdo (4 partes + paleta compacta
+  `.gi-palette`), e **Aplicar Visual** faz o mesmo do antigo Salvar
+  (save + volta pra aba Personagem).
+- Busca continua reativa (`CHARD.outfitBusca`), agora filtrando a
+  lista antes de renderizar em vez de esconder cards no DOM.
+- CSS novo em `game/css/layout.css` (todas as classes `gi-*`) na
+  **paleta quente do jogo** (fundos `#0d0c0a`/`#14120e`/`#1c1913`,
+  bordas `#3a3428`, acentos ouro `#d4af37`/`#e6b84c` — substituindo o
+  slate-azul do mockup original); cache-busters `wardrobe-gi-v2`.
+- **Ajustes pós-feedback**: catálogo exibe **apenas outfits/montarias
+  desbloqueados** (filtro `"owned"`, contadores das abas acompanham),
+  e a prévia escala **proporcionalmente** para caber inteira no palco
+  (o canvas do `AppearanceRenderer.preview` é recortado pelo conteúdo —
+  montado fica ~64×100; antes era forçado 84×84 e esmagava).
+- **Paleta sem scroll + botão Random**: as 96 cores ficam em 6 linhas
+  de 16 dentro da coluna (`.gi-palette`, sem `outfit-palette-compact`),
+  stage reduzido pra 128px, e 🎲 **Random** no cabeçalho do grupo CORES
+  sorteia as 4 partes de uma vez (save + refresh completo).
+
+---
+
+## 2026-11-20 — Lothar: troca aceita Loot Pouch, `enough` autoritativo e sprites que sempre renderizam
+
+- **Fix — "NPC não confirma a troca"**: o botão Trocar usava o espelho
+  local `G.p.bag`, que podia ficar atrasado, e a receita só aceitava a
+  Bag — mas o loot das hunts cai na **Loot Pouch**. Agora o catálogo do
+  servidor devolve `enough`/`have` por alternativa calculados sobre
+  `shared.bag + shared.lootPouch` (autoridade), o `exchange` consome da
+  Bag primeiro e completa da Pouch, e o modal mostra "(tem X)" por item.
+  No cliente o espelho local virou só fallback.
+- **Fix — sprite da montaria sempre renderiza**: o preview trocou o
+  canvas/`Sprites.get` por `background` CSS do `.base.png` (mesmo padrão
+  das recompensas de quest). Um 404 transitório envenenava o cache e o
+  slot ficava vazio pra sempre.
+- **Novo — sprites dos 2 últimos itens nome-only**: `frostheart-shard`
+  (Norseman addon) e `mermaid-comb` (Oriental addon) são itens custom
+  sem equivalente no client 15.x — ganharam definição própria e sprite
+  emprestada de ice shard (54128) / coral comb (5945). Todos os 154
+  itens de troca agora têm def + sprite.
+- Drop do `marinated-sturgeon` permanece no oficial **0,01%**
+  (raubritter-skirmisher, cliente + engine).
+
+---
+
 ## 2026-11-20 — Lothar: montarias 15.x + sprites de troca, Vladrukh com drops raros, recuperação de senha por e-mail
 
 - **Fix — troca de montaria travada no Lothar**: o Battlefrazzle (e

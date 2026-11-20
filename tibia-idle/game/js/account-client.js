@@ -2107,6 +2107,8 @@ async function accountLogin(login, password) {
       accountSetGold(Math.max(0,Number(r.data.account.gold)||0));
     if(typeof accountSetCoins==="function"&&r.data.account.coins!==undefined)
       accountSetCoins(Math.max(0,Number(r.data.account.coins)||0));
+    if(typeof accountSetCoinsNt==="function"&&r.data.account.coinsNt!==undefined)
+      accountSetCoinsNt(Math.max(0,Number(r.data.account.coinsNt)||0));
   }
   return {
     ok: true,
@@ -2201,6 +2203,14 @@ function accountApplySharedInventory(shared) {
    * sobrescreve com o espelho do servidor. */
   if (!ACCOUNT_SAVE_PENDING && shared.prey && typeof shared.prey === "object" && !Array.isArray(shared.prey)) {
     try { p.prey = JSON.parse(JSON.stringify(shared.prey)); } catch (e) {}
+  }
+  /* Charms DA CONTA: unlocks + charm points são o pool compartilhado.
+   * Só o assign (p.charmRace) fica por personagem — não tocar. */
+  if (!ACCOUNT_SAVE_PENDING && shared.charms && typeof shared.charms === "object" && !Array.isArray(shared.charms)) {
+    p.charms = Object.assign({}, shared.charms);
+  }
+  if (!ACCOUNT_SAVE_PENDING && shared.charmPoints !== undefined) {
+    p.charmPoints = Math.max(0, Math.floor(Number(shared.charmPoints) || 0));
   }
   p._sharedInv = 1;
   // Reward Chest é DA CONTA: ao aplicar o shared (troca de personagem,
@@ -2310,11 +2320,17 @@ async function accountAdminSaveCharacter(token, charId, p) {
     const applyOk=(data)=>{
       if(data.character)accountMergeCharacterCache([data.character]);
       if(data.instance)accountInstanceApply(data.instance);
+      // Mesmo rebase do autosave comum (accountMaybeApplyShared): sem aplicar
+      // o shared retornado, o _forgeBase fica no valor antigo e o próximo
+      // save re-soma o delta de dust/slivers/cores — o grant parecia "não
+      // aplicar" ou gravava o recurso duplicado.
+      if(data.sharedInventory)accountApplySharedInventory(data.sharedInventory);
       if(data.account){
         try{
           const raw=sessionStorage.getItem("tibia-idle-account"),acc=raw?JSON.parse(raw):null;
           if(acc){
             if(data.account.coins!==undefined)acc.coins=Math.max(0,Number(data.account.coins)||0);
+            if(data.account.coinsNt!==undefined)acc.coinsNt=Math.max(0,Number(data.account.coinsNt)||0);
             if(data.account.gold!==undefined)acc.gold=Math.max(0,Number(data.account.gold)||0);
             if(data.account.vipUntil!==undefined)acc.vipUntil=data.account.vipUntil;
             sessionStorage.setItem("tibia-idle-account",JSON.stringify(acc));
@@ -2323,6 +2339,8 @@ async function accountAdminSaveCharacter(token, charId, p) {
         if(typeof syncVipFromAccount==="function")syncVipFromAccount(data.account);
         if(typeof accountSetCoins==="function"&&data.account.coins!==undefined)
           accountSetCoins(Math.max(0,Number(data.account.coins)||0));
+        if(typeof accountSetCoinsNt==="function"&&data.account.coinsNt!==undefined)
+          accountSetCoinsNt(Math.max(0,Number(data.account.coinsNt)||0));
         if(typeof accountSetGold==="function"&&data.account.gold!==undefined)
           accountSetGold(Math.max(0,Number(data.account.gold)||0));
       }
@@ -2671,17 +2689,21 @@ async function marketBank(token) {
   return {ok:false,msg:r.data.msg};
 }
 
-function storeApplyCoins(coins) {
+function storeApplyCoins(coins, coinsNt) {
   const n = Math.max(0, Math.floor(Number(coins) || 0));
+  const hasNt = coinsNt !== undefined && coinsNt !== null;
+  const nNt = hasNt ? Math.max(0, Math.floor(Number(coinsNt) || 0)) : null;
   try {
     const raw = sessionStorage.getItem("tibia-idle-account");
     const acc = raw ? JSON.parse(raw) : null;
     if (acc) {
       acc.coins = n;
+      if (nNt !== null) acc.coinsNt = nNt;
       sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
     }
   } catch (e) {}
   if (typeof accountSetCoins === "function") accountSetCoins(n);
+  if (nNt !== null && typeof accountSetCoinsNt === "function") accountSetCoinsNt(nNt);
   if (typeof renderCoinBalance === "function") renderCoinBalance();
   return n;
 }
@@ -2696,18 +2718,18 @@ async function storeCheckout(token, packId, method, email) {
 }
 async function storeOrderStatus(token, orderId) {
   const r = await _api("GET", "/api/store/orders/" + encodeURIComponent(orderId), null, token);
-  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
   return r.data || { ok: false, msg: "Pedido não encontrado" };
 }
 async function storeSimulatePay(token, orderId) {
   const r = await _api("POST", "/api/store/simulate", { token, orderId });
-  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
   return r.data || { ok: false, msg: "Falha ao simular" };
 }
 async function storeBuyVip(token, packId) {
   const r = await _api("POST", "/api/store/vip", { token, packId });
   if (r.data && r.data.ok) {
-    if (r.data.coins != null) storeApplyCoins(r.data.coins);
+    if (r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
     if (typeof syncVipFromAccount === "function")
       syncVipFromAccount({ vipUntil: r.data.vipUntil, vip: r.data.vip });
     try { if (typeof G !== "undefined" && G && G.p) G.p.vipUntil = r.data.vipUntil; } catch (e) {}
@@ -2716,7 +2738,7 @@ async function storeBuyVip(token, packId) {
 }
 async function storeHistory(token) {
   const r = await _api("GET", "/api/store/history", null, token);
-  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
   return r.data || { ok: false, msg: "Falha ao carregar histórico" };
 }
 async function storeAdminSummary(token) {
@@ -2725,13 +2747,35 @@ async function storeAdminSummary(token) {
 }
 async function storeRedeemVoucher(token, code) {
   const r = await _api("POST", "/api/store/voucher", { token, code });
-  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  if (r.data && r.data.ok) {
+    if (r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
+    /* Voucher com VIP/montaria: sincroniza o estado da conta. */
+    if (r.data.vipUntil != null && typeof syncVipFromAccount === "function")
+      syncVipFromAccount({ vipUntil: r.data.vipUntil, vip: r.data.vip });
+    if (r.data.vipUntil != null) {
+      try { if (typeof G !== "undefined" && G && G.p) G.p.vipUntil = r.data.vipUntil; } catch (e) {}
+    }
+    if (r.data.cosmetics) {
+      /* Montaria/outfit do voucher vai para a CONTA (acc.cosmetics no
+       * sessionStorage — a mesma que ownsMount lê). */
+      try {
+        const raw = sessionStorage.getItem("tibia-idle-account");
+        const acc = raw ? JSON.parse(raw) : null;
+        if (acc) {
+          acc.cosmetics = acc.cosmetics && typeof acc.cosmetics === "object" ? acc.cosmetics : {};
+          acc.cosmetics.mounts = Object.assign({}, acc.cosmetics.mounts, r.data.cosmetics.mounts || {});
+          acc.cosmetics.outfits = Object.assign({}, acc.cosmetics.outfits, r.data.cosmetics.outfits || {});
+          sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+        }
+      } catch (e) {}
+    }
+  }
   return r.data || { ok: false, msg: "Falha ao resgatar voucher" };
 }
 async function storeBuyCosmetic(token, kind, id) {
   const r = await _api("POST", "/api/store/cosmetic", { token, kind, id });
   if (r.data && r.data.ok) {
-    if (r.data.coins != null) storeApplyCoins(r.data.coins);
+    if (r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
     if (r.data.cosmetics) {
       try {
         const raw = sessionStorage.getItem("tibia-idle-account");
@@ -2749,7 +2793,7 @@ async function accountPreyCardsRequest(token, packId) {
   const consume = !packId;
   const r = await _api("POST", consume ? "/api/prey/card" : "/api/store/preys", { token, packId });
   if (r.data && r.data.ok) {
-    if (!consume && r.data.coins != null) storeApplyCoins(r.data.coins);
+    if (!consume && r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
     const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
     if (acc && r.data.cosmetics) {
       acc.cosmetics = Object.assign({}, acc.cosmetics || {}, { preyCards: r.data.cosmetics.preyCards || 0 });
@@ -2776,7 +2820,7 @@ async function accountPreySlotRequest(token) {
 async function storeBuyBless(token) {
   const r = await _api("POST", "/api/store/bless", { token });
   if (r.data && r.data.ok) {
-    if (r.data.coins != null) storeApplyCoins(r.data.coins);
+    if (r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
     if (r.data.cosmetics) {
       try {
         const raw = sessionStorage.getItem("tibia-idle-account");
@@ -2794,7 +2838,7 @@ async function storeBuyBless(token) {
  * débito confirmado o cliente aplica o imbue (sem materiais/gold, 100%). */
 async function storeBuyImbuement(token, tier) {
   const r = await _api("POST", "/api/store/imbuement", { token, tier });
-  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins, r.data.coinsNt);
   return r.data || { ok: false, msg: "Falha ao comprar imbuement" };
 }
 

@@ -131,9 +131,9 @@ const COURT_WARLOCK = {
     /* Fire Wave "COSY IN HERE!" (design). */
     { el: "fire", min: 500, max: 900, int: 6000, ch: 25, range: 6,
       wave: 1, fx: "fire-area", miss: "fire" },
-    /* Death strike no alvo (design). */
+    /* Death strike no alvo (design; oficial: miss death + fx mort-area). */
     { el: "death", min: 450, max: 800, int: 5000, ch: 30, range: 7,
-      miss: "mort-area", alvo: 1 },
+      miss: "death", fx: "mort-area", alvo: 1 },
   ],
   looktype: 1903, raceId: 2741, targetDistance: 3, staticAttack: 90,
   imune: ["paralyze", "invisible"], grupo: "quests",

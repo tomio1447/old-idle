@@ -752,6 +752,37 @@ JsonStore.prototype.updateCoins = function (id, coins) {
   if (a) { a.coins = Math.max(0, coins); this._save(); return a; }
   return null;
 };
+/* NON-TRANSFERABLE TIBIA COINS (coins_nt): créditos promocionais que só
+ * podem ser gastos na STORE — nunca passam pelo market nem pelo RMT
+ * (esses caminhos só leem/gravam `coins`). Todo gasto de store debita
+ * coins_nt primeiro e completa com coins via spendStoreCoins. */
+JsonStore.prototype.updateCoinsNt = function (id, coinsNt) {
+  const a = this.findAccountById(id);
+  if (a) { a.coins_nt = Math.max(0, Math.floor(Number(coinsNt) || 0)); this._save(); return a; }
+  return null;
+};
+JsonStore.prototype.creditCoinsNt = function (id, amount) {
+  const a = this.findAccountById(id);
+  if (!a) return null;
+  a.coins_nt = Math.max(0, Math.floor(Number(a.coins_nt) || 0)) +
+    Math.max(0, Math.floor(Number(amount) || 0));
+  this._save();
+  return a;
+};
+/* Débito NT-first atômico para compras de store: retorna { ntSpent,
+ * tSpent, coins, coinsNt } ou null quando o total não cobre o custo. */
+JsonStore.prototype.spendStoreCoins = function (accountId, amount) {
+  const a = this.findAccountById(accountId);
+  const cost = Math.max(0, Math.floor(Number(amount) || 0));
+  if (!a) return null;
+  const nt = Math.max(0, Number(a.coins_nt) || 0), c = Math.max(0, Number(a.coins) || 0);
+  if (nt + c < cost) return null;
+  const ntSpent = Math.min(nt, cost);
+  a.coins_nt = nt - ntSpent;
+  a.coins = c - (cost - ntSpent);
+  this._save();
+  return { ntSpent, tSpent: cost - ntSpent, coins: a.coins, coinsNt: a.coins_nt };
+};
 JsonStore.prototype.storeOrderInsert = function (row) {
   const order = Object.assign({ id: ++this._storeOrderSeq }, row || {});
   this.storeOrders = this.storeOrders || [];
@@ -793,7 +824,7 @@ JsonStore.prototype.accountWardrobe = function (accountId, recipeId, alternative
     if (result.ok) this.setAccountSharedInventory(accountId, shared);
   }
   this._save();
-  return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters), sharedInventory: shared });
+  return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters, shared), sharedInventory: shared });
 };
 JsonStore.prototype.setAccountCosmetics = function (accountId, cosmetics) {
   const a = this.findAccountById(accountId);
@@ -828,8 +859,12 @@ JsonStore.prototype.changePreyCards = function (accountId, delta, cost) {
   if (typeof cos === "string") cos = JSON.parse(cos);
   cos = cos && typeof cos === "object" ? cos : {};
   const cards = Math.max(0, Math.floor(Number(cos.preyCards) || 0));
-  if ((Number(a.coins) || 0) < cost || cards + delta < 0) return false;
-  a.coins = (Number(a.coins) || 0) - cost;
+  /* Custo é compra de store → debita coins_nt primeiro, completa com coins. */
+  const nt = Math.max(0, Number(a.coins_nt) || 0), c = Math.max(0, Number(a.coins) || 0);
+  if (nt + c < cost || cards + delta < 0) return false;
+  const ntSpent = Math.min(nt, cost);
+  a.coins_nt = nt - ntSpent;
+  a.coins = c - (cost - ntSpent);
   a.cosmetics = Object.assign({}, cos, { preyCards: cards + delta });
   this._save();
   return true;
@@ -951,6 +986,7 @@ JsonStore.prototype.coinLedgerList = function (opts) {
 JsonStore.prototype.listAccountCoinSummaries = function () {
   return (this.accounts || []).map((a) => ({
     id: a.id, login: a.login, coins: Number(a.coins) || 0,
+    coinsNt: Number(a.coins_nt) || 0,
     vipUntil: Number(a.vip_until) || 0, role: a.role || "user",
   })).sort((a, b) => b.coins - a.coins);
 };
@@ -1227,6 +1263,16 @@ JsonStore.prototype.accountSharedInventory = function (accountId) {
     try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
     if (SharedInv) SharedInv.seedSharedStamina(s, chars);
     s.staminaSharedDone = 1;
+    a.shared_inventory = s;
+    this._save();
+  }
+  if (!s.charmsSharedDone) {
+    // Charms eram por personagem: pool da conta = união dos unlocks +
+    // soma dos charm points não gastos de todos os personagens.
+    let chars = [];
+    try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
+    if (SharedInv && SharedInv.seedSharedCharms) SharedInv.seedSharedCharms(s, chars);
+    s.charmsSharedDone = 1;
     a.shared_inventory = s;
     this._save();
   }
@@ -3021,7 +3067,7 @@ async function MysqlStore() {
           await conn.query("UPDATE accounts SET cosmetics=? WHERE id=?", [JSON.stringify(account.cosmetics), Number(accountId)]);
         }
         await conn.commit();
-        return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters), sharedInventory: shared });
+        return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters, shared), sharedInventory: shared });
       } catch (error) { await conn.rollback(); throw error; }
       finally { conn.release(); }
     },
@@ -3151,6 +3197,15 @@ async function MysqlStore() {
         s.staminaSharedDone = 1;
         await this.setAccountSharedInventory(Number(accountId), s);
       }
+      if (!s.charmsSharedDone && SharedInv && SharedInv.seedSharedCharms) {
+        // Charms eram por personagem: pool da conta = união dos unlocks +
+        // soma dos charm points não gastos de todos os personagens.
+        let chars = [];
+        try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
+        SharedInv.seedSharedCharms(s, chars);
+        s.charmsSharedDone = 1;
+        await this.setAccountSharedInventory(Number(accountId), s);
+      }
       return SharedInv ? SharedInv.normalizeSharedInventory(s) : s;
     },
     async setAccountSharedInventory(accountId, s) {
@@ -3163,14 +3218,49 @@ async function MysqlStore() {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
       return this.findAccountById(id);
     },
+    /* NON-TRANSFERABLE TIBIA COINS (coins_nt): só gastáveis na STORE —
+     * market e RMT só mexem em `coins`. Débito de store é NT-first.
+     * ATENÇÃO à ordem do SET: MySQL/MariaDB avalia as atribuições da
+     * esquerda para a direita; `coins` usa o coins_nt ANTIGO e `coins_nt`
+     * é atualizado depois — não reordenar. */
+    async updateCoinsNt(id, coinsNt) {
+      await this.run("UPDATE accounts SET coins_nt = ? WHERE id = ?",
+        [Math.max(0, Math.floor(Number(coinsNt) || 0)), Number(id)]);
+      return this.findAccountById(id);
+    },
+    async creditCoinsNt(id, amount) {
+      const add = Math.max(0, Math.floor(Number(amount) || 0));
+      if (!add) return this.findAccountById(id);
+      await this.run("UPDATE accounts SET coins_nt = coins_nt + ? WHERE id = ?", [add, Number(id)]);
+      return this.findAccountById(id);
+    },
+    async spendStoreCoins(id, amount) {
+      const cost = Math.max(0, Math.floor(Number(amount) || 0));
+      const r = await this.run(
+        `UPDATE accounts SET
+           coins = coins - (? - LEAST(coins_nt, ?)),
+           coins_nt = coins_nt - LEAST(coins_nt, ?)
+         WHERE id = ? AND coins + coins_nt >= ?`,
+        [cost, cost, cost, Number(id), cost]);
+      if (!(r && r.affectedRows > 0)) return null;
+      const fresh = await this.findAccountById(id);
+      return {
+        coins: Math.max(0, Number(fresh && fresh.coins) || 0),
+        coinsNt: Math.max(0, Number(fresh && fresh.coins_nt) || 0),
+      };
+    },
     async changePreyCards(id, delta, cost) {
       if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(cost) || cost < 0) return false;
       const json = "CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END";
       const count = `GREATEST(0, COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.preyCards')) AS SIGNED), 0))`;
+      /* Custo é compra de store → NT-first (mesma ordem do SET acima). */
       const r = await this.run(
-        `UPDATE accounts SET coins = coins - ?, cosmetics = JSON_SET(${json}, '$.preyCards', ${count} + ?)
-         WHERE id = ? AND coins >= ? AND ${count} + ? >= 0`,
-        [cost, delta, Number(id), cost, delta]);
+        `UPDATE accounts SET
+           coins = coins - (? - LEAST(coins_nt, ?)),
+           coins_nt = coins_nt - LEAST(coins_nt, ?),
+           cosmetics = JSON_SET(${json}, '$.preyCards', ${count} + ?)
+         WHERE id = ? AND coins + coins_nt >= ? AND ${count} + ? >= 0`,
+        [cost, cost, cost, delta, Number(id), cost, delta]);
       return !!(r && r.affectedRows > 0);
     },
     /* 3º slot de prey por conta: um único UPDATE atômico — debita os
@@ -3282,9 +3372,10 @@ async function MysqlStore() {
       return rows.map(hydrateLedger);
     },
     async listAccountCoinSummaries() {
-      const rows = await this.query("SELECT id, login, coins, vip_until, role FROM accounts ORDER BY coins DESC LIMIT 500");
+      const rows = await this.query("SELECT id, login, coins, coins_nt, vip_until, role FROM accounts ORDER BY coins DESC LIMIT 500");
       return rows.map((a) => ({
         id: a.id, login: a.login, coins: Number(a.coins) || 0,
+        coinsNt: Number(a.coins_nt) || 0,
         vipUntil: Number(a.vip_until) || 0, role: a.role || "user",
       }));
     },
@@ -3415,6 +3506,13 @@ async function MysqlStore() {
       else if (data && typeof data === "object") parsed = data;
       if (parsed) { parsed.level = level; parsed.exp = exp; row.data = typeof data === "string" ? JSON.stringify(parsed) : parsed; }
       return row;
+    },
+    /* Nome é único cross-account (checagem do /api/characters). */
+    async findCharacterByName(name) {
+      const rows = await this.query(
+        "SELECT id FROM characters WHERE LOWER(name) = LOWER(?) LIMIT 1",
+        [String(name || "")]);
+      return rows[0] || null;
     },
     /* Busca cross-account para o painel admin (edição de terceiros). */
     async adminSearchCharacters(query, limit) {
@@ -6210,6 +6308,9 @@ async function ensureSchema(pool) {
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN friends MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
+  /* Non-transferable Tibia Coins: pool separado, só gastável na STORE. */
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN coins_nt INT UNSIGNED NOT NULL DEFAULT 0"); }
+  catch(e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     seller_id INT UNSIGNED NOT NULL,
@@ -6411,6 +6512,15 @@ async function getDb() {
   }
   _db = new JsonStore();
   console.log("[db] storage JSON local em", DATA_DIR);
+  /* Sem MYSQL_HOST o servidor serve o dataset de teste do JsonStore —
+   * as contas/chars reais ficam no MySQL (server/.env). Aviso alto para
+   * o caso clássico de subir `node server/server.js` da raiz (dotenv não
+   * acha server/.env e cai aqui silenciosamente). */
+  if (process.env.NODE_ENV !== "test" && !process.env.ALLOW_JSON_DB) {
+    console.warn("[db] ATENÇÃO: rodando SEM MYSQL_HOST — dataset JSON local" +
+      " (chars de teste). Para a DB principal inicie a partir de server/" +
+      " (cd server && node server.js) ou use start-idle.bat.");
+  }
   return _db;
 }
 

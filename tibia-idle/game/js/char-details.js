@@ -9,9 +9,10 @@
  *   Personagem — faixa de troca (todos os personagens da conta/roster) +
  *                atributos, skills, detalhes de combate, proteções e
  *                progressão do personagem ativo.
- *   Outfit     — prévia viva + addons/montaria/cores à esquerda e o catálogo
- *                (visual/montarias, filtros e busca) à direita, reaproveitando
- *                cycloAppearance() no modo "minimal".
+ *   Outfit     — guarda-roupa gi-*: prévia viva com rotação + toggles de
+ *                addon/montaria/cores à esquerda e catálogo próprio
+ *                (abas Visuais/Montarias, busca, cards equipado/bloqueado)
+ *                à direita, sobre os mesmos dados do cycloAppearance().
  *   Roda       — Wheel of Destiny embutida (mesmo planner do openWheelModal,
  *                mas renderizada dentro da aba).
  *   Deaths     — histórico de mortes (p.deathLog, campo protegido do save:
@@ -543,57 +544,85 @@ function chardTabOutfit(p, el) {
   const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
   const atual = typeof currentAppearance === "function" ? currentAppearance(p) : null;
   const mnt = typeof currentMount === "function" ? currentMount(p) : null;
-  const donos = atual ? ownedAddons(p, atual.id) : 0;
+  const mask = atual ? ownedAddonMask(p, atual.id) : 0;
+  const addonsAtivos = (p.outfit && p.outfit.addons) || 0;
+  if (CHARD.tab === "montarias") CHARD.outfitMode = "mount";
+  else if (!CHARD.outfitMode) CHARD.outfitMode = "outfit";
+  if (!CHARD.previewDir) CHARD.previewDir = "s";
+
+  const addonPill = (bit, label) => {
+    const ok = (mask & bit) === bit;
+    const on = (addonsAtivos & bit) === bit;
+    return `<button type="button" class="gi-toggle-pill ${on ? "is-active" : ""}"
+      data-chard-addon-bit="${bit}" ${ok ? "" : `disabled title="Desbloqueie o addon no Addoner ou na Store"`}>
+      ${on ? "✓ " : ""}${label}</button>`;
+  };
 
   el.innerHTML = `
-    <div class="chard-outfit-grid">
-      <div class="chard-outfit-side">
-        <div class="chard-sec-title">Prévia</div>
-        <div class="outfit-preview chard-outfit-preview" id="chard-outfit-preview"></div>
-        <div class="tiny dim center mt4" id="chard-outfit-name">${atual ? chardEsc(atual.nome) : "—"}${mnt ? "<br>+ " + chardEsc(mnt.nome) : ""}</div>
-        <div class="chard-sec-title">Addons</div>
-        <div class="row wrap" style="gap:4px" id="chard-outfit-addons">
-          ${[[0, "Nenhum"], [1, "Addon 1"], [2, "Addon 2"], [3, "Os dois"]]
-            .map(([n, t]) => {
-              const temAddons = atual ? (atual.addons || 0) : 0;
-              const ok = n === 0 || (n === 3 ? donos >= 2 : donos >= n);
-              return `<button class="sm ${(p.outfit.addons || 0) === n ? "primary" : ""}"
-                data-chard-addon="${n}" ${ok ? "" : "disabled"}
-                title="${ok ? "" : "Adquirido na Store"}">${t}</button>`;
-            }).join("")}
+  <div class="gi-wardrobe">
+    <aside class="gi-wardrobe-preview">
+      <div class="gi-preview-stage">
+        <div class="gi-preview-pedestal"></div>
+        <div class="gi-preview-sprite" id="chard-outfit-preview"></div>
+        <button type="button" class="gi-rotate-btn" id="chard-outfit-rotate" title="Girar personagem">↻</button>
+      </div>
+      <div class="gi-preview-identity">
+        <h3 class="gi-preview-outfit" id="chard-outfit-name">${atual ? chardEsc(atual.nome) : "—"}</h3>
+        <span class="gi-preview-mount" id="chard-mount-name">${mnt ? "+ " + chardEsc(mnt.nome) : ""}</span>
+      </div>
+      <div class="gi-control-group">
+        <span class="gi-control-label">ADDONS</span>
+        <div class="gi-addon-toggles">
+          ${addonPill(1, "Addon 1")}${addonPill(2, "Addon 2")}
         </div>
-        <div class="chard-sec-title">Montaria</div>
-        <div class="row wrap" style="gap:4px">
-          <button class="sm ${!mnt ? "primary" : ""}" data-chard-mount-off>A pé</button>
-          ${mnt ? `<span class="tiny dim" style="align-self:center">Montado em <b>${chardEsc(mnt.nome)}</b></span>` : ""}
+      </div>
+      <div class="gi-control-group">
+        <span class="gi-control-label">MONTARIA</span>
+        <div class="gi-mount-switch">
+          <button type="button" class="gi-switch-opt ${!mnt ? "is-active" : ""}" data-chard-mount-off>A pé</button>
+          <button type="button" class="gi-switch-opt ${mnt ? "is-active" : ""}" data-chard-mount-on>Montado</button>
         </div>
-        <div class="chard-sec-title">Cores</div>
-        <div class="row wrap mb4" id="chard-outfit-parts" style="gap:4px">
-          ${PARTS.map(([n, i]) => `<button class="sm ${CHARD.outfitPart === i ? "primary" : ""}" data-chard-part="${i}">${n}</button>`).join("")}
+      </div>
+      <div class="gi-control-group">
+        <div class="gi-control-head">
+          <span class="gi-control-label">CORES</span>
+          <button type="button" class="gi-random-btn" id="chard-outfit-random" title="Sortear cores das 4 partes">🎲 Random</button>
         </div>
-        <div id="chard-outfit-palette" class="outfit-palette outfit-palette-compact">
+        <div class="gi-addon-toggles" id="chard-outfit-parts" style="grid-template-columns:repeat(4,1fr)">
+          ${PARTS.map(([n, i]) => `<button type="button" class="gi-toggle-pill ${CHARD.outfitPart === i ? "is-active" : ""}" data-chard-part="${i}">${n}</button>`).join("")}
+        </div>
+        <div id="chard-outfit-palette" class="outfit-palette gi-palette">
           ${OUTFIT_PALETTE.map((c, i) =>
             `<span class="swatch ${p.outfit.colors[CHARD.outfitPart] === i ? "sel" : ""}" data-chard-color="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
         </div>
-        <button class="primary full mt8" id="chard-outfit-save">Salvar</button>
       </div>
-      <div class="chard-outfit-main">
-        <div class="row mb4" style="gap:6px;align-items:center">
-          <input id="chard-outfit-busca" placeholder="Buscar outfits ou montarias…"
-            value="${chardEsc(CHARD.outfitBusca)}" autocomplete="off" style="flex:1;min-width:0">
+      <button type="button" class="gi-wardrobe-apply" id="chard-outfit-save">Aplicar Visual</button>
+    </aside>
+    <section class="gi-wardrobe-catalog">
+      <div class="gi-catalog-toolbar">
+        <div class="gi-catalog-tabs" id="chard-cat-tabs"></div>
+        <div class="gi-catalog-search">
+          <span class="gi-search-icon">🔍</span>
+          <input type="text" id="chard-outfit-busca" placeholder="Buscar outfit ou montaria..."
+            value="${chardEsc(CHARD.outfitBusca || "")}" autocomplete="off">
         </div>
-        <div id="cyclo-content" class="chard-outfit-catalog"></div>
       </div>
-    </div>`;
+      <div class="gi-catalog-grid" id="chard-catalog-grid"></div>
+    </section>
+  </div>`;
 
   let repaintEspera = 0;
   const repaint = () => {
     const cv = (typeof AppearanceRenderer !== "undefined")
-      ? AppearanceRenderer.preview(p, "s", repaintEspera >= 10) : null;
+      ? AppearanceRenderer.preview(p, CHARD.previewDir, repaintEspera >= 10) : null;
     const box = $("#chard-outfit-preview");
     if (box) {
       if (cv) {
-        cv.style.width = "76px"; cv.style.height = "76px";
+        /* O canvas do preview é recortado pelo conteúdo (montado fica mais
+         * alto que largo) — escala proporcional pra caber inteiro na box. */
+        const s = Math.min(1.5, 110 / cv.width, 116 / cv.height);
+        cv.style.width = Math.max(1, Math.round(cv.width * s)) + "px";
+        cv.style.height = Math.max(1, Math.round(cv.height * s)) + "px";
         cv.style.imageRendering = "pixelated";
         box.innerHTML = ""; box.appendChild(cv);
       } else if (repaintEspera < 60) {
@@ -605,47 +634,130 @@ function chardTabOutfit(p, el) {
     }
     const mnt2 = typeof currentMount === "function" ? currentMount(p) : null;
     const at2 = typeof currentAppearance === "function" ? currentAppearance(p) : null;
-    const nm = $("#chard-outfit-name");
-    if (nm) nm.innerHTML = `${at2 ? chardEsc(at2.nome) : "—"}${mnt2 ? "<br>+ " + chardEsc(mnt2.nome) : ""}`;
+    const nm = $("#chard-outfit-name"), mn = $("#chard-mount-name");
+    if (nm) nm.textContent = at2 ? at2.nome : "—";
+    if (mn) mn.textContent = mnt2 ? "+ " + mnt2.nome : "";
   };
   repaint();
 
-  // catálogo (mesma tela de Aparências da Cyclopedia, sem o bloco de preview)
-  const catalog = () => {
-    const box = $("#cyclo-content");
-    if (box && typeof cycloAppearance === "function")
-      cycloAppearance(p, box, { minimal: true, ownedOnly: true });
-    chardApplyOutfitSearch();
-  };
-  // a aba decide o modo inicial do catálogo (Visuais x Montarias)
-  if (typeof CYCLO !== "undefined")
-    CYCLO.appModo = CHARD.tab === "montarias" ? "mount" : "outfit";
-  catalog();
-  // O catálogo re-renderiza sozinho (filtros, compras); re-aplica a busca.
-  if (CHARD._catalogMo) { try { CHARD._catalogMo.disconnect(); } catch (e) {} }
-  const catBox = $("#cyclo-content");
-  if (catBox && typeof MutationObserver !== "undefined") {
-    CHARD._catalogMo = new MutationObserver(() => chardApplyOutfitSearch());
-    CHARD._catalogMo.observe(catBox, { childList: true, subtree: false });
-  }
+  const refresh = () => chardRender();
 
-  // busca: filtra os cards renderizados pelo catálogo
+  /* Catálogo próprio (mesma fonte do cycloAppearance): Visuais/Montarias
+   * com contagem, cards equipado/bloqueado e pintura em lotes. */
+  const catalog = () => {
+    const modo = CHARD.outfitMode || "outfit";
+    const q = (CHARD.outfitBusca || "").trim().toLowerCase();
+    const total = {
+      outfit: appearanceCatalog(p, "owned").length,
+      mount: mountCatalog(p, "owned").length,
+    };
+    const lista = (modo === "outfit" ? appearanceCatalog(p, "owned") : mountCatalog(p, "owned"))
+      .filter((o) => !q || (o.nome || "").toLowerCase().includes(q));
+
+    const tabs = $("#chard-cat-tabs");
+    if (tabs) {
+      tabs.innerHTML = [["outfit", "Visuais", total.outfit], ["mount", "Montarias", total.mount]]
+        .map(([id, t, n]) => `<button type="button" class="gi-cat-tab ${modo === id ? "is-active" : ""}"
+          data-chard-cat="${id}">${t} <span>${n}</span></button>`).join("");
+      $$("#chard-cat-tabs [data-chard-cat]").forEach((b) =>
+        b.addEventListener("click", () => { CHARD.outfitMode = b.dataset.chardCat; catalog(); }));
+    }
+
+    const grid = $("#chard-catalog-grid");
+    if (!grid) return;
+    const at2 = typeof currentAppearance === "function" ? currentAppearance(p) : null;
+    const mn2 = typeof currentMount === "function" ? currentMount(p) : null;
+    grid.innerHTML = lista.map((o) => {
+      if (modo === "outfit") {
+        const tem = ownsOutfit(p, o.id), ads = ownedAddons(p, o.id);
+        const eq = at2 && at2.id === o.id;
+        return `<button type="button" class="gi-item-card ${eq ? "is-equipped" : ""} ${tem ? "" : "is-locked"}"
+          data-chard-pick-outfit="${o.id}" ${tem ? "" : `title="Desbloqueie no Addoner ou na Store"`}>
+          ${eq ? `<span class="gi-equipped-tag">EM USO</span>` : ""}${tem ? "" : `<span class="gi-lock-tag">🔒</span>`}
+          <div class="gi-item-sprite" data-pintar="${o.id}"><div class="tiny dim">…</div></div>
+          <span class="gi-item-name">${chardEsc(o.nome)}</span>
+          <span class="gi-item-meta ${tem && o.addons && ads >= o.addons ? "is-complete" : ""}">
+            ${tem ? (o.addons ? `addons ${ads}/${o.addons}` : "sem addon") : "Bloqueado"}</span>
+        </button>`;
+      }
+      const tem = ownsMount(p, o.id);
+      const eq = mn2 && mn2.id === o.id;
+      return `<button type="button" class="gi-item-card ${eq ? "is-equipped" : ""} ${tem ? "" : "is-locked"}"
+        data-chard-pick-mount="${o.id}" ${tem ? "" : `title="Desbloqueie no Lothar ou na Store"`}>
+        ${eq ? `<span class="gi-equipped-tag">EM USO</span>` : ""}${tem ? "" : `<span class="gi-lock-tag">🔒</span>`}
+        <div class="gi-item-sprite" data-pintar-mount="${o.id}"><div class="tiny dim">…</div></div>
+        <span class="gi-item-name">${chardEsc(o.nome)}</span>
+        <span class="gi-item-meta">${tem ? `+${o.speed} vel` : "Bloqueado"}</span>
+      </button>`;
+    }).join("") || `<div class="tiny dim" style="padding:10px;grid-column:1/-1">Nenhum resultado.</div>`;
+
+    /* Pintura em lotes (mesma técnica do cycloAppearance): colorir ~127
+     * sprites de uma vez congela a aba — 12 por frame. */
+    const alvos = grid.querySelectorAll("[data-pintar],[data-pintar-mount]");
+    const cores = (p.outfit && p.outfit.colors) ||
+      DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
+    let i = 0;
+    const lote = () => {
+      let feitos = 0;
+      while (i < alvos.length && feitos < 12) {
+        const box = alvos[i];
+        const cv = box.dataset.pintarMount
+          ? AppearanceRenderer.mount(box.dataset.pintarMount, "s", 0)
+          : AppearanceRenderer.outfit(box.dataset.pintar, 0, cores);
+        if (!cv) break;
+        cv.style.width = "52px"; cv.style.height = "52px";
+        cv.style.imageRendering = "pixelated"; cv.style.objectFit = "contain";
+        box.innerHTML = ""; box.appendChild(cv);
+        i++; feitos++;
+      }
+      if (i < alvos.length) requestAnimationFrame(lote);
+    };
+    if (alvos.length) requestAnimationFrame(lote);
+
+    grid.querySelectorAll("[data-chard-pick-outfit]").forEach((c) =>
+      c.addEventListener("click", () => {
+        const id = c.dataset.chardPickOutfit;
+        if (!ownsOutfit(p, id)) { toast("Visual bloqueado — desbloqueie no Addoner ou na Store."); return; }
+        setAppearance(p, id); save(); renderAll(); refresh();
+      }));
+    grid.querySelectorAll("[data-chard-pick-mount]").forEach((c) =>
+      c.addEventListener("click", () => {
+        const id = c.dataset.chardPickMount;
+        if (!ownsMount(p, id)) { toast("Montaria bloqueada — desbloqueie no Lothar ou na Store."); return; }
+        setMount(p, id); save(); renderAll(); refresh();
+      }));
+  };
+  catalog();
+
   const busca = $("#chard-outfit-busca");
   if (busca) busca.addEventListener("input", () => {
     CHARD.outfitBusca = busca.value;
-    chardApplyOutfitSearch();
+    catalog();
   });
 
-  const refresh = () => chardRender();
+  const rot = $("#chard-outfit-rotate");
+  if (rot) rot.addEventListener("click", () => {
+    const dirs = ["s", "w", "n", "e"];
+    CHARD.previewDir = dirs[(dirs.indexOf(CHARD.previewDir || "s") + 1) % 4];
+    repaintEspera = 0;
+    repaint();
+  });
 
-  $$("#chard-body [data-chard-addon]").forEach((b) =>
+  $$("#chard-body [data-chard-addon-bit]").forEach((b) =>
     b.addEventListener("click", () => {
-      setAddons(p, +b.dataset.chardAddon);
+      setAddons(p, addonsAtivos ^ (+b.dataset.chardAddonBit));
       save(); renderAll(); refresh();
     }));
   const off = $("#chard-body [data-chard-mount-off]");
   if (off) off.addEventListener("click", () => {
     setMount(p, null); save(); renderAll(); refresh();
+  });
+  const on = $("#chard-body [data-chard-mount-on]");
+  if (on) on.addEventListener("click", () => {
+    if (currentMount(p)) return;
+    CHARD.outfitMode = "mount";
+    catalog();
+    toast("Escolha uma montaria no catálogo.");
   });
   $$("#chard-outfit-parts [data-chard-part]").forEach((b) =>
     b.addEventListener("click", () => {
@@ -655,28 +767,24 @@ function chardTabOutfit(p, el) {
     s.addEventListener("click", () => {
       p.outfit.colors[CHARD.outfitPart] = +s.dataset.chardColor;
       save(); renderAll();
+      repaintEspera = 0;
       repaint();
       catalog();
     }));
+  const rnd = $("#chard-outfit-random");
+  if (rnd) rnd.addEventListener("click", () => {
+    p.outfit.colors = (p.outfit.colors || [0, 0, 0, 0]).map(() =>
+      Math.floor(Math.random() * OUTFIT_PALETTE.length));
+    save(); renderAll(); refresh();
+  });
   $("#chard-outfit-save").addEventListener("click", () => {
     save();
-    toast("Visual salvo!");
+    toast("Visual aplicado!");
     renderAll();
     CHARD.tab = "personagem";
     chardShell(p);
     chardRender();
     chardRefreshChars();
-  });
-}
-
-/* Esconde/mostra os cards do catálogo pelo nome (o grid é re-renderizado
- * pelo cycloAppearance a cada interação, então roda de novo depois dele). */
-function chardApplyOutfitSearch() {
-  const q = (CHARD.outfitBusca || "").trim().toLowerCase();
-  if (!q) return;
-  $$("#cyclo-content .app-card").forEach((card) => {
-    const nome = (card.querySelector(".tiny") || {}).textContent || "";
-    card.style.display = nome.toLowerCase().includes(q) ? "" : "none";
   });
 }
 
@@ -1075,6 +1183,8 @@ function chardTabDeaths(p, el) {
  * para não recolorir o sprite a cada renderStats. */
 function paintSwitchPortrait(p) {
   const box = $("#btn-switch-portrait");
+  const nm = $("#btn-switch-name");
+  if (nm && p) nm.textContent = p.name || "Personagem";
   if (!box || !p || typeof AppearanceRenderer === "undefined") return;
   const o = p.outfit || {};
   const key = [
@@ -1094,7 +1204,8 @@ function paintSwitchPortrait(p) {
     return;
   }
   delete box.dataset.espera;
-  cv.style.width = "20px"; cv.style.height = "20px";
+  cv.style.height = "26px"; cv.style.width = "auto";
+  cv.style.maxWidth = "28px";
   cv.style.imageRendering = "pixelated";
   box.innerHTML = ""; box.appendChild(cv);
   box.dataset.key = key;

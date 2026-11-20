@@ -74,6 +74,7 @@ const TEST_SERVER = process.env.TEST_SERVER === "1";
 // Verificação de e-mail por código (confirmação de conta).
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const EMAIL_VERIFY_REQUIRED = process.env.EMAIL_VERIFY_REQUIRED === "1";
+const ACCOUNT_MAX_CHARS = 4;
 const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
 const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)||120000);
 const SESSION_TTL_MS=Math.max(1000,parseInt(process.env.SESSION_TTL_MS||"86400000",10)||86400000);
@@ -887,6 +888,7 @@ function accountPublicView(acc){
   const vipUntil=Math.max(0,Math.floor(Number(acc&&acc.vip_until)||0));
   return {
     id:acc.id, login:acc.login, role:acc.role, coins:acc.coins||0,
+    coinsNt:Math.max(0,Math.floor(Number(acc.coins_nt)||0)),
     displayName:String(acc.display_name||acc.login||""),
     level:Math.max(1,Math.floor(Number(acc.level)||1)),
     email:String(acc&&acc.email||""),
@@ -1185,6 +1187,8 @@ async function createCharacter(db, body) {
   payload=payload&&typeof payload==="object"?payload:{};
   payload=sanitizeNewPlayer(Object.assign({},payload,{name}),voc);
   const existingCharacters=await db.charactersOf(acc.id);
+  if (existingCharacters.length >= ACCOUNT_MAX_CHARS)
+    return { code: 400, body: { ok: false, msg: `Limite de ${ACCOUNT_MAX_CHARS} personagens por conta.` } };
   const c = await db.createCharacter(acc.id, name, voc, 1, JSON.stringify(payload));
   payload.id=String(c.id);payload.name=c.name;payload.voc=voc;payload.level=1;
   const data=JSON.stringify(payload);

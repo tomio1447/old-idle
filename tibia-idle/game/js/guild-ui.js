@@ -84,7 +84,7 @@ function openGuildModal(view) {
   body.innerHTML = `<div class="panel-title guild-modal-title">
       <span class="guild-btn-icon" aria-hidden="true"></span>
       <span>GUILDS</span>
-      <button class="sm" id="guild-modal-back" hidden>◀ Voltar</button>
+      <button class="sm" id="guild-modal-back" hidden>◀ Voltar ao Diretório</button>
       <button class="sm" id="guild-modal-close">Fechar</button>
     </div>
     <div class="panel-body" id="guild-modal-list"></div>`;
@@ -163,15 +163,22 @@ async function loadGuildList() {
 
   const listCards = ordered.length ? ordered.map((g) => {
     const isMine = myGuild && Number(g.id) === Number(myGuild.id);
-    return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card guild-card guild-card-select${Number(g.id) === selId ? " on" : ""}"
-        data-guild-select="${g.id}">
-      <span class="mobs" aria-hidden="true">${guildIconImg(g.icon, "guild-card-icon")}</span>
-      <span class="info">
-        <span class="nm">${guildEsc(g.name)} <b>Nv ${g.level}</b>
-          ${isMine ? `<span class="guild-mine-tag">sua guild</span>` : ""}</span>
-        <span class="meta">${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
-      </span>
-      <span class="risk ${g.freeSlots > 0 ? "low" : "high"}">${g.freeSlots > 0 ? "recrutando" : "cheia"}</span>
+    const cls = ["gi-guild-card"];
+    if (isMine) cls.push("is-mine");
+    if (Number(g.id) === selId) cls.push("is-selected");
+    return `<button type="button" class="${cls.join(" ")}" data-guild-select="${g.id}">
+      <div class="gi-guild-icon-frame">${guildIconImg(g.icon)}</div>
+      <div class="gi-guild-card-info">
+        <div class="gi-guild-card-top">
+          <strong>${guildEsc(g.name)}</strong>
+          <span class="gi-lvl-pill">Nv ${g.level}</span>
+          ${isMine ? `<span class="gi-mine-badge">SUA GUILD</span>` : ""}
+        </div>
+        <span class="gi-guild-slots">${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
+      </div>
+      ${g.freeSlots > 0
+        ? `<span class="gi-recruit-badge">RECRUTANDO</span>`
+        : `<span class="gi-recruit-badge is-full">CHEIA</span>`}
     </button>`;
   }).join("") : `<div class="hunt-section-empty">Nenhuma guild criada ainda.</div>`;
 
@@ -190,23 +197,23 @@ async function loadGuildList() {
       <div class="tiny" id="guild-create-msg"></div>
     </div>` : "";
 
-  root.innerHTML = inviteHtml + `<section class="guild-section guild-browser">
-      <div class="guild-browser-left">
-        <div class="hunt-cat-title">Guilds (${ordered.length})</div>
-        <div class="guild-list-col">${listCards}</div>
-        ${myGuild ? `<button class="primary full" id="guild-open-mine">Acessar minha guild</button>` : ""}
+  root.innerHTML = inviteHtml + `<section class="guild-section gi-guild-directory">
+      <div class="gi-dir-list-col">
+        <div class="gi-section-bar"><span>GUILDS ATIVAS (${ordered.length})</span></div>
+        <div class="gi-guild-cards">${listCards}</div>
+        ${myGuild ? `<button type="button" class="gi-guild-primary-cta" id="guild-open-mine">⚔️ Acessar minha guild</button>` : ""}
         ${createHtml}
       </div>
-      <div class="guild-browser-right" id="guild-preview">
+      <aside class="gi-dir-detail-col" id="guild-preview">
         <div class="tiny dim" style="padding:12px;text-align:center">Selecione uma guild.</div>
-      </div>
+      </aside>
     </section>`;
 
   $$("#guild-modal-list [data-guild-select]").forEach((btn) => {
     btn.addEventListener("click", () => {
       GUILD_UI.selectedGuildId = Number(btn.dataset.guildSelect);
-      $$("#guild-modal-list .guild-card-select").forEach((b) =>
-        b.classList.toggle("on", Number(b.dataset.guildSelect) === GUILD_UI.selectedGuildId));
+      $$("#guild-modal-list .gi-guild-card").forEach((b) =>
+        b.classList.toggle("is-selected", Number(b.dataset.guildSelect) === GUILD_UI.selectedGuildId));
       loadGuildPreview(GUILD_UI.selectedGuildId);
     });
   });
@@ -267,30 +274,21 @@ async function loadGuildPreview(guildId) {
   }
   const g = data.guild, members = data.members || [];
   const isMine = Number(GUILD_UI.myGuildId) === Number(g.id);
-  const expHtml = guildExpBarHtml(g);
-  const memberRows = members.map((m) => {
-    const rank = m.rank;
-    return `<div class="guild-member-row">
-      <span class="guild-member-name guild-profile-link" data-char-profile="${m.character_id}">${rank === "leader" ? "👑 " : rank === "vice" ? "⭐ " : ""}${guildEsc(m.name)}</span>
-      <span class="tiny dim">${guildVocLabel(m.voc)} · Nv ${m.level}</span>
-      <span class="guild-member-rank">${GUILD_RANK_LABEL[rank] || "Membro"}</span>
-    </div>`;
-  }).join("") || `<div class="tiny dim" style="padding:6px">Sem membros.</div>`;
-  host.innerHTML = `<div class="guild-preview-head">
-      ${guildIconImg(g.icon, "guild-card-icon")}
-      <span class="guild-preview-name">
-        <b>${guildEsc(g.name)}</b>
-        <span class="tiny dim">Nível ${g.level} · ${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
-      </span>
+  const memberRows = members.map((m) => guildMemberRowHtml(m)).join("") ||
+    `<li class="gi-member-row"><span class="tiny dim">Sem membros.</span></li>`;
+  /* CTA "Acessar minha guild" fica só na coluna esquerda — aqui, para guilds
+   * de terceiros, o botão é "Ver guild completa". */
+  host.innerHTML = `<div class="gi-detail-hero">
+      <div class="gi-detail-avatar">${guildIconImg(g.icon)}</div>
+      <div class="gi-detail-meta">
+        <h3>${guildEsc(g.name)}</h3>
+        <p>Nível ${g.level} · <strong>${g.members}/${g.slots}</strong> vagas · ${g.freeSlots} livres</p>
+        ${guildExpBarHtml(g)}
+      </div>
     </div>
-    ${expHtml}
-    <div class="hunt-cat-title" style="margin-top:8px">Membros (${members.length})</div>
-    <div class="guild-member-list guild-preview-members">${memberRows}</div>
-    <div class="guild-preview-actions">
-      ${isMine
-        ? `<button class="primary full" id="guild-preview-open">Acessar minha guild</button>`
-        : `<button class="sm full" id="guild-preview-open">Ver guild completa</button>`}
-    </div>`;
+    <div class="gi-section-bar"><span>MEMBROS (${members.length})</span></div>
+    <ul class="gi-member-list">${memberRows}</ul>
+    ${isMine ? "" : `<button class="sm full gi-dir-open-btn" id="guild-preview-open">Ver guild completa</button>`}`;
   const openBtn = $("#guild-preview-open");
   if (openBtn) openBtn.addEventListener("click", () => {
     GUILD_UI.view = "detail"; GUILD_UI.guildId = Number(g.id);
@@ -307,15 +305,47 @@ async function loadGuildPreview(guildId) {
 /* ------------------------------ PAINEL DA GUILD ------------------------------ */
 function guildExpBarHtml(guild) {
   if (!guild.nextLevelExp) return `<div class="tiny dim">Nível máximo</div>`;
-  const prev = guild.exp - 0; // exp absoluta
   const base = guild.level > 1 ? (typeof GUILD_LEVEL_EXP_CLIENT !== "undefined" ?
     GUILD_LEVEL_EXP_CLIENT[guild.level - 1] : 0) : 0;
   const span = Math.max(1, guild.nextLevelExp - base);
   const pct = Math.max(0, Math.min(100, Math.floor((guild.exp - base) / span * 100)));
-  return `<div class="guild-exp-bar" title="${guild.exp}/${guild.nextLevelExp} pontos">
-    <i style="width:${pct}%"></i>
-    <span>${guild.exp} / ${guild.nextLevelExp} EXP</span>
+  return `<div class="gi-exp-track" title="${guild.exp}/${guild.nextLevelExp} pontos">
+    <div class="gi-exp-fill" style="width:${pct}%"></div>
+    <span class="gi-exp-label">${guild.exp} / ${guild.nextLevelExp} EXP</span>
   </div>`;
+}
+
+/* Badge de cargo com cor distinta (mockup gi-guild): líder ouro, vice
+ * azul-prata, membro neutro. */
+function guildRoleTag(rank) {
+  if (rank === "leader") return `<span class="gi-role-tag role-leader">Líder</span>`;
+  if (rank === "vice") return `<span class="gi-role-tag role-vice">Vice-líder</span>`;
+  return `<span class="gi-role-tag">Membro</span>`;
+}
+function guildRankIcon(rank) {
+  return rank === "leader" ? `<span class="gi-crown" title="Líder">👑</span>`
+    : rank === "vice" ? `<span class="gi-crown" title="Vice-líder">⭐</span>` : "";
+}
+/* Linha de membro padronizada (preview e painel interno). opts:
+ * {tasks:bool, actions:html} */
+function guildMemberRowHtml(m, opts) {
+  opts = opts || {};
+  const rank = m.rank || "member";
+  const cls = ["gi-member-row"];
+  if (rank === "leader") cls.push("is-leader");
+  else if (rank === "vice") cls.push("is-vice");
+  return `<li class="${cls.join(" ")}">
+    <div class="gi-member-name">
+      ${guildRankIcon(rank)}
+      <strong class="guild-profile-link" data-char-profile="${m.character_id}">${guildEsc(m.name)}</strong>
+    </div>
+    <div class="gi-member-specs">
+      <span>${guildEsc(guildVocLabel(m.voc))} · Nv ${m.level}</span>
+      ${guildRoleTag(rank)}
+      ${opts.tasks ? `<span class="gi-task-pill">${Number(m.contribution) || 0} tasks</span>` : ""}
+      ${opts.actions ? `<div class="gi-member-actions">${opts.actions}</div>` : ""}
+    </div>
+  </li>`;
 }
 
 /* Gold sempre no valor real com separador de milhar (35.000.000 gp),
@@ -497,25 +527,26 @@ async function loadGuildDetail() {
     contentHtml = `<div class="tiny dim" style="margin-bottom:6px">
       Clique no nome do personagem para ver o perfil antes de aceitar —
       líder e vice-líderes podem aceitar ou recusar.</div>
-      <div class="guild-member-list">${reqs.map((r) => `<div class="guild-req-row">
-        <span class="guild-member-name guild-profile-link" data-char-profile="${r.character_id}">${guildEsc(r.name)}</span>
-        <span class="tiny dim">${guildVocLabel(r.voc)} · Nv ${r.level}</span>
-        <span class="guild-invite-actions">
-          <button class="sm primary" data-guild-req-accept="${r.id}">Aceitar</button>
-          <button class="sm" data-guild-req-decline="${r.id}">Recusar</button>
-        </span>
-      </div>`).join("") || `<div class="hunt-section-empty">Sem solicitações pendentes.</div>`}</div>`;
+      <ul class="gi-member-list">${reqs.map((r) => `<li class="gi-member-row">
+        <div class="gi-member-name">
+          <strong class="guild-profile-link" data-char-profile="${r.character_id}">${guildEsc(r.name)}</strong>
+        </div>
+        <div class="gi-member-specs">
+          <span>${guildEsc(guildVocLabel(r.voc))} · Nv ${r.level}</span>
+          <div class="gi-member-actions">
+            <button class="gi-act-btn is-promote" data-guild-req-accept="${r.id}" title="Aceitar">✔</button>
+            <button class="gi-act-btn is-kick" data-guild-req-decline="${r.id}" title="Recusar">✕</button>
+          </div>
+        </div>
+      </li>`).join("") || `<li class="gi-member-row"><span class="tiny dim">Sem solicitações pendentes.</span></li>`}</ul>`;
   } else if (GUILD_UI.tab === "ranking") {
     const ranked = members.slice().sort((a, b) =>
       (Number(b.contribution) || 0) - (Number(a.contribution) || 0));
-    contentHtml = `<div class="guild-member-list">${ranked.map((m, i) => `
-      <div class="guild-member-row">
-        <span class="guild-member-pos">#${i + 1}</span>
-        <span class="guild-member-name guild-profile-link" data-char-profile="${m.character_id}">${guildEsc(m.name)}</span>
-        <span class="tiny dim">${guildVocLabel(m.voc)} · Nv ${m.level}</span>
-        <span class="guild-member-rank">${GUILD_RANK_LABEL[m.rank] || "Membro"}</span>
-        <span class="guild-member-contrib"><b>${Number(m.contribution) || 0}</b> tasks</span>
-      </div>`).join("") || `<div class="hunt-section-empty">Sem membros.</div>`}</div>`;
+    contentHtml = `<ul class="gi-member-list">${ranked.map((m, i) => {
+      const row = guildMemberRowHtml(m, { tasks: true });
+      return row.replace(`<div class="gi-member-name">`,
+        `<span class="gi-member-pos">#${i + 1}</span><div class="gi-member-name">`);
+    }).join("") || `<li class="gi-member-row"><span class="tiny dim">Sem membros.</span></li>`}</ul>`;
   } else if (GUILD_UI.tab === "tasks" && isMember) {
     contentHtml = `<div class="tiny dim" style="margin-bottom:6px">
       3 tasks por server save · cada task completada dá <b>+1 EXP</b> e <b>+1 GUILD POINT</b> à guild.</div>
@@ -542,31 +573,23 @@ async function loadGuildDetail() {
     contentHtml = `<div class="guild-log-host">
       <div class="tiny dim" style="padding:8px">Carregando histórico…</div></div>`;
   } else {
-    contentHtml = `<div class="guild-member-list">${members.map((m) => {
+    contentHtml = `<ul class="gi-member-list">${members.map((m) => {
       const rank = m.rank, isLeaderRow = rank === "leader", isVice = rank === "vice";
       const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
       const isSelf = acc && Number(m.account_id) === Number(acc.id);
       /* Servidor: líder promove/rebaixa/expulsa não-líderes (e rebaixa
        * outros líderes); vice só expulsa membros comuns. */
-      const actions = isLeader ? `
-        <span class="guild-member-actions">
-          ${!isLeaderRow ? `<button class="sm" data-guild-promote="${m.account_id}"
-            title="${isVice ? "Promover a líder" : "Promover a vice-líder"}">⭐</button>` : ""}
-          ${!isSelf && rank !== "member" ? `<button class="sm" data-guild-demote="${m.account_id}"
-            title="${isLeaderRow ? "Rebaixar a vice-líder" : "Rebaixar a membro"}">⬇</button>` : ""}
-          ${!isSelf && !isLeaderRow ? `<button class="sm" data-guild-kick="${m.account_id}" title="Expulsar">✖</button>` : ""}
-        </span>` : (myRank === "vice" && rank === "member" ? `
-        <span class="guild-member-actions">
-          <button class="sm" data-guild-kick="${m.account_id}" title="Expulsar">✖</button>
-        </span>` : "");
-      return `<div class="guild-member-row">
-        <span class="guild-member-name guild-profile-link" data-char-profile="${m.character_id}">${isLeaderRow ? "👑 " : isVice ? "⭐ " : ""}${guildEsc(m.name)}</span>
-        <span class="tiny dim">${guildVocLabel(m.voc)} · Nv ${m.level}</span>
-        <span class="guild-member-rank">${GUILD_RANK_LABEL[rank] || "Membro"}</span>
-        <span class="guild-member-contrib">${Number(m.contribution) || 0} tasks</span>
-        ${actions}
-      </div>`;
-    }).join("") || `<div class="hunt-section-empty">Sem membros.</div>`}</div>`;
+      const actions = isLeader
+        ? `${!isLeaderRow ? `<button class="gi-act-btn is-promote" data-guild-promote="${m.account_id}"
+            title="${isVice ? "Promover a líder" : "Promover a vice-líder"}">★</button>` : ""}
+          ${!isSelf && rank !== "member" ? `<button class="gi-act-btn" data-guild-demote="${m.account_id}"
+            title="${isLeaderRow ? "Rebaixar a vice-líder" : "Rebaixar a membro"}">▼</button>` : ""}
+          ${!isSelf && !isLeaderRow ? `<button class="gi-act-btn is-kick" data-guild-kick="${m.account_id}" title="Expulsar">✕</button>` : ""}`
+        : (myRank === "vice" && rank === "member"
+          ? `<button class="gi-act-btn is-kick" data-guild-kick="${m.account_id}" title="Expulsar">✕</button>`
+          : "");
+      return guildMemberRowHtml(m, { tasks: true, actions });
+    }).join("") || `<li class="gi-member-row"><span class="tiny dim">Sem membros.</span></li>`}</ul>`;
   }
 
   const inviteBox = canManage ? `<div class="guild-invite-box">
@@ -596,31 +619,41 @@ async function loadGuildDetail() {
   const renameCost = Number(data.renameCostCoins) || 250;
   const iconWait = (Number(g.iconAt) || 0) + iconCooldown - Date.now();
   const guildCoins = Number(g.coins) || 0;
-  const manageBox = isLeader ? `<section class="guild-section guild-manage-box">
-    <div class="hunt-cat-title">Gerenciamento</div>
-    <div class="guild-manage-row">
-      <span class="tiny">Ícone:</span>
+  const manageBox = isLeader ? `<section class="gi-manage-box">
+    <div class="gi-section-bar"><span>⚙️ GERENCIAMENTO DA GUILD</span></div>
+    <div class="gi-icon-picker-row">
+      <span class="gi-field-label">Ícone:</span>
       ${iconWait > 0
         ? `${guildIconImg(g.icon)}<span class="tiny dim">troca liberada em ${guildTimeLeft(Number(g.iconAt) + iconCooldown)}</span>`
-        : guildIconPickHtml(Math.max(1, Number(g.icon) || 1), "guild-manage-icons")}
+        : `<div class="gi-icon-grid">${guildIconPickHtml(Math.max(1, Number(g.icon) || 1), "guild-manage-icons")}</div>`}
     </div>
-    <div class="guild-manage-row">
-      <input id="guild-rename-input" maxlength="30" placeholder="Novo nome da guild" />
-      <button class="sm" id="guild-rename-btn"${guildCoins >= renameCost ? "" : " disabled"}>Renomear (${fmtFull(renameCost)} TC)</button>
+    <div class="gi-rename-row">
+      <input id="guild-rename-input" class="gi-dark-input" maxlength="30" placeholder="Novo nome da guild" />
+      <button class="gi-tc-btn" id="guild-rename-btn"${guildCoins >= renameCost ? "" : " disabled"}>Renomear (${fmtFull(renameCost)} TC)</button>
       <span class="tiny" id="guild-rename-msg"></span>
     </div>
-    <div class="tiny dim">Renomear usa ${fmtFull(renameCost)} Tibia Coins do caixa de coins da guild
-      (atual: <b>${fmtFull(guildCoins)}</b>) — membros doam na aba GUILD BALANCE.</div>
+    <p class="gi-manage-hint">Renomear usa ${fmtFull(renameCost)} Tibia Coins do caixa da guild
+      (atual: <b>${fmtFull(guildCoins)}</b>) — membros doam na aba GUILD BALANCE.</p>
   </section>` : "";
 
-  root.innerHTML = `<div class="guild-tabs">${tabs.map((tab) =>
-      `<button type="button" class="guild-tab${GUILD_UI.tab === tab.id ? " active" : ""}${tab.id === "requests" && reqs.length ? " has-pending" : ""}"
-        data-guild-tab="${tab.id}">${tab.label}</button>`).join("")}</div>
-    <section class="guild-section guild-head">
-      <div class="hunt-cat-title">${guildIconImg(g.icon)} ${guildEsc(g.name)} — Nível ${g.level}</div>
-      <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${fmtFull(Number(g.exp) || 0)} EXP${isMember ? ` · <b>${fmtFull(Number(g.points) || 0)} GP</b> · <b>${fmtFull(guildCoins)} TC</b>` : ""}</div>
+  root.innerHTML = `<nav class="gi-guild-tabs">${tabs.map((tab) =>
+      `<button type="button" class="gi-gtab${GUILD_UI.tab === tab.id ? " is-active" : ""}${tab.id === "requests" && reqs.length ? " has-pending" : ""}${tab.id === "pvp" ? " is-pvp" : ""}"
+        data-guild-tab="${tab.id}">${tab.label}</button>`).join("")}</nav>
+    <div class="gi-interior-banner">
+      <div class="gi-interior-identity">
+        <div class="gi-detail-avatar">${guildIconImg(g.icon)}</div>
+        <div>
+          <h3>${guildEsc(g.name)} — NÍVEL ${g.level}</h3>
+          <div class="gi-interior-stats">
+            <span>${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
+            <span class="gi-stat-chip">✨ ${fmtFull(Number(g.exp) || 0)} EXP</span>
+            ${isMember ? `<span class="gi-stat-chip is-gold">🪙 ${fmtFull(Number(g.points) || 0)} GP</span>
+              <span class="gi-stat-chip is-tc">💎 ${fmtFull(guildCoins)} TC</span>` : ""}
+          </div>
+        </div>
+      </div>
       ${guildExpBarHtml(g)}
-    </section>
+    </div>
     ${manageBox}
     ${contentHtml}
     ${joinBox}

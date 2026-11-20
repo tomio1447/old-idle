@@ -126,7 +126,7 @@
 
   function ensureDom() {
     if (document.getElementById("global-chat")) return;
-    const wrap = document.getElementById("scene-wrap");
+    const wrap = document.getElementById("chat-dock") || document.getElementById("scene-wrap");
     if (!wrap) return;
     const el = document.createElement("div");
     el.id = "global-chat";
@@ -136,7 +136,6 @@
       <div class="global-chat-head">
         <div class="global-chat-tabs" id="global-chat-tabs"></div>
         <button type="button" class="sm global-chat-cfg" id="global-chat-config" data-i18n="chat.config">Config</button>
-        <button type="button" class="sm global-chat-toggle" id="global-chat-toggle" title="Minimizar">▾</button>
       </div>
       <div class="global-chat-body" id="global-chat-body">
         <div class="global-chat-messages" id="global-chat-messages"></div>
@@ -203,15 +202,6 @@
       cfg._bound = true;
       cfg.addEventListener("click", openChatConfigModal);
     }
-    const toggle = document.getElementById("global-chat-toggle");
-    if (toggle && !toggle._bound) {
-      toggle._bound = true;
-      toggle.addEventListener("click", () => {
-        ChatUI.collapsed = !ChatUI.collapsed;
-        applyCollapsed();
-        savePrefs();
-      });
-    }
     const msgs = document.getElementById("global-chat-messages");
     if (msgs && !msgs._bound) {
       msgs._bound = true;
@@ -225,12 +215,11 @@
     }
   }
 
+  /* O chat dockado fica SEMPRE aberto — o botão de minimizar saiu;
+   * applyCollapsed só garante que nenhuma prefs antiga recolha o body. */
   function applyCollapsed() {
     const root = document.getElementById("global-chat");
-    const toggle = document.getElementById("global-chat-toggle");
-    if (!root) return;
-    root.classList.toggle("collapsed", !!ChatUI.collapsed);
-    if (toggle) toggle.textContent = ChatUI.collapsed ? "▸" : "▾";
+    if (root) root.classList.remove("collapsed");
   }
 
   function setChannel(id) {

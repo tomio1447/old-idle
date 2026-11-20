@@ -119,13 +119,14 @@ MOBS_LOOKTYPE = {
     "enraged-frozen-raubritter": 1885,
     "enraged-raging-raubritter": 1919,
     "enraged-energised-raubritter": 1882,
-    # Stag Bastion — Raubritters de hunt (bestiário existe mas sem
-    # looktype público → estimados do lote livre 15.20).
-    "raubritter-skirmisher": 1908,
-    "raubritter-chastener": 1920,
-    "raubritter-marksman": 1889,
-    # Arean Outskirts — Night Harpy (ave negra do lote livre — estimado).
-    "night-harpy": 1901,
+    # Stag Bastion — Raubritters de hunt: looktypes OFICIAIS do
+    # staticdata do client 15.20 (race→outfit: skirmisher 2750→1900,
+    # marksman 2751→1901, chastener 2752→1902).
+    "raubritter-skirmisher": 1900,
+    "raubritter-chastener": 1902,
+    "raubritter-marksman": 1901,
+    # Arean Outskirts — Night Harpy (race 2764 → outfit 1899 oficial).
+    "night-harpy": 1899,
 }
 
 # Bosses "lookItem": a entidade oficial aparece como objeto (cid). O sheet

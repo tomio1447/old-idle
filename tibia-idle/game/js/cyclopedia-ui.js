@@ -835,58 +835,112 @@ function cycloBossDetail(p, el, slug) {
 
 /* ---------------------------------------------------------------- charms */
 
+/* Pool da conta: charms/pontos são compartilhados. O espelho de um char
+ * NÃO ativo pode estar velho (online) — sincroniza do G.p antes de operar.
+ * Offline os accessors já leem a mesma conta (sync vira no-op barato). */
+function charmPoolSync(selP) {
+  const live = (typeof G !== "undefined" && G && G.p) ? G.p : null;
+  if (live && selP !== live) {
+    selP.charms = Object.assign({}, live.charms);
+    selP.charmPoints = live.charmPoints;
+  }
+  ensureCyclopedia(selP);
+  return selP;
+}
+
+/* Persiste assign/clear de um char que talvez NÃO seja o ativo:
+ * roster local sempre; save no servidor quando online. */
+function charmSaveChar(selP) {
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(selP);
+  if (typeof accountApiConfigured === "function" && accountApiConfigured()
+      && typeof accountSaveCharacter === "function" && typeof accountSessionToken === "function"
+      && selP !== ((typeof G !== "undefined" && G) ? G.p : null)) {
+    accountSaveCharacter(accountSessionToken(), String(selP.id), selP).catch(() => {});
+  }
+  save();
+}
+
+/* Personagem selecionado no seletor do painel de charms (default: ativo). */
+function charmSelectedChar() {
+  const chars = (typeof getCharacters === "function") ? getCharacters() : [];
+  const activeId = String(((typeof G !== "undefined" && G && G.p) ? G.p.id : "") || "");
+  let sel = chars.find((c) => String(c.id) === String(CYCLO.charmChar || ""));
+  if (!sel) sel = chars.find((c) => String(c.id) === activeId) || chars[0] || null;
+  if (sel) CYCLO.charmChar = String(sel.id);
+  return { chars: chars, selP: sel };
+}
+
 function renderCycloCharms(p, el) {
   ensureCyclopedia(p);
-  const pts = p.charmPoints || 0;
+  const { chars, selP } = charmSelectedChar();
+  const pts = p.charmPoints || 0; // pool DA CONTA (mesmo p/ todos os chars)
   const tab = CYCLO.charmTab === "minor" ? "minor" : "major";
   const sel = CYCLO.charmSel && CHARMS[CYCLO.charmSel] ? CYCLO.charmSel : null;
-  const finished = typeof bestiaryFinishedList === "function"
-    ? bestiaryFinishedList(p) : [];
+  const selRaceList = selP && typeof bestiaryFinishedList === "function"
+    ? bestiaryFinishedList(selP) : [];
   const ids = Object.keys(CHARMS).filter((id) => CHARMS[id].cat === tab);
+  const vocAbbr = (typeof otcAnalyserVocAbbr === "function") ? otcAnalyserVocAbbr : (v) => v || "";
 
   el.innerHTML = `
-    <div class="charm-otc-head">
-      <img src="assets/ui/cyclopedia/charms/icon-charms-major.png" alt="" width="18" height="18">
-      <div class="tiny dim" style="flex:1">
-        Charm points vêm dos estágios do bestiário (valores Canary por criatura).
-        Desbloqueie a runa e <b>assigne</b> a uma raça completa — igual ao Canary.
+    <div class="gi-charms-panel">
+      <div class="gi-charms-topbar">
+        <p class="gi-charms-rule">
+          Charm points vêm dos estágios do bestiário e ficam na <b>conta</b>:
+          desbloqueios valem para todos os personagens, mas cada um <b>associa
+          as próprias runas</b> às criaturas que completou no bestiário.
+        </p>
+        <div class="gi-charms-balance">
+          <span>✦</span><strong>${fmtFull(pts)}</strong><small>pts</small>
+        </div>
       </div>
-      <div class="charm-points-badge">
-        <img src="assets/ui/cyclopedia/icon_charms.png" alt="" width="14" height="14"
-             onerror="this.style.display='none'">
-        <b class="gold-txt">${fmtFull(pts)}</b>
-        <span class="tiny dim">pts</span>
+
+      <div class="gi-charms-toolbar">
+        <div class="gi-charms-subtabs">
+          ${[["major", "Major Charms"], ["minor", "Minor Charms"]]
+            .map(([t, l]) => `<button type="button" class="gi-subtab ${tab === t ? "is-active" : ""}"
+              data-charm-tab="${t}">${l}</button>`).join("")}
+        </div>
+        <div class="gi-charms-legend">
+          <span class="leg-item"><i class="dot dot-unlocked"></i> Desbloqueada</span>
+          <span class="leg-item"><i class="dot dot-assigned"></i> Associada</span>
+        </div>
       </div>
-    </div>
-    <div class="charm-tabs mb8" style="display:flex;gap:6px">
-      ${[["major", "Major Charms"], ["minor", "Minor Charms"]]
-        .map(([t, l]) => `<button class="sm charm-tab-btn ${tab === t ? "on" : ""}"
-          data-charm-tab="${t}">${l}</button>`).join("")}
-    </div>
-    <div class="charm-otc-layout">
-      <div class="charm-otc-list">
-        ${ids.map((id) => {
-          const c = CHARMS[id];
-          const tem = charmOwned(p, id);
-          const race = charmAssignedRace(p, id);
-          const mob = race && GAMEDATA.monsters[race];
-          return `<div class="charm-otc-row ${sel === id ? "active" : ""} ${tem ? "owned" : "locked"}"
-                       data-charm-sel="${id}">
-            ${charmIconHtml(id, 32)}
-            <div class="charm-otc-meta">
-              <div class="small">${c.nome}</div>
-              <div class="tiny dim">${race
-                ? `→ ${mob ? mob.name : race}`
-                : (tem ? "sem assign" : fmtFull(c.custo) + " pts")}</div>
-            </div>
-            ${race ? `<span class="charm-otc-mob">${mobImg(race, 28)}</span>` : ""}
-          </div>`;
-        }).join("") || `<div class="tiny dim">Nenhum charm nesse filtro.</div>`}
+
+      <div class="gi-charms-charbox">
+        <span class="gi-charbox-label">Aplicar em</span>
+        <select id="gi-charm-char-sel" class="gi-charm-char-sel">
+          ${chars.map((c) => `<option value="${c.id}" ${selP && String(c.id) === String(selP.id) ? "selected" : ""}>
+            ${c.name}${c.id === ((typeof G !== "undefined" && G.p) ? G.p.id : "") ? " (ativo)" : ""} · nv ${c.level || 1} ${vocAbbr(c.voc)}</option>`).join("")}
+        </select>
+        <span class="gi-charbox-hint">o bônus só vale para este personagem</span>
       </div>
-      <div class="charm-otc-detail" id="charm-detail">
-        ${sel ? cycloCharmDetail(p, sel, finished)
-              : `<div class="tiny dim" style="padding:16px;text-align:center">
-                   Selecione uma runa para desbloquear ou assignar.</div>`}
+
+      <div class="gi-charms-body">
+        <div class="gi-charms-grid">
+          ${ids.map((id) => {
+            const c = CHARMS[id];
+            const tem = selP ? charmOwned(selP, id) : false;
+            const race = selP ? charmAssignedRace(selP, id) : null;
+            const cls = ["gi-charm-card"];
+            if (sel === id) cls.push("is-selected");
+            if (race) cls.push("is-assigned");
+            else if (tem) cls.push("is-unlocked");
+            return `<button type="button" class="${cls.join(" ")}" data-charm-sel="${id}">
+              <div class="gi-charm-icon">${charmIconHtml(id, 28)}</div>
+              <div class="gi-charm-meta">
+                <span class="gi-charm-name">${c.nome}</span>
+                <span class="gi-charm-cost">${fmtFull(c.custo)} pts</span>
+                <span class="gi-charm-tag">${c.elemento ? c.elemento : c.tipo}</span>
+              </div>
+            </button>`;
+          }).join("") || `<div class="tiny dim">Nenhum charm nesse filtro.</div>`}
+        </div>
+
+        <aside class="gi-charm-inspector" id="charm-detail">
+          ${sel && selP ? cycloCharmDetail(selP, sel, selRaceList)
+            : `<div class="tiny dim" style="padding:16px;text-align:center">
+                 Selecione uma runa para desbloquear ou associar.</div>`}
+        </aside>
       </div>
     </div>`;
 
@@ -902,39 +956,44 @@ function renderCycloCharms(p, el) {
       CYCLO.charmSel = b.dataset.charmSel;
       renderCycloCharms(p, el);
     }));
+  const charSel = $("#gi-charm-char-sel");
+  if (charSel) charSel.addEventListener("change", () => {
+    CYCLO.charmChar = charSel.value;
+    renderCycloCharms(p, el);
+  });
   const raceSel = $("#charm-race-sel");
   if (raceSel) raceSel.addEventListener("change", () => {
     const prev = $("#charm-race-preview");
     if (prev && typeof mobImg === "function") prev.innerHTML = mobImg(raceSel.value, 36);
   });
-  const player = (typeof G !== "undefined" && G && G.p) ? G.p : p;
-  ensureCyclopedia(player);
+  if (!selP) return;
+  const player = charmPoolSync(selP);
   const buy = $("#charm-buy");
   if (buy) buy.addEventListener("click", () => {
     const id = cycloCharmIdFromEl(buy) || CYCLO.charmSel;
-    const r = buyCharm(player, id);
+    const r = buyCharm(player, id);   // pool da conta — debita 1x só
     if (!r.ok) { toast(r.erro); return; }
     const cid = r.id || id;
-    toast(`Charm <b>${CHARMS[cid].nome}</b> desbloqueado!`);
-    save(); renderAll(); renderCycloCharms(player, el);
+    toast(`Charm <b>${CHARMS[cid].nome}</b> desbloqueado na conta!`);
+    charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
   });
   const clr = $("#charm-clear");
   if (clr) clr.addEventListener("click", () => {
     const id = cycloCharmIdFromEl(clr) || CYCLO.charmSel;
-    const r = clearCharm(player, id);
+    const r = clearCharm(player, id);   // assign é por personagem
     if (!r.ok) { toast(r.erro); return; }
-    toast("Runa removida da criatura.");
-    save(); renderAll(); renderCycloCharms(player, el);
+    toast(`Runa removida da criatura para <b>${player.name}</b>.`);
+    charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
   });
   const asg = $("#charm-assign");
   if (asg) asg.addEventListener("click", () => {
     const selEl = $("#charm-race-sel");
     const slug = selEl && selEl.value;
     const id = cycloCharmIdFromEl(asg) || CYCLO.charmSel;
-    const r = assignCharm(player, id, slug);
+    const r = assignCharm(player, id, slug);  // grava só no charmRace DESTE char
     if (!r.ok) { toast(r.erro); return; }
-    toast(`Runa assignada a <b>${GAMEDATA.monsters[slug].name}</b>.`);
-    save(); renderAll(); renderCycloCharms(player, el);
+    toast(`Runa associada a <b>${GAMEDATA.monsters[slug].name}</b> para <b>${player.name}</b>.`);
+    charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
   });
 }
 
@@ -946,47 +1005,43 @@ function cycloCharmDetail(p, id, finished) {
   const opts = finished.map((s) => {
     const taken = charmOnRace(p, s);
     const dis = taken && taken !== id ? "disabled" : "";
-    const sel = race === s ? "selected" : "";
-    return `<option value="${s}" ${sel} ${dis}>${GAMEDATA.monsters[s].name}${
+    const selOpt = race === s ? "selected" : "";
+    return `<option value="${s}" ${selOpt} ${dis}>${GAMEDATA.monsters[s].name}${
       taken && taken !== id ? " (ocupada)" : ""}</option>`;
   }).join("");
   return `
-    <div class="charm-detail-head">
-      ${charmIconHtml(id, 48)}
+    <div class="gi-inspector-head">
+      <div class="gi-inspector-thumb">${charmIconHtml(id, 32)}</div>
       <div>
-        <div class="small" style="color:#d4af37">${c.nome}</div>
-        <div class="tiny dim">${c.cat} · ${c.tipo}</div>
+        <h4 class="gi-inspector-title">${c.nome}</h4>
+        <span class="gi-inspector-sub">Custo: <strong>${fmtFull(c.custo)} pts</strong> · ${c.cat} · ${c.elemento || c.tipo}</span>
       </div>
     </div>
-    <div class="tiny" style="line-height:1.45;margin:8px 0">${c.desc}</div>
-    ${c.chance != null ? `<div class="tiny dim">Chance (tier 1): <b>${c.chance}%</b></div>` : ""}
-    ${c.percent != null ? `<div class="tiny dim">Efeito: <b>${c.percent}%</b></div>` : ""}
-    <div class="tiny dim mb8">Custo: <b class="gold-txt">${fmtFull(c.custo)}</b> charm points</div>
-    ${!tem
-      ? `<button class="primary sm" id="charm-buy" data-charm-id="${id}"
-           ${pode ? "" : "disabled"}>${pode ? "Desbloquear" : "Pontos insuficientes"}</button>`
-      : `<div class="tiny" style="color:#9ce84a;margin-bottom:6px">Desbloqueado</div>
-         ${race
-           ? `<div class="charm-assign-box" style="border:1px solid #3a3324;border-radius:4px;padding:8px;margin-bottom:6px">
-                <div class="tiny dim mb4">Criatura assignada:</div>
-                <div class="row" style="gap:8px;align-items:center">
-                  ${mobImg(race, 36)}
-                  <div class="tiny"><b>${GAMEDATA.monsters[race].name}</b></div>
-                </div>
-                <button class="sm mt8" id="charm-clear" data-charm-id="${id}">Remover assign</button>
-              </div>`
-           : (finished.length
-              ? `<div class="charm-assign-box" style="border:1px solid #3a3324;border-radius:4px;padding:8px;margin-bottom:6px">
-                   <div class="tiny dim mb4">Assignar a uma criatura (bestiário completo):</div>
-                   <div class="row" style="gap:8px;align-items:center">
-                     <span id="charm-race-preview">${race ? mobImg(race, 36) : mobImg(finished[0], 36)}</span>
-                     <select id="charm-race-sel" class="charm-race-sel" style="flex:1">${opts}</select>
-                   </div>
-                   <button class="primary sm mt8" id="charm-assign" data-charm-id="${id}">
-                     Assignar runa</button>
-                 </div>`
-              : `<div class="tiny dim">Complete o bestiário de uma criatura para assignar.</div>`)}`
-    }`;
+    <p class="gi-inspector-desc">${c.desc}</p>
+    ${c.chance != null ? `<div class="gi-inspector-sub">Chance (tier 1): <b>${c.chance}%</b></div>` : ""}
+    ${c.percent != null ? `<div class="gi-inspector-sub">Efeito: <b>${c.percent}%</b></div>` : ""}
+    <div class="gi-assigned-box">
+      <span class="gi-assigned-label">Criatura Associada (${p.name || "—"})</span>
+      ${race
+        ? `<strong class="gi-assigned-value gi-assigned-mob">
+             ${mobImg(race, 28)} ${GAMEDATA.monsters[race].name}</strong>`
+        : `<strong class="gi-assigned-value">Nenhuma criatura selecionada</strong>`}
+    </div>
+    <div class="gi-inspector-actions">
+      ${!tem
+        ? `<button type="button" class="gi-btn-unlock" id="charm-buy" data-charm-id="${id}"
+             ${pode ? "" : "disabled"}>Desbloquear (${fmtFull(c.custo)} pts)</button>`
+        : (race
+          ? `<button type="button" class="gi-btn-assign" id="charm-clear" data-charm-id="${id}">Remover associação</button>`
+          : (finished.length
+            ? `<div class="gi-assign-row">
+                 <span id="charm-race-preview">${mobImg(finished[0], 36)}</span>
+                 <select id="charm-race-sel" class="gi-charm-race-sel">${opts}</select>
+               </div>
+               <button type="button" class="gi-btn-assign" id="charm-assign" data-charm-id="${id}">
+                 Associar Criatura</button>`
+            : `<div class="tiny dim">Complete o bestiário de uma criatura com este personagem para associar.</div>`))}
+    </div>`;
 }
 
 /* ------------------------------------------------------------------ hunts */
