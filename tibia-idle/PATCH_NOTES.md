@@ -4,6 +4,39 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Unhallowed Crypt — nova hunt 400+ (update 15.20)
+
+### Hunt
+
+- **Unhallowed Crypt** (HUNTS 400+): mapa oficial OTBM 34×27 z=7
+  (bounds 1009–1042 × 1016–1042), centermap {1027,1030,7}, zona de
+  spawn {1021,1028}→{1030,1034} 10×7 = 60 sqm conectados, respawn de
+  **8 a 12 monstros por onda**.
+
+### Monstros (fichas oficiais TibiaWiki/tibia.gg)
+
+- **Creepy Crawler** — 27.000 hp / 22.380 exp, armor 100, mit 6.60,
+  speed 260, raceId 2763, looktype 1890. Ability oficial **Fear (2s)**
+  (mesmo modelo do Soul War: condição no cliente, fx no servidor).
+- **Crypt Construct** — 25.000 hp / 19.730 exp, armor 100, mit 5.36,
+  speed 240, raceId 2760, looktype 1887. **Area Healing oficial**
+  10.000–13.250 (uncommon) como defSkill de cura.
+- **Crypt Fiend** — 30.000 hp / 19.070 exp, armor 140, mit 4.39,
+  speed 240, raceId 2758, looktype 1885, som oficial "Uhhh!".
+- Todas: Skeletons/Undead **Challenging** (200/2.000/5.000 → 100
+  charms), melee, paraimmune + veem invisível, sprites 9×4 reais
+  (4 direções) renderizadas do DAT convertido.
+
+### Itens novos (7, cids do update 15.20)
+
+- amber 20.000 · necromantic-core 10.000 · giant-tusk 6.000 ·
+  toe-nails 4.500 · crystallized-death 3.000 ·
+  cluster-of-crystallized-death 9.000 (Yasir)
+- **fetid-heart: sell 0** — item de quest (5 Ancestral Charges), sem
+  comprador NPC oficial.
+
+---
+
 ## 2026-11-20 — Prey Cards: seleção paga de criatura + 3º slot na Store
 
 ### Prey
