@@ -1,0 +1,380 @@
+/* Regressão: The Roost of the Graveborn Quest — boss quest 450+
+ * (update 15.20).
+ *
+ * Progressão oficial (wikitext TibiaWiki/Fandom):
+ *   M1 — 5.000 kills na Unhallowed Crypt → acesso ao Adventurer Group
+ *   M2 — cadeia sequencial: Adventurer Group (The First Dragon,
+ *        first_dragon.otbm) → Eldritch Dragon Lord (Under Fire,
+ *        eldritch_dl.otbm) → Ice Horror (The Frozen Hoard,
+ *        ice_horror.otbm) → The Gravedigger (The Last Dragon Soul,
+ *        gravedigger.otbm) → libera Bonelord's Phylactery
+ *        (bonelords_phylactery.otbm)
+ *   M3 — derrotar a Phylactery → 1 de cada Crypt Rune (auto-resgate)
+ *
+ * NPC Dragon Ancestor Spirit (Draconia): troca 1 de cada Crypt Rune
+ * por 1 arma Crypt aleatória — roleta gif igual à do Make Believe,
+ * pesos oficiais: spine 82 / slicer 79 / bile 76 / strike 75 /
+ * splitter 73 / breaker 69 / jaw 64.
+ *
+ * Bosses (fichas oficiais): eldritch-dl race 2739 lt 1879 exp 750k,
+ * ice-horror race 2733 lt 1881 hp 542.700 exp 259.000 (ice 0%, heal
+ * 0%), gravedigger race 2721 lt 1880 exp 750k, adventurer-group race
+ * 2773 lookItem 52836, phylactery race 2771 lookItem 52831 exp 1M
+ * earth 110%. Cooldown 20h todos. HPs ocultos oficialmente —
+ * estimados (adventurer 520k, eldritch 680k, gravedigger 720k,
+ * phylactery 850k).
+ */
+"use strict";
+const fs = require("fs"), path = require("path"), vm = require("vm");
+const game = path.join(__dirname, "..", "game");
+const js = path.join(game, "js");
+function must(v, m) { if (!v) throw Error(m); }
+
+const engine = require("../server/authoritative_engine.js");
+const OTBM = require(path.join(js, "otbm.js"));
+const roost = require("../game/js/roost-graveborn.js");
+
+/* ---------------- dados do cliente (vm, ordem do index) ---------------- */
+const ctx = { window: {}, console, Math, Date, Map, Set, document: undefined };
+ctx.window = ctx;
+vm.createContext(ctx);
+for (const f of ["gamedata.js", "monsterdata.js", "mobsheetdata.js", "monsters.js",
+                 "weapondata.js", "weapons.js", "yasir-prices.js", "tileflags.js"])
+  vm.runInContext(fs.readFileSync(path.join(js, f), "utf8"), ctx, { filename: f });
+vm.runInContext("GAMEDATA=window.GAMEDATA;", ctx);
+/* Stubs das coleções que vivem em game.js/city.js/city-ui.js (DOM) — o
+ * módulo escreve nelas via referência. */
+vm.runInContext(
+  "var MISSION_DEFS={},QUEST_DEFS={},BOSS_DEFS={},NPCS={},BOSS_MODAL_SECTIONS=[];" +
+  "var NPC_MODAL_CATALOG=[],MONSTERDATA=window.MONSTERDATA||{};", ctx);
+vm.runInContext(fs.readFileSync(path.join(js, "roost-graveborn.js"), "utf8"),
+  ctx, { filename: "roost-graveborn.js" });
+
+const M = ctx.GAMEDATA.monsters;
+const BOSSES = ["adventurer-group", "eldritch-dragon-lord", "ice-horror",
+  "the-gravedigger", "bonelords-phylactery"];
+
+/* ---------------- boss rooms + gating sequencial ---------------- */
+for (const id of BOSSES) {
+  const mon = M[id];
+  must(mon, id + ": monstro ausente no GAMEDATA.monsters");
+  const b = ctx.BOSS_DEFS[id];
+  must(b, id + ": BOSS_DEFS ausente");
+  must(b.hunt === id + "-room" && b.baseMonster === id && b.sprite === id,
+    id + ": BOSS_DEFS hunt/baseMonster/sprite divergentes");
+  must(b.requirement && b.requirement.level === 450 && b.requirement.enforced,
+    id + ": requirement level 450 enforced ausente");
+  must(b.cooldown === 20 * 60 * 60 * 1000, id + ": cooldown deve ser 20h");
+  const room = ctx.GAMEDATA.hunts[id + "-room"];
+  must(room && room.hidden && room.pack === 1 && room.cat === "boss-room",
+    id + "-room: hunt técnica ausente");
+  must(room.monsters.length === 1 && room.monsters[0] === id,
+    id + "-room: monsters divergentes");
+}
+/* Missão 1 e cadeia. */
+must(ctx.BOSS_DEFS["adventurer-group"].requirement.mission === "unhallowed-crypt" &&
+  ctx.BOSS_DEFS["adventurer-group"].requirement.access === "adventurer-group",
+  "adventurer-group deve pedir a missão unhallowed-crypt");
+must(JSON.stringify(ctx.BOSS_DEFS["eldritch-dragon-lord"].requirement.killsRequired) ===
+  '["adventurer-group"]', "eldritch deve exigir adventurer-group");
+must(JSON.stringify(ctx.BOSS_DEFS["ice-horror"].requirement.killsRequired) ===
+  '["eldritch-dragon-lord"]', "ice-horror deve exigir eldritch");
+must(JSON.stringify(ctx.BOSS_DEFS["the-gravedigger"].requirement.killsRequired) ===
+  '["ice-horror"]', "gravedigger deve exigir ice-horror");
+must(JSON.stringify(ctx.BOSS_DEFS["bonelords-phylactery"].requirement.killsRequired) ===
+  '["adventurer-group","eldritch-dragon-lord","ice-horror","the-gravedigger"]',
+  "phylactery deve exigir os 4 bosses");
+
+const mission = ctx.MISSION_DEFS["unhallowed-crypt"];
+must(mission && mission.tasks.length === 1 &&
+  mission.tasks[0].counter === "kills" && mission.tasks[0].target === 5000,
+  "Missão unhallowed-crypt deve pedir 5000 kills");
+must(mission.completeReward && mission.completeReward.bossAccess === "adventurer-group",
+  "Missão deve liberar o Adventurer Group");
+
+must(ctx.QUEST_DEFS["roost-of-the-graveborn-quest"] &&
+  ctx.QUEST_DEFS["roost-of-the-graveborn-quest"].level === 450 &&
+  typeof ctx.QUEST_DEFS["roost-of-the-graveborn-quest"].renderDetail === "function",
+  "QUEST_DEFS da Roost ausente");
+const sect = ctx.BOSS_MODAL_SECTIONS.find((s) => /GRAVEBORN/.test(s.title));
+must(sect && sect.minLevel === 450 &&
+  JSON.stringify(sect.ids) === JSON.stringify(BOSSES),
+  "seção GRAVEBORN 450+ ausente/ordenada errada");
+
+/* ---------------- NPC Dragon Ancestor Spirit ---------------- */
+must(ctx.NPCS["dragon-ancestor-spirit"] &&
+  ctx.NPCS["dragon-ancestor-spirit"].type === "crypt-exchange",
+  "NPC dragon-ancestor-spirit ausente/type errado");
+must(ctx.NPC_MODAL_CATALOG.some((e) => e.shop === "dragon-ancestor-spirit"),
+  "NPC fora do catálogo do modal");
+const cui = fs.readFileSync(path.join(js, "city-ui.js"), "utf8");
+must((cui.match(/case "crypt-exchange":/g) || []).length === 2,
+  "city-ui.js deve despachar crypt-exchange nos 2 switches");
+must(cui.includes("roostBindExchange"), "bindNpc sem wiring crypt-exchange");
+must(fs.existsSync(path.join(game, "assets", "npc", "dragon-ancestor-spirit_s.png")),
+  "portrait do NPC ausente");
+
+/* ---------------- runas + armas: tabela da roleta ---------------- */
+const RUNES = ["fiery-crypt-rune", "icy-crypt-rune", "deathly-crypt-rune",
+  "ancient-crypt-rune", "necromantic-crypt-rune"];
+const WEAPONS = { "crypt-spine": 82, "crypt-slicer": 79, "crypt-bile": 76,
+  "crypt-strike": 75, "crypt-splitter": 73, "crypt-breaker": 69, "crypt-jaw": 64 };
+const WEAPON_CIDS = { "crypt-spine": 52332, "crypt-splitter": 52333,
+  "crypt-breaker": 52334, "crypt-strike": 52335, "crypt-bile": 52336,
+  "crypt-jaw": 52337, "crypt-slicer": 52338 };
+const RUNE_CIDS = { "fiery-crypt-rune": 52657, "icy-crypt-rune": 52658,
+  "deathly-crypt-rune": 52659, "ancient-crypt-rune": 52660,
+  "necromantic-crypt-rune": 52661 };
+const NEW_LOOT = { "worn-guide-book": [52710, 250000], "golden-claw": [52711, 250000],
+  "shrunken-head": [52712, 250000], "ancient-scales": [52713, 400000],
+  "soul-trap": [52714, 250000], "skull-tendril": [52715, 650000],
+  "bone-spikes": [52717, 1500000], "icy-scales": [52726, 250000],
+  "icy-horns": [52727, 250000], "frozen-crapace": [52728, 500000],
+  "dragon-tongue": [24938, 550], "shard": [7290, 2000] };
+
+const pctSum = roost.CRYPT_WEAPONS.reduce((s, w) => s + w.pct, 0);
+must(Math.abs(pctSum - 100.1) < 0.05 && roost.CRYPT_WEAPONS.length === 7,
+  "percentuais da roleta devem somar ~100 (7 armas)");
+for (const w of roost.CRYPT_WEAPONS)
+  must(WEAPONS[w.slug] === w.qty, w.slug + ": qty oficial divergente");
+
+/* Distribuição da roleta — 40k giros: cada arma aparece; spine é o mais
+ * frequente; jaw o menos. */
+{
+  const n = 40000, hits = {};
+  const rnd = vm.runInContext("Math.random", ctx) || Math.random;
+  for (let i = 0; i < n; i++) { const s = roost.roostRollWeapon(); hits[s] = (hits[s] || 0) + 1; }
+  for (const slug of Object.keys(WEAPONS))
+    must((hits[slug] || 0) > n * 0.10, slug + ": roleta quase nunca sorteia");
+  const sorted = Object.entries(hits).sort((a, b) => b[1] - a[1]);
+  must(sorted[0][0] === "crypt-spine" && sorted[6][0] === "crypt-jaw",
+    "distribuição da roleta invertida: " + JSON.stringify(sorted));
+}
+
+/* Itens: catálogo cliente + paridade servidor + ícone. */
+const catalog = { console }; catalog.window = catalog; vm.createContext(catalog);
+for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js",
+  "core.js", "accessorydata.js", "supply-stash-data.js", "supplydata.js", "supplies.js",
+  "yasir-prices.js", "hardcore-library.js", "hard-hunts.js", "magma-bubble.js", "gnomprona.js",
+  "falcon-bastion.js", "deathlings-sunken-temple.js",
+  "azzilon-castle.js", "bloodrotten.js", "glooth-cave.js", "buried-cathedral.js",
+  "buster-darashia.js", "urmahlullu.js", "bashmuul-issavi.js", "true-asuras.js",
+  "mimar-haffar.js", "moonstone-castle.js", "radiant-skyhold.js", "book-world.js",
+  "sir-leonard.js", "norcferatus-fortress.js", "unhallowed-crypt.js",
+  "roost-graveborn.js"]) {
+  vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), catalog, { filename: file });
+  if (file === "weapons.js") vm.runInContext("fundirWeaponData()", catalog);
+}
+const E = engine;
+const checkItem = (slug, cid, sell) => {
+  const client = catalog.GAMEDATA.items[slug], server = E.ITEMS[slug];
+  must(client && server, slug + ": ausente no cliente ou no servidor");
+  const cId = client.cid !== undefined ? client.cid : client.id;
+  const sId = server.cid !== undefined ? server.cid : server.id;
+  must(cId === cid && sId === cid, slug + ": cid divergente (" + cid + ")");
+  must(Number(client.sell) === sell && Number(server.sell) === sell,
+    slug + ": preço divergente (" + sell + ")");
+  must(fs.existsSync(path.join(game, "assets", "item", slug + ".png")),
+    slug + ": ícone ausente");
+};
+for (const slug of Object.keys(WEAPON_CIDS)) checkItem(slug, WEAPON_CIDS[slug], 0);
+for (const slug of Object.keys(RUNE_CIDS)) checkItem(slug, RUNE_CIDS[slug], 0);
+for (const slug of Object.keys(NEW_LOOT)) checkItem(slug, NEW_LOOT[slug][0], NEW_LOOT[slug][1]);
+/* stats oficiais das armas */
+{
+  const it = catalog.GAMEDATA.items;
+  must(it["crypt-slicer"].atk === 58 && it["crypt-slicer"].def === 33 &&
+    it["crypt-slicer"].sword === 4 && it["crypt-slicer"].lvl === 450 &&
+    it["crypt-slicer"].vocs[0] === "knight" && it["crypt-slicer"].th === 1,
+    "crypt-slicer stats divergentes");
+  must(it["crypt-spine"].atk === 8 && it["crypt-spine"].hit === 5 &&
+    it["crypt-spine"].range === 6 && it["crypt-spine"].dist === 3 &&
+    it["crypt-spine"].res.ice === 5 && it["crypt-spine"].vocs[0] === "paladin",
+    "crypt-spine stats divergentes");
+  must(it["crypt-bile"].dmgMin === 85 && it["crypt-bile"].dmgMax === 135 &&
+    it["crypt-bile"].mag === 4 && it["crypt-bile"].range === 7 &&
+    it["crypt-bile"].vocs[0] === "sorcerer", "crypt-bile stats divergentes");
+  must(it["crypt-jaw"].res.energy === 6 && it["crypt-jaw"].vocs[0] === "druid",
+    "crypt-jaw stats divergentes");
+  must(it["crypt-strike"].fist === 4 && it["crypt-strike"].mag === 1 &&
+    it["crypt-strike"].vocs[0] === "monk", "crypt-strike stats divergentes");
+  must(it["crypt-splitter"].axe === 4 && it["crypt-breaker"].club === 4,
+    "crypt-splitter/breaker skills divergentes");
+}
+/* Todos os drops dos bosses existem no catálogo. */
+const known = new Set(Object.keys(catalog.GAMEDATA.items)
+  .concat(Object.keys(catalog.AMMODATA ? catalog.AMMODATA.ammo || {} : {})));
+for (const slug of BOSSES)
+  for (const l of M[slug].loot)
+    must(known.has(l.item), slug + ": drop fora do catálogo: " + l.item);
+/* Runa certa dropa no boss certo (rare oficial). */
+must(M["eldritch-dragon-lord"].loot.some((l) => l.item === "fiery-crypt-rune"),
+  "eldritch sem fiery-crypt-rune");
+must(M["ice-horror"].loot.some((l) => l.item === "icy-crypt-rune"),
+  "ice-horror sem icy-crypt-rune");
+must(M["the-gravedigger"].loot.some((l) => l.item === "deathly-crypt-rune"),
+  "gravedigger sem deathly-crypt-rune");
+must(M["bonelords-phylactery"].loot.some((l) => l.item === "necromantic-crypt-rune"),
+  "phylactery sem necromantic-crypt-rune");
+must(M["adventurer-group"].loot.some((l) => l.item === "ancient-crypt-rune") &&
+  M["adventurer-group"].loot.some((l) => l.item === "worn-guide-book"),
+  "adventurer-group (loot do Fatal Bug) sem ancient-crypt-rune/worn-guide-book");
+
+/* Fichas oficiais. */
+must(M["ice-horror"].hp === 542700 && M["ice-horror"].exp === 259000 &&
+  M["ice-horror"].raceId === 2733 && M["ice-horror"].resist.ice === 100,
+  "ice-horror ficha divergente");
+must(M["ice-horror"].skills.some((s) => s.el === "death" && s.min === 950) &&
+  M["ice-horror"].skills.some((s) => s.el === "energy" && s.min === 1300),
+  "ice-horror sem Death Ring 950+ / Great Energy Wave 1300+");
+must(M["eldritch-dragon-lord"].exp === 750000 && M["eldritch-dragon-lord"].raceId === 2739 &&
+  M["eldritch-dragon-lord"].resist.fire === 100, "eldritch ficha divergente");
+must(M["the-gravedigger"].raceId === 2721 && M["the-gravedigger"].exp === 750000 &&
+  M["the-gravedigger"].skills.some((s) => s.el === "fire" && s.min === 600 && s.max === 800),
+  "gravedigger sem Fire Ball 600-800");
+must(M["bonelords-phylactery"].exp === 1000000 && M["bonelords-phylactery"].resist.earth === -10,
+  "phylactery ficha divergente");
+must(M["adventurer-group"].raceId === 2773 && M["adventurer-group"].lookItem === 52836 &&
+  M["bonelords-phylactery"].lookItem === 52831, "lookItems divergentes");
+
+/* ---------------- sprites ---------------- */
+for (const slug of BOSSES) {
+  const sheet = ctx.MOBSHEETS[slug];
+  must(sheet && sheet.rows === 4 && sheet.cols === 9,
+    slug + ": MOBSHEETS ausente/9x4 divergente");
+  const png = fs.readFileSync(path.join(game, "assets", "mob", slug + ".png"));
+  must(png.readUInt32BE(16) === sheet.cw * sheet.cols &&
+    png.readUInt32BE(20) === sheet.ch * sheet.rows,
+    slug + ": dimensões do PNG não batem com o MOBSHEETS");
+}
+const caCtx = { console }; caCtx.window = caCtx; vm.createContext(caCtx);
+vm.runInContext(fs.readFileSync(path.join(js, "creatureanchordata.js"), "utf8"), caCtx);
+for (const slug of ["eldritch-dragon-lord", "the-gravedigger", "ice-horror"])
+  must(caCtx.CREATURE_ANCHORS && caCtx.CREATURE_ANCHORS[slug],
+    slug + ": âncora CREATURE_ANCHORS ausente");
+
+/* ---------------- engine ---------------- */
+for (const slug of BOSSES) {
+  must(E.MONSTERS[slug], "engine: " + slug + " ausente do MONSTERS");
+  const eh = E.HUNTS[slug + "-room"];
+  must(eh && eh.monsters.length === 1 && eh.monsters[0] === slug,
+    "engine: " + slug + "-room ausente");
+}
+const engineSrc = fs.readFileSync(path.join(__dirname, "..", "server", "authoritative_engine.js"), "utf8");
+must(engineSrc.includes('"roost-graveborn.js"'),
+  "engine não carrega roost-graveborn.js no sandbox de itens");
+must(engineSrc.includes('require("../game/js/roost-graveborn.js")'),
+  "engine sem require/registerMonsters do patch");
+
+/* ---------------- OTBMs: bounds, spawns, caminhabilidade ---------------- */
+const tfCtx = { console }; tfCtx.window = tfCtx; vm.createContext(tfCtx);
+vm.runInContext(fs.readFileSync(path.join(js, "tileflags.js"), "utf8"), tfCtx);
+const TILEFLAGS = tfCtx.TILEFLAGS || {};
+const MAPS = [
+  ["adventurer-group", "first_dragon.otbm", "first_dragon.otbm"],
+  ["ice-horror", "ice_horror.otbm", "ice_horror.otbm"],
+  ["eldritch-dragon-lord", "bossesroom/eldritch_dl.otbm", "eldritch_dl.otbm"],
+  ["the-gravedigger", "bossesroom/gravedigger.otbm", "gravedigger.otbm"],
+  ["bonelords-phylactery", "bossesroom/bonelords_phylactery.otbm", "bonelords_phylactery.otbm"],
+];
+for (const [bossId, betaRel, mapName] of MAPS) {
+  const runtime = path.join(game, "maps", mapName);
+  const beta = path.join(game, "beta-maps", betaRel);
+  must(fs.existsSync(runtime), mapName + " não publicado");
+  must(fs.existsSync(beta), "beta ausente: " + betaRel);
+  must(fs.readFileSync(runtime).equals(fs.readFileSync(beta)),
+    mapName + ": runtime diverge do beta");
+  const buf = fs.readFileSync(runtime);
+  const map = OTBM.read(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), { z: 7 });
+  must(map.z === 7 && map.w > 10 && map.h > 10, mapName + ": mapa 1x1/piso errado");
+  const room = roost.ROOST_ROOMS[bossId];
+  must(map.sourceBounds &&
+    room.spawn.x >= map.sourceBounds.minX && room.spawn.x <= map.sourceBounds.maxX &&
+    room.spawn.y >= map.sourceBounds.minY && room.spawn.y <= map.sourceBounds.maxY &&
+    room.boss.x >= map.sourceBounds.minX && room.boss.x <= map.sourceBounds.maxX &&
+    room.boss.y >= map.sourceBounds.minY && room.boss.y <= map.sourceBounds.maxY,
+    bossId + ": spawn/boss fora dos bounds");
+  /* zones absolutas → locais (espelho do applyHuntOtbmZones). */
+  map.spawn = { x: room.spawn.x - map.sourceBounds.minX, y: room.spawn.y - map.sourceBounds.minY };
+  map.mob = [{ x: room.boss.x - map.sourceBounds.minX, y: room.boss.y - map.sourceBounds.minY, w: 1, h: 1 }];
+  const hm = OTBM.huntMapFromOtbm(map, TILEFLAGS);
+  const walk = (ax, ay) => {
+    const x = ax - map.sourceBounds.minX, y = ay - map.sourceBounds.minY;
+    if (x < 0 || y < 0 || x >= map.w || y >= map.h) return false;
+    const e = hm.leg[hm.rows[y][x]];
+    return !!(e && !e.bloc && !hm.footprintBlocked[x + ":" + y]);
+  };
+  must(walk(room.spawn.x, room.spawn.y), bossId + ": playerspawn bloqueado");
+  must(walk(room.boss.x, room.boss.y), bossId + ": bossspawn bloqueado");
+  const sep = Math.max(Math.abs(room.spawn.x - room.boss.x), Math.abs(room.spawn.y - room.boss.y));
+  must(sep >= 4, bossId + ": spawn/boss colados (" + sep + " sqm)");
+  /* Conectividade: spawn alcança boss. */
+  const W = hm.rows[0].length, H = hm.rows.length;
+  const sx = room.spawn.x - map.sourceBounds.minX, sy = room.spawn.y - map.sourceBounds.minY;
+  const seen = {}; seen[sx + "," + sy] = 1;
+  const q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.pop();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = nx + "," + ny;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen[k]) continue;
+      const e = hm.leg[hm.rows[ny][nx]];
+      if ((e && e.bloc) || hm.footprintBlocked[nx + ":" + ny]) continue;
+      seen[k] = 1; q.push([nx, ny]);
+    }
+  }
+  const bx = room.boss.x - map.sourceBounds.minX, by = room.boss.y - map.sourceBounds.minY;
+  must(seen[bx + "," + by], bossId + ": bossspawn inalcançável a partir do playerspawn");
+  /* Tiles: todos têm sprite + catálogo RME. */
+  const used = new Set();
+  Object.values(map.cells).forEach((c) => {
+    if (c.g) used.add(c.g); (c.items || []).forEach((id) => used.add(id));
+  });
+  const missingPng = [...used].filter((id) =>
+    !fs.existsSync(path.join(game, "assets", "tiles", id + ".png")));
+  must(missingPng.length === 0, mapName + ": tiles sem sprite: " + missingPng.join(","));
+}
+const rmeCtx = { window: {} }; rmeCtx.window = rmeCtx; vm.createContext(rmeCtx);
+vm.runInContext(fs.readFileSync(path.join(game, "rme", "data", "known_tiles.js"), "utf8"), rmeCtx);
+for (const [, , mapName] of MAPS) {
+  const buf = fs.readFileSync(path.join(game, "maps", mapName));
+  const map = OTBM.read(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), { z: 7 });
+  const unlisted = OTBM.missingTiles(map, rmeCtx.RME_KNOWN_TILES);
+  must(unlisted.length === 0, mapName + ": tiles fora do catálogo RME: " + unlisted.join(","));
+}
+
+/* ---------------- roostCanExchange / auto-resgate ---------------- */
+{
+  const p = { level: 450, lootPouch: {}, bosses: {}, missions: {}, missionsDone: {} };
+  must(!roost.roostCanExchange(p), "troca sem runas não pode liberar");
+  for (const r of RUNES.slice(0, 4)) p.lootPouch[r] = 1;
+  must(!roost.roostCanExchange(p), "troca com 4/5 runas não pode liberar");
+  p.lootPouch["necromantic-crypt-rune"] = 1;
+  must(roost.roostCanExchange(p), "troca com 5 runas deve liberar");
+  /* Estado da quest: M1 5k kills → M2 4 bosses → M3 phylactery. */
+  const st0 = roost.roostState(p);
+  must(!st0.m1.done && !st0.m2.done && !st0.m3.done, "estado inicial errado");
+  p.missions["unhallowed-crypt"] = { progress: { kills: 5000 } };
+  must(roost.roostState(p).m1.done, "M1 deve completar com 5000 kills");
+  for (const id of ["adventurer-group", "eldritch-dragon-lord", "ice-horror"])
+    p.bosses[id] = { kills: 1 };
+  must(!roost.roostState(p).m2.done, "M2 deve exigir os 4 bosses");
+  p.bosses["the-gravedigger"] = { kills: 1 };
+  must(roost.roostState(p).m2.done && !roost.roostState(p).m3.done, "M2/M3 estado errado");
+  p.bosses["bonelords-phylactery"] = { kills: 1 };
+  must(roost.roostState(p).complete, "quest deve completar com a Phylactery");
+}
+
+/* ---------------- index.html ---------------- */
+const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
+must(html.includes("js/roost-graveborn.js?v="),
+  "roost-graveborn.js não carregado no index");
+must(html.indexOf("js/make-believe-quest.js") < html.indexOf("js/roost-graveborn.js"),
+  "roost-graveborn deve carregar depois do make-believe (roleta)");
+
+console.log("OK — Roost of the Graveborn Quest 450+: 5 bossrooms OTBM " +
+  "z=7 (spawn/boss validados), cadeia sequencial M1 5000 kills → " +
+  "Adventurer Group → Eldritch DL → Ice Horror → Gravedigger → " +
+  "Phylactery (5 crypt runes), NPC Dragon Ancestor Spirit com troca " +
+  "por roleta gif (7 armas crypt, pesos oficiais), paridade " +
+  "cliente/servidor.");

@@ -475,6 +475,7 @@ function openNpc(id) {
     case "oberon-trader": body = npcOberonTraderHtml(p); break;
     case "umbral-creation": body = npcUmbralCreationHtml(p); break;
     case "sweaty": body = npcSweatyHtml(p); break;
+    case "crypt-exchange": body = npcCryptExchangeHtml(p); break;
   }
 
   const npcTitleSprite = npc.sprite === "umbral-creation"
@@ -499,6 +500,7 @@ function openNpc(id) {
 
 function closeNpc() {
   G.activeNpc = null;
+  if (typeof mbStopRoulettes === "function") mbStopRoulettes();
   $("#modal").classList.remove("show");
   const b = $("#modal-body");
   if (b) b.classList.remove("npc-modal-shell");
@@ -526,6 +528,7 @@ function refreshNpc(id) {
     case "oberon-trader": body = npcOberonTraderHtml(p); break;
     case "umbral-creation": body = npcUmbralCreationHtml(p); break;
     case "sweaty": body = npcSweatyHtml(p); break;
+    case "crypt-exchange": body = npcCryptExchangeHtml(p); break;
   }
   $("#npc-content").innerHTML = body;
   bindNpc(id, npc.type);
@@ -1412,6 +1415,10 @@ function npcTravel(p) {
 /* ---------------------------------------------------------- binds */
 function bindNpc(id, type) {
   const p = G.p;
+  if (type === "crypt-exchange" && typeof roostBindExchange === "function") {
+    roostBindExchange();
+    return;
+  }
 
   // tooltips dos itens
   $$("#npc-content [data-tip]").forEach((el) => {

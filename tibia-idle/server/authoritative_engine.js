@@ -63,6 +63,9 @@ require("../game/js/norcferatus-fortress.js").registerMonsters(MONSTERS);
 /* Unhallowed Crypt (update 15.20): 3 criaturas ausentes do dump Canary
  * — fichas oficiais registradas no MONSTERS. */
 require("../game/js/unhallowed-crypt.js").registerMonsters(MONSTERS);
+/* Roost of the Graveborn Quest (update 15.20): 5 bosses ausentes do
+ * dump Canary — fichas oficiais registradas no MONSTERS. */
+require("../game/js/roost-graveborn.js").registerMonsters(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -544,7 +547,7 @@ try{
     "urmahlullu.js","bashmuul-issavi.js","true-asuras.js","mimar-haffar.js",
     "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
     "book-world.js","sir-leonard.js","norcferatus-fortress.js",
-    "unhallowed-crypt.js"]){
+    "unhallowed-crypt.js","roost-graveborn.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -655,6 +658,11 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "unhallowed-crypt":{monsters:["creepy-crawler","crypt-construct","crypt-fiend"],
     cat:"hard",pack:10,packMin:8,packMax:12,
     spawnWeights:{"creepy-crawler":20,"crypt-construct":20,"crypt-fiend":20}},
+  "adventurer-group-room":{monsters:["adventurer-group"]},
+  "eldritch-dragon-lord-room":{monsters:["eldritch-dragon-lord"]},
+  "ice-horror-room":{monsters:["ice-horror"]},
+  "the-gravedigger-room":{monsters:["the-gravedigger"]},
+  "bonelords-phylactery-room":{monsters:["bonelords-phylactery"]},
   "maior-domus-room":{monsters:["maior-domus"]},
   "moonstone-castle":{monsters:["moonsilver-custodian","moonstone-miner"],cat:"hard",pack:14,packMin:6,packMax:14,
     spawnWeights:{"moonsilver-custodian":50,"moonstone-miner":50}},

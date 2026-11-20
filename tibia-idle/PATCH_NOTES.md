@@ -4,6 +4,82 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — The Roost of the Graveborn Quest — boss quest 450+ (update 15.20)
+
+### Progressão (oficial)
+
+- **M1** — 5.000 kills na Unhallowed Crypt → libera **Adventurer Group**
+  (The First Dragon, `first_dragon.otbm`).
+- **M2** — cadeia sequencial de 4 bosses → libera **Bonelord's
+  Phylactery** (boss final):
+  1º Adventurer Group (first_dragon) → 2º Eldritch Dragon Lord
+  (Under Fire, `eldritch_dl.otbm`) → 3º Ice Horror (The Frozen Hoard,
+  `ice_horror.otbm`) → 4º The Gravedigger (The Last Dragon Soul,
+  `gravedigger.otbm`).
+- **M3** — derrotar a Phylactery (`bonelords_phylactery.otbm`) →
+  **1 de cada Crypt Rune** (auto-resgate ao abrir a quest).
+
+### Bosses (fichas oficiais 15.20)
+
+- **Adventurer Group** — race 2773, `lookItem 52836` (encounter de 5
+  aventureiros modelado como boss único); loot oficial do **Fatal Bug**:
+  Ancient Crypt Rune + Worn Guide Book (rare). HP/XP ocultos —
+  520k/750k estimados.
+- **Eldritch Dragon Lord** — race 2739, looktype 1879, exp 750.000,
+  680k hp; fire imune (oficial: se cura com fogo).
+- **Ice Horror** — race 2733, looktype 1881, **hp oficial 542.700**,
+  exp 259.000; ice 0% (imune), Death Ring 950+, Great Energy Wave 1300+.
+- **The Gravedigger** — race 2721, looktype 1880, exp 750.000;
+  Fire Ball 600–800, Bonelord Totem → área de morte.
+- **Bonelord's Phylactery** — race 2771, `lookItem 52831`, exp
+  1.000.000, 850k hp; earth 110% (fraco). Batalha máx. oficial 900s.
+- Cooldown **20h** em todos; gates `enforced` + `killsRequired`
+  sequencial (boss modal "ROOST OF THE GRAVEBORN 450+").
+
+### NPC Dragon Ancestor Spirit
+
+- `crypt-exchange` (catálogo de NPCs): exige **1 de cada Crypt Rune**
+  (fiery/icy/deathly/ancient/necromantic) e troca por **1 arma Crypt
+  aleatória** — debita antes do giro (troca persistida).
+- Roleta gif igual à do Make Believe: preview ciclando ícones + giro
+  que desacelera até o sorteado. Pesos oficiais (Crypt Runes
+  Statistics): Spine 82/15,8% · Slicer 79/15,3% · Bile 76/14,7% ·
+  Strike 75/14,5% · Splitter 73/14,1% · Breaker 69/13,3% ·
+  Jaw 64/12,4%.
+
+### Itens novos (12, cids oficiais 15.20)
+
+- 7 **Crypt weapons** lvl 450 cls 4 — sell 0 ("Negotiable", sem
+  comprador NPC): spine (bow pal, atk+8 hit+5 dist+3 range6 ice+5%),
+  slicer/splitter/breaker (sword/axe/club knight, atk 58 def 33 +4),
+  strike (fist monk, atk 45 def 20 fist+4 ml+1), bile (wand sorc,
+  85-135 physical, range 7, ml+4, fire+6%), jaw (rod druid, range 5,
+  ml+4, energy+6%). **ids 52332–52338 corrigidos** (estavam 51309–15
+  no weapondata).
+- 5 **Crypt Runes** — sell 0 (quest, npcvalue 0): cids 52657–52661.
+- Creature products novos (Yasir, npcvalue oficial): worn-guide-book
+  250k, golden-claw 250k, shrunken-head 250k, ancient-scales 400k,
+  soul-trap 250k, skull-tendril 650k, bone-spikes 1,5M, icy-scales
+  250k, icy-horns 250k, frozen-crapace 500k, dragon-tongue 550, shard
+  2.000 (id 7290 — item antigo que faltava no catálogo).
+
+### Sprites e mapas
+
+- Sheets 9×4 reais do DAT: eldritch (1879), gravedigger (1880),
+  ice-horror (1881); sheets estáticos dos `lookItem` 52836/52831;
+  portrait do NPC (looktype 1899); 166+ tiles importados dos 5 OTBMs
+  (2 ids invisíveis: 33720/51935 metadata).
+- Paridade cliente/servidor: `roost-graveborn.js` carrega no sandbox
+  do engine + `registerMonsters(MONSTERS)` + 5 HUNTS `*-room`.
+
+### Teste
+
+- `node tools/test_roost_graveborn.js` — OTBM bounds/spawns conectados,
+  cadeia de gates, fichas oficiais, cids/preços, sheets, âncoras,
+  roleta ponderada (40k giros), troca 5-runas, paridade engine.
+
+---
+
 ## 2026-11-20 — Unhallowed Crypt — nova hunt 400+ (update 15.20)
 
 ### Hunt
