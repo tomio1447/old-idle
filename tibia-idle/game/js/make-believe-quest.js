@@ -351,6 +351,14 @@ function renderMakeBelieveQuestDetail(q, ui) {
       bossSprite: "phosphorus",
       description: "A grande quest do update Make Believe: explore Moonstone Castle, derrote os guardiões Mimar Haffar e Maior Domus, conquiste Radiant Skyhold e encare o World Boss Phosphorus para ganhar a outfit Illuminated Warrior, a montaria Radiant Nimbus e itens Moonsilver.",
       renderDetail: renderMakeBelieveQuestDetail,
+      rewardReady: (pp) => {
+        const st = makeBelieveState(pp);
+        if (!st.requirementsMet) return false;
+        return (st.m1.done && !st.claimed.outfit) ||
+          (st.m2.done && !st.claimed.helmet) ||
+          (st.m3.done && !st.claimed.mount) ||
+          (st.m4.done && !st.claimed.weapon);
+      },
     };
   }
   // Gate da hunt Radiant Skyhold — Missão 2 (kills de Mimar + Maior Domus).

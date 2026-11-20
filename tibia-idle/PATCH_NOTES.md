@@ -4,6 +4,23 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Notificação "!" de recompensa de quest a coletar
+
+- Sempre que uma missão de quest está concluída e a recompensa ainda
+  não foi resgatada, um badge **"!"** dourado aparece:
+  - no botão **QUESTS** da topbar (`#btn-quests`), e
+  - no **card da quest** dentro do modal QUESTS (sobre o retrato).
+- Detecção por quest via `rewardReady(p)` no `QUEST_DEFS`:
+  - **Roost of the Graveborn** — Crypt Runes (M3, auto-resgate ao abrir)
+  - **Order of the Stag** — Royal Bounacean Advisor Outfit (M3)
+  - **Make Believe** — outfit/elmo/montaria/arma Moonsilver pendentes
+  - **Book World** — Illuminator Outfit · **Bloody Tusks** — Gloom Maw
+  - **Primal Ordeal** — Noxious Ripptor (Hazard 6, claim manual)
+- O badge do botão atualiza em todo `renderAll`; o do card no render do
+  modal. Some ao resgatar/receber a recompensa.
+
+---
+
 ## 2026-11-20 — Dragon Ancestor Spirit: outfit corrigida + novo modal de troca
 
 - **Outfit corrigida** — o retrato do NPC usava o looktype 1899, que é a

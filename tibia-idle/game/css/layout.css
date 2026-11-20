@@ -6406,3 +6406,25 @@ body.quest-lobby-open #party-panel { display:none !important; }
 @media (max-width: 680px) {
   .gi-rune-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ── Quest reward pending — badge "!" (botão topbar + card da quest) ── */
+.quests-btn-badge {
+  visibility: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 14px; height: 14px; margin-left: 4px; padding: 0 3px;
+  font-size: 10px; font-weight: 800; line-height: 1;
+  color: #1a1206; background: #ffd24a;
+  border: 1px solid #6b5410; border-radius: 3px;
+  box-shadow: 0 0 6px rgba(255, 210, 74, .55);
+}
+.quest-modal-card { position: relative; }
+.quest-modal-card .mobs.quest-open { position: relative; }
+.quest-pending-badge {
+  position: absolute; top: -5px; right: -5px; z-index: 2;
+  width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; line-height: 1;
+  color: #1a1206; background: #ffd24a;
+  border: 1px solid #6b5410; border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255, 210, 74, .7), 0 1px 3px rgba(0,0,0,.6);
+}
+.quest-modal-card.quest-pending .nm { color: #ffd24a; }

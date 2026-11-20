@@ -5910,6 +5910,7 @@ function renderAll() {
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
   if (typeof renderRewardButton === "function") renderRewardButton(p);
+  if (typeof renderQuestsButton === "function") renderQuestsButton(p);
   // painel de party estilo OTC (canto superior direito da tela do jogo)
   if (typeof renderPartyPanel === "function") renderPartyPanel(p);
   // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi

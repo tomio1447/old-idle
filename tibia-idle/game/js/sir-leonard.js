@@ -401,6 +401,10 @@ function renderBookWorldQuestDetail(q, ui) {
       bossSprite: "sir-leonard",
       description: "A quest da Book World (Between the Lines): derrote 1000 monstros em Book World para abrir a sala do Sir Leonard e, ao vencê-lo, conquiste a outfit Illuminator com os dois addons.",
       renderDetail: renderBookWorldQuestDetail,
+      rewardReady: (pp) => {
+        const st = bookWorldQuestState(pp);
+        return st.m2.done && !st.claimed.outfit;
+      },
     };
   }
 

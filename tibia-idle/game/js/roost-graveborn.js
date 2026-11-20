@@ -1080,6 +1080,10 @@ function roostBindExchange() {
       bossSprite: "bonelords-phylactery",
       description: "A quest do update 15.20: uma horda de dragões sob o controle do Necromancer. Missão 1 — elimine 500 monstros na Unhallowed Crypt para liberar a cadeia sequencial de 4 bosses: Adventurer Group (5 aventureiros por vocação que viram avatares em vida vermelha + Bright Crystal e Fatal Bug), Eldritch Dragon Lord (vulcões que evoluem até Flame Totems — 3+ totens vivos o deixam IMORTAL), Ice Horror (invoca Ice Crawlers) e The Gravedigger (invoca até 2 Bonelord Totems invulneráveis, área de morte). O boss final, Bonelord's Phylactery, luta em 2 fases: F1 com 4 Soulcages de HP compartilhado guardadas por 4 dragon spirits invulneráveis (afaste-os ou eles curam o pool), F2 com a Phylactery + 4 Enthralled Dragons sob os gazes do Bone Overlord (An Eye, Wraithfire, Mana Drain, Curse, Bone Barrier). A vitória rende 1 de cada Crypt Rune; o Dragon Ancestor Spirit troca um set completo por uma arma Crypt aleatória.",
       renderDetail: renderRoostQuestDetail,
+      rewardReady: (pp) => {
+        const st = roostState(pp);
+        return st.m3.done && !st.runesClaimed;
+      },
     };
   }
 

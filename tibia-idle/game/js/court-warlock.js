@@ -897,6 +897,10 @@ function renderStagQuestDetail(q, ui) {
       bossSprite: "court-warlock",
       description: "A quest que coroa a Order of the Stag: prove seu valor na Stag Bastion eliminando 500 Raubritters para receber o Mariner's Compass da Antoinette (extra slot, +3 armadura), cace 50 Night Harpies nas Arean Outskirts para ganhar acesso ao Court Warlock e, ao derrotá-lo, vista-se como Royal Bounacean Advisor (addons 1 e 2).",
       renderDetail: renderStagQuestDetail,
+      rewardReady: (pp) => {
+        const st = stagQuestState(pp);
+        return st.m3.done && !st.outfitClaimed;
+      },
     };
   }
 })();

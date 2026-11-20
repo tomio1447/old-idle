@@ -52,3 +52,42 @@ test("noxious ripptor mount is claimed via the quest modal, not auto-granted", (
   assert.ok(questSource.includes('mountRewards: ["noxious-ripptor"]'));
   assert.ok(!bossSource.includes('accountMount: "noxious-ripptor"'));
 });
+
+test("pending quest reward shows '!' on the quest card and the QUESTS button", () => {
+  const { ctx } = setup();
+  /* Primal Ordeal: hazard 12 mockado + montaria não resgatada → pendente. */
+  const q = ctx.QUEST_DEFS["primal-ordeal"];
+  assert.equal(ctx.questHasPendingReward(ctx.G.p, q), true);
+  const card = ctx.questCard(q);
+  assert.ok(card.includes("quest-pending-badge") && card.includes("quest-pending"));
+  /* Montaria já resgatada → sem badge. */
+  ctx.ownsMount = () => true;
+  assert.equal(ctx.questHasPendingReward(ctx.G.p, q), false);
+  assert.ok(!ctx.questCard(q).includes("quest-pending-badge"));
+  /* renderQuestsButton cria/atualiza o badge no botão QUESTS. */
+  const badgeEl = { textContent: "", style: {}, setAttribute() {} };
+  const btn = {
+    title: "", querySelector: (sel) => (btn._b || null),
+    appendChild(el) { btn._b = el; },
+  };
+  ctx.document.getElementById = (id) => (id === "btn-quests" ? btn : null);
+  ctx.document.createElement = () => ({ textContent: "", style: {}, setAttribute() {} });
+  delete ctx.ownsMount;
+  ctx.renderQuestsButton(ctx.G.p);
+  assert.equal(btn._b.style.visibility, "visible");
+  ctx.ownsMount = () => true;
+  ctx.renderQuestsButton(ctx.G.p);
+  assert.equal(btn._b.style.visibility, "hidden");
+  /* Outras quests com rewardReady próprio (source-check). */
+  for (const [file, marker] of [
+    ["roost-graveborn.js", "st.m3.done && !st.runesClaimed"],
+    ["court-warlock.js", "st.m3.done && !st.outfitClaimed"],
+    ["make-believe-quest.js", "!st.claimed.weapon"],
+    ["sir-leonard.js", "st.m2.done && !st.claimed.outfit"],
+    ["norcferatus-fortress.js", "st.m2.done && !st.claimed.mount"],
+  ]) {
+    const src = fs.readFileSync(path.join(js, file), "utf8");
+    assert.ok(src.includes("rewardReady"), `${file} sem rewardReady`);
+    assert.ok(src.includes(marker), `${file} sem ${marker}`);
+  }
+});

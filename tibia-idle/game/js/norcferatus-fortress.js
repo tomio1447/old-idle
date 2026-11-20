@@ -591,6 +591,10 @@ function renderBloodyTusksQuestDetail(q, ui) {
       bossSprite: "vladrukh",
       description: "A quest da Norcferatus Fortress: derrote 5 Vargs para abrir a câmara do Vladrukh e, ao vencê-lo, conquiste a montaria Gloom Maw.",
       renderDetail: renderBloodyTusksQuestDetail,
+      rewardReady: (pp) => {
+        const st = bloodyTusksQuestState(pp);
+        return st.m2.done && !st.claimed.mount;
+      },
     };
   }
 

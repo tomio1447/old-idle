@@ -121,18 +121,61 @@ function questOutfitPreviewHtml(outfitReward, size) {
 
 /* ---- Quest card (lista principal) ---- */
 
+/* true quando a quest tem uma recompensa pronta a coletar (missão
+ * concluída + reward ainda não resgatado). Cada quest registra
+ * q.rewardReady(p) no seu QUEST_DEFS; quests sem predicado não
+ * acendem o "!". */
+function questHasPendingReward(p, q) {
+  if (!p || !q) return false;
+  if (typeof q.rewardReady === "function") {
+    try { return !!q.rewardReady(p); } catch (e) { return false; }
+  }
+  /* Primal Ordeal: montaria Noxious Ripptor resgatável no Hazard 6. */
+  if (q.id === "primal-ordeal") {
+    const h = typeof gnompronaHazardUnlock === "function" ? gnompronaHazardUnlock(p) : 0;
+    const mid = (q.mountRewards || [])[0];
+    return h >= 6 && !!mid && !(typeof ownsMount === "function" && ownsMount(p, mid));
+  }
+  return false;
+}
+
 function questCard(q) {
   const rewardsHtml = (q.rewards || []).map((slug) =>
     `<div class="quest-reward-thumb" title="${slug.replace(/-/g, ' ')}">${questRewardImg(slug, 28)}</div>`
   ).join("");
-  return `<div class="hunt-card hunt-modal-card hunt-canary-card quest-modal-card" data-quest="${q.id}">
+  const pending = questHasPendingReward(window.G && window.G.p, q);
+  return `<div class="hunt-card hunt-modal-card hunt-canary-card quest-modal-card${pending ? " quest-pending" : ""}" data-quest="${q.id}">
     <button type="button" class="mobs quest-open" data-quest="${q.id}" title="Ver ${q.name}" aria-label="Ver ${q.name}">
       ${questBossImg(q.bossSprite || q.boss, 48)}
+      ${pending ? `<span class="quest-pending-badge" title="Recompensa a coletar">!</span>` : ""}
     </button>
     <span class="info"><span class="nm">${q.name}</span><span class="meta">Level ${q.level}+</span>
       <span class="tiny dim">${q.questType === "boss" ? "Progresso dos bosses e recompensas" : q.playable === false ? "Em breve" : "Lobby: até " + q.maxPlayers + " jogadores"}</span></span>
     <span class="quest-card-rewards">${rewardsHtml}</span>
   </div>`;
+}
+
+/* Badge "!" no botão QUESTS da topbar enquanto houver recompensa
+ * pendente em qualquer quest. Chamado pelo renderAll. */
+function renderQuestsButton(p) {
+  const btn = typeof document !== "undefined" && document.getElementById("btn-quests");
+  if (!btn) return;
+  let any = false;
+  const quests = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS : {};
+  for (const q of Object.values(quests)) {
+    if (questHasPendingReward(p, q)) { any = true; break; }
+  }
+  let badge = btn.querySelector(".quests-btn-badge");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "quests-btn-badge";
+    badge.setAttribute("aria-hidden", "true");
+    btn.appendChild(badge);
+  }
+  badge.textContent = "!";
+  badge.style.visibility = any ? "visible" : "hidden";
+  btn.title = any ? "Abrir catálogo de Quests — há recompensa a coletar!"
+                  : "Abrir catálogo de Quests";
 }
 
 /* ---- Quest list modal ---- */
