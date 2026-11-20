@@ -4,6 +4,25 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — The Roost of the Graveborn Quest — informações in-game atualizadas
+
+A página da quest (QUEST_DEFS `roost-of-the-graveborn-quest`) agora
+descreve as mecânicas realmente implementadas de cada encontro — não
+mais só a cadeia nominal:
+
+- **Descrição** reescrita: M1 5.000 kills na Unhallowed Crypt →
+  cadeia de 4 bosses com as mecânicas de cada um (avatares + Bright
+  Crystal + Fatal Bug; vulcões→Flame Totems/imortalidade; Ice
+  Crawlers; Bonelord Totems invulneráveis) → Phylactery em 2 fases
+  (Soulcages de pool compartilhado + dragon spirits; Phylactery + 4
+  Enthralled Dragons sob os gazes) → 5 Crypt Runes.
+- Novo painel **"MECÂNICAS DA CADEIA"** no detalhe da quest, com uma
+  linha de estratégia por boss.
+- `game/js/roost-graveborn.js` → `?v=roost-info-v1`. Nenhuma
+  mecânica alterada — apenas a informação exibida.
+
+---
+
 ## 2026-11-20 — The Order of the Stag Quest (350+) — 3 missões
 
 A quest que amarra a região da Isle of Ada: duas missões de caça nos
