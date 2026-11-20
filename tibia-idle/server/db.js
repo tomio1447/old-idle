@@ -122,6 +122,10 @@ function JsonStore() {
   this.storeOrders = Array.isArray(storeData && storeData.orders) ? storeData.orders : [];
   this.coinLedger = Array.isArray(storeData && storeData.ledger) ? storeData.ledger : [];
   this.vouchers = Array.isArray(storeData && storeData.vouchers) ? storeData.vouchers : [];
+  // Estado administrável por código (paused/deleted) — a aba VOUCHERS do
+  // painel admin controla isso sem mexer no VOUCHERS fixo do store.js.
+  this.voucherState = (storeData && storeData.voucherState && typeof storeData.voucherState === "object")
+    ? storeData.voucherState : {};
   // Punições administrativas persistem em data/bans.json
   this.bans = Array.isArray(this._load("bans.json", [])) ? this._load("bans.json", []) : [];
   // Silenciamentos de chat persistem em data/chat_mutes.json (restarts não limpam)
@@ -169,7 +173,7 @@ JsonStore.prototype._save = function () {
 JsonStore.prototype._saveStore = function () {
   fs.writeFileSync(path.join(DATA_DIR, "store.json"),
     JSON.stringify({ orders: this.storeOrders || [], ledger: this.coinLedger || [],
-                     vouchers: this.vouchers || [] }, null, 1));
+                     vouchers: this.vouchers || [], voucherState: this.voucherState || {} }, null, 1));
 };
 JsonStore.prototype._saveBans = function () {
   fs.writeFileSync(path.join(DATA_DIR, "bans.json"),
@@ -967,6 +971,42 @@ JsonStore.prototype.voucherRedemptionList = function (limit) {
     return { accountId, login: loginOf[accountId] || "", code,
       createdAt: ledgerAt[accountId + ":" + code] || null };
   }).slice(-n).reverse();
+};
+/* Estado administrável do voucher: paused bloqueia resgates novos,
+ * deleted esconde/inutiliza o código. Independe da definição em store.js. */
+JsonStore.prototype.voucherStateList = function () {
+  return Object.assign({}, this.voucherState || {});
+};
+JsonStore.prototype.voucherStateGet = function (code) {
+  return (this.voucherState || {})[String(code || "").toUpperCase()] || null;
+};
+JsonStore.prototype.voucherStateSet = function (code, patch, by) {
+  code = String(code || "").toUpperCase().slice(0, 40);
+  if (!code) return null;
+  patch = patch || {};
+  this.voucherState = this.voucherState || {};
+  const cur = this.voucherState[code] || {};
+  const next = {
+    paused: patch.paused != null ? !!patch.paused : !!cur.paused,
+    deleted: patch.deleted != null ? !!patch.deleted : !!cur.deleted,
+    updatedAt: Date.now(), updatedBy: String(by || ""),
+  };
+  this.voucherState[code] = next;
+  this._saveStore();
+  return next;
+};
+JsonStore.prototype.voucherClaimCounts = function () {
+  const counts = {};
+  for (const key of this.vouchers || []) {
+    const i = String(key).indexOf(":");
+    const c = String(key).slice(i + 1).toUpperCase();
+    counts[c] = (counts[c] || 0) + 1;
+  }
+  return counts;
+};
+JsonStore.prototype.voucherClaims = function (code) {
+  const c = String(code || "").toUpperCase();
+  return this.voucherRedemptionList(500).filter((r) => String(r.code || "").toUpperCase() === c);
 };
 JsonStore.prototype.coinLedgerAdd = function (row) {
   const entry = Object.assign({ id: ++this._coinLedgerSeq }, row || {});
@@ -3353,6 +3393,53 @@ async function MysqlStore() {
                 v.created_at AS createdAt
          FROM voucher_redemptions v LEFT JOIN accounts a ON a.id=v.account_id
          ORDER BY v.id DESC LIMIT ?`, [n]);
+    },
+    /* Estado administrável por código (paused/deleted) — aba VOUCHERS do
+     * painel admin; não altera a definição fixa em store.js. */
+    async voucherStateList() {
+      const rows = await this.query(
+        "SELECT code, paused, deleted, updated_at AS updatedAt, updated_by AS updatedBy FROM voucher_state");
+      const out = {};
+      for (const r of rows || [])
+        out[String(r.code || "").toUpperCase()] = {
+          paused: !!Number(r.paused), deleted: !!Number(r.deleted),
+          updatedAt: r.updatedAt, updatedBy: r.updatedBy };
+      return out;
+    },
+    async voucherStateGet(code) {
+      const rows = await this.query(
+        "SELECT code, paused, deleted, updated_at AS updatedAt, updated_by AS updatedBy FROM voucher_state WHERE code=?",
+        [String(code || "").toUpperCase().slice(0, 40)]);
+      const r = rows && rows[0];
+      return r ? { paused: !!Number(r.paused), deleted: !!Number(r.deleted),
+        updatedAt: r.updatedAt, updatedBy: r.updatedBy } : null;
+    },
+    async voucherStateSet(code, patch, by) {
+      code = String(code || "").toUpperCase().slice(0, 40);
+      if (!code) return null;
+      patch = patch || {};
+      const cur = (await this.voucherStateGet(code)) || {};
+      const paused = patch.paused != null ? !!patch.paused : !!cur.paused;
+      const deleted = patch.deleted != null ? !!patch.deleted : !!cur.deleted;
+      await this.run(
+        `INSERT INTO voucher_state (code, paused, deleted, updated_by) VALUES (?,?,?,?)
+         ON DUPLICATE KEY UPDATE paused=VALUES(paused), deleted=VALUES(deleted), updated_by=VALUES(updated_by)`,
+        [code, paused ? 1 : 0, deleted ? 1 : 0, String(by || "").slice(0, 60)]);
+      return { paused, deleted, updatedBy: String(by || "") };
+    },
+    async voucherClaimCounts() {
+      const rows = await this.query(
+        "SELECT code, COUNT(*) AS n FROM voucher_redemptions GROUP BY code");
+      const out = {};
+      for (const r of rows || []) out[String(r.code || "").toUpperCase()] = Number(r.n) || 0;
+      return out;
+    },
+    async voucherClaims(code) {
+      return await this.query(
+        `SELECT v.account_id AS accountId, a.login AS login, v.created_at AS createdAt
+         FROM voucher_redemptions v LEFT JOIN accounts a ON a.id=v.account_id
+         WHERE v.code=? ORDER BY v.id DESC LIMIT 500`,
+        [String(code || "").toUpperCase().slice(0, 40)]);
     },
     async coinLedgerAdd(row) {
       const r = await this.run(
@@ -5905,6 +5992,13 @@ async function ensureSchema(pool) {
     code VARCHAR(40) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_voucher_account (account_id, code)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS voucher_state (
+    code VARCHAR(40) NOT NULL PRIMARY KEY,
+    paused TINYINT(1) NOT NULL DEFAULT 0,
+    deleted TINYINT(1) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by VARCHAR(60) NOT NULL DEFAULT ''
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS bans (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

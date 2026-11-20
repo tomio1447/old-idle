@@ -4,6 +4,37 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Topbar: PERSONAGEM e STORE quadrados com glow
+
+- Os botões **Personagem** e **STORE** saíram da faixa de botões e agora
+  ocupam o canto superior direito da topbar como quadrados 58×58 com
+  moldura e glow dourados (`.topbar-hero-*`) — mais destaque visual.
+- Personagem mostra o retrato do char + nome; STORE mostra o coin + label.
+- Fallback responsivo para telas <640px (quadrados 46×46).
+- Modal de patch notes (`alpha-announce.js`) atualizado com a data da
+  release e as novidades da sessão.
+
+---
+
+## 2026-11-20 — Aba VOUCHERS no painel Admin + voucher sem cura no treino
+
+- **Painel Admin → aba 🎟 VOUCHERS**: lista todos os códigos definidos no
+  servidor com status (ATIVO/PAUSADO/EXCLUÍDO) e contagem de resgates.
+  Clicar no card abre o detalhe: recompensas, quem resgatou (login + data)
+  e ações **Pausar/Retomar**, **Excluir** (com confirmação) e **Restaurar**.
+- **Estado administrável por código** (`voucher_state` — tabela MySQL +
+  campo no JsonStore): `paused` bloqueia novos resgates com
+  "Voucher pausado temporariamente"; `deleted` responde "Voucher inválido".
+  É um overlay — a definição em `store.VOUCHERS` permanece intacta.
+- Novas rotas `/api/admin/vouchers` (lista), `/api/admin/vouchers/:code`
+  (detalhe) e `/api/admin/vouchers/state` (pause/resume/delete/restore),
+  todas atrás de `adminSession` (role=admin).
+- **Treino sem cura instantânea**: `startTrainingArea` agora passa
+  `keepVitals` ao `stopHunt` — entrar na área de treino vindo de uma hunt
+  não enche mais HP/mana na hora (o treino não é templo).
+
+---
+
 ## 2026-11-20 — STORE sem a aba "Vender Coins"
 
 - Removida a aba **Vender Coins (BETA)** da STORE (venda player-to-player

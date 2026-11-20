@@ -3253,17 +3253,10 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 
 /* botão da topbar: retrato do personagem no lugar do texto (o label fica
  * só para acessibilidade e para o menu mobile, que lê textContent) */
-#btn-switch.btn-switch-portrait { display: inline-flex; align-items: center; gap: 8px; }
 #btn-switch .topbar-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 #btn-switch-portrait {
-  width: 30px; height: 30px; flex: none; display: inline-flex;
-  align-items: center; justify-content: center; overflow: hidden;
-  background: radial-gradient(circle at center, #2a251c 0%, #0d0b08 80%);
-  border: 1px solid rgba(242, 201, 107, .55); border-radius: 4px;
-}
-#btn-switch-portrait canvas {
-  height: 26px; width: auto; max-width: 28px;
-  image-rendering: pixelated;
+  flex: none; display: inline-flex;
+  align-items: flex-end; justify-content: center; overflow: hidden;
 }
 
 @media (max-width: 900px) {
@@ -4265,36 +4258,56 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 #btn-prey img.prey-btn-gif { display: inline-block; }
 
-/* ---- Topbar refinada: herói do personagem + botões metálicos ----
- * O botão do personagem abre a faixa à esquerda com borda dourada; os
- * demais seguem o mesmo quadro metálico escuro da paleta do jogo. */
-#btn-switch.gi-char-hero-btn {
-  padding: 2px 10px 2px 4px !important;
-  height: auto; min-height: 34px;
-  background: linear-gradient(180deg, rgba(92, 69, 24, .55) 0%, rgba(24, 20, 14, .92) 100%);
-  border: 1.5px solid #e6b84c; border-radius: 5px;
-  color: #fff6df;
-  box-shadow: 0 0 12px rgba(230, 184, 76, .22),
-              inset 0 1px 0 rgba(255, 232, 163, .25);
+/* ---- Topbar: heróis quadrados (PERSONAGEM + STORE) ----
+ * Par de botões quadrados no canto superior direito — mais destaque com
+ * moldura e glow dourados. Ficam na 1ª faixa da .topbar (depois do spacer);
+ * os demais botões seguem o quadro metálico de 28px na faixa de baixo. */
+.topbar-hero {
+  display: flex; gap: 8px; align-items: stretch; flex: none;
+}
+.topbar-hero-btn {
+  width: 58px; height: 58px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  background: radial-gradient(circle at 50% 22%, rgba(120, 90, 30, .5) 0%, rgba(24, 20, 14, .94) 70%);
+  border: 1.5px solid #e6b84c; border-radius: 6px;
+  color: #fff6df; cursor: pointer; padding: 3px;
+  font: 800 9px Verdana, sans-serif; letter-spacing: .5px;
+  box-shadow: 0 0 14px rgba(230, 184, 76, .32),
+              inset 0 1px 0 rgba(255, 232, 163, .22);
   transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
 }
-#btn-switch.gi-char-hero-btn:hover {
+.topbar-hero-btn:hover {
   transform: translateY(-1px); border-color: #ffe082;
-  box-shadow: 0 0 16px rgba(230, 184, 76, .4),
-              inset 0 1px 0 rgba(255, 240, 190, .4);
+  box-shadow: 0 0 22px rgba(230, 184, 76, .55),
+              inset 0 1px 0 rgba(255, 240, 190, .42);
 }
-.gi-char-hero-meta {
-  display: flex; flex-direction: column; align-items: flex-start;
-  line-height: 1.15;
+.topbar-hero-btn:active { transform: translateY(0); }
+.topbar-hero-avatar {
+  width: 36px; height: 34px; flex: none;
+  display: flex; align-items: flex-end; justify-content: center; overflow: hidden;
+  background: radial-gradient(circle at center, #2a251c 0%, #0d0b08 80%);
+  border: 1px solid rgba(242, 201, 107, .55); border-radius: 4px;
 }
-.gi-char-hero-name {
-  font-size: 11px; font-weight: 800; color: #ffe394;
-  max-width: 96px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap;
+/* O canvas do retrato chega com style inline de 26px — o hero quer maior. */
+#btn-switch-portrait canvas {
+  height: 32px !important; width: auto; max-width: 34px !important;
+  image-rendering: pixelated;
 }
-.gi-char-hero-sub {
-  font-size: 8px; font-weight: 700; letter-spacing: .5px;
-  text-transform: uppercase; color: #a89f8a;
+.topbar-hero-name {
+  font-size: 9px; font-weight: 800; color: #ffe394; line-height: 1;
+  max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar-hero-btn--store img {
+  width: 24px; height: 24px; flex: none;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 4px rgba(255, 214, 90, .6));
+}
+.topbar-hero-label { font-size: 9px; font-weight: 800; letter-spacing: .6px; color: #ffe394; }
+@media (max-width: 640px) {
+  .topbar-hero-btn { width: 46px; height: 46px; }
+  .topbar-hero-avatar { width: 30px; height: 26px; }
+  #btn-switch-portrait canvas { height: 24px !important; max-width: 28px !important; }
 }
 .gi-toolbar-divider {
   width: 1px; height: 22px; flex: none;

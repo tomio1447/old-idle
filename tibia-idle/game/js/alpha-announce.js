@@ -6,10 +6,17 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "20/11/2026 às 14:15";
+const ALPHA_UPDATE_AT = "20/11/2026 às 20:40";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Topbar redesenhada: botões PERSONAGEM e STORE quadrados com glow dourado no canto superior direito",
+  "NOVO — Non-Transferable Tibia Coins (NT TC): saldo separado que só gasta na STORE — não pode ser vendido no Market",
+  "NOVO — Cupons de streamer na aba Vouchers da STORE: DRUWELL e buto__pvp dão VIP, montaria exclusiva e NT TC",
+  "NOVO — Painel Admin → aba VOUCHERS: veja usos por código e pause/exclua cupons",
+  "FIX — Treino não cura mais: ao entrar na área de treino o HP/mana ficam como estavam",
+  "NOVO — Modal de Guild redesenhado: diretório em 2 colunas, hero com barra de EXP e badges de cargo",
+  "NOVO — Charmes por conta + aba Charms nos Analyzers (procs e bônus por personagem)",
   "NOVO — Wheel of Destiny com novo visual: palco circular com borda dourada, nós com estados claros (verde/ciano) e controles −1/+1/MAX + OK/Reset no painel direito",
   "NOVO — The Order of the Stag Quest (350+): Stag Bastion, Arean Outskirts e Court Warlock — outfit Royal Bounacean Advisor (addons 1+2) e Mariner's Compass (+3 arm no extra slot)",
   "NOVO — The Roost of the Graveborn Quest (450+): 500 kills na Unhallowed Crypt liberam a cadeia de 5 bossrooms; Phylactery rende as 5 Crypt Runes",

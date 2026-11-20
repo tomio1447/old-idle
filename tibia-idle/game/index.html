@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=party-chip-tr-v1">
+  <link rel="stylesheet" href="css/layout.css?v=topbar-hero-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wod-modal-v1">
@@ -283,16 +283,20 @@
       <b id="server-save-text">--:--:--</b>
     </div>
     <span class="spacer"></span>
+    <!-- Heróis da topbar: PERSONAGEM e STORE em botões quadrados com glow,
+         ocupando o canto superior direito (área livre marcada no layout). -->
+    <div class="topbar-hero">
+      <button class="topbar-hero-btn" id="btn-switch" title="Detalhes do personagem — trocar, outfit e roda" data-i18n-title="btn.switch">
+        <span id="btn-switch-portrait" class="topbar-hero-avatar" aria-hidden="true"></span>
+        <span class="topbar-hero-name" id="btn-switch-name">—</span>
+        <span class="topbar-btn-label" data-i18n="btn.switch">Personagem</span>
+      </button>
+      <button class="topbar-hero-btn topbar-hero-btn--store" id="btn-store" title="STORE — Tibia Coins e VIP" data-i18n-title="title.store">
+        <img src="assets/ui/coins/tibia-coins.gif" alt="" width="24" height="24">
+        <span class="topbar-hero-label" data-i18n="btn.store">STORE</span>
+      </button>
+    </div>
     <div class="topbar-btns">
-    <button class="sm topbar-sys-btn btn-switch-portrait gi-char-hero-btn" id="btn-switch" title="Detalhes do personagem — trocar, outfit e roda" data-i18n-title="btn.switch">
-      <span id="btn-switch-portrait" class="btn-switch-avatar" aria-hidden="true"></span>
-      <span class="gi-char-hero-meta" aria-hidden="true">
-        <strong class="gi-char-hero-name" id="btn-switch-name">—</strong>
-        <small class="gi-char-hero-sub">Personagem</small>
-      </span>
-      <span class="topbar-btn-label" data-i18n="btn.switch">Personagem</span>
-    </button>
-    <span class="gi-toolbar-divider" aria-hidden="true"></span>
     <button class="sm topbar-sys-btn" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin"><span class="topbar-btn-emoji" aria-hidden="true">🛠</span><span class="topbar-btn-label" data-i18n="btn.admin">Admin</span></button>
     <button class="sm topbar-sys-btn" id="btn-calendar" title="Calendário — eventos e metas do servidor">
       <span class="topbar-btn-emoji" aria-hidden="true">📅</span>
@@ -318,10 +322,6 @@
     <button class="sm topbar-sys-btn" id="btn-social" title="Social — lista de amigos, convites e mensagens privadas">
       <span class="topbar-btn-emoji" aria-hidden="true">👥</span>
       <span class="topbar-btn-label">SOCIAL</span>
-    </button>
-    <button class="sm topbar-sys-btn" id="btn-store" title="STORE — Tibia Coins, VIP e vender coins" data-i18n-title="title.store">
-      <img src="assets/ui/coins/tibia-coins.gif" alt="" class="topbar-btn-icon coin-gif" width="18" height="18">
-      <span data-i18n="btn.store">STORE</span>
     </button>
     <span class="gi-toolbar-divider" aria-hidden="true"></span>
     <button class="sm topbar-sys-btn" id="btn-city" data-i18n-title="btn.city"><span class="topbar-btn-emoji" aria-hidden="true">🏛</span><span class="topbar-btn-label" data-i18n="btn.city">Ir para a cidade</span></button>
@@ -737,7 +737,7 @@
 <script src="js/ui.js?v=palette-random-v1"></script>
 <script src="js/helper-presets.js?v=autosell-sync-v1"></script>
 <script src="js/i18n.js?v=cfg-logout-v1"></script>
-<script src="js/alpha-announce.js?v=wod-modal-v1"></script>
+<script src="js/alpha-announce.js?v=topbar-hero-v1"></script>
 <script src="js/settings.js?v=cfg-logout-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>
@@ -763,7 +763,7 @@
 <script src="js/announce.js?v=gm-panel-v1"></script>
 <script src="js/daily-boost.js?v=daily-boost-v2"></script>
 <script src="js/player-profile.js?v=guild-req-tab-v1"></script>
-<script src="js/account-client.js?v=forge-admin-v1"></script>
+<script src="js/account-client.js?v=adm-vouchers-v1"></script>
 <script src="js/chat.js?v=chat-dock-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js?v=deploy-1911-v1"></script>
@@ -771,12 +771,12 @@
 <script src="js/store-ui.js?v=store-rm-sell-v1"></script>
 <script src="js/market-local.js"></script>
 <script src="js/reward-chest.js?v=reward-claim-repaint-v1"></script>
-<script src="js/training.js?v=stamina-account-v1"></script>
+<script src="js/training.js?v=training-vitals-v1"></script>
 <script src="js/training-ui.js?v=training-online-v1"></script>
 <script src="js/accessorydata.js?v=plasma-collars-v1"></script>
 <script src="js/supply-stash-data.js?v=primal-rings-v2"></script>
 <script src="js/supply-stash.js?v=loot-rules-v1"></script>
-<script src="js/admin.js?v=deploy-1911-v1"></script>
+<script src="js/admin.js?v=adm-vouchers-v1"></script>
 <script src="js/admin-rmt.js?v=rmt-v1"></script>
 <script src="js/admin-spectate.js?v=gm-spectator-v1"></script>
 <script src="js/city-ui.js?v=account-progress-v1"></script>
@@ -786,7 +786,7 @@
 <script src="js/guild-ui.js?v=guild-redesign-v1"></script>
 <script src="js/pvp-ui.js?v=pvp-wars-v9"></script>
 <script src="js/preload.js?v=deploy-1911-v1"></script>
-<script src="js/game.js?v=gi-charms-v1"></script>
+<script src="js/game.js?v=training-vitals-v1"></script>
 <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v1"></script>
 <script src="js/feast-of-souls.js?v=paleworm-fov-v1"></script>

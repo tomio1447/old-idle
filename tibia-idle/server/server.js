@@ -5197,6 +5197,59 @@ async function adminBanList(db,token){
   return {code:200,body:{ok:true,bans}};
 }
 
+/* ------------------------------ VOUCHERS (GM) -----------------------------
+ * Lista/estado dos códigos de brinde definidos em store.VOUCHERS. Pause e
+ * delete são overlay em voucher_state — a definição fica intacta. */
+function voucherRewardSummary(def){
+  const parts=[];
+  if(def.vipDays)parts.push("VIP "+Math.floor(Number(def.vipDays))+"d");
+  if(def.mount)parts.push("montaria "+String(def.mount));
+  if(def.coins)parts.push(Math.floor(Number(def.coins))+" TC");
+  if(def.coinsNt)parts.push(Math.floor(Number(def.coinsNt))+" NT TC");
+  if(def.items&&def.items.length)parts.push(def.items.length+" item(ns)");
+  return parts;
+}
+async function adminVoucherList(db,token){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  const states=typeof db.voucherStateList==="function"?await db.voucherStateList():{};
+  const counts=typeof db.voucherClaimCounts==="function"?await db.voucherClaimCounts():{};
+  const vouchers=Object.keys(store.VOUCHERS||{}).map((code)=>{
+    const def=store.VOUCHERS[code]||{},st=states[code]||{};
+    return {code,label:def.label||"",rewards:voucherRewardSummary(def),
+      hasModal:!!(def.modal),claims:Number(counts[code])||0,
+      paused:!!st.paused,deleted:!!st.deleted,
+      updatedAt:st.updatedAt||null,updatedBy:st.updatedBy||""};
+  });
+  return {code:200,body:{ok:true,vouchers}};
+}
+async function adminVoucherDetail(db,token,code){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  code=String(code||"").toUpperCase().slice(0,40);
+  const def=store.VOUCHERS&&store.VOUCHERS[code];
+  if(!def)return {code:404,body:{ok:false,msg:"Voucher não encontrado"}};
+  const st=typeof db.voucherStateGet==="function"?(await db.voucherStateGet(code))||{}:{};
+  const claims=typeof db.voucherClaims==="function"?await db.voucherClaims(code):[];
+  return {code:200,body:{ok:true,voucher:{
+    code,label:def.label||"",rewards:voucherRewardSummary(def),
+    paused:!!st.paused,deleted:!!st.deleted,
+    updatedAt:st.updatedAt||null,updatedBy:st.updatedBy||"",claims}}};
+}
+async function adminVoucherSetState(db,body){
+  body=body&&typeof body==="object"?body:{};
+  const auth=await adminSession(db,String(body.token||""));if(auth.error)return auth.error;
+  const code=String(body.code||"").toUpperCase().slice(0,40);
+  if(!store.VOUCHERS||!store.VOUCHERS[code])
+    return {code:404,body:{ok:false,msg:"Voucher não encontrado"}};
+  if(typeof db.voucherStateSet!=="function")
+    return {code:500,body:{ok:false,msg:"Backend sem estado de voucher"}};
+  const action=String(body.action||"");
+  const patch={pause:{paused:true},resume:{paused:false},
+    delete:{deleted:true},restore:{deleted:false}}[action];
+  if(!patch)return {code:400,body:{ok:false,msg:"Ação inválida"}};
+  const st=await db.voucherStateSet(code,patch,String(auth.acc.login||"admin"));
+  return {code:200,body:{ok:true,code,state:st}};
+}
+
 /* --------------------------------------------------- server actions --- */
 /* Server save manual: flusha runtime/characters no JsonStore e avisa os
  * clientes pelo mesmo evento do save diário (broadcast "server-save"). */
@@ -6381,6 +6434,17 @@ async function main() {
       if(req.method==="GET"&&url==="/api/admin/bans"){
         const token=(req.headers.authorization||"").replace("Bearer ","");
         const r=await adminBanList(db,token);return send(res,r.code,r.body);}
+      /* -------- VOUCHERS (aba GM): lista, detalhe de resgates, pause/delete -------- */
+      if(req.method==="GET"&&url==="/api/admin/vouchers"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await adminVoucherList(db,token);return send(res,r.code,r.body);}
+      if(req.method==="POST"&&url==="/api/admin/vouchers/state"){
+        const r=await adminVoucherSetState(db,await readBody(req));return send(res,r.code,r.body);}
+      const adminVoucherMatch=url.match(/^\/api\/admin\/vouchers\/([A-Za-z0-9_\-]{1,40})$/);
+      if(adminVoucherMatch&&req.method==="GET"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await adminVoucherDetail(db,token,adminVoucherMatch[1]);
+        return send(res,r.code,r.body);}
       if(req.method==="POST"&&url==="/api/admin/chat-delete"){
         const body=await readBody(req);
         const auth=await adminSession(db,String(body.token||""));if(auth.error)return send(res,auth.error.code,auth.error.body);

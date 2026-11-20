@@ -2458,6 +2458,22 @@ async function adminApiBans(token) {
   if (!r.data || !r.data.ok) return { ok: false, bans: [] };
   return { ok: true, bans: r.data.bans || [] };
 }
+/* Vouchers (aba VOUCHERS do painel GM) */
+async function adminApiVouchers(token) {
+  const r = await _api("GET", "/api/admin/vouchers", null, token);
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Falha ao listar vouchers", vouchers: [] };
+  return { ok: true, vouchers: r.data.vouchers || [] };
+}
+async function adminApiVoucherDetail(token, code) {
+  const r = await _api("GET", "/api/admin/vouchers/" + encodeURIComponent(String(code || "")), null, token);
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Falha ao carregar voucher" };
+  return { ok: true, voucher: r.data.voucher };
+}
+async function adminApiVoucherState(token, code, action) {
+  const r = await _api("POST", "/api/admin/vouchers/state", { token, code: String(code || ""), action: String(action || "") });
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Ação recusada" };
+  return { ok: true, state: r.data.state };
+}
 async function adminApiServerSave(token) {
   const r = await _api("POST", "/api/admin/server-save", { token });
   if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Server save falhou" };

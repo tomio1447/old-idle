@@ -480,6 +480,14 @@ async function redeemVoucher(db, body) {
   const v = code && VOUCHERS[code];
   if (!v) return { code: 400, body: { ok: false, msg: "Voucher inválido" } };
 
+  // Estado administrável (aba VOUCHERS do painel): deleted = inválido,
+  // paused = temporariamente indisponível para novos resgates.
+  if (typeof db.voucherStateGet === "function") {
+    const st = await db.voucherStateGet(code);
+    if (st && st.deleted) return { code: 400, body: { ok: false, msg: "Voucher inválido" } };
+    if (st && st.paused) return { code: 400, body: { ok: false, msg: "Voucher pausado temporariamente" } };
+  }
+
   // Reserva o resgate ANTES de creditar: o UNIQUE (code, account_id) decide
   // corridas entre requisições simultâneas — só um ganha.
   if (typeof db.voucherClaim === "function") {

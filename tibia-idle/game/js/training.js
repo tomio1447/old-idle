@@ -253,7 +253,10 @@ function hideTrainingLoading(){const el=document.getElementById("training-loadin
 
 function startTrainingArea() {
   if (!G.p) return {ok:false,msg:"Crie um personagem primeiro."};
-  if (G.combat) stopHunt(true);
+  // keepVitals: treino não é templo — ao sair de uma hunt direto pro
+  // treino, HP/MP ficam como estavam (sem o checkpoint de cura). Também
+  // pula o report de zone=city que expulsava a party antes do zone=training.
+  if (G.combat) stopHunt(true, { keepVitals: true, skipPartyZone: true });
   if (G.training) return {ok:true,msg:""};
   showTrainingLoading();
   const enter = (map) => {

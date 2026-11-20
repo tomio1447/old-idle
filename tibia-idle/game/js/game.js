@@ -3123,10 +3123,14 @@ function stopHunt(skipMapLoading, opts) {
   // Checkpoint do templo: cura ANTES de persistir. save() com G.combat
   // online não grava o personagem (o tick já o fez com HP de combate),
   // então HP 150/0 acabava no banco se a cura viesse depois.
-  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("templo");
+  // opts.keepVitals (transição hunt→treino): a área de treino não é
+  // templo — HP/MP do combate são mantidos em vez de encher na hora.
+  if (!opts.keepVitals && typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("templo");
   if (G.p) {
-    const m = maxStats(G.p);
-    G.p.hp = m.hp; G.p.mp = m.mp;
+    if (!opts.keepVitals) {
+      const m = maxStats(G.p);
+      G.p.hp = m.hp; G.p.mp = m.mp;
+    }
     G.p.hunt = null;
     G.p.instanceMode = null;
   }

@@ -28,6 +28,8 @@ const ADMIN = {
   charBusca: "",
   charResults: [],
   targetLoading: false,
+  /* Aba VOUCHERS: código selecionado p/ detalhe (null = lista) */
+  voucherSel: null,
 };
 
 /* Abas do painel */
@@ -42,6 +44,7 @@ const ADMIN_TABS = [
   { id: "forge", nome: "⚒ FORJE" },
   { id: "mobs", nome: "👹 Invocar" },
   { id: "store", nome: "💰 Financeiro" },
+  { id: "vouchers", nome: "🎟 Vouchers" },
   { id: "rmt", nome: "💵 RMT" },
   { id: "ban", nome: "🔨 Banimento" },
   { id: "server", nome: "💾 Server" },
@@ -240,6 +243,7 @@ function renderAdminContent() {
     skills: renderAdminSkills,
     items: renderAdminItems, loot: renderAdminLoot, imb: renderAdminImbuements, equip: renderAdminEquip,
     forge: renderAdminForge, mobs: renderAdminMobs, store: renderAdminStore,
+    vouchers: renderAdminVouchers,
     ban: renderAdminBan, server: renderAdminServer, popup: renderAdminPopup,
     templo: renderAdminTemplo, raid: renderAdminRaid, spec: renderAdminSpec,
     rmt: renderAdminRmt,
@@ -1596,6 +1600,106 @@ function renderAdminMobs(p, el) {
  * Ferramentas da conta @admin (role=admin) — operam cross-account via
  * /api/admin/*. Diferente das abas de debug (que editam o char alvo), estas
  * agem no servidor/terceiros diretamente. */
+
+/* ----------------------------------------------------- 🎟 VOUCHERS -----
+ * Lista os códigos definidos no servidor (store.VOUCHERS), com contagem de
+ * resgates. Clique no card abre o detalhe: quem resgatou + pause/delete.
+ * Pause/delete são overlay persistido (voucher_state) — a definição do
+ * código não é alterada. */
+function renderAdminVouchers(p, el) {
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmtWhen = (v) => {
+    const d = v == null ? null : new Date(typeof v === "number" ? v : v);
+    return d && !isNaN(d) ? d.toLocaleString("pt-BR") : "—";
+  };
+  const statusBadge = (v) => v.deleted
+    ? `<b style="color:#ff7a6a">EXCLUÍDO</b>`
+    : (v.paused ? `<b style="color:#ffd65a">PAUSADO</b>` : `<b style="color:#9ce84a">ATIVO</b>`);
+
+  /* ---------- detalhe de um voucher ---------- */
+  if (ADMIN.voucherSel) {
+    const code = ADMIN.voucherSel;
+    el.innerHTML = `
+      <div class="admin-grid">
+        <div class="admin-card">
+          <div class="admin-card-t">
+            <button class="sm" id="adm-vch-back">◀ Vouchers</button> ${esc(code)}
+          </div>
+          <div id="adm-vch-info" class="tiny dim">carregando…</div>
+        </div>
+        <div class="admin-card">
+          <div class="admin-card-t">Resgates</div>
+          <div id="adm-vch-claims" class="tiny dim">carregando…</div>
+        </div>
+      </div>`;
+    $("#adm-vch-back").addEventListener("click", () => {
+      ADMIN.voucherSel = null;
+      renderAdminContent();
+    });
+    (async () => {
+      const r = await adminApiVoucherDetail(sessionToken(), code);
+      const info = $("#adm-vch-info"), claimsBox = $("#adm-vch-claims");
+      if (!info || !claimsBox) return;
+      if (!r.ok || !r.voucher) {
+        info.innerHTML = `<span style="color:#ff9a6a">${esc(r.msg || "Voucher não encontrado")}</span>`;
+        claimsBox.textContent = "—";
+        return;
+      }
+      const v = r.voucher;
+      info.innerHTML = `
+        <div class="tiny mb4">${esc(v.label || "")}</div>
+        <div class="tiny mb4">Recompensas: <b>${esc((v.rewards || []).join(" + ") || "—")}</b></div>
+        <div class="tiny mb4">Status: ${statusBadge(v)}
+          <span class="dim">${v.updatedAt ? " · por " + esc(v.updatedBy) + " · " + fmtWhen(v.updatedAt) : ""}</span></div>
+        <div class="tiny mb4">Resgates: <b>${(v.claims || []).length}</b> conta(s)</div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
+          ${v.deleted
+            ? `<button class="sm primary" data-vch-act="restore">Restaurar</button>`
+            : `<button class="sm ${v.paused ? "primary" : ""}" data-vch-act="${v.paused ? "resume" : "pause"}">${v.paused ? "Retomar" : "Pausar"}</button>
+               <button class="sm" data-vch-act="delete" style="color:#ff8a7a;border-color:#5a2a24">Excluir</button>`}
+        </div>`;
+      const claims = v.claims || [];
+      claimsBox.innerHTML = claims.length
+        ? `<div class="list" style="max-height:240px">` + claims.map((c) => `
+            <div class="stat-row"><span class="k">${esc(c.login || "conta #" + c.accountId)}</span>
+            <span class="v dim">${fmtWhen(c.createdAt)}</span></div>`).join("") + `</div>`
+        : `<span class="dim">Nenhum jogador resgatou ainda.</span>`;
+      $$("#adm-vch-info [data-vch-act]").forEach((b) =>
+        b.addEventListener("click", async () => {
+          const act = b.dataset.vchAct;
+          if (act === "delete" && !confirm("Excluir o voucher " + code + "? Jogadores não poderão mais resgatá-lo.")) return;
+          const rr = await adminApiVoucherState(sessionToken(), code, act);
+          if (!rr.ok) { adminLog("voucher: " + (rr.msg || "falha")); return; }
+          adminLog(`voucher ${code}: ${act === "pause" ? "pausado" : act === "resume" ? "retomado" : act === "delete" ? "excluído" : "restaurado"}`);
+          renderAdminContent();
+        }));
+    })();
+    return;
+  }
+
+  /* ---------- lista de vouchers ---------- */
+  el.innerHTML = `<div id="adm-vch-list" class="tiny dim">carregando…</div>`;
+  (async () => {
+    const box = $("#adm-vch-list");
+    const r = await adminApiVouchers(sessionToken());
+    if (!box) return;
+    if (!r.ok) { box.innerHTML = `<span style="color:#ff9a6a">${esc(r.msg || "Falha")}</span>`; return; }
+    const rows = r.vouchers || [];
+    if (!rows.length) { box.innerHTML = `<span class="dim">Nenhum voucher definido no servidor.</span>`; return; }
+    box.innerHTML = `<div class="admin-grid">` + rows.map((v) => `
+      <div class="admin-card" data-vch="${esc(v.code)}" style="cursor:pointer">
+        <div class="admin-card-t">${esc(v.code)} ${statusBadge(v)}</div>
+        <div class="tiny dim">${esc(v.label || "")}</div>
+        <div class="tiny mt4"><b>${v.claims}</b> resgate(s) · ${esc((v.rewards || []).join(" + ") || "—")}</div>
+      </div>`).join("") + `</div>`;
+    $$("#adm-vch-list [data-vch]").forEach((card) =>
+      card.addEventListener("click", () => {
+        ADMIN.voucherSel = card.dataset.vch;
+        renderAdminContent();
+      }));
+  })();
+}
 
 /* ----------------------------------------------------- 🔨 BANIMENTO --- */
 function renderAdminBan(p, el) {
