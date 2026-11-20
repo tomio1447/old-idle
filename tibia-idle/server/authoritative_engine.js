@@ -1081,6 +1081,7 @@ function normalizeVisualState(raw,auth){
       if(input.helperPresets!==undefined)item.helperPresets=sanitizeHelperPresets(input.helperPresets);
       if(input.helperActivePreset!==undefined)
         item.helperActivePreset=input.helperActivePreset?String(input.helperActivePreset).slice(0,64):null;
+      if(input.wheel!==undefined)item.wheel=input.wheel;
       const wdx=Number(input.walkIntent&&input.walkIntent.dx),wdy=Number(input.walkIntent&&input.walkIntent.dy);
       if(Number.isFinite(wdx)&&Number.isFinite(wdy)&&(wdx||wdy)){
         item.walkIntent={dx:Math.max(-1,Math.min(1,Math.round(wdx))),dy:Math.max(-1,Math.min(1,Math.round(wdy)))};
@@ -1248,6 +1249,13 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
      * este espelho, o snapshot da instância regrava a lista antiga no save. */
     if(pos.helperPresets!==undefined){item.p=item.p||{};item.p.helperPresets=pos.helperPresets;}
     if(pos.helperActivePreset!==undefined){item.p=item.p||{};item.p.helperActivePreset=pos.helperActivePreset;}
+    /* Wheel of Destiny: preferência do cliente — sanitiza contra o budget
+     * real (nível + scrolls + grade IV) e espelha em item.p para a
+     * autoridade regravá-la no save da instância. */
+    if(pos.wheel!==undefined){
+      const w=sanitizeWheelState(pos.wheel,item.p);
+      if(w){item.p=item.p||{};item.p.wheel=w;}
+    }
   }}
   const clock=Number(auth.clock)||0;
   // Posição dos MOBS é autoritativa no servidor (advanceAuthorityMovement
@@ -3199,6 +3207,28 @@ function clearCharm(p,id){
   const cid=resolveCharmId(id);
   if(!cid||!p.charmRace[cid])return{ok:false,erro:"Charm sem assign."};
   delete p.charmRace[cid];return{ok:true,id:cid};
+}
+/* Sanitiza o `wheel` enviado pelo cliente no tick: só ids conhecidos,
+ * inteiros ≥0 ≤ spec.max e gasto total ≤ wheelPoints (nível + scrolls +
+ * grade IV). Campos não-slot (scrolls, gems, sockets, frags…) passam por
+ * clone — são gravados pelo mesmo canal do save comum de cidade. Retorna
+ * null quando o payload não é objeto (a autoridade mantém a roda atual). */
+function sanitizeWheelState(raw,p){
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
+  const out=JSON.parse(JSON.stringify(raw));
+  const src=raw.slots&&typeof raw.slots==="object"?raw.slots:{};
+  const base={level:Math.max(1,Number(p&&p.level)||1),voc:(p&&p.voc)||"knight",wheel:{slots:{},scrolls:(out.scrolls&&typeof out.scrolls==="object")?out.scrolls:{},gems:Array.isArray(out.gems)?out.gems:[]}};
+  const budget=WHEEL_FN&&typeof WHEEL_FN.wheelPoints==="function"?Number(WHEEL_FN.wheelPoints(base))||0:0;
+  const slots={};let spent=0;
+  for(const id of Object.keys(src)){
+    const spec=WHEEL_SLOTS[id];if(!spec)continue;
+    const v=Math.max(0,Math.min(Number(spec.max)||0,Math.floor(Number(src[id])||0)));
+    if(v<=0)continue;
+    if(spent+v>budget)continue; // estourou o budget: ignora o restante
+    slots[id]=v;spent+=v;
+  }
+  out.slots=slots;
+  return out;
 }
 function wheelSkillBonus(p,which){
   if(!p||!p.wheel||!p.wheel.slots)return 0;
@@ -9737,7 +9767,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState,opts)
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
   annihilatorTick,claimAnnihilatorReward,annihilatorRewardOffer,claimAnnihilatorCart,bloodrottenTick,
-  normalizeVisualState,sanitizeHelperPresets,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
+  normalizeVisualState,sanitizeHelperPresets,sanitizeWheelState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
   spawnHuntWave,pickHuntSpawnSlug,openAuthBagYouDesire,openAuthPrimalBag,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   skillWaveCells,

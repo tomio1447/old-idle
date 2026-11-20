@@ -533,6 +533,10 @@ function accountAuthorityVisualState(){
       if(isSelf&&cfgSrc&&typeof helperPresetClone==="function"){
         if(Array.isArray(cfgSrc.helperPresets))visual.helperPresets=helperPresetClone(cfgSrc.helperPresets);
         visual.helperActivePreset=cfgSrc.helperActivePreset?String(cfgSrc.helperActivePreset):null;
+        /* Wheel of Destiny é preferência do cliente (como presets): sem o
+         * espelho, a instância regrava a roda antiga no save e os pontos
+         * alocados em combate "somem" no fim da hunt. */
+        if(cfgSrc.wheel&&typeof cfgSrc.wheel==="object")visual.wheel=helperPresetClone(cfgSrc.wheel);
       }
       if(cfgSrc&&cfgSrc.config){
         const mode=cfgSrc.config.attackMode||(combat&&combat.huntMode)||"kiting";

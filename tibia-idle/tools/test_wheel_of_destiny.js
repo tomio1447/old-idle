@@ -13,7 +13,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 must(html.includes("js/wheeldata.js?v=wheel-seq-v1"), "index sem wheeldata cache-bust");
 must(html.includes("js/wheel-gems.js?v=wheel-otc-v2"), "index sem wheel-gems cache-bust v2");
 must(html.includes("js/wheel.js?v=wheel-active-v1"), "index sem wheel.js cache-bust");
-must(html.includes("js/wheel-ui.js?v=wod-modal-v1"), "index sem wheel-ui cache-bust wod-modal");
+must(html.includes("js/wheel-ui.js?v=wod-save-v1"), "index sem wheel-ui cache-bust wod-save");
 must(html.includes("css/wheel-otc.css?v=wod-modal-v1"), "index sem wheel-otc.css cache-bust wod-modal");
 must(!html.includes("js/wheel-ui.js?v=wheel-fit-screen-v1"), "wheel-ui ainda com cache antigo");
 
@@ -119,5 +119,28 @@ must(smash.ok && smash.kind === "lesser" && smash.amount >= 1, "dismantle não d
 const css = fs.readFileSync(path.join(root, "css/wheel-otc.css"), "utf8");
 must(css.includes("wheel-largebonus") && css.includes("wheel-slice-fill") && css.includes("wod-wheel-container"),
   "CSS sem overlays/bordas oficiais");
+
+/* Persistência da roda: espelho no tick + sanitize server-side + OK sem
+ * fechar o modal. */
+const ac = fs.readFileSync(path.join(root, "js/account-client.js"), "utf8");
+must(ac.includes("visual.wheel=helperPresetClone(cfgSrc.wheel)"),
+  "tick não espelha wheel para a autoridade");
+const engSrc = fs.readFileSync(path.join(__dirname, "../server/authoritative_engine.js"), "utf8");
+must(engSrc.includes("item.p.wheel=w"), "engine não aplica wheel do tick");
+must(ui.includes('id="wheel-ok"') && !ui.includes('modal.classList.remove("show", "wide")'),
+  "OK da roda não deve fechar o modal");
+
+must(typeof engine.sanitizeWheelState === "function", "engine sem sanitizeWheelState");
+const clean = engine.sanitizeWheelState(
+  { slots: { GREEN_50: 75, FAKE_SLOT: 99, RED_50: 20 }, scrolls: {}, gems: [] },
+  { level: 500, voc: "knight" });
+must(clean && clean.slots.GREEN_50 === 50, "sanitize não clampeou spec.max (GREEN_50=" + (clean && clean.slots.GREEN_50) + ")");
+must(clean.slots.FAKE_SLOT === undefined, "sanitize manteve slot desconhecido");
+must(clean.slots.RED_50 === 20, "sanitize removeu slot válido");
+must(engine.sanitizeWheelState("x", p) === null, "sanitize aceitou payload não-objeto");
+// budget: lvl 80 knight = 30 pts — mais que isso é truncado
+const over = engine.sanitizeWheelState({ slots: { GREEN_50: 50, RED_50: 50 } }, { level: 80, voc: "knight" });
+const overSpent = Object.values(over.slots).reduce((a, b) => a + b, 0);
+must(overSpent <= 30, "sanitize não respeitou o budget de pontos (" + overSpent + ")");
 
 console.log("OK: wheel OTC assets, gem atelier, fragments, augments client+server.");

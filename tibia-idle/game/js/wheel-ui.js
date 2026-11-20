@@ -639,10 +639,9 @@ function bindWheel(root, rerender) {
     if (!p || !p.wheel) return;
     save();
     toast("Pontos da roda salvos.");
-    // Fecha em vez de re-renderizar: os pontos já foram salvos em cada
-    // clique; reabrir o modal aqui re-inicializava o estado e os pontos
-    // alocados "sumiam" na tela.
-    modal.classList.remove("show", "wide");
+    // NÃO fecha: o jogador continua distribuindo pontos (+1 por fatia)
+    // antes de fechar o modal manualmente.
+    rerender();
   });
   var resetBtn = body.querySelector("#wheel-reset");
   if (resetBtn) resetBtn.addEventListener("click", function(){

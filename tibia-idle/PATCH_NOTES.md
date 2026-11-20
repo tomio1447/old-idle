@@ -4,6 +4,22 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Wheel of Destiny: pontos persistem durante a hunt
+
+- **Fix — pontos da roda não salvavam**: durante uma hunt ativa o
+  autosave era ignorado (instância ativa) e o snapshot autoritativo
+  regravava a roda antiga no fim do combate. A roda agora viaja no
+  tick como preferência do cliente (mesmo canal dos Helper presets):
+  o cliente espelha `p.wheel` no `visual`, o engine sanitiza contra
+  o budget real (ids válidos, `spec.max`, gasto ≤ pontos por nível)
+  e aplica em `item.p` — e `enforceAuthoritativeProgress` preserva
+  a roda enviada no save.
+- **OK (Aplicar) não fecha mais o modal** — continua aberto para
+  distribuir +1 por fatia enquanto houver pontos; fecha pelo botão
+  "Close" ou pelo X do modal.
+
+---
+
 ## 2026-11-20 — Modal de patch notes compacto
 
 - Modal de boas-vindas/patch notes **menor** (720 → 560px, logo 96px,

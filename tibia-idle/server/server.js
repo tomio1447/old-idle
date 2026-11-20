@@ -46,7 +46,7 @@ const {
   filterHardObscenity, sanitizeText, vocShort, parsePm,
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
-  sanitizeHelperPresets, advanceTrainingPlayer, staminaRegenPlayer,
+  sanitizeHelperPresets, sanitizeWheelState, advanceTrainingPlayer, staminaRegenPlayer,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, openAuthPrimalBag, claimAnnihilatorReward, annihilatorRewardOffer, claimAnnihilatorCart, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
@@ -1353,6 +1353,11 @@ async function enforceAuthoritativeProgress(db,accountId,prepared){
     if(sentPrefs.helperPresets!==undefined)player.helperPresets=sanitizeHelperPresets(sentPrefs.helperPresets);
     if(sentPrefs.helperActivePreset!==undefined)
       player.helperActivePreset=sentPrefs.helperActivePreset?String(sentPrefs.helperActivePreset).slice(0,64):null;
+    /* Wheel: preferência do cliente — preserva a versão enviada (sanitizada
+     * no engine) para o snapshot da instância não apagar a roda nova. */
+    if(sentPrefs.wheel!==undefined&&typeof sanitizeWheelState==="function"){
+      const w=sanitizeWheelState(sentPrefs.wheel,player);if(w)player.wheel=w;
+    }
   }
   prepared.save.data=JSON.stringify(player);prepared.save.level=Math.max(1,Number(player.level)||1);
   prepared.save.voc=String(player.voc||prepared.save.voc);prepared.save.extra.hp=Math.max(0,Number(player.hp)||0);
