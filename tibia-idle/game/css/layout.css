@@ -6343,6 +6343,9 @@ body.fullhd .scene-overlay { font-size: 13px; }
 .modal-bg .modal.quest-detail-shell,
 .modal-bg .modal.quest-reward-shell { width:min(720px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
 .modal-bg .modal.quest-lobby-shell { width:min(580px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
+/* Annihilator reward cart — só o tamanho das 4 cartas + rodapé */
+.modal-bg .modal.anni-cart-shell { width:min(660px,calc(100vw - 32px)); height:auto; }
+.modal-bg .modal.anni-cart-shell .quest-reward-grid { grid-template-columns:repeat(auto-fill,minmax(135px,1fr)); }
 .quest-modal-card { cursor:pointer; }
 .quest-modal-card .quest-card-rewards { display:flex; gap:4px; flex-wrap:wrap; align-items:center; margin-left:auto; }
 .quest-reward-thumb { width:30px; height:30px; background:#151515; border:1px solid #555; display:flex; align-items:center; justify-content:center; }

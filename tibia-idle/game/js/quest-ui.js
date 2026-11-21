@@ -54,10 +54,11 @@ function questActiveChar() {
 function questPrepareModal(shell) {
   const modal = $("#modal"), body = $("#modal-body");
   if (!modal || !body) return null;
-  body.classList.remove("hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
-    "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
-    "mega-lobby-char-shell", "world-boss-detail-shell", "quests-modal-shell", "quest-detail-shell",
-    "quest-lobby-shell", "quest-reward-shell", "forge-modal-shell", "imb-modal-shell");
+  // Remove QUALQUER shell residual (*-shell / gi-picker) — listas manuais já
+  // deixaram ammo-modal-shell vazar e inflar este modal com padding/width dela.
+  for (const cls of [...body.classList]) {
+    if (/(?:-shell|gi-picker)$/.test(cls)) body.classList.remove(cls);
+  }
   body.classList.add(shell);
   modal.classList.add("show");
   return { modal, body };
@@ -892,8 +893,11 @@ async function annihilatorCartRequest(combat, payload) {
 function annihilatorPollRewardCart() {
   const c = G.combat;
   if (c?.questId !== "annihilator" || typeof ANNIHILATOR === "undefined") return;
+  // Com o cart aberto nunca re-dispara — reabrir recriaria os contadores.
+  if ($("#modal")?.classList.contains("show") && $("#anni-cart-confirm")) return;
   const point = ANNIHILATOR.rewardTrigger, b = ANNIHILATOR.bounds, p = c.player;
-  const inside = p && p.p?.hp > 0 && Math.round(p.cx) === point.x - b.x && Math.round(p.cy) === point.y - b.y;
+  const inside = p && p.p?.hp > 0 && !p.moving
+    && Math.round(p.cx) === point.x - b.x && Math.round(p.cy) === point.y - b.y;
   if (!inside || (c.mobs || []).some((m) => m.hp > 0)) { c.annihilatorRewardTileSeen = false; return; }
   if (c.annihilatorRewardTileSeen || c.annihilatorCartLoading) return;
   c.annihilatorRewardTileSeen = true;
@@ -905,8 +909,9 @@ async function openAnnihilatorRewardCart(combat) {
     const offer = await annihilatorCartRequest(combat, { preview: true });
     if (G.combat !== combat) return;
     if (!offer.count) return questToast("A conta já resgatou todas as recompensas da Annihilator.", "ok");
-    const ui = questPrepareModal("quest-reward-shell");
+    const ui = questPrepareModal("anni-cart-shell");
     if (!ui) return;
+    ui.body.classList.add("quest-reward-shell");
     const quantities = Object.fromEntries(ANNIHILATOR.rewards.map((slug) => [slug, 0]));
     let busy = false;
     const render = () => {

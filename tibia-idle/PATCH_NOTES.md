@@ -3,6 +3,20 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Annihilator: trigger no sqm parado + cart nao reseta + modal compacto
+
+- Modal de recompensa só abre com o personagem PARADO sobre o sqm do
+  chest (antes disparava ao passar por cima, !p.moving agora exigido).
+- Contadores -1/+1 não resetam mais: guard impede reabertura do cart
+  enquanto ele já está na tela (o poll re-disparava ao sair/voltar ao
+  tile e recriava quantities).
+- Modal encolhido pro conteúdo (anni-cart-shell, 660px auto-height) e
+  causa raiz do modal gigante corrigida: shells residuais (*-shell,
+  gi-picker) agora são removidos genericamente em questPrepareModal,
+  openAmmoPicker e charDetails — ammo-modal-shell vazava padding/width
+  para os demais modais.
+
+---
 ## 2026-11-21 — Storm arrows 15.25 + modal de municao no shell da cidade
 
 - Novas municoes AoE oficiais do update 15.25 (13 sqm em losango, hit 100%):

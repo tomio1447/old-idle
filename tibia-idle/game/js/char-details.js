@@ -42,12 +42,13 @@ const CHARD_TABS = [
   { id: "deaths",     nome: "Deaths" },
 ];
 
-const CHARD_SHELL_CLASSES = [
-  "hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
-  "reward-modal-shell", "npcs-modal-shell", "npc-modal-shell",
-  "cidade-modal-shell", "ranking-modal-shell", "social-modal-shell",
-  "calendar-modal-shell", "lootcfg-modal-shell", "imb-modal-shell",
-];
+// Remove qualquer *-shell/gi-picker residual antes de aplicar o próprio —
+// listas manuais deixavam shells novos (ex.: ammo-modal-shell) vazarem.
+function chardStripShells(body) {
+  for (const cls of [...body.classList]) {
+    if (/(?:-shell|gi-picker)$/.test(cls)) body.classList.remove(cls);
+  }
+}
 
 /* ------------------------------------------------------------ entrada */
 
@@ -82,7 +83,7 @@ function chardClose() {
 
 function chardShell(p) {
   const body = $("#modal-body");
-  body.classList.remove.apply(body.classList, CHARD_SHELL_CLASSES);
+  chardStripShells(body);
   body.classList.add("chard-modal-shell");
   body.innerHTML = `
     <div class="panel-title chard-title">

@@ -4624,12 +4624,9 @@ function openAmmoPicker() {
   if (!p) return;
   const body = $("#modal-body");
   if (body) {
-    body.classList.remove(
-      "hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
-      "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell",
-      "ranking-modal-shell", "lootcfg-modal-shell", "imb-modal-shell",
-      "chard-modal-shell", "calendar-modal-shell", "npc-modal-shell",
-      "gi-crypt-shell", "forge-modal-shell", "gi-picker");
+    for (const cls of [...body.classList]) {
+      if (/(?:-shell|gi-picker)$/.test(cls)) body.classList.remove(cls);
+    }
     body.classList.add("ammo-modal-shell");
   }
   AMMO_MODAL.busca = "";
