@@ -249,7 +249,8 @@ CANARY_ADDONS = {"pirat-bombardier": 2, "pirat-cutthroat": 1, "pirat-mate": 3,
                   "vile-grandmaster": 1,
                   "renegade-knight": 2,
                   "izcandar-champion-of-summer": 3,
-                  "izcandar-champion-of-winter": 3}
+                  "izcandar-champion-of-winter": 3,
+                  "monk-s-apparition": 1}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
 
