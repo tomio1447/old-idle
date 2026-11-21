@@ -5,13 +5,13 @@ Histórico de alterações do jogo, mais recentes primeiro.
 ---
 ## 2026-11-21 — Charms: Melhorar também funciona durante caçada online
 
-- "Melhorar"/"Desbloquear" eram bloqueados online ()
+- "Melhorar"/"Desbloquear" eram bloqueados online (charmLockedOnline)
   — quem caça o tempo todo nunca conseguia usar. Agora as operações de pool
-  (buy/upgrade) viram op do  no p autoritativo.
+  (buy/upgrade) viram op do POST /api/instance/charm no p autoritativo.
 - Contabilidade exactly-once: o débito sai pela extração do p da instância;
-   shifta  para o save comum sair com
+  charmPoolCommit shifta _charmPointsBase para o save comum sair com
   delta 0 (antes debitaria 2x). Falha do patch → rollback local sem cobrança.
--  passou a ser baseline no 
+- p._charmPointsBase passou a ser baseline no accountApplySharedInventory
   e a ser preservado no merge da autoridade (charmPoints/base viram campos
   client-owned como helperPresets).
 - Tier é espelhado nos demais membros da MESMA conta dentro da instância.
