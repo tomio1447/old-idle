@@ -3,6 +3,18 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Log: fonte de dano/cura +35%
+
+- Linhas de dano e cura do log de combate renderizam com fonte 35%
+  maior: 10px→13.5px (hora 9→12px); no modo fullhd 13→17.5px
+  (hora 11→15px).
+- Nova classe extra `.log-xl` aplicada nos addLog de dano/cura —
+  o kind (hit/death/party/skill) continua controlando a cor.
+- Cobertas: "X sofreu Y" (hit), "Curou X com spell" + "Mass Healing"
+  (party), "Curou condição" (skill, cured) e ticks de condição
+  "causou Y de dano" (death). Demais linhas (loot/exp/info) intactas.
+
+---
 ## 2026-11-21 — Stonerefiner: loot -50%
 
 - A chance de cada entrada da tabela de loot do Stonerefiner (Canary)

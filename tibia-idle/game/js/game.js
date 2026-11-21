@@ -3312,7 +3312,7 @@ function addCombatHitLog(comboKey, alvo, col, amount, elName) {
     }
     return;
   }
-  addLog("hit", `<b>${alvo}</b> sofreu <b style="color:${col}">${fmtDmg(amount)}</b> (${elName}).`);
+  addLog("hit log-xl", `<b>${alvo}</b> sofreu <b style="color:${col}">${fmtDmg(amount)}</b> (${elName}).`);
   _hitLogCombo = {
     key: comboKey || "",
     total: amount,
@@ -3621,8 +3621,8 @@ function drainEvents() {
         }
         // A fala (exura sio "Nome") vem no evento `say` do caster, como no
         // Canary. Não repetir as palavras sobre o aliado curado.
-        if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmtFull(e.amount)} hp)`);
-        else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmtFull(e.amount)} hp)`);
+        if (e.mass) addLog("party log-xl", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmtFull(e.amount)} hp)`);
+        else addLog("party log-xl", `Curou <b>${e.target}</b> com ${e.spell} (+${fmtFull(e.amount)} hp)`);
         break;
       }
       case "heal": {
@@ -3707,12 +3707,12 @@ function drainEvents() {
         const col = (typeof ELEMENTS !== "undefined" && ELEMENTS[el]) ? ELEMENTS[el].color : "#ff6b6b";
         if (e.dmg > 0) r.addFloater(px, py, "-" + fmtDmg(e.dmg), col, false, true, "damage");
         r.addEffect(px, py, (d && d.fx) || (typeof ELEMENTS !== "undefined" && ELEMENTS[el] && ELEMENTS[el].fx) || "draw-blood");
-        if (d) addLog("death", `<b style="color:${d.cor}">${d.nome}</b> causou <b>${e.dmg}</b> de dano.`);
+        if (d) addLog("death log-xl", `<b style="color:${d.cor}">${d.nome}</b> causou <b>${e.dmg}</b> de dano.`);
         renderStats(G.p);
         break;
       }
       case "cured":
-        addLog("skill", `Curou <b>${e.nome}</b>.`);
+        addLog("skill log-xl", `Curou <b>${e.nome}</b>.`);
         renderStats(G.p);
         break;
       case "challenge-target": {

@@ -1211,6 +1211,12 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .log-line.say   { color: #ffe680; }
 .log-line.hit   { color: #d8c8b0; }
 
+/* Logs de dano e cura com fonte 35% maior (10px -> 13.5px, time 9 -> 12).
+ * `.log-xl` é classe extra aplicada nas linhas de dano/cura — o kind
+ * (hit/death/party/skill) continua controlando a cor. */
+.log-line.log-xl { font-size: 13.5px; }
+.log-line.log-xl .time { font-size: 12px; }
+
 .helper-supply-row {
   display: flex; align-items: center; gap: 7px;
   padding: 4px 0;
@@ -5798,6 +5804,8 @@ body.fullhd .bar .label { font-size: 12px; }
 body.fullhd .stat-row { font-size: 13px; }
 body.fullhd .log-line { font-size: 13px; line-height: 1.45; }
 body.fullhd .log-line .time { font-size: 11px; }
+body.fullhd .log-line.log-xl { font-size: 17.5px; }
+body.fullhd .log-line.log-xl .time { font-size: 15px; }
 body.fullhd .tiny { font-size: 11px; }
 body.fullhd .small { font-size: 12px; }
 body.fullhd .panel-title { font-size: 13px; }
