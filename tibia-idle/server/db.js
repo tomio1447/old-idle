@@ -315,6 +315,25 @@ JsonStore.prototype.findAccountByEmail = function (email) {
   const em = String(email || "").toLowerCase();
   return (this.accounts || []).find((a) => String(a.email || "").toLowerCase() === em && em) || null;
 };
+/* Login social: localiza a conta pela identidade do provedor —
+ * google.sub / twitch.id dentro de accounts.social (JSON). */
+JsonStore.prototype.findAccountBySocial = function (provider, key) {
+  const prov = String(provider || ""), k = String(key || "");
+  if (!k || (prov !== "google" && prov !== "twitch")) return null;
+  return (this.accounts || []).find((a) => {
+    let s = a.social;
+    if (typeof s === "string") { try { s = JSON.parse(s); } catch (e) { s = null; } }
+    const node = s && typeof s === "object" ? s[prov] : null;
+    return node && String(node.sub || node.id || "") === k;
+  }) || null;
+};
+JsonStore.prototype.setAccountEmailVerified = function (accountId, ok) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.email_verified = ok ? 1 : 0;
+  this._save();
+  return a;
+};
 JsonStore.prototype.setAccountRecoveryCode = function (accountId, code, expiresAt) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
@@ -3511,6 +3530,19 @@ async function MysqlStore() {
       const rows = await this.query("SELECT * FROM accounts WHERE email = ? AND email != ''",
         [String(email || "").slice(0, 120)]);
       return hydrateAccount(rows[0] || null);
+    },
+    async findAccountBySocial(provider, key) {
+      const prov = String(provider || ""), k = String(key || "");
+      if (!k || (prov !== "google" && prov !== "twitch")) return null;
+      const path = prov === "google" ? "$.google.sub" : "$.twitch.id";
+      const rows = await this.query(
+        "SELECT a.* FROM accounts a WHERE JSON_UNQUOTE(JSON_EXTRACT(a.social, ?)) = ?",
+        [path, k]);
+      return hydrateAccount(rows[0] || null);
+    },
+    async setAccountEmailVerified(accountId, ok) {
+      await this.run("UPDATE accounts SET email_verified = ? WHERE id = ?",
+        [ok ? 1 : 0, Number(accountId)]);
     },
     async setAccountRecoveryCode(accountId, code, expiresAt) {
       await this.run("UPDATE accounts SET recovery_code = ?, recovery_code_expires = ? WHERE id = ?",

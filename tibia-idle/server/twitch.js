@@ -68,10 +68,12 @@ async function postForm(url, params) {
   return j;
 }
 
-const exchangeCode = (code) => postForm(TOKEN_URL, {
+/* `redirectOverride`: o fluxo de LOGIN social (server/oauth.js) usa o
+ * callback compartilhado /api/oauth/callback em vez de TWITCH_REDIRECT_URI. */
+const exchangeCode = (code, redirectOverride) => postForm(TOKEN_URL, {
   client_id: clientId(), client_secret: clientSecret(),
   code: String(code), grant_type: "authorization_code",
-  redirect_uri: redirectUri(),
+  redirect_uri: redirectOverride || redirectUri(),
 });
 
 async function helix(path, bearer) {
@@ -156,4 +158,5 @@ setTimeout(function(){try{window.close()}catch(e){}},5000);</script></body></htm
 module.exports = {
   configured, requiredChannel, newState, takeState, authUrl,
   exchangeCode, verifyFollow, socialOf, linkedLogin, verifiedChannel, pageHtml,
+  postForm, helix,
 };

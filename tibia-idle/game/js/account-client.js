@@ -2093,6 +2093,13 @@ async function accountEmailVerify(token, code) {
   return r.data || { ok: false, msg: "Falha ao confirmar o código" };
 }
 
+/* Login social (OAuth): o servidor diz quais provedores estão configurados
+ * — o cliente só mostra botões para os que retornam true. */
+async function accountAuthProviders() {
+  const r = await _api("GET", "/api/auth/providers");
+  return r.data && r.data.ok ? r.data : { ok: false, google: false, twitch: false };
+}
+
 async function accountLogin(login, password) {
   const r = await _api("POST", "/api/login", { login, password });
   if (!r.data.ok) return { ok: false, msg: r.data.msg || "Falha no login" };

@@ -7143,6 +7143,46 @@ function initAccountLogin() {
   $("#acc-open-register").addEventListener("click", openRegisterModal);
   const recoverBtn = $("#acc-open-recover");
   if (recoverBtn) recoverBtn.addEventListener("click", openRecoverModal);
+
+  /* Retorno do login social (OAuth): o callback do servidor redireciona
+   * para /?sso=<token>&provider=... — consome o token antes do fluxo de
+   * reconexão abaixo e limpa a URL. */
+  try {
+    const qs = new URLSearchParams(location.search);
+    const sso = qs.get("sso");
+    if (sso) {
+      sessionStorage.setItem("tibia-idle-token", sso);
+      if (qs.get("provider"))
+        sessionStorage.setItem("tibia-idle-sso-provider", qs.get("provider"));
+      history.replaceState(null, "", location.pathname);
+    }
+  } catch (e) {}
+
+  /* Botões "Continuar com Google/Twitch": só aparecem se o provedor estiver
+   * configurado no servidor (/api/auth/providers). */
+  (async () => {
+    try {
+      if (typeof accountAuthProviders !== "function") return;
+      const pr = await accountAuthProviders();
+      if (!pr || (!pr.google && !pr.twitch)) return;
+      const box = $("#account-login");
+      if (!box) return;
+      const wrap = document.createElement("div");
+      wrap.className = "oauth-login";
+      let h = '<div class="oauth-divider"><span>ou continue com</span></div>';
+      if (pr.google) h += `<button type="button" class="oauth-btn oauth-google" data-provider="google">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.1h6.5c-.1 1.1-.8 2.7-2.4 3.8l-.02.15 3.5 2.7.24.02c2.2-2 3.5-5 3.5-8.5z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.8-2.9c-1 .7-2.4 1.2-4.1 1.2-3.1 0-5.8-2.1-6.8-5l-.14.01-3.7 2.9-.05.13C3.2 21.3 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.2 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.7.4-2.4l-.01-.16-3.8-2.9-.12.06C.4 8.2 0 10 0 12s.4 3.8 1.2 5.4l4-3z"/><path fill="#EA4335" d="M12 4.6c2.2 0 3.7 1 4.6 1.8l3.3-3.2C17.9 1.2 15.2 0 12 0 7.3 0 3.2 2.7 1.2 6.6l4 3c1-2.8 3.7-5 6.8-5z"/></svg>
+        <span>Google</span></button>`;
+      if (pr.twitch) h += `<button type="button" class="oauth-btn oauth-twitch" data-provider="twitch">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#9146FF" d="M4.3 1L1.5 5.4v15.8h5.1V23h2.8l2.1-2.1h3.2l6-5.9V1H4.3zm14.6 13l-3.1 3.1h-5l-2.1 2.1v-2.1H5.3V3h13.6v11z"/><path fill="#9146FF" d="M15.9 7.6v4.7h-2V7.6h2zm-5.6 0v4.7h-2V7.6h2z"/></svg>
+        <span>Twitch</span></button>`;
+      wrap.innerHTML = h;
+      box.appendChild(wrap);
+      wrap.querySelectorAll(".oauth-btn").forEach((b) => {
+        b.addEventListener("click", () => { location.href = "/api/auth/" + b.dataset.provider; });
+      });
+    } catch (e) {}
+  })();
   $("#account-login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = $("#acc-btn-login");

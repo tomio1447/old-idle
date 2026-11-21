@@ -3,6 +3,28 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Login/registro social: Google + Twitch (OAuth)
+
+- Novo `server/oauth.js` + callback compartilhado `GET /api/oauth/callback`
+  (o state carrega o provider — UMA Redirect URI serve nos dois apps).
+- `/api/auth/{google|twitch}` redireciona pro authorize; `/api/auth/providers`
+  diz ao cliente quais botões exibir (provedor sem credenciais não aparece).
+- `oauthFinish` decide: conta logada → VINCULA o provedor; identidade já
+  ligada → login; Google com e-mail verificado → vincula por e-mail;
+  senão → CRIA conta nova (login/display únicos, senha aleatória, e-mail
+  verificado só quando o Google confirma). Ban ativo bloqueia igual ao
+  login por senha; sessão emitida via redirect `/?sso=<token>`.
+- Login Twitch reusa `TWITCH_CLIENT_ID/SECRET` e já checa o follow do
+  canal do voucher (`user:read:follows`) — quem segue sai do login com o
+  gate do BUTO__PVP resolvido.
+- `accounts.social` armazena `google.sub` / `twitch.id`; novos métodos
+  `findAccountBySocial` e `setAccountEmailVerified` nos dois stores.
+- Cliente: tela de login ganha "ou continue com Google/Twitch" (injetado
+  só quando configurado) e consome `?sso=` no boot → `/api/me` → picker.
+- Requer env: `GOOGLE_CLIENT_ID/SECRET`, `TWITCH_CLIENT_ID/SECRET`,
+  `OAUTH_REDIRECT_URI` registrada nos consoles Google e Twitch.
+
+---
 ## 2026-11-21 — Voucher de streamer exige follow real na Twitch (OAuth)
 
 - Novo `server/twitch.js`: fluxo OAuth completo — `/api/twitch/auth` redireciona

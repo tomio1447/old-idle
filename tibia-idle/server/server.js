@@ -66,6 +66,7 @@ try { SharedInv = require("./shared_inventory"); } catch (e) { SharedInv = null;
 const store = require("./store");
 const rmt = require("./rmt");
 const twitch = require("./twitch");
+const oauth = require("./oauth");
 const mailer = require("./mailer");
 
 const PORT = parseInt(process.env.PORT || "8001", 10);
@@ -1042,6 +1043,89 @@ async function login(db, body) {
       characters: characters.map(charSummaryWithGold(acc)),
     },
   };
+}
+
+/* ---- LOGIN SOCIAL (OAuth) -------------------------------------------
+ * oauthFinish: entrada única pós-callback — state diz o provider e se é
+ * um vínculo em conta logada (?token= no /api/auth/*). Prioridade:
+ *   1) conta logada (vínculo) → grava a identidade social nela
+ *   2) conta já ligada a esta identidade (google.sub / twitch.id)
+ *   3) Google com e-mail verificado que já existe como conta → vincula
+ *      (Twitch NÃO vincula por e-mail — verificação não comprovada)
+ *   4) nada encontrado → cria conta nova (senha aleatória — pode definir
+ *      uma depois pela tela de recuperação se quiser login por senha)
+ * Sempre grava o nó social, aplica a mesma regra de ban do login por
+ * senha e devolve uma sessão nova do jogo. */
+function oauthGenLogin(base) {
+  const s = String(base || "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 28);
+  return s.length ? s : "player";
+}
+function oauthGenDisplay(base) {
+  let s = String(base || "").replace(/[^A-Za-zÀ-ÿ0-9 .'-]/g, " ")
+    .replace(/\s+/g, " ").trim();
+  if (!/^[A-Za-zÀ-ÿ]/.test(s)) s = "Player " + s;
+  if (s.length < 3) s = "Player " + (100 + Math.floor(Math.random() * 900));
+  return s.slice(0, 24).trim();
+}
+async function oauthUniqueLogin(db, base) {
+  const cand = oauthGenLogin(base);
+  for (let i = 0; i < 50; i++) {
+    const name = i ? (cand + i).slice(0, 32) : cand;
+    if (!(await db.findAccountByLogin(name))) return name;
+  }
+  return (cand + Date.now().toString(36)).slice(0, 32);
+}
+async function oauthUniqueDisplay(db, base) {
+  const cand = oauthGenDisplay(base);
+  for (let i = 0; i < 50; i++) {
+    const name = i ? (cand + " " + (i + 1)).slice(0, 24).trim() : cand;
+    if (typeof db.findAccountByDisplayName !== "function" ||
+        !(await db.findAccountByDisplayName(name))) return name;
+  }
+  return (cand.slice(0, 20) + " " + Math.floor(Math.random() * 90 + 10)).trim();
+}
+async function oauthFinish(db, st, provider, p) {
+  let acc = null, linked = false, created = false;
+  if (st && st.token) {
+    acc = await db.findAccountByToken(st.token);
+    if (acc) linked = true;
+  }
+  if (!acc && typeof db.findAccountBySocial === "function")
+    acc = await db.findAccountBySocial(provider, p.key);
+  if (!acc && provider === "google" && p.emailVerified && p.email &&
+      typeof db.findAccountByEmail === "function")
+    acc = await db.findAccountByEmail(p.email);
+  if (!acc) {
+    const seed = p.login || String(p.email || "").split("@")[0] || p.name || "player";
+    const login = await oauthUniqueLogin(db, seed);
+    const display = await oauthUniqueDisplay(db, p.name || seed);
+    const hash = bcrypt.hashSync(crypto.randomBytes(24).toString("hex"), SALT_ROUNDS);
+    acc = await db.createAccount(login, hash, "user", 0, p.email || "", display);
+    created = true;
+    if (p.emailVerified && typeof db.setAccountEmailVerified === "function")
+      await db.setAccountEmailVerified(acc.id, true);
+  }
+  const social = twitch.socialOf(acc);
+  if (provider === "google") {
+    social.google = { sub: p.key, email: String(p.email || ""), at: Date.now() };
+  } else if (provider === "twitch") {
+    const prevFollows = social.twitch && social.twitch.follows;
+    social.twitch = { id: p.key, login: String(p.login || ""),
+      follows: Object.assign({}, prevFollows || {}), at: Date.now() };
+    if (p.follows === true || p.follows === false)
+      social.twitch.follows[twitch.requiredChannel()] = p.follows;
+  }
+  if (typeof db.setAccountSocial === "function") await db.setAccountSocial(acc.id, social);
+  if (typeof db.banActiveForAccount === "function") {
+    const ban = await db.banActiveForAccount(acc.id);
+    if (ban) return { ban };
+  }
+  acc = await ensureAccountWallet(db, acc);
+  const token = newToken();
+  if (SYNC_BUS) SYNC_BUS.revokeAccount(acc.id);
+  if (typeof db.createSession === "function")
+    await db.createSession(acc.id, token, Date.now() + SESSION_TTL_MS);
+  return { token, account: acc, created, linked };
 }
 
 async function me(db, token) {
@@ -6287,6 +6371,62 @@ async function main() {
           configured: twitch.configured(), channel: twitch.requiredChannel(),
           linked: !!twitch.linkedLogin(acc), login: twitch.linkedLogin(acc),
           verified: twitch.verifiedChannel(acc) });
+      }
+      /* ---- LOGIN SOCIAL (Google + Twitch) ----
+       * /api/auth/providers: o cliente só exibe botões dos provedores
+       *   configurados no .env.
+       * /api/auth/{provider}: 302 pro authorize do provedor.
+       * /api/oauth/callback: URI compartilhada — o state carrega o provider.
+       *   ?token= no início vincula o provedor à conta logada. */
+      if (req.method === "GET" && url === "/api/auth/providers") {
+        return send(res, 200, { ok: true,
+          google: oauth.googleConfigured(), twitch: oauth.twitchConfigured() });
+      }
+      if (req.method === "GET" && (url === "/api/auth/google" || url === "/api/auth/twitch")) {
+        const provider = url.endsWith("google") ? "google" : "twitch";
+        const conf = provider === "google" ? oauth.googleConfigured() : oauth.twitchConfigured();
+        if (!conf)
+          return sendText(res, 503, twitch.pageHtml("Login indisponível",
+            "O login com " + provider + " ainda não está configurado no servidor.", false),
+            "text/html; charset=utf-8");
+        const q = new URL(req.url, "http://x").searchParams;
+        const st = oauth.newLoginState(provider, String(q.get("token") || ""));
+        res.writeHead(302, Object.assign(hardenedHeaders(res), {
+          Location: provider === "google" ? oauth.googleAuthUrl(st) : oauth.twitchAuthUrl(st) }));
+        return res.end();
+      }
+      if (req.method === "GET" && url === "/api/oauth/callback") {
+        const q = new URL(req.url, "http://x").searchParams;
+        const st = oauth.takeLoginState(q.get("state") || "");
+        const page = (code, t, m, ok) =>
+          sendText(res, code, twitch.pageHtml(t, m, ok), "text/html; charset=utf-8");
+        if (!st) return page(400, "Sessão de login expirada", "Volte ao jogo e tente entrar de novo.", false);
+        if (q.get("error") || !q.get("code"))
+          return page(200, "Login cancelado", "Você cancelou a autorização. Pode fechar esta janela.", false);
+        try {
+          let profile = null;
+          if (st.provider === "google") {
+            const tok = await oauth.googleExchange(q.get("code"));
+            profile = await oauth.googleProfile(tok.access_token);
+          } else if (st.provider === "twitch") {
+            const tok = await oauth.twitchExchange(q.get("code"));
+            profile = await oauth.twitchLoginProfile(tok.access_token);
+          }
+          if (!profile) return page(400, "Provedor inválido", "Fluxo de login desconhecido.", false);
+          const r = await oauthFinish(db, st, st.provider, profile);
+          if (r.ban) {
+            const b = r.ban;
+            return page(403, "Conta suspensa", "Esta conta está suspensa" +
+              (b.until ? " até " + new Date(b.until).toLocaleDateString("pt-BR") : " por tempo indeterminado") +
+              (b.reason ? ". Motivo: " + b.reason : ""), false);
+          }
+          res.writeHead(302, Object.assign(hardenedHeaders(res), {
+            Location: "/?sso=" + encodeURIComponent(r.token) + "&provider=" + st.provider }));
+          return res.end();
+        } catch (e) {
+          console.log("[oauth] callback falhou:", e && e.message);
+          return page(502, "Falha no login", "Não foi possível concluir com o provedor. Tente de novo.", false);
+        }
       }
       if (req.method === "GET" && url === "/api/store/history") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
