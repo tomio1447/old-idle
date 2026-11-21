@@ -3,6 +3,15 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Status bar: recursos da Forja
+
+- A barra Status do painel de equipamento agora mostra Dust (com limite
+  no tooltip), Slivers e Exalted Cores após os ícones de condições,
+  separados por divisor. Saldo abreviado (ex.: 3.5k) sobre o ícone e
+  tooltip com saldo/descrição completa. A barra passa a ficar sempre
+  visível (antes sumia sem condições ativas).
+
+---
 ## 2026-11-21 — Forge: custo verde quando o ouro cobre
 
 - O valor em gp das abas Fusion e Transfer ficava sempre vermelho, mesmo

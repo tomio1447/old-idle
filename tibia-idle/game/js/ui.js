@@ -904,7 +904,8 @@ function attrEscape(s) {
 function paintConditionBar(box, p, withLabel) {
   if (!box) return;
   const itens = collectConditionBarItems(p);
-  if (!itens.length) {
+  const showForge = !!(withLabel && p);
+  if (!itens.length && !showForge) {
     box.style.display = "none";
     box.innerHTML = "";
     return;
@@ -924,6 +925,23 @@ function paintConditionBar(box, p, withLabel) {
     const tempo = it.tempo
       ? `<span class="sb-tempo">${it.tempo}</span>` : "";
     h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${attrEscape(it.nome)}" data-desc="${attrEscape(it.desc)}" data-tempo="${attrEscape(it.tempo)}">${img}${tempo}</span>`;
+  }
+  if (showForge) {
+    if (typeof ensureForge === "function") ensureForge(p);
+    const fmtN = (n) => n >= 1000
+      ? ((n / 1000).toFixed(n % 1000 ? 1 : 0).replace(/\.0$/, "")) + "k" : String(n);
+    const res = [
+      { slug: "dust", nome: "Dust", num: p.dust || 0,
+        desc: `Recurso da Forja — criaturas Influenced/Fiendish geram Dust. Saldo: ${fmtFull(p.dust || 0)}/${fmtFull(p.dustLimit || 100)}` },
+      { slug: "sliver", nome: "Slivers", num: p.slivers || 0,
+        desc: `Fiendish podem conceder Slivers. Converta em Exalted Cores na Forja. Saldo: ${fmtFull(p.slivers || 0)}` },
+      { slug: "exalted-core", nome: "Exalted Cores", num: p.exaltedCores || 0,
+        desc: `Melhora a chance de fusão ou reduz a perda de tier na Forja. Saldo: ${fmtFull(p.exaltedCores || 0)}` },
+    ];
+    h += '<span class="sb-sep"></span>';
+    for (const r of res) {
+      h += `<span class="sb-ico neutral sb-res" data-nome="${attrEscape(r.nome)}" data-desc="${attrEscape(r.desc)}" data-tempo=""><img src="assets/item/${r.slug}.gif" alt=""><span class="sb-tempo">${fmtN(r.num)}</span></span>`;
+    }
   }
   box.innerHTML = h;
   box.style.display = "flex";
