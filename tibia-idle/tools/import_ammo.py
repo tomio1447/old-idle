@@ -38,6 +38,30 @@ ELEM_POR_NOME = {
     "envenomed arrow": "earth", "poison arrow": "earth",
 }
 
+# Storm arrows do update 15.25 (Summer 2025): o items.xml local e anterior a
+# 15.25, entao os dados oficiais ficam chumbados aqui — patch notes + wiki:
+# 13 sqm em forma de losango (a mesma area dos storm effects), hit 100%.
+# cid oficial entre parenteses nos comentarios.
+_AREA_13SQM = [[0, 0, 1, 0, 0], [0, 1, 1, 1, 0], [1, 1, 3, 1, 1],
+               [0, 1, 1, 1, 0], [0, 0, 1, 0, 0]]
+AMMO_1525 = {
+    "shatterstorm-arrow": {"n": "shatterstorm arrow", "atk": 27,  # cid 53168
+                           "el": "physical", "lvl": 50,
+                           "areaFx": "explosion-area"},
+    "firestorm-arrow":    {"n": "firestorm arrow", "atk": 21,     # cid 53169
+                           "el": "fire", "lvl": 125,
+                           "areaFx": "fire-area"},
+    "terrastorm-arrow":   {"n": "terrastorm arrow", "atk": 21,    # cid 53170
+                           "el": "earth", "lvl": 125,
+                           "areaFx": "poison-area"},
+    "froststorm-arrow":   {"n": "froststorm arrow", "atk": 21,    # cid 53171
+                           "el": "ice", "lvl": 125,
+                           "areaFx": "ice-area"},
+    "thunderstorm-arrow": {"n": "thunderstorm arrow", "atk": 21,  # cid 53172
+                           "el": "energy", "lvl": 125,
+                           "areaFx": "energy-area"},
+}
+
 
 def slug(nome):
     return re.sub(r"[^a-z0-9]+", "-", nome.lower()).strip("-")
@@ -154,6 +178,17 @@ def main():
             if sc.get("fx"):
                 reg["areaFx"] = sc["fx"]
         itens[s] = reg
+
+    # Storm arrows 15.25: ausentes do items.xml local — entram da tabela
+    # oficial AMMO_1525 (atk = dano elemental; o fisico oficial e 0).
+    for slug_novo, d in AMMO_1525.items():
+        itens[slug_novo] = {
+            "n": d["n"], "s": "ammo", "t": "ammo", "atk": d["atk"],
+            "ammoKind": "arrow", "el": d["el"], "w": 0.8,
+            "hit": 100, "noMiss": 1,
+            "areaMatrix": [linha[:] for linha in _AREA_13SQM],
+            "areaFx": d["areaFx"], "lvl": d["lvl"],
+        }
 
     saida = os.path.join(GAME, "data", "ammo.json")
     json.dump(itens, open(saida, "w"))

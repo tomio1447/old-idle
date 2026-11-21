@@ -627,6 +627,14 @@ function renderEquip(p) {
   $$("#equip .slot").forEach((el) => {
     const slotDrop = el.dataset.slot;
     if (slotDrop === "cap") return;
+    // Clique na flecha abre o seletor de munição (slot cheio ou vazio) —
+    // antes o clique desequipava a munição sem aviso.
+    if (slotDrop === "ammo") {
+      el.addEventListener("click", () => {
+        hideTip();
+        if (typeof openAmmoPicker === "function") openAmmoPicker();
+      });
+    }
     if (typeof bindDrop === "function") {
     bindDrop(el, (payload) => {
       if (payload && payload.source === "stash" && typeof persistEquipFromSupplyStash === "function") {
@@ -654,7 +662,7 @@ function renderEquip(p) {
         slot === "shield" && (GAMEDATA.items[slug] || {}).t === "quiver"
           ? `Aljava na mão secundária. Munição: ${p.equip.ammo ? itemName(p.equip.ammo.item) + " · " + fmtFull(ammoPrice(p.equip.ammo.item)) + " gp/tiro" : "nenhuma"}` :
         slot === "extra" ? "Extra Slot: ferramentas bônus com resistência elemental" :
-        slot === "ammo" ? `Munição no quiver · ${fmtFull(ammoPrice(slug))} gp/tiro` :
+        slot === "ammo" ? `Munição no quiver · ${fmtFull(ammoPrice(slug))} gp/tiro · clique para trocar` :
         "Clique para desequipar";
       // passa o slot: e por ele que imbOf() encontra os imbuements do item
       // (e o instId resolve o tier da instância para o bônus da forja)
@@ -675,7 +683,8 @@ function renderEquip(p) {
         }
         return;
       }
-      if (slot === "ammo") { setActiveAmmo(G.p, null); hideTip(); renderAll(); return; }
+      // O clique no ammo já foi tratado acima (abre o seletor de munição).
+      if (slot === "ammo") return;
       // Instância online: desequip autoritativo (senão o tick restaura o slot).
       if (typeof persistUnequipFromContainer === "function" &&
           typeof accountApiConfigured === "function" && accountApiConfigured()) {
@@ -4613,6 +4622,16 @@ function bestAmmoFor(p) {
 function openAmmoPicker() {
   const p = G.p;
   if (!p) return;
+  const body = $("#modal-body");
+  if (body) {
+    body.classList.remove(
+      "hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
+      "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell",
+      "ranking-modal-shell", "lootcfg-modal-shell", "imb-modal-shell",
+      "chard-modal-shell", "calendar-modal-shell", "npc-modal-shell",
+      "gi-crypt-shell", "forge-modal-shell", "gi-picker");
+    body.classList.add("ammo-modal-shell");
+  }
   AMMO_MODAL.busca = "";
   desenhaAmmoPicker();
   $("#modal").classList.add("show");
@@ -4753,11 +4772,23 @@ function desenhaAmmoPicker() {
                           : "Nenhuma munição escolhida")}
         </span>
         <button class="sm ${auto ? "primary" : ""}" id="ammo-auto">Automática</button>
+        ${atual ? `<button class="sm" id="ammo-limpar">Remover</button>` : ""}
         <button class="sm" id="ammo-fechar">Fechar</button>
       </div>
     </div>`;
 
-  const fechar = () => $("#modal").classList.remove("show");
+  const fechar = () => {
+    $("#modal").classList.remove("show");
+    const b = $("#modal-body");
+    if (b) b.classList.remove("ammo-modal-shell");
+  };
+  const btnLimpar = $("#ammo-limpar");
+  if (btnLimpar) btnLimpar.addEventListener("click", () => {
+    p.config.ammoAuto = false;
+    setActiveAmmo(p, null);
+    toast("Nenhuma munição selecionada.");
+    save(); renderAll(); desenhaAmmoPicker();
+  });
   $("#ammo-close").addEventListener("click", fechar);
   $("#ammo-fechar").addEventListener("click", fechar);
 

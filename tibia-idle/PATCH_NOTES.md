@@ -3,6 +3,21 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Storm arrows 15.25 + modal de municao no shell da cidade
+
+- Novas municoes AoE oficiais do update 15.25 (13 sqm em losango, hit 100%):
+  shatterstorm (fisica, atk 27, lvl 50, 45 gp/tiro) e as elementais
+  firestorm/terrastorm/froststorm/thunderstorm (atk 21 elemental, lvl 125,
+  75 gp/tiro) — cids oficiais 53168-53172, areaMatrix + areaFx por elemento.
+- Clique no slot de municao do equipamento abre o seletor (antes
+  desequipava sem aviso); botao Remover dentro do modal mantem o caminho
+  de limpar a municao.
+- Modal de municao agora usa o ammo-modal-shell — mesmo pergaminho/paleta
+  quente dos modais da cidade (hunts/bosses).
+- import_ammo.py / import_quivers.py: tabela AMMO_1525 suplementar
+  oficial, pois o items.xml local e anterior a 15.25.
+
+---
 ## 2026-11-21 — Imbuements: 2o/3o slot sumia em cacada online
 
 - p.imbuements nao era preservado no merge da autoridade: o snapshot do

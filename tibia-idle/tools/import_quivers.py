@@ -79,6 +79,22 @@ ESPECIAL = {
                         "desc": "Veneno forte"},
 }
 
+# Storm arrows do update 15.25 (Summer 2025): ausentes do items.xml local —
+# dados oficiais (patch notes/TibiaWiki): AoE de 13 sqm em losango, hit 100%,
+# atk = dano elemental (fisico 0). Cids 53168-53172.
+AMMO_1525 = {
+    "shatterstorm-arrow": {"itemId": 53168, "nome": "shatterstorm arrow",
+                           "atk": 27, "lvl": 50, "custo": 45},
+    "firestorm-arrow":    {"itemId": 53169, "nome": "firestorm arrow",
+                           "atk": 21, "lvl": 125, "custo": 75, "el": "fire"},
+    "terrastorm-arrow":   {"itemId": 53170, "nome": "terrastorm arrow",
+                           "atk": 21, "lvl": 125, "custo": 75, "el": "earth"},
+    "froststorm-arrow":   {"itemId": 53171, "nome": "froststorm arrow",
+                           "atk": 21, "lvl": 125, "custo": 75, "el": "ice"},
+    "thunderstorm-arrow": {"itemId": 53172, "nome": "thunderstorm arrow",
+                           "atk": 21, "lvl": 125, "custo": 75, "el": "energy"},
+}
+
 
 def slug(nome):
     return re.sub(r"[^a-z0-9]+", "-", (nome or "").lower()).strip("-")
@@ -149,6 +165,24 @@ def main():
             e.update({k: v for k, v in esp.items() if k != "desc"})
             e["desc"] = esp["desc"]
         ammo[e["id"]] = e
+
+    # Storm arrows 15.25: nao existem no items.xml local — entram da tabela
+    # oficial (area 5 = fallback do losango de 13 sqm; a matriz real mora
+    # no ammo.json gerado pelo import_ammo.py).
+    for slug_novo, d in AMMO_1525.items():
+        e = {
+            "id": slug_novo, "itemId": d["itemId"], "nome": d["nome"],
+            "tipo": "arrow", "atk": d["atk"], "lvl": d["lvl"], "peso": 0.8,
+            "custo": d["custo"], "hit": 100, "noMiss": True,
+            "area": 5,
+            "desc": "Explode em 13 sqm%s e nunca erra"
+                    % ((" de " + {"fire": "fogo", "earth": "terra",
+                                 "ice": "gelo", "energy": "energia"}[d["el"]])
+                       if d.get("el") else ""),
+        }
+        if d.get("el"):
+            e["el"] = d["el"]
+        ammo[slug_novo] = e
 
     quivers = {}
     for iid in QUIVER_IDS:
