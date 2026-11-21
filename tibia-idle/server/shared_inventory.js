@@ -118,6 +118,9 @@ function normalizeSharedInventory(s) {
    * podem associar runas diferentes à MESMA criatura. */
   s.charms = (s.charms && typeof s.charms === "object" && !Array.isArray(s.charms)) ? s.charms : {};
   s.charmPoints = Math.max(0, Math.floor(Number(s.charmPoints) || 0));
+  /* Boost de skills de voucher (ex.: FLOWERS0800 = +50% por 12h) — timestamp
+   * DA CONTA, lido por addSkillTries/addManaSpent na engine e no cliente. */
+  s.skillBoostUntil = Math.max(0, Math.floor(Number(s.skillBoostUntil) || 0));
   return s;
 }
 
@@ -272,6 +275,7 @@ function applySharedToPlayer(p, shared) {
   p.dustLimit = shared.dustLimit;
   p.slivers = shared.slivers;
   p.exaltedCores = shared.exaltedCores;
+  p.skillBoostUntil = Number(shared.skillBoostUntil) || 0;
   // Baseline dos recursos da forja (mesma ideia do _pouchBase): o delta
   // (espelho − base) é o que ESTE player mudou — a extração soma o delta ao
   // shared atual em vez de sobrescrever, então um espelho atrasado não

@@ -680,7 +680,10 @@ function addSkillTries(p, which, tries) {
   const currentSkill = p.skills[which] || 10;
   const skillRate = (typeof serverSkillRate === "function")
     ? serverSkillRate(currentSkill) : 1;
-  const effectiveTries = Math.floor(tries * skillRate);
+  /* Boost de skills de voucher (FLOWERS0800): +50% nos tries enquanto
+   * p.skillBoostUntil > now — espelha a regra do servidor. */
+  const boostMul = Number(p.skillBoostUntil) > Date.now() ? 1.5 : 1;
+  const effectiveTries = Math.floor(tries * skillRate * boostMul);
 
   p.skillTries[which] = (p.skillTries[which] || 0) + effectiveTries;
   let up = false;

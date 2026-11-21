@@ -3,6 +3,24 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Novo parceiro: bruno_flowers (voucher FLOWERS0800)
+
+- partners.js: segunda entrada (channel bruno_flowers) — listado no modal
+  Parceiros com follow-gate próprio via /api/oauth/callback.
+- Voucher FLOWERS0800: 250 NT Tibia Coins + 3 dias VIP + outfit Warrior
+  com addons 1 e 2 (cosmetics.outfits.warrior=3, chave canônica) + NOVO
+  tipo de recompensa: 12h de skill boost +50%.
+- Skill boost por conta: shared.skillBoostUntil persiste em
+  accounts.shared_inventory; applySharedToPlayer hidrata p.skillBoostUntil;
+  addSkillTries/addManaSpent da engine multiplicam por 1.5 enquanto ativo
+  (separado do bônus temporário de guilda +25%, acumulativo).
+  accountApplySharedInventory + addSkillTries do cliente espelham.
+- voucherRewardsPreview ganhou kinds "outfit" (sprite warrior-f) e
+  "boost" (ícone raio); voucherRewardIcon renderiza os dois.
+- Fix: loop de itens do redeem tolerava voucher sem `items` — FLOWERS0800
+  quebrava após o claim (TypeError em for..of de undefined).
+
+---
 ## 2026-11-21 — Modal Parceiros em identidade Twitch (roxo radiante)
 
 - Restyle completo: card e modal em gradiente roxo Twitch com glow

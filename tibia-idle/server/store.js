@@ -474,6 +474,23 @@ const VOUCHERS = {
         ],
       },
     } },
+  /* Cupom do parceiro bruno_flowers — mesmo gate OAuth de follow. Recompensa
+   * extra: `skillBoostHours` grava shared.skillBoostUntil (multiplicador
+   * 1.5x de tries/mana em addSkillTries/addManaSpent) e `outfit` libera o
+   * cosmético canônico completo (valor 3 = base + addon 1 + addon 2). */
+  FLOWERS0800: { coinsNt: 250, vipDays: 3, outfit: "warrior", skillBoostHours: 12,
+    twitchFollow: "bruno_flowers",
+    label: "3 dias de VIP + outfit Warrior c/ addons + 12h de skill boost +50% + 250 NT Tibia Coins",
+    modal: {
+      title: "Obrigado por apoiar nosso streamer!",
+      intro: "Você recebeu as seguintes recompensas:",
+      social: {
+        label: "Apoie o streamer siga nas plataformas:",
+        links: [
+          { name: "Twitch", handle: "@bruno_flowers", url: "https://www.twitch.tv/bruno_flowers" },
+        ],
+      },
+    } },
   // futuros: { items: [{ slug: "x", qty: 1, instanced: false, tier: 0 }], label: "..." }
 };
 /* Código sem underscores → código canônico (lookup tolerante no resgate). */
@@ -492,6 +509,13 @@ function voucherRewardsPreview(v) {
   if (v.mount) rewards.push({ kind: "mount", mount: String(v.mount), label: "Montaria " + mountNome });
   if (v.coinsNt) rewards.push({ kind: "coinsNt", label: "+" + Math.floor(Number(v.coinsNt)) + " NT Tibia Coins" });
   if (v.coins) rewards.push({ kind: "coins", label: "+" + Math.floor(Number(v.coins)) + " Tibia Coins" });
+  if (v.outfit) {
+    const okey = cosmeticCanonical(v.outfit);
+    const nome = cosmeticCatalog().outfits[okey] ? cosmeticCatalog().outfits[okey].nome : String(v.outfit);
+    rewards.push({ kind: "outfit", sprite: okey + "-f", label: "Outfit " + nome + " + addons 1 e 2" });
+  }
+  if (v.skillBoostHours)
+    rewards.push({ kind: "boost", label: "+" + Math.floor(Number(v.skillBoostHours)) + "h de skill boost +50%" });
   const itemQty = (Array.isArray(v.items) ? v.items : [])
     .reduce((n, it) => n + Math.max(1, Math.floor(Number(it && it.qty) || 1)), 0);
   if (itemQty) rewards.push({ kind: "items", label: itemQty + " item(ns) no depot da conta" });
@@ -577,12 +601,14 @@ async function redeemVoucher(db, body) {
       await db.setAccountVipUntil(acc.id, vipUntil);
   }
 
-  /* Montaria de voucher vai para a CONTA (accounts.cosmetics.mounts) —
-   * mesma chave usada pelo catálogo de cosméticos da store. */
+  /* Montaria/outfit de voucher vai para a CONTA (accounts.cosmetics) —
+   * mesma chave usada pelo catálogo de cosméticos da store. Valor 3 =
+   * outfit completo (base + addon 1 + addon 2). */
   let cosmetics = null;
-  if (v.mount && typeof db.setAccountCosmetics === "function") {
+  if ((v.mount || v.outfit) && typeof db.setAccountCosmetics === "function") {
     cosmetics = sanitizeCosmetics(acc.cosmetics);
-    cosmetics.mounts[String(v.mount)] = true;
+    if (v.mount) cosmetics.mounts[String(v.mount)] = true;
+    if (v.outfit) cosmetics.outfits[cosmeticCanonical(v.outfit)] = 3;
     await db.setAccountCosmetics(acc.id, cosmetics);
   }
 
@@ -590,13 +616,20 @@ async function redeemVoucher(db, body) {
   // formato que o market usa: instanciados viram itemInstances loc "depot" +
   // id na lista; stackáveis entram como slug por unidade. Cap de 30 slots.
   const entregues = [];
-  if (Array.isArray(v.items) && v.items.length &&
+  const needsShared = (Array.isArray(v.items) && v.items.length) || v.skillBoostHours;
+  if (needsShared &&
       typeof db.accountSharedInventory === "function" &&
       typeof db.setAccountSharedInventory === "function") {
     const shared = await db.accountSharedInventory(acc.id);
     shared.seq = Math.max(0, Math.floor(Number(shared.seq) || 0));
     shared.itemInstances = Array.isArray(shared.itemInstances) ? shared.itemInstances : [];
     shared.depot = Array.isArray(shared.depot) ? shared.depot : [];
+    /* Skill boost de voucher: empilha sobre o tempo restante vigente. */
+    if (v.skillBoostHours) {
+      const h = Math.max(0, Math.floor(Number(v.skillBoostHours)));
+      shared.skillBoostUntil = Math.max(Date.now(),
+        Math.floor(Number(shared.skillBoostUntil) || 0)) + h * 3600 * 1000;
+    }
     const usedIds = new Set(shared.itemInstances.map((i) => String(i && i.id)));
     const nextId = () => {
       let id;
@@ -604,7 +637,7 @@ async function redeemVoucher(db, body) {
       usedIds.add(id);
       return id;
     };
-    for (const it of v.items) {
+    for (const it of (Array.isArray(v.items) ? v.items : [])) {
       const slug = String((it && it.slug) || "");
       const qty = Math.max(1, Math.floor(Number(it && it.qty) || 1));
       if (!slug) continue;
@@ -619,7 +652,7 @@ async function redeemVoucher(db, body) {
         entregues.push(slug);
       }
     }
-    if (entregues.length) await db.setAccountSharedInventory(acc.id, shared);
+    if (entregues.length || v.skillBoostHours) await db.setAccountSharedInventory(acc.id, shared);
   }
 
   /* Lista estruturada de recompensas (mesmo helper do preview do gate —

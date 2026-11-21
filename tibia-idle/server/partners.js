@@ -25,6 +25,15 @@ const PARTNERS = [
     level: 1,
     voucher: "BUTO__PVP",
   },
+  {
+    id: "bruno-flowers",
+    name: "Bruno Flowers",
+    channel: "bruno_flowers",
+    url: "https://www.twitch.tv/bruno_flowers",
+    instagram: "",
+    level: 1,
+    voucher: "FLOWERS0800",
+  },
 ];
 
 function channels() {

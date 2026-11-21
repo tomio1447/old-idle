@@ -2227,7 +2227,8 @@ function addSkillTries(p,which,tries){
   p.skills=p.skills||{};p.skillTries=p.skillTries||{};
   p.skills[which]=Math.max(10,Number(p.skills[which])||10);
   const rate=serverSkillRate(p.skills[which])*(1+guildBonusLevel(p,"skill")*0.01)
-    *(guildTempBonusOn(p,"skill")?1.25:1);
+    *(guildTempBonusOn(p,"skill")?1.25:1)
+    *(Number(p.skillBoostUntil)>Date.now()?1.5:1);
   p.skillTries[which]=(Number(p.skillTries[which])||0)+Math.max(0,Math.floor((Number(tries)||0)*rate));
   let up=false,need=skillTriesNeeded(p,which);
   while(p.skillTries[which]>=need){p.skillTries[which]-=need;p.skills[which]++;up=true;need=skillTriesNeeded(p,which);}
@@ -2238,7 +2239,8 @@ function addManaSpent(p,mana,auth){
   if(!p)return false;
   const gained=Math.max(0,Math.floor((Number(mana)||0)*instanceSkillMul(auth)));
   const rate=serverMagicRate(Number(p.ml)||0)*(1+guildBonusLevel(p,"skill")*0.01)
-    *(guildTempBonusOn(p,"skill")?1.25:1);
+    *(guildTempBonusOn(p,"skill")?1.25:1)
+    *(Number(p.skillBoostUntil)>Date.now()?1.5:1);
   p.manaSpent=(Number(p.manaSpent)||0)+Math.max(0,Math.floor(gained*rate));
   let up=false,need=mlTriesNeeded(p);
   while(p.manaSpent>=need){p.manaSpent-=need;p.ml=(Number(p.ml)||0)+1;up=true;need=mlTriesNeeded(p);}

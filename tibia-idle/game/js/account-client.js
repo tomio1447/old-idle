@@ -2174,6 +2174,8 @@ function accountApplySharedInventory(shared) {
   if (shared.dustLimit !== undefined) p.dustLimit = Math.max(100, Math.min(325, Math.floor(Number(shared.dustLimit) || 100)));
   if (shared.slivers !== undefined) p.slivers = Math.max(0, Math.floor(Number(shared.slivers) || 0));
   if (shared.exaltedCores !== undefined) p.exaltedCores = Math.max(0, Math.floor(Number(shared.exaltedCores) || 0));
+  if (shared.skillBoostUntil !== undefined)
+    p.skillBoostUntil = Math.max(0, Math.floor(Number(shared.skillBoostUntil) || 0));
   /* Baseline dos recursos da forja: o servidor faz merge por DELTA
    * (espelho − _forgeBase). Sem rebasar aqui, um shared que mudou por
    * outro caminho faria o próximo save reenviar o delta antigo (duplicar
