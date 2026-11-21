@@ -338,7 +338,7 @@ const RAUB_CHASTENER = Object.assign({}, HUNT_RAUB_BASE, {
     { item: "ring-of-green-plasma", chance: 6, max: 1 },
     { item: "magma-amulet", chance: 1.5, max: 1 },
     { item: "bottle-of-raubritter-lager", chance: 1.5, max: 1 },
-    { item: "crystal-coin", chance: 1.5, max: 149 },
+    { item: "crystal-coin", chance: 1.5, max: 1 },
   ],
 });
 /* Raubritter Marksman — distance fighter oficial, hp 10500, exp 9025,
@@ -442,7 +442,7 @@ const NIGHT_HARPY = Object.assign({}, HUNT_RAUB_BASE, {
     { item: "giant-sapphire", chance: 1, max: 1 },
     { item: "giant-topaz", chance: 1, max: 1 },
     { item: "giant-emerald", chance: 1, max: 1 },
-    { item: "crystal-coin", chance: 1, max: 100 },
+    { item: "crystal-coin", chance: 1, max: 1 },
     { item: "giant-ruby", chance: 1, max: 1 },
     { item: "giant-amethyst", chance: 1, max: 1 },
   ],
