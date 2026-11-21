@@ -6888,6 +6888,175 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .pvp-table th { text-align: left; color: #d8cfa8; border-bottom: 1px solid #4b493e; padding: 4px 6px; font-size: 11px; text-transform: uppercase; }
 .pvp-table td { padding: 4px 6px; border-bottom: 1px solid #2a2820; }
 
+/* ============ PVP — Guerras de Guild: redesign visual ============
+ * Tokens do mockup (cards #21242b, borda #363b47, dourado #e6b84c,
+ * crimson #ef4444, verde #22c55e, muted #9ba2b0) aplicados sobre o
+ * markup pvp-* existente — escopado em .pvp-modal-shell. */
+.pvp-modal-shell .cidade-modal-shell {
+  background: radial-gradient(circle at top center, #222630 0%, #181a1f 70%);
+  border: 1.5px solid #5a4826; border-radius: 7px;
+  box-shadow: 0 22px 55px rgba(0,0,0,.88), 0 0 26px rgba(230,184,76,.14),
+    inset 0 1px 0 rgba(255,232,170,.12);
+  color: #ece9e2;
+}
+/* ---- Abas ---- */
+.pvp-modal-shell .pvp-tabs { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px; }
+.pvp-modal-shell .pvp-tab {
+  padding: 8px 10px; font-size: .82rem; font-weight: 700; color: #aeb5c2;
+  background: #1f222a; border: 1px solid #353a47; border-radius: 4px;
+  transition: all .15s ease;
+}
+.pvp-modal-shell .pvp-tab:hover { color: #fff; border-color: #7c6330; background: #252933; }
+.pvp-modal-shell .pvp-tab.on {
+  color: #ffe394; background: linear-gradient(180deg, rgba(230,184,76,.2) 0%, #242832 100%);
+  border-color: #e6b84c;
+  box-shadow: 0 0 14px rgba(230,184,76,.25), inset 0 0 8px rgba(230,184,76,.12);
+}
+/* ---- Banner da guild do jogador: glow dourado ---- */
+.pvp-modal-shell .pvp-myguild {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: linear-gradient(90deg, rgba(230,184,76,.13) 0%, rgba(33,36,43,.92) 65%);
+  border: 1px solid rgba(230,184,76,.55); border-radius: 5px;
+  box-shadow: 0 0 16px rgba(230,184,76,.14);
+}
+.pvp-modal-shell .pvp-myguild .pvp-gicon {
+  width: 38px; height: 38px; background: #13151b;
+  border-color: #755b29; border-radius: 5px;
+  box-shadow: 0 0 10px rgba(230,184,76,.25);
+}
+.pvp-modal-shell .pvp-myguild-info b { color: #f6e7c1; font-size: .9rem; }
+.pvp-modal-shell .pvp-myguild-info span { color: #9ba2b0; font-size: .78rem; }
+.pvp-modal-shell .pvp-myguild-info span i,
+.pvp-modal-shell .pvp-myguild-info em { font-style: normal; color: #e6b84c; font-weight: 700; }
+/* ---- Rótulos de seção / cards vazios ---- */
+.pvp-modal-shell .pvp-sec-title {
+  margin: 12px 0 6px; font-size: .74rem; font-weight: 800;
+  letter-spacing: 1px; color: #9ba2b0; text-transform: uppercase;
+}
+.pvp-modal-shell .pvp-empty {
+  padding: 18px 14px; text-align: center; font-size: .82rem; color: #9ba2b0;
+  background: #21242b; border: 1px solid #363b47; border-radius: 5px;
+}
+.pvp-modal-shell .pvp-note { margin-top: 10px; font-size: .78rem; color: #9ba2b0; }
+/* ---- Card de guild elegível + botão Desafiar metálico crimson ---- */
+.pvp-modal-shell .pvp-grow {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left;
+  background: #21242b; border: 1px solid #363b47; border-radius: 5px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.pvp-modal-shell .pvp-grow:hover:not(:disabled) {
+  border-color: rgba(239,68,68,.55); box-shadow: 0 0 14px rgba(239,68,68,.12);
+  background: #21242b;
+}
+.pvp-modal-shell .pvp-grow .pvp-gicon {
+  width: 38px; height: 38px; background: #13151b;
+  border-color: #464d5d; border-radius: 5px; flex: none;
+}
+.pvp-modal-shell .pvp-grow-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pvp-modal-shell .pvp-grow-name { display: block; font-size: .9rem; color: #f3c65f; font-weight: 700; }
+.pvp-modal-shell .pvp-grow-meta { font-size: .78rem; color: #9ba2b0; }
+.pvp-modal-shell .pvp-grow-go {
+  margin-left: auto; flex: none; padding: 7px 14px;
+  font-size: .8rem; font-weight: 700; color: #ffd6d6;
+  background: linear-gradient(180deg, rgba(153,27,27,.55) 0%, #291c20 100%);
+  border: 1px solid rgba(239,68,68,.65); border-radius: 4px;
+  transition: all .15s ease;
+}
+.pvp-modal-shell .pvp-grow:hover:not(:disabled) .pvp-grow-go {
+  color: #fff; border-color: #f87171; box-shadow: 0 0 14px rgba(239,68,68,.28);
+}
+.pvp-modal-shell .pvp-grow:disabled { opacity: .55; }
+.pvp-modal-shell .pvp-grow:disabled .pvp-grow-go { display: none; }
+/* ---- Linhas de batalha (calendar/lobbies/histórico da guild) ---- */
+.pvp-modal-shell .pvp-brow {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; text-align: left;
+  background: #21242b; border: 1px solid #363b47; border-radius: 5px;
+  transition: border-color .15s ease;
+}
+.pvp-modal-shell .pvp-brow:hover { border-color: #7c6330; background: #21242b; }
+.pvp-modal-shell .pvp-brow b { color: #f3c65f; }
+.pvp-modal-shell .pvp-bmeta { font-size: .78rem; color: #9ba2b0; }
+.pvp-modal-shell .pvp-cal-day { font-size: .78rem; font-weight: 700; color: #cbd5e1; margin: 6px 0 2px; }
+/* ---- Pills de status e resultado ---- */
+.pvp-modal-shell .pvp-badge {
+  flex: none; padding: 2px 8px; font-size: .7rem; font-weight: 800;
+  border-radius: 3px; border: 1px solid transparent;
+}
+.pvp-modal-shell .pvp-st-pend { color: #fde047; background: rgba(133,77,14,.4); border-color: rgba(234,179,8,.45); }
+.pvp-modal-shell .pvp-st-ok { color: #86efac; background: rgba(22,101,52,.4); border-color: rgba(34,197,94,.45); }
+.pvp-modal-shell .pvp-st-prep { color: #93c5fd; background: rgba(30,58,138,.45); border-color: rgba(96,165,250,.5); }
+.pvp-modal-shell .pvp-st-live { color: #fca5a5; background: rgba(127,29,29,.5); border-color: rgba(239,68,68,.55); animation: pvp-pulse 1.2s infinite; }
+.pvp-modal-shell .pvp-st-done { color: #cbd5e1; background: #2f3440; border-color: #3a4150; }
+.pvp-modal-shell .pvp-st-off { color: #7a7668; background: #23262d; border-color: #2e323a; }
+.pvp-modal-shell .pvp-win {
+  color: #86efac; background: rgba(22,101,52,.45); border-color: rgba(34,197,94,.5);
+  box-shadow: 0 0 10px rgba(34,197,94,.18);
+}
+.pvp-modal-shell .pvp-loss { color: #fca5a5; background: rgba(127,29,29,.45); border-color: rgba(239,68,68,.5); }
+.pvp-modal-shell .pvp-tie { color: #fde047; background: rgba(133,77,14,.45); border-color: rgba(234,179,8,.5); }
+/* ---- Chips de resumo (histórico pessoal + carteira da aba boosts) ---- */
+.pvp-modal-shell .pvp-boost-head { display: flex; flex-wrap: wrap; gap: 10px; }
+.pvp-modal-shell .pvp-boost-head > span {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+  background: #21242b; border: 1px solid #363b47; border-radius: 4px;
+  font-size: .8rem; color: #dce1eb;
+}
+.pvp-modal-shell .pvp-boost-head > span:last-child {
+  border-color: rgba(230,184,76,.5); box-shadow: 0 0 12px rgba(230,184,76,.14);
+}
+.pvp-modal-shell .pvp-boost-head b { color: #f6d57e; }
+.pvp-modal-shell .pvp-chip-ic { font-size: .85rem; line-height: 1; }
+/* ---- Tabela de histórico ---- */
+.pvp-modal-shell .pvp-table th {
+  font-size: .68rem; font-weight: 800; letter-spacing: .6px; color: #9ba2b0;
+  border-bottom-color: #363b47;
+}
+.pvp-modal-shell .pvp-table td { border-bottom-color: #2a2e38; }
+.pvp-modal-shell .pvp-table tr:hover td { background: rgba(230,184,76,.04); }
+.pvp-modal-shell .pvp-res-win { color: #86efac; font-weight: 700; }
+.pvp-modal-shell .pvp-res-loss { color: #fca5a5; font-weight: 700; }
+.pvp-modal-shell .pvp-res-draw { color: #fde047; font-weight: 700; }
+/* ---- Cards de boost (guild-shop-* reutilizado, escopo PvP) ---- */
+.pvp-modal-shell .guild-shop-list { display: flex; flex-direction: column; gap: 8px; }
+.pvp-modal-shell .guild-shop-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; background: #21242b; border: 1px solid #363b47;
+  border-radius: 5px; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.pvp-modal-shell .guild-shop-row:hover {
+  border-color: rgba(230,184,76,.45); box-shadow: 0 0 12px rgba(230,184,76,.1);
+}
+.pvp-modal-shell .guild-shop-row.maxed { border-color: rgba(34,197,94,.45); }
+.pvp-modal-shell .guild-shop-info .nm { display: block; font-size: .88rem; color: #f4f1ea; }
+.pvp-modal-shell .guild-shop-info .meta { font-size: .76rem; color: #9ba2b0; }
+.pvp-modal-shell .guild-temp-active {
+  flex: none; padding: 4px 10px; font-size: .72rem; font-weight: 800; letter-spacing: .5px;
+  color: #86efac; background: rgba(22,101,52,.4); border: 1px solid rgba(34,197,94,.5);
+  border-radius: 4px;
+}
+/* ---- Botão de ação metálico dourado (Ativar / Aceitar / Criar) ---- */
+.pvp-modal-shell .sm.primary {
+  padding: 7px 16px; font-size: .78rem; font-weight: 700; color: #fff8e7;
+  background: linear-gradient(180deg, #b8892d 0%, #835e18 100%);
+  border: 1px solid #f2c96b; border-radius: 4px; cursor: pointer;
+  transition: all .15s ease;
+}
+.pvp-modal-shell .sm.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #cf9d38 0%, #966c1d 100%);
+  box-shadow: 0 0 14px rgba(230,184,76,.25);
+}
+.pvp-modal-shell .sm.primary:disabled { opacity: .5; filter: saturate(.4); cursor: default; }
+.pvp-modal-shell .pvp-invite-btns .sm:not(.primary) {
+  padding: 7px 12px; font-size: .76rem; font-weight: 700; color: #d5dae4;
+  background: #2b2f3a; border: 1px solid #454c5c; border-radius: 4px;
+}
+.pvp-modal-shell .pvp-invite-btns .sm:not(.primary):hover:not(:disabled) {
+  border-color: #e6b84c; color: #fff; box-shadow: 0 0 10px rgba(230,184,76,.2);
+}
+@media (max-width: 720px) {
+  .pvp-modal-shell .pvp-tabs { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
 /* Contador de preparo na HUD */
 #pvp-countdown {
   position: fixed; top: 46px; left: 50%; transform: translateX(-50%); z-index: 60;

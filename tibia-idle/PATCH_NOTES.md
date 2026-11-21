@@ -3,6 +3,19 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Redesign do modal PVP (Guerras de Guild)
+
+- Restyle das 5 abas nos tokens do mockup: cards #21242b, bordas #363b47,
+  dourado/crimson/esmeralda — CSS escopado em .pvp-modal-shell.
+- Banner da guild com gradiente + glow dourado; ícone maior.
+- "Desafiar ›" vira botão metálico crimson com glow no hover do card.
+- Pills de status e resultado com fundo colorido (VITÓRIA verde, EMPATE
+  âmbar, DERROTA vermelha, AO VIVO pulsante).
+- Resumo de histórico e carteira de boosts em chips; último chip com
+  acento dourado; resultado da tabela colorido.
+- Botões de ação (Ativar/Aceitar/Criar) em dourado metálico com glow.
+
+---
 ## 2026-11-21 — HP oficial Maior Domus/Phosphorus + kill de boss por conta
 
 - final-radiant.js: HP oficial dificuldade 1 — Maior Domus 460.000,

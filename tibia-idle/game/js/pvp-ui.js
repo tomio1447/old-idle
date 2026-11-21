@@ -286,7 +286,7 @@ function pvpLoadBoosts() {
       const isLeader = d.myRank === "leader";
       const ins = Number(d.insignias) || 0;
       box.innerHTML = `<div class="pvp-boost-head">
-          <span><b>${ins}</b> insígnias PvP (sua conta)</span>
+          <span><span class="pvp-chip-ic">🏅</span><b>${ins}</b> insígnias PvP (sua conta)</span>
           <span>Caixa da guild: ${pvpCoinIcon("gold")}<b>${pvpFmtMoney(d.guild.balance)}</b> gold</span>
         </div>
         <div class="pvp-note">Boosts valem 24h para todos os personagens das contas da guild. Ganhe insígnias
@@ -314,8 +314,10 @@ function pvpTabBattles(st, officer) {
   else out += `<div class="pvp-glist">` + eligible.map((g) => `
     <button type="button" class="pvp-grow" data-pvp-guild="${g.id}" ${officer && st.eligible ? "" : "disabled"}>
       ${pvpGuildIcon(g.icon)}
-      <span class="pvp-grow-name">${pvpEsc(g.name)}</span>
-      <span class="pvp-grow-meta">Nv ${g.level} · ${g.members} membros</span>
+      <span class="pvp-grow-info">
+        <span class="pvp-grow-name">${pvpEsc(g.name)}</span>
+        <span class="pvp-grow-meta">Nv ${g.level} · ${g.members} membros</span>
+      </span>
       <span class="pvp-grow-go">${officer && st.eligible ? "Desafiar ›" : ""}</span>
     </button>`).join("") + `</div>`;
   if (others.length) out += `<details class="pvp-ineligible"><summary>Guilds ocupadas/inelegíveis (${others.length})</summary>` +
@@ -388,7 +390,9 @@ function pvpTabHistory(st) {
       <table class="pvp-table"><tr><th>Batalha</th><th>Resultado</th><th>Kills</th><th>Mortes</th><th>Dano</th><th>Insígnias</th></tr>
       ${mine.map((h) => `<tr data-pvp-battle="${h.id}" style="cursor:pointer">
         <td>#${h.id} ${pvpEsc(h.challengerName)} × ${pvpEsc(h.challengedName)}<br><span class="pvp-bmeta">${pvpEsc(h.mapName)} · ${pvpFmtWhen(h.scheduledAt)}</span></td>
-        <td>${h.outcome === "win" ? "Vitória" : h.outcome === "loss" ? "Derrota" : h.outcome === "draw" ? "Empate" : "—"}</td>
+        <td>${h.outcome === "win" ? `<span class="pvp-res-win">Vitória</span>`
+          : h.outcome === "loss" ? `<span class="pvp-res-loss">Derrota</span>`
+          : h.outcome === "draw" ? `<span class="pvp-res-draw">Empate</span>` : "—"}</td>
         <td>${h.kills}</td><td>${h.deaths}</td><td>${pvpFmtMoney(h.damage)}</td><td>${h.insignias}</td></tr>`).join("")}</table>`;
   }
   out += `<div class="pvp-sec-title">Histórico da guild</div>`;
