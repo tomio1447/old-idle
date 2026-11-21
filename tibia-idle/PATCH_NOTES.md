@@ -3,6 +3,20 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Wheel: perks com nitidez total + MAX persiste online
+
+- Nós "locked" da roda nao escurecem mais (opacity/grayscale removidos) —
+  todos os perks aparecem com a mesma nitidez; o estado segue legivel
+  pela borda (glow verde = alocavel, cor do quadrante = cheio).
+- MAX/+/- nao persistia em caçada online: p.wheel nao era preservado no
+  merge da autoridade — o snapshot sobrescrevia a roda a cada tick antes
+  do save. Agora wheel é client-owned no merge (mesmo padrao de
+  helperPresets; o tick já envia visual.wheel e a extração sanitiza
+  sentPrefs.wheel).
+- Botao CONTA: label "CONTA" vazia pela borda inferior — avatar/nome/
+  label compactados para caber no quadrado da topbar.
+
+---
 ## 2026-11-21 — Botao CONTA com "!" de pontos pendentes + modal instantaneo
 
 - Botao da topbar agora mostra a descricao "CONTA" (label visivel,

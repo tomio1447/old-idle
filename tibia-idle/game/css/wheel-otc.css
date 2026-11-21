@@ -78,8 +78,11 @@
 /* estados: disponivel=glow verde | travado=apagado | cheio=cor do quadrante
  * | selecionada=borda/glow ciano (mockup wod) */
 .wheel-node { border-radius: 50%; background: rgba(16,18,24,.82); border-color: #494e59; }
-.wheel-node.locked { opacity: .42; filter: grayscale(.7); }
-.wheel-node.locked .wn-med { filter: grayscale(.75); }
+/* locked sem dim: perks ainda inativos aparecem com a mesma nitidez;
+ * o estado continua legível pela borda (glow verde = alocável, cor do
+ * quadrante = cheio) */
+.wheel-node.locked { opacity: 1; }
+.wheel-node.locked .wn-med { }
 .wheel-node.can { border-color: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,.35), inset 0 0 8px rgba(0,0,0,.55); }
 .wheel-node.w-green.full  { border-color: #4ade80; }
 .wheel-node.w-red.full    { border-color: #f87171; }

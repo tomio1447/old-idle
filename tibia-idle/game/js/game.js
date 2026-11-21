@@ -5149,6 +5149,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
       const localConfig=playerRef.config,localCombo=localConfig&&localConfig.combo,localStances=playerRef.stances,
         localPrey=playerRef.prey,localMissions=playerRef.missions,localMissionsDone=playerRef.missionsDone,
         localHelperPresets=playerRef.helperPresets,localHelperActivePreset=playerRef.helperActivePreset,
+        localWheel=playerRef.wheel,
         localCharms=playerRef.charms,localCharmRace=playerRef.charmRace,
         localCharmPoints=playerRef.charmPoints,localCharmsPagos=playerRef.charmsPagos,
         localCharmPointsBase=playerRef._charmPointsBase,
@@ -5210,6 +5211,10 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
        * antes do "New preset" regravava a lista antiga por cima. */
       if(localHelperPresets!==undefined)playerRef.helperPresets=localHelperPresets;
       if(localHelperActivePreset!==undefined)playerRef.helperActivePreset=localHelperActivePreset;
+      /* Wheel é client-owned (como helperPresets): o tick já envia
+       * visual.wheel e a extração sanitiza sentPrefs.wheel — preservar o
+       * local impede o snapshot de apagar pontos recém-alocados (MAX). */
+      if(localWheel&&typeof localWheel==="object")playerRef.wheel=localWheel;
       if(localPrey&&typeof localPrey==="object")playerRef.prey=localPrey;
       if(localMissions&&typeof localMissions==="object")
         playerRef.missions=mergeMissionMaps(remote.p.missions,localMissions);
