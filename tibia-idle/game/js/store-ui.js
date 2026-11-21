@@ -777,6 +777,11 @@ function renderStoreVouchers(main) {
          * conexão OAuth; ao verificar, refaz o resgate automaticamente. */
         setMsg("Este voucher exige seguir @" + (r.channel || "buto_pvp") + " na Twitch.", "#f2c96b");
         openVoucherTwitchGate(r, redeem);
+      } else if (r && r.alreadyClaimed) {
+        /* Voucher já usado na conta: mostra o modal de prêmios com
+         * "Recompensa já obtida" no lugar do botão. */
+        setMsg("✖ " + (r.msg || "Voucher já resgatado nesta conta"), "#ff9a6a");
+        openStoreVoucherModal(r);
       } else {
         setMsg("✖ " + ((r && r.msg) || "Falha ao resgatar voucher"), "#ff9a6a");
       }
@@ -884,14 +889,17 @@ function openStoreVoucherModal(r) {
           </a>`).join("")}
       </div>` : ""}
       <div class="voucher-tw-actions">
-        <button type="button" class="voucher-tw-btn" id="voucher-reward-ok">OK</button>
+        ${r.alreadyClaimed
+          ? `<div class="voucher-tw-claimed">Recompensa já obtida</div>`
+          : `<button type="button" class="voucher-tw-btn" id="voucher-reward-ok">OK</button>`}
       </div>
     </div>`;
   document.body.appendChild(bd);
   const close = () => bd.remove();
   bd.addEventListener("click", (e) => { if (e.target === bd) close(); });
   bd.querySelector(".voucher-reward-close").addEventListener("click", close);
-  bd.querySelector("#voucher-reward-ok").addEventListener("click", close);
+  const okBtn = bd.querySelector("#voucher-reward-ok");
+  if (okBtn) okBtn.addEventListener("click", close);
 }
 
 /* Gate social do voucher de streamer: o servidor respondeu `needTwitch`

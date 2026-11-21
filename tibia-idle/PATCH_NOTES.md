@@ -3,6 +3,12 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Voucher já resgatado exibe modal de prêmios
+
+- Resposta de claim duplicado agora carrega rewards+modal — o cliente
+  abre o pop-up de prêmios com "Recompensa já obtida" no lugar do botão.
+
+---
 ## 2026-11-21 — Modais de voucher em roxo Twitch + botão COLETAR
 
 - Gate "Siga o streamer" e modal de recompensa adotam a identidade roxa

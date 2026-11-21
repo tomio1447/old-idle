@@ -564,7 +564,12 @@ async function redeemVoucher(db, body) {
   // corridas entre requisições simultâneas — só um ganha.
   if (typeof db.voucherClaim === "function") {
     const claimed = await db.voucherClaim(acc.id, code);
-    if (!claimed) return { code: 400, body: { ok: false, msg: "Voucher já resgatado nesta conta" } };
+    /* Reenvio de voucher já usado: devolve rewards+modal para o cliente
+     * exibir o pop-up de prêmios com "Recompensa já obtida" no lugar do
+     * botão — mesma apresentação do resgate bem-sucedido. */
+    if (!claimed) return { code: 400, body: { ok: false, alreadyClaimed: true,
+      msg: "Voucher já resgatado nesta conta",
+      rewards: voucherRewardsPreview(v), modal: v.modal || null } };
   }
 
   let coins = Math.max(0, Number(acc.coins) || 0);

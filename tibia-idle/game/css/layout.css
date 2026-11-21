@@ -5963,6 +5963,13 @@ body.fullhd .scene-overlay { font-size: 13px; }
   0%, 100% { box-shadow: 0 0 10px rgba(145,70,255,.35); }
   50% { box-shadow: 0 0 20px rgba(169,112,255,.65); }
 }
+/* Estado "Recompensa já obtida" — texto no lugar do botão OK/COLETAR. */
+.voucher-tw-claimed {
+  flex: 1; padding: 11px 12px; text-align: center;
+  font-size: 12px; font-weight: 800; letter-spacing: .5px;
+  color: #c9b8ef; background: #1d1138;
+  border: 1px dashed rgba(169,112,255,.45); border-radius: 6px;
+}
 
 /* ---- Modal PARCEIROS (topbar) — identidade Twitch: roxo radiante,
  * logo animada e glow pulsante ao redor do streamer. */
