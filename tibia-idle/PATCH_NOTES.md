@@ -3,6 +3,15 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Ícone de item na barra de cooldown ao usar potion/runa
+
+- Ao beber potion de HP/mana (ou runa de cura), o ícone do item aparece
+  na barra de cooldown com o compartilhamento de 1s — como no cliente
+  oficial (runas de ataque já apareciam).
+- p.itemCd separado de p.cd: cdHydrateFromAuthority reconstroi p.cd a
+  cada sync do servidor e apagaria os ícones; itemCd sobrevive.
+
+---
 ## 2026-11-21 — Fix crash "p.skills undefined" no load/treino
 
 - normalizePlayer agora garante skills (10s), skillTries, ml e manaSpent —

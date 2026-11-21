@@ -35,7 +35,19 @@ const CD_GRUPO_PT = {
 function cdInit(p) {
   if (!p.cd) p.cd = {};      // por magia:  id -> timestamp de liberacao
   if (!p.gcd) p.gcd = {};    // por grupo:  idGrupo -> timestamp de liberacao
+  if (!p.itemCd) p.itemCd = {}; // por item (potion/runa de cura): slug -> lib
   return p;
+}
+
+/* Item consumido (potion, food, runa de cura): so entra na barra de
+ * icones — NAO trava grupo nenhum (o compartilhamento de 1s entre potions
+ * ja e o potionCd do motor de combate). Fica fora de p.cd porque
+ * cdHydrateFromAuthority reconstroi p.cd a cada sync do servidor. */
+function cdItemStart(p, slug, durMs, now) {
+  cdInit(p);
+  now = now || Date.now();
+  const dur = Number(durMs) || 1000;
+  p.itemCd[slug] = { ate: now + dur, dur: dur };
 }
 
 /* Registra o disparo de uma magia: trava ela e todos os grupos dela */
@@ -93,6 +105,7 @@ function cdPrune(p, now) {
   now = now || Date.now();
   for (const k in p.cd) if (p.cd[k].ate <= now) delete p.cd[k];
   for (const k in p.gcd) if (p.gcd[k].ate <= now) delete p.gcd[k];
+  for (const k in p.itemCd) if (p.itemCd[k].ate <= now) delete p.itemCd[k];
 }
 
 function cdGroupKey(raw) {
@@ -170,6 +183,20 @@ function cdActiveSpells(p, now) {
       pct: Math.max(0, Math.min(1, resta / (e.dur || s.cd || 2000))),
     });
   }
+  // itens consumidos (potions, runas de cura, food): icones de item na
+  // mesma fileira, como no cliente oficial
+  for (const slug in p.itemCd) {
+    const e = p.itemCd[slug];
+    const resta = e.ate - now;
+    if (resta <= 0) continue;
+    const s = cdSpellInfo(slug);
+    if (!s) continue;
+    out.push({
+      id: slug, spell: s, resta: resta, dur: e.dur || 1000,
+      pct: Math.max(0, Math.min(1, resta / (e.dur || 1000))),
+      item: true,
+    });
+  }
   out.sort((a, b) => a.resta - b.resta);
   return out;
 }
@@ -210,7 +237,7 @@ function cdGroupState(p, g, now) {
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    cdStart, cdReady, cdRemaining, cdActiveSpells, cdVocGroups, cdGroupState,
+    cdStart, cdItemStart, cdReady, cdRemaining, cdActiveSpells, cdVocGroups, cdGroupState,
     cdHydrateFromAuthority, cdSpellInfo, cdGroupKey,
   };
 }

@@ -3559,6 +3559,9 @@ function tryHeal(c, p, now) {
       // entao usa o cooldown de runa e mantem o healCd antigo
       if (s.kind === "rune") entCdSet(c, p, "healCd", now + 1000);
       else entCdSet(c, p, "potionCd", now + 1000);
+      // icone do item na barra de cooldown (oficial: potion/runa de cura
+      // aparecem com o cooldown de 1s)
+      if (typeof cdItemStart === "function") cdItemStart(p, best, 1000, now);
       if (typeof forgeTryMomentum === "function") {
         const momentum = forgeTryMomentum(p, now);
         if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
@@ -3837,6 +3840,7 @@ function tryMana(c, p, now) {
     p.hp = Math.min(max.hp, p.hp + healAmount);
   }
   entCdSet(c, p, "potionCd", now + 1000);   // cooldown por personagem (party combat)
+  if (typeof cdItemStart === "function") cdItemStart(p, slug, 1000, now);
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
     if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
