@@ -2984,10 +2984,26 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px;
 }
 .chard-char-card {
+  position: relative;
   display: flex; align-items: center; gap: 6px; flex: none;
   min-width: 150px; padding: 4px 6px; text-align: left;
   background: #14120e; border: 1px solid var(--border-in, #3a3428);
   color: inherit; cursor: pointer;
+}
+.chard-char-alert {
+  position: absolute; top: -6px; right: -6px; z-index: 2;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #d4af37; color: #1c1508;
+  font: 800 11px/16px Verdana, sans-serif; text-align: center;
+  border: 1.5px solid #1c1508; box-shadow: 0 0 7px rgba(212,175,55,.65);
+  pointer-events: none;
+}
+.chard-tab-alert {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 50%; margin-left: 5px;
+  background: #d4af37; color: #1c1508;
+  font: 800 10px/14px Verdana, sans-serif;
+  vertical-align: middle;
 }
 .chard-char-card:hover:not(:disabled) { background: #26221a; border-color: #6b6455; }
 .chard-char-card.is-current { border-color: var(--gold, #d4af37); background: #35301f; cursor: default; }
@@ -3277,9 +3293,19 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .chard-deaths-table tr:hover td { background: #1c1913; }
 .chard-deaths-table .num, .chard-deaths-table th.num { text-align: right; }
 
-/* botão da topbar: retrato do personagem no lugar do texto (o label fica
- * só para acessibilidade e para o menu mobile, que lê textContent) */
-#btn-switch .topbar-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* botão da topbar: retrato + nome do char + descrição CONTA embaixo */
+#btn-switch .topbar-btn-label {
+  font-size: 8px; font-weight: 800; letter-spacing: .8px;
+  color: #a8915c; line-height: 1; text-transform: uppercase;
+}
+.topbar-hero-alert {
+  position: absolute; top: -5px; right: -5px; z-index: 3;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #d4af37; color: #1c1508;
+  font: 800 12px/18px Verdana, sans-serif; text-align: center;
+  border: 1.5px solid #1c1508; box-shadow: 0 0 8px rgba(212,175,55,.7);
+  pointer-events: none;
+}
 #btn-switch-portrait {
   flex: none; display: inline-flex;
   align-items: flex-end; justify-content: center; overflow: hidden;
@@ -4301,6 +4327,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   display: flex; gap: 8px; align-items: stretch;
 }
 .topbar-hero-btn {
+  position: relative;
   /* estica até preencher a altura da topbar; aspect-ratio mantém o quadrado */
   height: auto; width: auto; aspect-ratio: 1 / 1;
   display: flex; flex-direction: column;

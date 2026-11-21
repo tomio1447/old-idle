@@ -64,12 +64,14 @@ function openCharDetails(tab) {
   chardShell(p);
   chardRender();
   chardRefreshChars();
+  chardStartLive();
 }
 
 /* Compatibilidade: openCharacterModal() e openOutfitModal() continuam
  * declaradas em game.js, mas delegam para esta janela. */
 
 function chardClose() {
+  chardStopLive();
   if (CHARD._catalogMo) { try { CHARD._catalogMo.disconnect(); } catch (e) {} CHARD._catalogMo = null; }
   const modal = $("#modal"), body = $("#modal-body");
   if (modal) modal.classList.remove("show", "wide", "modal-cyclo", "login-modal");
@@ -92,7 +94,7 @@ function chardShell(p) {
     <div class="chard-tabs market-tabs" id="chard-tabs">
       ${CHARD_TABS.map((t) => `
         <button class="sm chard-tab ${CHARD.tab === t.id ? "primary" : ""}"
-                data-chard-tab="${t.id}">${t.nome}</button>`).join("")}
+                data-chard-tab="${t.id}">${t.nome}<span class="chard-tab-alert" data-chard-alert="${t.id}" hidden>!</span></button>`).join("")}
     </div>
     <div class="panel-body chard-body" id="chard-body"></div>`;
   const modal = $("#modal");
@@ -114,6 +116,167 @@ function chardEsc(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/* ---------- pontos pendentes por personagem (roda + proficiência) ---------- */
+
+/* Aceita o blob completo (p/roster) ou o snapshot do summary da conta. */
+function charPendingPoints(p) {
+  const out = { wheel: 0, prof: 0 };
+  if (!p || typeof p !== "object") return out;
+  try { if (typeof wheelAvail === "function") out.wheel = wheelAvail(p); } catch (e) {}
+  try {
+    if (typeof profLevel === "function" && typeof profPicked === "function" &&
+        p.prof && p.prof.xp) {
+      for (const slug in p.prof.xp) {
+        const unlocked = profLevel(p, slug);
+        const picked = Object.keys(profPicked(p, slug)).length;
+        out.prof += Math.max(0, unlocked - picked);
+      }
+    }
+  } catch (e) {}
+  return out;
+}
+if (typeof window !== "undefined") window.charPendingPoints = charPendingPoints;
+
+/* "!" nas abas Proficiência/Roda quando o char ativo tem pontos sobrando. */
+function chardPaintTabBadges(p) {
+  const pend = charPendingPoints(p);
+  $$("#chard-tabs [data-chard-alert]").forEach((s) => {
+    const id = s.dataset.chardAlert;
+    s.hidden = !(id === "proficiencia" && pend.prof > 0) &&
+               !(id === "roda" && pend.wheel > 0);
+  });
+}
+
+/* ---------- refresh instantâneo enquanto o modal está aberto ---------- */
+
+/* p vivo de um char da conta: ativo ou participante da instância online. */
+function chardLiveP(id) {
+  if (typeof G === "undefined" || !G || !G.p) return null;
+  const cid = typeof characterId === "function" ? characterId(G.p) : G.p.id;
+  if (String(cid) === String(id) || String(G.p.id) === String(id)) return G.p;
+  if (typeof combatSessionParticipants === "function") {
+    const parts = combatSessionParticipants(G.combat) || [];
+    for (const e of parts) {
+      if (e && e.p && (String(e.id) === String(id) || String(e.p.id) === String(id)))
+        return e.p;
+    }
+  }
+  return null;
+}
+
+/* Roster local (throttle 2s — o parse do localStorage não roda a cada tick). */
+let _chardRosterMap = null, _chardRosterAt = 0;
+function chardRosterChar(id) {
+  if (typeof getCharacters !== "function") return null;
+  const now = Date.now();
+  if (!_chardRosterMap || now - _chardRosterAt > 2000) {
+    _chardRosterAt = now; _chardRosterMap = {};
+    try { for (const c of getCharacters()) _chardRosterMap[String(c.id)] = c; }
+    catch (e) {}
+  }
+  return _chardRosterMap[String(id)] || null;
+}
+
+/* Nível/"!" dos cards da faixa de personagens — patch in-place, sem
+ * reconstruir retratos nem listeners. */
+function chardLiveCharStrip() {
+  const host = $("#chard-chars");
+  if (!host || !CHARD.chars || CHARD.chars.loading) return;
+  const isOnline = CHARD.chars.mode === "online";
+  const list = isOnline ? (CHARD.chars.characters || []) : (CHARD.chars.chars || []);
+  for (const c of list) {
+    const id = String(c.id);
+    const btn = host.querySelector(`[data-chard-enter="${id}"]`);
+    if (!btn) continue;
+    const live = chardLiveP(id) || chardRosterChar(id) ||
+                 (isOnline ? c.snapshot : c);
+    const lvl = Number(live && live.level) || Number(c.level) || 1;
+    const lvlEl = btn.querySelector(".chard-char-level");
+    if (lvlEl && lvlEl.textContent !== String(lvl)) lvlEl.textContent = String(lvl);
+    const pend = charPendingPoints(live);
+    const hasPend = pend.wheel + pend.prof > 0;
+    btn.classList.toggle("has-pending", hasPend);
+    let alertEl = btn.querySelector(".chard-char-alert");
+    if (hasPend && !alertEl) {
+      alertEl = document.createElement("span");
+      alertEl.className = "chard-char-alert";
+      alertEl.title = "Pontos disponíveis";
+      alertEl.textContent = "!";
+      btn.insertBefore(alertEl, btn.firstChild);
+    } else if (!hasPend && alertEl) alertEl.remove();
+  }
+}
+
+/* Assinatura dos campos exibidos: level/XP/skills/ouro/pontos mudam →
+ * re-renderiza a aba ativa e a faixa de personagens na hora. */
+function chardLiveTick() {
+  const el = $("#chard-body");
+  const p = (typeof G !== "undefined" && G) ? G.p : null;
+  if (!el || !p) { chardStopLive(); return; }
+  const pend = charPendingPoints(p);
+  const sig = [p.level, Math.floor(p.xp || 0), Math.floor(p.hp || 0),
+    Math.floor(p.mana || 0), Math.floor(p.stamina || 0),
+    Math.floor((typeof p.gold === "number" ? p.gold : 0)),
+    pend.wheel, pend.prof, CHARD.tab,
+    p.skills ? Object.keys(p.skills).map((k) =>
+      (p.skills[k] && (p.skills[k].level || p.skills[k])) || 0).join(",") : "",
+  ].join("|");
+  if (sig !== CHARD._liveSig) {
+    CHARD._liveSig = sig;
+    chardRender();
+    chardLiveCharStrip();
+  }
+}
+
+function chardStartLive() {
+  chardStopLive();
+  CHARD._liveSig = null;
+  CHARD._liveTimer = setInterval(chardLiveTick, 350);
+}
+function chardStopLive() {
+  if (CHARD._liveTimer) { clearInterval(CHARD._liveTimer); CHARD._liveTimer = null; }
+}
+
+/* ---------- "!" no botão CONTA da topbar ---------- */
+
+let _swAlertRosterAt = 0, _swAlertRosterMap = null;
+function paintSwitchAlert() {
+  const el = $("#btn-switch-alert");
+  if (!el) return;
+  let pend = 0;
+  if (typeof G !== "undefined" && G && G.p) {
+    /* Roster da conta — throttle 3s (o parse do localStorage é pesado). */
+    const now = Date.now();
+    if (!_swAlertRosterMap || now - _swAlertRosterAt > 3000) {
+      _swAlertRosterAt = now; _swAlertRosterMap = {};
+      if (typeof getCharacters === "function")
+        try { for (const c of getCharacters()) _swAlertRosterMap[String(c.id)] = c; }
+        catch (e) {}
+    }
+    const roster = _swAlertRosterMap, seen = {};
+    const cid = typeof characterId === "function" ? characterId(G.p) : G.p.id;
+    /* p vivo do ativo + participantes da instância — só os da minha conta
+     * (id no roster), senão PT com char alheio acenderia o badge. */
+    const live = typeof combatSessionParticipants === "function"
+      ? combatSessionParticipants(G.combat) : [{ p: G.p }];
+    for (const e of live) {
+      if (!e || !e.p) continue;
+      const id = String((typeof characterId === "function" ? characterId(e.p) : null) ||
+                        e.p.id || e.id);
+      if (seen[id] || !(id === String(cid) || roster[id])) continue;
+      seen[id] = 1;
+      const pp = charPendingPoints(e.p);
+      pend += pp.wheel + pp.prof;
+    }
+    for (const id in roster) {
+      if (seen[id]) continue;
+      const pp = charPendingPoints(roster[id]);
+      pend += pp.wheel + pp.prof;
+    }
+  }
+  el.hidden = pend <= 0;
+}
+
 function chardPaintTitlePortrait(p, tries) {
   const box = $("#chard-title-portrait");
   if (!box) return;
@@ -133,6 +296,7 @@ function chardRender() {
   const el = $("#chard-body");
   const p = (typeof G !== "undefined" && G) ? G.p : null;
   if (!el || !p) return;
+  chardPaintTabBadges(p);
   const shell = el.closest(".modal") || $("#modal-body");
   if (shell) {
     shell.classList.toggle("wheel-open", CHARD.tab === "roda");
@@ -200,15 +364,20 @@ function chardPaintCharStrip() {
       const id = String(c.id);
       const isCur = id === cur;
       const voc = vocationName({ voc: c.voc || "knight", promoted: !!c.promoted });
-      return `<button type="button" class="chard-char-card ${isCur ? "is-current" : ""}"
+      const live = chardLiveP(id) || chardRosterChar(id) ||
+                   (isOnline ? c.snapshot : c);
+      const pend = charPendingPoints(live);
+      const lvl = Number(live && live.level) || Number(c.level) || 1;
+      return `<button type="button" class="chard-char-card ${isCur ? "is-current" : ""} ${pend.wheel + pend.prof > 0 ? "has-pending" : ""}"
         data-chard-enter="${id}" ${isCur ? "disabled" : ""}
         title="${isCur ? "Personagem atual" : "Entrar com " + chardEsc(c.name)}">
+        ${pend.wheel + pend.prof > 0 ? `<span class="chard-char-alert" title="Pontos disponíveis">!</span>` : ""}
         <span class="chard-char-portrait" data-chard-portrait="${id}"></span>
         <span class="chard-char-info">
           <b>${chardEsc(c.name)}</b>
           <i>${chardEsc(voc)}</i>
         </span>
-        <span class="chard-char-level">${Number(c.level) || 1}</span>
+        <span class="chard-char-level">${lvl}</span>
         ${isCur ? `<span class="chard-char-tag">atual</span>` : `<span class="chard-char-enter">Entrar ›</span>`}
       </button>`;
     }).join("") || `<div class="tiny dim" style="padding:10px">Nenhum personagem.</div>`;

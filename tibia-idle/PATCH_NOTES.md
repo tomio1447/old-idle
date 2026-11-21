@@ -3,6 +3,24 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Botao CONTA com "!" de pontos pendentes + modal instantaneo
+
+- Botao da topbar agora mostra a descricao "CONTA" (label visivel,
+  era escondido no CSS) e um "!" dourado quando QUALQUER personagem da
+  conta tem pontos livres: roda (wheelAvail>0) ou proficiencia (nivel de
+  arma sem perk escolhido). Conta chars vivos da instancia + roster salvo;
+  chars de outras contas na PT nao contam.
+- No modal Detalhes: "!" nas abas Proficiencia/Roda quando o char ativo
+  tem pontos naquele sistema, e "!" no card de cada personagem com
+  pendencia (atualizado ao vivo).
+- Refresh instantaneo: intervalo de 350ms so enquanto o modal esta aberto
+  — mudanca de level/XP/skills/ouro/pontos re-renderiza a aba ativa e o
+  nivel dos cards (dados vivos da instancia + roster). Antes o modal so
+  atualizava ao reabrir.
+- charPendingPoints(p) exportado: {wheel, prof} por personagem (blob ou
+  snapshot da conta).
+
+---
 ## 2026-11-21 — Charms: sprite da criatura associada no card
 
 - O card do charm na grade agora mostra a sprite da criatura associada

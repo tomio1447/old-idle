@@ -390,8 +390,8 @@ function renderStats(p) {
   if (typeof paintConditionBar === "function") paintConditionBar($("#cond-bar"), p, false);
   // retrato do personagem no botão da topbar (abre Detalhes do personagem)
   if (typeof paintSwitchPortrait === "function") paintSwitchPortrait(p);
-  // retrato do personagem no botão da topbar (abre Detalhes do personagem)
-  if (typeof paintSwitchPortrait === "function") paintSwitchPortrait(p);
+  // "!" quando algum char da conta tem pontos de roda/proficiência livres
+  if (typeof paintSwitchAlert === "function") paintSwitchAlert();
 
   // faixa exclusiva do Monk: harmonia, mantra e o estado sereno
   const mbox = $("#monk-bar");
