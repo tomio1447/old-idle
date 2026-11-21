@@ -942,6 +942,7 @@ function renderCycloCharms(p, el) {
           ${ids.map((id) => {
             const c = CHARMS[id];
             const tem = selP ? charmOwned(selP, id) : false;
+            const tier = tem && typeof charmTier === "function" ? charmTier(selP, id) : 0;
             const race = selP ? charmAssignedRace(selP, id) : null;
             const cls = ["gi-charm-card"];
             if (sel === id) cls.push("is-selected");
@@ -950,7 +951,7 @@ function renderCycloCharms(p, el) {
             return `<button type="button" class="${cls.join(" ")}" data-charm-sel="${id}">
               <div class="gi-charm-icon">${charmIconHtml(id, 28)}</div>
               <div class="gi-charm-meta">
-                <span class="gi-charm-name">${c.nome}</span>
+                <span class="gi-charm-name">${c.nome}${tier > 0 ? ` <b style="color:#ffb84d">Nv.${tier}</b>` : ""}</span>
                 <span class="gi-charm-cost">${fmtFull(c.custo)} pts</span>
                 <span class="gi-charm-tag">${c.elemento ? c.elemento : c.tipo}</span>
               </div>
@@ -1027,6 +1028,16 @@ function renderCycloCharms(p, el) {
     toast(`Charm <b>${CHARMS[cid].nome}</b> desbloqueado na conta!`);
     charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
   });
+  const upg = $("#charm-upgrade");
+  if (upg) upg.addEventListener("click", () => {
+    if (charmLockedOnline()) return;
+    const id = cycloCharmIdFromEl(upg) || CYCLO.charmSel;
+    const r = upgradeCharm(player, id);   // pool da conta — debita 1x só
+    if (!r.ok) { toast(r.erro); return; }
+    const cid = r.id || id;
+    toast(`Charm <b>${CHARMS[cid].nome}</b> melhorado p/ nível ${r.tier}!`);
+    charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
+  });
   const clr = $("#charm-clear");
   if (clr) clr.addEventListener("click", () => {
     const id = cycloCharmIdFromEl(clr) || CYCLO.charmSel;
@@ -1054,8 +1065,16 @@ function renderCycloCharms(p, el) {
 function cycloCharmDetail(p, id, finished) {
   const c = CHARMS[id];
   const tem = charmOwned(p, id);
+  const tier = tem && typeof charmTier === "function" ? charmTier(p, id) : 0;
   const race = charmAssignedRace(p, id);
   const pode = (p.charmPoints || 0) >= c.custo;
+  const upCost = tier > 0 && tier < 3 && typeof charmCostAt === "function"
+    ? charmCostAt(id, tier + 1) : 0;
+  const podeUp = upCost > 0 && (p.charmPoints || 0) >= upCost;
+  const fxChance = tier > 0 && typeof charmFx === "function"
+    ? charmFx(id, "chance", tier) : (c.chance || 0);
+  const fxPercent = tier > 0 && typeof charmFx === "function"
+    ? charmFx(id, "percent", tier) : (c.percent || 0);
   const opts = finished.map((s) => {
     const taken = charmOnRace(p, s);
     const dis = taken && taken !== id ? "disabled" : "";
@@ -1067,13 +1086,13 @@ function cycloCharmDetail(p, id, finished) {
     <div class="gi-inspector-head">
       <div class="gi-inspector-thumb">${charmIconHtml(id, 32)}</div>
       <div>
-        <h4 class="gi-inspector-title">${c.nome}</h4>
+        <h4 class="gi-inspector-title">${c.nome}${tier > 0 ? ` <span class="gi-inspector-sub">· Nível ${tier}/3</span>` : ""}</h4>
         <span class="gi-inspector-sub">Custo: <strong>${fmtFull(c.custo)} pts</strong> · ${c.cat} · ${c.elemento || c.tipo}</span>
       </div>
     </div>
     <p class="gi-inspector-desc">${c.desc}</p>
-    ${c.chance != null ? `<div class="gi-inspector-sub">Chance (tier 1): <b>${c.chance}%</b></div>` : ""}
-    ${c.percent != null ? `<div class="gi-inspector-sub">Efeito: <b>${c.percent}%</b></div>` : ""}
+    ${c.chance != null ? `<div class="gi-inspector-sub">Chance (nível ${tier || 1}): <b>${fxChance}%</b></div>` : ""}
+    ${c.percent != null ? `<div class="gi-inspector-sub">Efeito: <b>${fxPercent}%</b></div>` : ""}
     <div class="gi-assigned-box">
       <span class="gi-assigned-label">Criatura Associada (${p.name || "—"})</span>
       ${race
@@ -1085,7 +1104,11 @@ function cycloCharmDetail(p, id, finished) {
       ${!tem
         ? `<button type="button" class="gi-btn-unlock" id="charm-buy" data-charm-id="${id}"
              ${pode ? "" : "disabled"}>Desbloquear (${fmtFull(c.custo)} pts)</button>`
-        : (race
+        : (tier < 3
+          ? `<button type="button" class="gi-btn-unlock" id="charm-upgrade" data-charm-id="${id}"
+               ${podeUp ? "" : "disabled"}>Melhorar p/ nível ${tier + 1} (${fmtFull(upCost)} pts)</button>`
+          : "")
+        + (race
           ? `<button type="button" class="gi-btn-assign" id="charm-clear" data-charm-id="${id}">Remover associação</button>`
           : (finished.length
             ? `<div class="gi-assign-row">

@@ -3,6 +3,22 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Charms: níveis (tiers) oficiais + procs restaurados
+
+- **Níveis de charm (WU 2024)**: cada charm agora tem 3 estágios com custos
+  e efeitos oficiais (ex.: Enflame 400/600/2000 pts → chance 5%/10%/11%).
+  `p.charms[id]` guarda o tier (1-3); `true` legado = nível 1.
+- Botão **Melhorar** no painel de Charms (mesmo bloqueio do Desbloquear
+  durante caçada online — debita o pool da conta).
+- `charmFx(id,key,tier)`/`charmCostAt(id,tier)`/`charmTier(p,id)` no
+  cliente e no engine; `charmTotals`/procs ofensivos/defensivos escalam
+  pelo nível; Gut corrigido p/ oficial (6/9/12%).
+- Uniões de `shared.charms` preservam o tier MÁXIMO (não regrediam p/ true).
+- **Procs quebrados**: o servidor local rodava build anterior ao endpoint
+  `/api/instance/charm` — o assign nunca chegava na autoridade
+  (`charmRace {}`), então nenhum charm procava. Reiniciado.
+
+---
 ## 2026-11-21 — Charms: seleção de criatura não oscila mais após Associar
 
 - Ao clicar em "Associar Criatura", o painel mostrava a primeira criatura

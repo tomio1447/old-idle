@@ -133,7 +133,10 @@ function seedSharedCharms(shared, characters) {
     const p = charDataOf(character);
     if (!p) continue;
     if (p.charms && typeof p.charms === "object" && !Array.isArray(p.charms)) {
-      for (const id of Object.keys(p.charms)) if (p.charms[id]) shared.charms[id] = true;
+      for (const id of Object.keys(p.charms)) if (p.charms[id])
+      shared.charms[id] = Math.max(
+        Math.min(3, Math.max(1, Math.floor(Number(shared.charms[id])) || 1)),
+        Math.min(3, Math.max(1, Math.floor(Number(p.charms[id])) || 1)));
     }
     shared.charmPoints += Math.max(0, Math.floor(Number(p.charmPoints) || 0));
   }
@@ -150,7 +153,10 @@ function applySharedCharms(p, shared) {
     p.charmPoints = Math.max(0, Math.floor(Number(shared.charmPoints) || 0));
   } else if ((p.charms && typeof p.charms === "object") || Number(p.charmPoints) > 0) {
     // pré-migração: o próprio char semeia o pool (primeiro hidratado)
-    for (const id of Object.keys(p.charms || {})) if (p.charms[id]) shared.charms[id] = true;
+    for (const id of Object.keys(p.charms || {})) if (p.charms[id])
+      shared.charms[id] = Math.max(
+        Math.min(3, Math.max(1, Math.floor(Number(shared.charms[id])) || 1)),
+        Math.min(3, Math.max(1, Math.floor(Number(p.charms[id])) || 1)));
     shared.charmPoints = Math.max(shared.charmPoints, Math.max(0, Math.floor(Number(p.charmPoints) || 0)));
     p.charmPoints = shared.charmPoints;
   }
@@ -164,7 +170,10 @@ function applySharedCharms(p, shared) {
  * reverter operações de outro caminho/cópia). */
 function mergeSharedCharms(p, shared) {
   if (p.charms && typeof p.charms === "object" && !Array.isArray(p.charms)) {
-    for (const id of Object.keys(p.charms)) if (p.charms[id]) shared.charms[id] = true;
+    for (const id of Object.keys(p.charms)) if (p.charms[id])
+      shared.charms[id] = Math.max(
+        Math.min(3, Math.max(1, Math.floor(Number(shared.charms[id])) || 1)),
+        Math.min(3, Math.max(1, Math.floor(Number(p.charms[id])) || 1)));
   }
   const cur = Math.floor(Number(p.charmPoints) || 0);
   const base = Number(p._charmPointsBase);

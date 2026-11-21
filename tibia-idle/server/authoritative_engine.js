@@ -1984,6 +1984,45 @@ const CHARMS={
   overpower:{tipo:"ofensivo",elemento:"physical",percent:5,chance:5,custo:600},
   overflux:{tipo:"ofensivo",elemento:"physical",percent:2.5,chance:5,custo:600},
 };
+/* Tiers oficiais (WU 2024): custo do estágio e efeito por estágio.
+ * p.charms[id] guarda o tier (1-3); `true` legado = 1. */
+const CHARM_TIERS={
+  wound:{cost:[240,360,1200],chance:[5,10,11]},
+  enflame:{cost:[400,600,2000],chance:[5,10,11]},
+  poison:{cost:[240,360,1200],chance:[5,10,11]},
+  freeze:{cost:[320,480,1600],chance:[5,10,11]},
+  zap:{cost:[320,480,1600],chance:[5,10,11]},
+  curse:{cost:[360,540,1800],chance:[5,10,11]},
+  cripple:{cost:[100,150,225],chance:[6,9,12]},
+  parry:{cost:[400,600,2000],chance:[5,10,11]},
+  dodge:{cost:[240,360,1200],chance:[5,10,11]},
+  adrenaline:{cost:[100,150,225],chance:[6,9,12]},
+  numb:{cost:[100,150,225],chance:[6,9,12]},
+  cleanse:{cost:[100,150,225],chance:[6,9,12]},
+  bless:{cost:[100,150,225],percent:[6,9,12]},
+  scavenge:{cost:[100,150,225],chance:[60,90,120]},
+  gut:{cost:[100,150,225],percent:[6,9,12]},
+  lowblow:{cost:[800,1200,4000],chance:[4,8,9]},
+  divine:{cost:[600,900,3000],chance:[5,10,11]},
+  vampiric:{cost:[100,150,225],chance:[1.6,2.4,3.2]},
+  voidcall:{cost:[100,150,225],chance:[0.8,1.2,1.6]},
+  savage:{cost:[800,1200,4000],chance:[20,40,44]},
+  fatal:{cost:[100,150,225],chance:[30,45,60]},
+  voidinversion:{cost:[100,150,225],chance:[20,30,40]},
+  carnage:{cost:[600,900,3000],chance:[10,20,22]},
+  overpower:{cost:[600,900,3000],chance:[5,10,11]},
+  overflux:{cost:[600,900,3000],chance:[5,10,11]},
+};
+function charmTierOf(p,id){
+  const v=p&&p.charms?p.charms[id]:0;if(!v)return 0;
+  const n=Math.floor(Number(v));return Math.min(3,Math.max(1,Number.isFinite(n)?n:1));
+}
+function charmFx(id,key,tier){
+  const c=CHARMS[id];if(!c)return 0;
+  const arr=(CHARM_TIERS[id]||{})[key];
+  if(Array.isArray(arr))return arr[Math.min(3,Math.max(1,tier||1))-1];
+  return Number(c[key])||0;
+}
 const IMB_SKILL_FX={
   Strike:{crit:[0,15,25,50],critChance:[0,10,10,10]},
   Chop:{axe:[0,1,2,4]},Slash:{sword:[0,1,2,4]},Bash:{club:[0,1,2,4]},
@@ -3104,17 +3143,18 @@ function charmTotals(p,slug){
     if(!p.charms[id])continue;const c=CHARMS[id];if(!c)continue;
     const race=p.charmRace[id];if(!race)continue;
     if(slug&&race!==slug)continue;
-    if(id==="parry")t.reflete+=c.chance||5;
-    else if(id==="dodge")t.esquiva+=c.chance||5;
-    else if(id==="vampiric")t.vampirismo+=c.chance||1.6;
-    else if(id==="voidcall")t.manaLeech+=c.chance||0.8;
-    else if(id==="lowblow")t.critChance+=c.chance||4;
-    else if(id==="savage")t.critExtra+=c.chance||20;
-    else if(id==="gut")t.gut+=c.percent||20;
-    else if(id==="cripple")t.lentidao+=c.chance||6;
-    else if(id==="numb")t.numb+=c.chance||6;
-    else if(id==="adrenaline")t.adrenaline+=c.chance||6;
-    else if(id==="cleanse")t.cleanse+=c.chance||6;
+    const tier=charmTierOf(p,id);
+    if(id==="parry")t.reflete+=charmFx(id,"chance",tier)||5;
+    else if(id==="dodge")t.esquiva+=charmFx(id,"chance",tier)||5;
+    else if(id==="vampiric")t.vampirismo+=charmFx(id,"chance",tier)||1.6;
+    else if(id==="voidcall")t.manaLeech+=charmFx(id,"chance",tier)||0.8;
+    else if(id==="lowblow")t.critChance+=charmFx(id,"chance",tier)||4;
+    else if(id==="savage")t.critExtra+=charmFx(id,"chance",tier)||20;
+    else if(id==="gut")t.gut+=charmFx(id,"percent",tier)||6;
+    else if(id==="cripple")t.lentidao+=charmFx(id,"chance",tier)||6;
+    else if(id==="numb")t.numb+=charmFx(id,"chance",tier)||6;
+    else if(id==="adrenaline")t.adrenaline+=charmFx(id,"chance",tier)||6;
+    else if(id==="cleanse")t.cleanse+=charmFx(id,"chance",tier)||6;
   }
   return t;
 }
@@ -3130,8 +3170,9 @@ function tryCharmOffensive(auth,p,mob,now){
   for(const id of Object.keys(p.charmRace||{})){
     if(p.charmRace[id]!==slug||!charmUnlocked(p,id))continue;
     const c=CHARMS[id];if(!c||c.tipo!=="ofensivo")continue;
+    const tier=charmTierOf(p,id);
     if(id==="cripple"){
-      if(random(auth)*100<(c.chance||6)&&!(mob.def&&mob.def.imune&&mob.def.imune.indexOf("paralyze")>=0)){
+      if(random(auth)*100<(charmFx(id,"chance",tier)||6)&&!(mob.def&&mob.def.imune&&mob.def.imune.indexOf("paralyze")>=0)){
         mob.slowUntil=now+3000;mob.slowMul=0.5;
         auth.events.push({t:"charm",id:"cripple",aplicado:1,slug:slug,whoId:String(p.id||""),
           x:mob.x,y:mob.y,screen:true,fx:"poff",ts:now});
@@ -3139,16 +3180,16 @@ function tryCharmOffensive(auth,p,mob,now){
       continue;
     }
     if(!c.elemento)continue;
-    if(random(auth)*100>=(c.chance||5))continue;
+    if(random(auth)*100>=(charmFx(id,"chance",tier)||5))continue;
     let dmg;
     if(id==="overpower"){
       const max=maxStats(p).hp;
-      dmg=Math.min(Math.ceil(maxHp*0.08),Math.ceil(max*(c.percent||5)/100));
+      dmg=Math.min(Math.ceil(maxHp*0.08),Math.ceil(max*(charmFx(id,"percent",tier)||5)/100));
     }else if(id==="overflux"){
       const max=maxStats(p).mp;
-      dmg=Math.min(Math.ceil(maxHp*0.08),Math.ceil(max*(c.percent||2.5)/100));
+      dmg=Math.min(Math.ceil(maxHp*0.08),Math.ceil(max*(charmFx(id,"percent",tier)||2.5)/100));
     }else{
-      dmg=Math.min(Math.ceil(level*2),Math.ceil(maxHp*(c.percent||5)/100));
+      dmg=Math.min(Math.ceil(level*2),Math.ceil(maxHp*(charmFx(id,"percent",tier)||5)/100));
     }
     if(!(dmg>0))continue;
     const dealt=applyOutgoingDamage(mob,c.elemento,dmg,now,profPiercePctFor(p,c.elemento));
@@ -3169,17 +3210,19 @@ function resolveCharmId(raw){
 function normalizeCharmUnlockMap(raw){
   const out={};
   if(!raw)return out;
-  const put=(key)=>{if(!key)return;const id=resolveCharmId(key);if(id)out[id]=true;};
+  const put=(key,val)=>{if(!key)return;const id=resolveCharmId(key);if(!id)return;
+    const t=Math.min(3,Math.max(1,Math.floor(Number(val))||1));
+    out[id]=Math.max(out[id]||0,t);};
   if(Array.isArray(raw)){
     for(const item of raw){
       if(typeof item==="string")put(item);
-      else if(item&&typeof item==="object")put(item.id||item.slug);
+      else if(item&&typeof item==="object")put(item.id||item.slug,item.tier);
     }
-    for(const key of Object.keys(raw)){if(!/^\d+$/.test(key)&&raw[key])put(key);}
+    for(const key of Object.keys(raw)){if(!/^\d+$/.test(key)&&raw[key])put(key,raw[key]);}
     return out;
   }
   if(typeof raw!=="object")return out;
-  for(const key of Object.keys(raw)){if(raw[key])put(key);}
+  for(const key of Object.keys(raw)){if(raw[key])put(key,raw[key]);}
   return out;
 }
 function normalizeCharmRaceMap(raw){
@@ -3204,7 +3247,19 @@ function buyCharm(p,id){
   if(!c)return{ok:false,erro:"Charm desconhecido."};
   if(p.charms[cid])return{ok:false,erro:"Você já tem esse charm."};
   if(p.charmPoints<(c.custo||0))return{ok:false,erro:"Charm points insuficientes."};
-  p.charmPoints-=c.custo||0;p.charms[cid]=true;return{ok:true,id:cid};
+  p.charmPoints-=c.custo||0;p.charms[cid]=1;return{ok:true,id:cid};
+}
+/* Melhoria oficial (WU 2024): estágio 2/3 debita do pool de charm points. */
+function upgradeCharm(p,id){
+  ensurePlayerCharms(p);
+  const cid=resolveCharmId(id);const c=cid&&CHARMS[cid];
+  if(!c)return{ok:false,erro:"Charm desconhecido."};
+  const tier=charmTierOf(p,cid);
+  if(!tier)return{ok:false,erro:"Desbloqueie o charm primeiro."};
+  if(tier>=3)return{ok:false,erro:"Charm já está no nível máximo."};
+  const cost=(CHARM_TIERS[cid]&&CHARM_TIERS[cid].cost||[])[tier]||((c.custo||0)*2);
+  if(p.charmPoints<cost)return{ok:false,erro:"Charm points insuficientes."};
+  p.charmPoints-=cost;p.charms[cid]=tier+1;return{ok:true,id:cid,tier:tier+1};
 }
 function assignCharm(p,id,slug){
   ensurePlayerCharms(p);

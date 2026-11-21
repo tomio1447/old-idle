@@ -222,29 +222,90 @@ function charmIconHtml(id, size) {
  * para o formato canônico { [charmId]: true }. Arrays com props nomeadas
  * perdem o unlock no JSON.stringify — por isso normalizamos sempre para
  * Object puro antes de salvar/ler. */
+/* Tiers oficiais (WU 2024): custo do próximo estágio e efeito por estágio.
+ * `custo`/`chance`/`percent` escalares da CHARMS = tier 1 (compat). */
+const CHARM_TIERS = {
+  wound:        { cost: [240, 360, 1200], chance: [5, 10, 11] },
+  enflame:      { cost: [400, 600, 2000], chance: [5, 10, 11] },
+  poison:       { cost: [240, 360, 1200], chance: [5, 10, 11] },
+  freeze:       { cost: [320, 480, 1600], chance: [5, 10, 11] },
+  zap:          { cost: [320, 480, 1600], chance: [5, 10, 11] },
+  curse:        { cost: [360, 540, 1800], chance: [5, 10, 11] },
+  cripple:      { cost: [100, 150, 225],  chance: [6, 9, 12] },
+  parry:        { cost: [400, 600, 2000], chance: [5, 10, 11] },
+  dodge:        { cost: [240, 360, 1200], chance: [5, 10, 11] },
+  adrenaline:   { cost: [100, 150, 225],  chance: [6, 9, 12] },
+  numb:         { cost: [100, 150, 225],  chance: [6, 9, 12] },
+  cleanse:      { cost: [100, 150, 225],  chance: [6, 9, 12] },
+  bless:        { cost: [100, 150, 225],  percent: [6, 9, 12] },
+  scavenge:     { cost: [100, 150, 225],  chance: [60, 90, 120] },
+  gut:          { cost: [100, 150, 225],  percent: [6, 9, 12] },
+  lowblow:      { cost: [800, 1200, 4000], chance: [4, 8, 9] },
+  divine:       { cost: [600, 900, 3000], chance: [5, 10, 11] },
+  vampiric:     { cost: [100, 150, 225],  chance: [1.6, 2.4, 3.2] },
+  voidcall:     { cost: [100, 150, 225],  chance: [0.8, 1.2, 1.6] },
+  savage:       { cost: [800, 1200, 4000], chance: [20, 40, 44] },
+  fatal:        { cost: [100, 150, 225],  chance: [30, 45, 60] },
+  voidinversion:{ cost: [100, 150, 225],  chance: [20, 30, 40] },
+  carnage:      { cost: [600, 900, 3000], chance: [10, 20, 22] },
+  overpower:    { cost: [600, 900, 3000], chance: [5, 10, 11] },
+  overflux:     { cost: [600, 900, 3000], chance: [5, 10, 11] },
+};
+
+/* Estágio do charm (1-3). `p.charms[id]` guarda o tier desde a migração —
+ * `true` legado = 1. */
+function charmTier(p, id) {
+  const cid = resolveCharmId(id);
+  const v = cid && p && p.charms ? p.charms[cid] : 0;
+  if (!v) return 0;
+  const n = Math.floor(Number(v));
+  return Math.min(3, Math.max(1, Number.isFinite(n) ? n : 1));
+}
+/* Valor do efeito (chance/percent) no estágio — sem array usa o escalar. */
+function charmFx(id, key, tier) {
+  const cid = resolveCharmId(id);
+  const c = cid && CHARMS[cid];
+  if (!c) return 0;
+  const t = Math.min(3, Math.max(1, tier || 1));
+  const arr = (CHARM_TIERS[cid] || {})[key];
+  if (Array.isArray(arr)) return arr[t - 1];
+  return Number(c[key]) || 0;
+}
+/* Custo do estágio (1 = desbloqueio; 2/3 = melhoria). */
+function charmCostAt(id, tier) {
+  const cid = resolveCharmId(id);
+  const c = cid && CHARMS[cid];
+  if (!c) return 0;
+  const t = Math.min(3, Math.max(1, tier || 1));
+  const arr = (CHARM_TIERS[cid] || {}).cost;
+  if (Array.isArray(arr)) return arr[t - 1];
+  return t === 1 ? (Number(c.custo) || 0) : (Number(c.custo) || 0) * 2;
+}
+
 function normalizeCharmUnlockMap(raw) {
   const out = {};
   if (!raw) return out;
-  const put = (key) => {
+  const put = (key, val) => {
     if (!key) return;
+    const tier = Math.min(3, Math.max(1, Math.floor(Number(val)) || 1));
     const s = String(key).trim();
     if (!s) return;
-    if (CHARMS[s]) { out[s] = true; return; }
+    if (CHARMS[s]) { out[s] = Math.max(out[s] || 0, tier); return; }
     const low = s.toLowerCase();
-    if (CHARMS[low]) { out[low] = true; return; }
+    if (CHARMS[low]) { out[low] = Math.max(out[low] || 0, tier); return; }
     for (const id of Object.keys(CHARMS)) {
-      if ((CHARMS[id].nome || "").toLowerCase() === low) { out[id] = true; return; }
+      if ((CHARMS[id].nome || "").toLowerCase() === low) { out[id] = Math.max(out[id] || 0, tier); return; }
     }
   };
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (typeof item === "string") put(item);
-      else if (item && typeof item === "object") put(item.id || item.slug || item.nome);
+      else if (item && typeof item === "object") put(item.id || item.slug || item.nome, item.tier);
     }
     /* props nomeadas em Array (ex.: arr.enflame = true) não serializam */
     for (const key of Object.keys(raw)) {
       if (/^\d+$/.test(key)) continue;
-      if (raw[key]) put(key);
+      if (raw[key]) put(key, raw[key]);
     }
     return out;
   }
@@ -252,7 +313,8 @@ function normalizeCharmUnlockMap(raw) {
   for (const key of Object.keys(raw)) {
     const v = raw[key];
     if (!v) continue;
-    if (v === true || v === 1 || v === "1" || v === "true") put(key);
+    if (v === true || v === "true") put(key, 1);
+    else if (typeof v === "number" && Number.isFinite(v)) put(key, v);
     else if (typeof v === "string") { put(key); put(v); }
     else put(key);
   }
@@ -430,8 +492,25 @@ function buyCharm(p, id) {
   p.charmPoints -= c.custo;
   // Reatribui o mapa inteiro — com p.charms bound à conta, a mutation
   // `p.charms[cid]=true` não dispara o setter e o unlock se perderia.
-  p.charms = Object.assign({}, p.charms, { [cid]: true });
-  return { ok: true, id: cid };
+  p.charms = Object.assign({}, p.charms, { [cid]: 1 });
+  return { ok: true, id: cid, tier: 1 };
+}
+
+/* Melhoria oficial (WU 2024): estágio 2/3 debita charm points do pool. */
+function upgradeCharm(p, id) {
+  ensureCyclopedia(p);
+  const cid = resolveCharmId(id);
+  const c = cid && CHARMS[cid];
+  if (!c) return { ok: false, erro: "Charm desconhecido." };
+  const tier = charmTier(p, cid);
+  if (!tier) return { ok: false, erro: "Desbloqueie o charm primeiro." };
+  if (tier >= 3) return { ok: false, erro: "Charm já está no nível máximo." };
+  const cost = charmCostAt(cid, tier + 1);
+  if ((p.charmPoints || 0) < cost)
+    return { ok: false, erro: "Charm points insuficientes." };
+  p.charmPoints -= cost;
+  p.charms = Object.assign({}, p.charms, { [cid]: tier + 1 });
+  return { ok: true, id: cid, tier: tier + 1 };
 }
 
 function assignCharm(p, id, slug) {
@@ -474,20 +553,21 @@ function charmTotals(p, slug) {
     const race = p.charmRace[id];
     if (!race) continue;
     if (slug && race !== slug) continue;
+    const tier = Math.min(3, Math.max(1, Math.floor(Number(p.charms[id])) || 1));
     if (c.tipo === "ofensivo" && c.elemento && c.percent) {
       /* procs ofensivos não somam % passivo — mantém mapa só para UI legada */
       t.dano[c.elemento] = (t.dano[c.elemento] || 0);
-    } else if (id === "parry") t.reflete += c.chance || 5;
-    else if (id === "dodge") t.esquiva += c.chance || 5;
-    else if (id === "vampiric") t.vampirismo += c.chance || 1.6;
-    else if (id === "voidcall") t.manaLeech += c.chance || 0.8;
-    else if (id === "cripple") t.lentidao += c.chance || 6;
-    else if (id === "numb") t.numb += c.chance || 6;
-    else if (id === "adrenaline") t.adrenaline += c.chance || 6;
-    else if (id === "cleanse") t.cleanse += c.chance || 6;
-    else if (id === "lowblow") t.critChance += c.chance || 4;
-    else if (id === "savage") t.critExtra += c.chance || 20;
-    else if (id === "gut") t.gut += c.percent || 20;
+    } else if (id === "parry") t.reflete += charmFx(id, "chance", tier) || 5;
+    else if (id === "dodge") t.esquiva += charmFx(id, "chance", tier) || 5;
+    else if (id === "vampiric") t.vampirismo += charmFx(id, "chance", tier) || 1.6;
+    else if (id === "voidcall") t.manaLeech += charmFx(id, "chance", tier) || 0.8;
+    else if (id === "cripple") t.lentidao += charmFx(id, "chance", tier) || 6;
+    else if (id === "numb") t.numb += charmFx(id, "chance", tier) || 6;
+    else if (id === "adrenaline") t.adrenaline += charmFx(id, "chance", tier) || 6;
+    else if (id === "cleanse") t.cleanse += charmFx(id, "chance", tier) || 6;
+    else if (id === "lowblow") t.critChance += charmFx(id, "chance", tier) || 4;
+    else if (id === "savage") t.critExtra += charmFx(id, "chance", tier) || 20;
+    else if (id === "gut") t.gut += charmFx(id, "percent", tier) || 6;
   }
   return t;
 }
@@ -501,17 +581,18 @@ function charmOffensiveProc(p, slug, maxHp, level, rng) {
     if (p.charmRace[id] !== slug || !p.charms[id]) continue;
     const c = CHARMS[id];
     if (!c || c.tipo !== "ofensivo" || !c.elemento) continue;
-    if (roll() * 100 >= (c.chance || 5)) continue;
+    const tier = charmTier(p, id);
+    if (roll() * 100 >= (charmFx(id, "chance", tier) || 5)) continue;
     let dmg;
     if (id === "overpower") {
       const max = (typeof maxStats === "function") ? maxStats(p).hp : (p.hp || 100);
-      dmg = Math.min(Math.ceil(maxHp * 0.08), Math.ceil(max * (c.percent || 5) / 100));
+      dmg = Math.min(Math.ceil(maxHp * 0.08), Math.ceil(max * (charmFx(id, "percent", tier) || 5) / 100));
     } else if (id === "overflux") {
       const max = (typeof maxStats === "function") ? maxStats(p).mp : (p.mp || 100);
-      dmg = Math.min(Math.ceil(maxHp * 0.08), Math.ceil(max * (c.percent || 2.5) / 100));
+      dmg = Math.min(Math.ceil(maxHp * 0.08), Math.ceil(max * (charmFx(id, "percent", tier) || 2.5) / 100));
     } else {
       dmg = Math.min(Math.ceil((level || 1) * 2),
-                     Math.ceil(maxHp * (c.percent || 5) / 100));
+                     Math.ceil(maxHp * (charmFx(id, "percent", tier) || 5) / 100));
     }
     if (dmg > 0) out.push({ id: id, element: c.elemento, dmg: dmg });
   }
@@ -548,7 +629,8 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     CYCLO_ABAS, CHARMS, BEST_ESTAGIOS, bestiaryKill, bestiaryStage,
     bestiaryProgress, bestiarySummary, bestiaryFinishedList,
-    buyCharm, assignCharm, clearCharm, charmTotals, charmOffensiveProc,
+    buyCharm, upgradeCharm, assignCharm, clearCharm, charmTotals, charmOffensiveProc,
+    charmTier, charmFx, charmCostAt, CHARM_TIERS,
     charmOwned, charmAssignedRace, charmOnRace, charmIconHtml,
     huntStars, huntStarsHtml, ensureCyclopedia, resolveCharmId,
     normalizeCharmUnlockMap, normalizeCharmRaceMap,
