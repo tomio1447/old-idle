@@ -1911,6 +1911,14 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
   }
   }
   opts.push({
+    label: "Mover para o depot",
+    hint: (Array.isArray(p.depot) ? p.depot.length : 0) + "/30",
+    action: () => {
+      if (typeof persistDepotAction === "function")
+        persistDepotAction(p, "store", instId || slug, { source: "bag", qty: instId ? 1 : count });
+    },
+  });
+  opts.push({
     label: "Mostrar no market",
     hint: "ofertas",
     action: () => {

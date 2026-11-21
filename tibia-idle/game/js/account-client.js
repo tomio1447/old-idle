@@ -738,6 +738,7 @@ function accountEquipItem(token,charId,opts){
         source:String(opts.source||"bag"),
         dest:String(opts.dest||"bag"),
         inst_id:opts.instId?String(opts.instId):null,
+        qty:Number(opts.qty)||0,
         instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
       if(r.data.ok){
         // A bag é da conta: o servidor sincronizou o shared com o delta do
@@ -762,6 +763,7 @@ function accountEquipItem(token,charId,opts){
       source:String(opts.source||"bag"),
       dest:String(opts.dest||"bag"),
       inst_id:opts.instId?String(opts.instId):null,
+      qty:Number(opts.qty)||0,
       expected_version:Number(summary&&summary.saveVersion)||0,
     },accountLeaseFields()));
     if(r.data.ok)return accountEquipmentResult(r.data,charId);

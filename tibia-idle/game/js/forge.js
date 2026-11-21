@@ -396,9 +396,12 @@ function depotStore(p, ref, options) {
     return { ok: true, msg: forgeEntryLabel(slug) + " guardado no Depot." };
   }
   if (options.source !== "equip" && forgeBagCount(p, slug) > 0) {
-    removeItem(p, slug, 1);
-    p.depot.push(slug);
-    return { ok: true, msg: forgeEntryLabel(slug) + " guardado no Depot." };
+    var want = Math.max(1, Math.floor(Number(options.qty) || 1));
+    var n = Math.min(want, forgeBagCount(p, slug), 30 - p.depot.length);
+    if (n <= 0) return { ok: false, msg: "Depot cheio (30 slots)." };
+    removeItem(p, slug, n);
+    for (var k = 0; k < n; k++) p.depot.push(slug);
+    return { ok: true, msg: (n > 1 ? n + "x " : "") + forgeEntryLabel(slug) + " guardado no Depot." };
   }
 
   for (var i = 0; i < SLOTS.length; i++) {

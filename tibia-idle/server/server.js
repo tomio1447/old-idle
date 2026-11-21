@@ -4049,7 +4049,7 @@ async function equipInstanceItem(db,body){
         ...(depotAction?{depot:(item.p.depot||[]).slice()}:{})
       };
       let r;
-      if(depotAction)r=depotActionAuth(item.p,{action:depotAction,ref:slug,source:body.source,slot:body.slot});
+      if(depotAction)r=depotActionAuth(item.p,{action:depotAction,ref:slug,source:body.source,slot:body.slot,qty:body.qty});
       else if(unequip)r=unequipFromContainerAuth(item.p,String(body.slot||""),String(body.dest||"bag"));
       else r=equipFromContainerAuth(item.p,String(body.slug||""),String(body.source||"bag"),
         {instId:body.inst_id?String(body.inst_id):null});
@@ -4075,7 +4075,7 @@ async function equipInstanceItem(db,body){
   }
   let p=await loadCityPlayer(db,acc,character);
   let r;
-  if(depotAction)r=depotActionAuth(p,{action:depotAction,ref:slug,source:body.source,slot:body.slot});
+  if(depotAction)r=depotActionAuth(p,{action:depotAction,ref:slug,source:body.source,slot:body.slot,qty:body.qty});
   else if(unequip)r=unequipFromContainerAuth(p,String(body.slot||""),String(body.dest||"bag"));
   else r=equipFromContainerAuth(p,String(body.slug||""),String(body.source||"bag"),
     {instId:body.inst_id?String(body.inst_id):null});

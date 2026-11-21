@@ -3,6 +3,18 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — "Mover para o depot" no menu do item da backpack
+
+- Nova opção no menu de contexto dos itens da mochila (ao lado de
+  "Mover para Loot Pouch"), com hint do uso do depot (ex.: "4/30").
+- Reusa o fluxo autoritativo depotAction ("store") — funciona online
+  (instância) e na cidade, com sync do shared da conta.
+- depotActionAuth e depotStore agora aceitam qty: stacks movem a pilha
+  inteira em uma chamada, respeitando o cap de 30 slots do depot.
+- Itens instanciados/tierados movem como instância (loc "depot"), como no
+  retrieve/equip existentes.
+
+---
 ## 2026-11-21 — Gate Twitch do voucher mostra as recompensas
 
 - A resposta `needTwitch` do /api/store/voucher agora inclui `rewards`

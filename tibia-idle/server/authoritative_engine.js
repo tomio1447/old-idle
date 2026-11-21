@@ -5515,8 +5515,12 @@ function depotActionAuth(p,opts){
       if(inst.loc!=="bag")return fail("Item não está na mochila");
       slug=inst.slug;inst.loc="depot";q.depot.push(inst.id);
     }else{
-      if(!ITEMS[ref]||!(Number(q.bag[ref])>0))return fail("Item não está na mochila");
-      slug=ref;q.bag[ref]--;if(q.bag[ref]<=0)delete q.bag[ref];q.depot.push(ref);
+      const have=Number(q.bag[ref])||0;
+      if(!ITEMS[ref]||have<=0)return fail("Item não está na mochila");
+      const n=Math.min(Math.max(1,Math.floor(Number(opts.qty)||1)),have,30-q.depot.length);
+      if(n<=0)return fail("Depot cheio (30 slots)");
+      slug=ref;q.bag[ref]-=n;if(q.bag[ref]<=0)delete q.bag[ref];
+      for(let i=0;i<n;i++)q.depot.push(ref);
     }
   }else{
     const index=q.depot.findIndex((entry)=>String(entry)===ref);
