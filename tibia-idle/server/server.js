@@ -46,7 +46,7 @@ const {
   filterHardObscenity, sanitizeText, vocShort, parsePm,
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
-  sanitizeHelperPresets, sanitizeWheelState, advanceTrainingPlayer, staminaRegenPlayer,
+  sanitizeHelperPresets, sanitizeWheelState, sanitizeImbuementState, advanceTrainingPlayer, staminaRegenPlayer,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, openAuthPrimalBag, claimAnnihilatorReward, annihilatorRewardOffer, claimAnnihilatorCart, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
@@ -1472,6 +1472,11 @@ async function enforceAuthoritativeProgress(db,accountId,prepared){
      * no engine) para o snapshot da instância não apagar a roda nova. */
     if(sentPrefs.wheel!==undefined&&typeof sanitizeWheelState==="function"){
       const w=sanitizeWheelState(sentPrefs.wheel,player);if(w)player.wheel=w;
+    }
+    /* Imbuements idem: o apply é client-side — sem preservar a versão
+     * enviada, um save antes do próximo tick regrava a lista antiga. */
+    if(sentPrefs.imbuements!==undefined&&typeof sanitizeImbuementState==="function"){
+      const im=sanitizeImbuementState(sentPrefs.imbuements);if(im)player.imbuements=im;
     }
   }
   prepared.save.data=JSON.stringify(player);prepared.save.level=Math.max(1,Number(player.level)||1);

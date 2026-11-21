@@ -3,6 +3,22 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Imbuements: 2o/3o slot sumia em cacada online
+
+- p.imbuements nao era preservado no merge da autoridade: o snapshot do
+  servidor (que nao conhecia o imbue novo) sobrescrevia a lista local a
+  cada tick — aplicar o terceiro "apagava" o segundo. Agora wheel e
+  imbuements sao client-owned no merge do char pilotado (demais membros
+  seguem o eco da autoridade).
+- Tick passa a enviar visual.imbuements do char pilotado; o engine
+  sanitiza (sanitizeImbuementState: storeKey inst:/equip:, tier 1-3,
+  rest <=24h, max 4 por item) e espelha em item.p — os bonus passam a
+  procurar na autoridade E a extracao nao regrava a lista antiga.
+- Save durante instancia preserva sentPrefs.imbuements (sanitize do
+  engine), mesmo padrao do wheel — um save antes do proximo tick nao
+  reverte o imbue aplicado.
+
+---
 ## 2026-11-21 — Wheel: perks com nitidez total + MAX persiste online
 
 - Nós "locked" da roda nao escurecem mais (opacity/grayscale removidos) —

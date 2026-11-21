@@ -1082,6 +1082,7 @@ function normalizeVisualState(raw,auth){
       if(input.helperActivePreset!==undefined)
         item.helperActivePreset=input.helperActivePreset?String(input.helperActivePreset).slice(0,64):null;
       if(input.wheel!==undefined)item.wheel=input.wheel;
+      if(input.imbuements!==undefined)item.imbuements=input.imbuements;
       const wdx=Number(input.walkIntent&&input.walkIntent.dx),wdy=Number(input.walkIntent&&input.walkIntent.dy);
       if(Number.isFinite(wdx)&&Number.isFinite(wdy)&&(wdx||wdy)){
         item.walkIntent={dx:Math.max(-1,Math.min(1,Math.round(wdx))),dy:Math.max(-1,Math.min(1,Math.round(wdy)))};
@@ -1255,6 +1256,13 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     if(pos.wheel!==undefined){
       const w=sanitizeWheelState(pos.wheel,item.p);
       if(w){item.p=item.p||{};item.p.wheel=w;}
+    }
+    /* Imbuements: preferência do cliente (apply é client-side) — sanitiza
+     * e espelha em item.p para a autoridade calcular os bônus e regravar
+     * a lista no save da instância. */
+    if(pos.imbuements!==undefined){
+      const im=sanitizeImbuementState(pos.imbuements);
+      if(im){item.p=item.p||{};item.p.imbuements=im;}
     }
   }}
   const clock=Number(auth.clock)||0;
@@ -3298,6 +3306,32 @@ function sanitizeWheelState(raw,p){
     slots[id]=v;spent+=v;
   }
   out.slots=slots;
+  return out;
+}
+/* Sanitiza o mapa `imbuements` enviado pelo cliente (tick/save): objeto
+ * {storeKey: [{key, tier, rest, bonus?}]}, storeKey "inst:<id>" ou
+ * "equip:<slot>" ≤80 chars, entries com key ≤64, tier int 1-3, rest
+ * 0..24h, bonus opcional finito. Máx 4 por storeKey (cap oficial é 3).
+ * Retorna null quando o payload não é objeto — mantém o estado atual. */
+function sanitizeImbuementState(raw){
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
+  const REST_MAX=24*3600*1000,out={};
+  for(const k of Object.keys(raw)){
+    const key=String(k).slice(0,80),list=raw[k];
+    if(!key.startsWith("inst:")&&!key.startsWith("equip:"))continue;
+    if(!Array.isArray(list)||!list.length)continue;
+    const clean=[];
+    for(const e of list){
+      if(clean.length>=4)break;
+      if(!e||typeof e!=="object"||!e.key)continue;
+      const im={key:String(e.key).slice(0,64),
+        tier:Math.max(1,Math.min(3,Math.floor(Number(e.tier)||1))),
+        rest:Math.max(0,Math.min(REST_MAX,Number(e.rest)||0))};
+      if(Number.isFinite(Number(e.bonus))&&Number(e.bonus)>0)im.bonus=Number(e.bonus);
+      clean.push(im);
+    }
+    if(clean.length)out[key]=clean;
+  }
   return out;
 }
 function wheelSkillBonus(p,which){
@@ -9921,7 +9955,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState,opts)
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
   annihilatorTick,claimAnnihilatorReward,annihilatorRewardOffer,claimAnnihilatorCart,bloodrottenTick,
-  normalizeVisualState,sanitizeHelperPresets,sanitizeWheelState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
+  normalizeVisualState,sanitizeHelperPresets,sanitizeWheelState,sanitizeImbuementState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
   spawnHuntWave,pickHuntSpawnSlug,openAuthBagYouDesire,openAuthPrimalBag,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   skillWaveCells,

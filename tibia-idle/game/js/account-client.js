@@ -537,6 +537,11 @@ function accountAuthorityVisualState(){
          * espelho, a instância regrava a roda antiga no save e os pontos
          * alocados em combate "somem" no fim da hunt. */
         if(cfgSrc.wheel&&typeof cfgSrc.wheel==="object")visual.wheel=helperPresetClone(cfgSrc.wheel);
+        /* Imbuements idem: o apply é client-side — sem o espelho a
+         * instância não vê o imbue novo (bônus não proca na autoridade)
+         * e a extração regrava a lista antiga. */
+        if(cfgSrc.imbuements&&typeof cfgSrc.imbuements==="object")
+          visual.imbuements=helperPresetClone(cfgSrc.imbuements);
       }
       if(cfgSrc&&cfgSrc.config){
         const mode=cfgSrc.config.attackMode||(combat&&combat.huntMode)||"kiting";
