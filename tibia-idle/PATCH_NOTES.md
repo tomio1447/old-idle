@@ -4,6 +4,19 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-20 — Fix: Desbloquear de charm não persistia
+
+- `charmSaveChar` pulava o save no servidor para o personagem ativo — o
+  unlock ficava só no espelho local e o próximo `sharedInventory`
+  (`/api/me`, SSE) revertia. Agora TODOS os personagens empurram
+  `accountSaveCharacter` na fila (`ACCOUNT_SAVE_PENDING` protege da
+  reversão em voo).
+- Operações de charm (desbloquear/associar/remover) bloqueadas durante
+  instância autoritativa — lá a engine é dona do estado e o save local
+  não persiste; o aviso explica ao jogador.
+
+---
+
 ## 2026-11-20 — Voucher tolerante a underscores
 
 - O resgate de vouchers agora ignora variações de underscores no código:

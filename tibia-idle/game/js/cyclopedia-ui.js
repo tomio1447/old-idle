@@ -849,12 +849,14 @@ function charmPoolSync(selP) {
 }
 
 /* Persiste assign/clear de um char que talvez NÃO seja o ativo:
- * roster local sempre; save no servidor quando online. */
+ * roster local sempre; save no servidor quando online — TAMBÉM para o
+ * char ativo: a fila (ACCOUNT_SAVE_PENDING) impede que um /api/me ou SSE
+ * reverta o unlock antes dele chegar ao servidor (era o bug do Desbloquear
+ * que mostrava o toast mas não persistia). */
 function charmSaveChar(selP) {
   if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(selP);
   if (typeof accountApiConfigured === "function" && accountApiConfigured()
-      && typeof accountSaveCharacter === "function" && typeof accountSessionToken === "function"
-      && selP !== ((typeof G !== "undefined" && G) ? G.p : null)) {
+      && typeof accountSaveCharacter === "function" && typeof accountSessionToken === "function") {
     accountSaveCharacter(accountSessionToken(), String(selP.id), selP).catch(() => {});
   }
   save();
@@ -968,8 +970,18 @@ function renderCycloCharms(p, el) {
   });
   if (!selP) return;
   const player = charmPoolSync(selP);
+  /* Durante instância autoritativa o save local não persiste (a engine é
+   * dona do estado) — unlock/assign reverteria. Bloqueia com aviso. */
+  const charmLockedOnline = () => {
+    if (typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+      toast("Charms só podem ser alterados fora de uma caçada online.");
+      return true;
+    }
+    return false;
+  };
   const buy = $("#charm-buy");
   if (buy) buy.addEventListener("click", () => {
+    if (charmLockedOnline()) return;
     const id = cycloCharmIdFromEl(buy) || CYCLO.charmSel;
     const r = buyCharm(player, id);   // pool da conta — debita 1x só
     if (!r.ok) { toast(r.erro); return; }
@@ -979,6 +991,7 @@ function renderCycloCharms(p, el) {
   });
   const clr = $("#charm-clear");
   if (clr) clr.addEventListener("click", () => {
+    if (charmLockedOnline()) return;
     const id = cycloCharmIdFromEl(clr) || CYCLO.charmSel;
     const r = clearCharm(player, id);   // assign é por personagem
     if (!r.ok) { toast(r.erro); return; }
@@ -987,6 +1000,7 @@ function renderCycloCharms(p, el) {
   });
   const asg = $("#charm-assign");
   if (asg) asg.addEventListener("click", () => {
+    if (charmLockedOnline()) return;
     const selEl = $("#charm-race-sel");
     const slug = selEl && selEl.value;
     const id = cycloCharmIdFromEl(asg) || CYCLO.charmSel;
