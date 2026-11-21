@@ -6338,8 +6338,14 @@ async function main() {
         let chan = String(q.get("channel") || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
         if (chan && chan !== twitch.requiredChannel() &&
             !partners.channels().includes(chan)) chan = "";
+        /* Follow-gate usa o callback unificado /api/oauth/callback quando
+         * OAUTH_REDIRECT_URI está configurada — assim UMA Redirect URL
+         * registrada no app Twitch atende login social E gate de voucher.
+         * /api/twitch/callback continua funcional (compat/local). */
+        const cb = (typeof oauth.redirectUri === "function" && oauth.redirectUri())
+          || undefined;
         res.writeHead(302, Object.assign(hardenedHeaders(res), {
-          Location: twitch.authUrl(twitch.newState(token, chan)) }));
+          Location: twitch.authUrl(twitch.newState(token, chan), cb) }));
         return res.end();
       }
       if (req.method === "GET" && url === "/api/twitch/callback") {
@@ -6418,10 +6424,36 @@ async function main() {
       }
       if (req.method === "GET" && url === "/api/oauth/callback") {
         const q = new URL(req.url, "http://x").searchParams;
-        const st = oauth.takeLoginState(q.get("state") || "");
         const page = (code, t, m, ok) =>
           sendText(res, code, twitch.pageHtml(t, m, ok), "text/html; charset=utf-8");
-        if (!st) return page(400, "Sessão de login expirada", "Volte ao jogo e tente entrar de novo.", false);
+        let st = oauth.takeLoginState(q.get("state") || "");
+        /* State não é de login? Pode ser do FOLLOW-GATE de voucher/parceiro
+         * (twitch.newState) — o authorize usou esta mesma URI unificada. */
+        if (!st) {
+          const fst = twitch.takeState(q.get("state") || "");
+          const facc = fst && fst.token ? await db.findAccountByToken(fst.token) : null;
+          if (!facc) return page(400, "Sessão de login expirada", "Volte ao jogo e tente entrar de novo.", false);
+          if (q.get("error") || !q.get("code"))
+            return page(200, "Conexão cancelada", "Você cancelou ou a Twitch recusou a conexão. Pode fechar esta janela.", false);
+          try {
+            const tok = await twitch.exchangeCode(q.get("code"), oauth.redirectUri());
+            const chan = fst.channel || twitch.requiredChannel();
+            const v = await twitch.verifyFollow(tok.access_token, chan);
+            const social = twitch.socialOf(facc);
+            social.twitch = {
+              id: v.id, login: v.login,
+              follows: Object.assign({}, social.twitch && social.twitch.follows, { [chan]: v.follows }),
+              at: Date.now(),
+            };
+            if (typeof db.setAccountSocial === "function") await db.setAccountSocial(facc.id, social);
+            return page(200, "Twitch conectada",
+              v.follows
+                ? "@" + v.login + " segue @" + chan + " — a verificação foi registrada. Pode fechar esta janela."
+                : "@" + v.login + " ainda não segue @" + chan + ". Siga na Twitch e tente de novo.", v.follows);
+          } catch (e) {
+            return page(502, "Falha na verificação", "Não foi possível confirmar com a Twitch agora. Tente novamente.", false);
+          }
+        }
         if (q.get("error") || !q.get("code"))
           return page(200, "Login cancelado", "Você cancelou a autorização. Pode fechar esta janela.", false);
         try {

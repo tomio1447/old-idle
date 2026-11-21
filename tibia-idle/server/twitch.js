@@ -50,9 +50,9 @@ function takeState(s) {
   return v && Date.now() - v.at <= STATE_TTL ? v : null;
 }
 
-function authUrl(state) {
+function authUrl(state, redirectOverride) {
   return AUTHORIZE_URL + "?" + new URLSearchParams({
-    client_id: clientId(), redirect_uri: redirectUri(),
+    client_id: clientId(), redirect_uri: redirectOverride || redirectUri(),
     response_type: "code", scope: "user:read:follows", state: String(state),
     force_verify: "true",
   }).toString();

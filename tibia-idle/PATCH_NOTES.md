@@ -3,6 +3,16 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Follow-gate usa o callback unificado do OAuth
+
+- /api/twitch/auth agora direciona o authorize para OAUTH_REDIRECT_URI
+  (/api/oauth/callback) — a MESMA Redirect URL já registrada no app Twitch
+  atende login social E gate de voucher/parceiros (fim do erro
+  redirect_mismatch; /api/twitch/callback segue como fallback).
+- /api/oauth/callback reconhece states do gate (twitch.newState) e executa
+  a verificação de follow do canal do parceiro.
+
+---
 ## 2026-11-21 — CSP libera CDN da Twitch (avatares dos parceiros)
 
 - img-src ganhou https://static-cdn.jtvnw.net — o avatar do canal no modal
