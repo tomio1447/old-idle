@@ -36,17 +36,18 @@ const configured = () => !!(clientId() && clientSecret());
  * repete o fluxo (state expira/não é encontrado → erro claro). */
 const STATES = new Map();
 const STATE_TTL = 10 * 60 * 1000;
-function newState(sessionToken) {
+function newState(sessionToken, channel) {
   for (const [k, v] of STATES) if (Date.now() - v.at > STATE_TTL) STATES.delete(k);
   const s = crypto.randomBytes(18).toString("hex");
-  STATES.set(s, { token: String(sessionToken || ""), at: Date.now() });
+  STATES.set(s, { token: String(sessionToken || ""),
+    channel: String(channel || "").toLowerCase() || null, at: Date.now() });
   return s;
 }
 function takeState(s) {
   const k = String(s || "");
   const v = STATES.get(k);
   STATES.delete(k);
-  return v && Date.now() - v.at <= STATE_TTL ? v.token : null;
+  return v && Date.now() - v.at <= STATE_TTL ? v : null;
 }
 
 function authUrl(state) {
@@ -98,22 +99,24 @@ async function appToken() {
   return _appToken.token;
 }
 
-let _channelId = null;
-async function channelId() {
-  if (_channelId) return _channelId;
-  const j = await helix("/users?login=" + encodeURIComponent(requiredChannel()), await appToken());
+const _channelIds = new Map();
+async function channelId(channel) {
+  const login = String(channel || requiredChannel()).toLowerCase();
+  if (_channelIds.has(login)) return _channelIds.get(login);
+  const j = await helix("/users?login=" + encodeURIComponent(login), await appToken());
   const u = j && j.data && j.data[0];
-  if (!u || !u.id) throw new Error("canal twitch não encontrado: " + requiredChannel());
-  _channelId = String(u.id);
-  return _channelId;
+  if (!u || !u.id) throw new Error("canal twitch não encontrado: " + login);
+  _channelIds.set(login, String(u.id));
+  return _channelIds.get(login);
 }
 
-/* Confirma com o token do jogador se ele segue o canal exigido. */
-async function verifyFollow(userToken) {
+/* Confirma com o token do jogador se ele segue `channel` (default: o canal
+ * exigido do voucher). Retorna id/login do jogador + flag follows. */
+async function verifyFollow(userToken, channel) {
   const me = await helix("/users", userToken);
   const u = me && me.data && me.data[0];
   if (!u || !u.id) throw new Error("usuário twitch não resolvido");
-  const bid = await channelId();
+  const bid = await channelId(channel);
   const chk = await helix(
     "/channels/followed?user_id=" + encodeURIComponent(u.id) +
     "&broadcaster_id=" + encodeURIComponent(bid), userToken);
@@ -121,6 +124,37 @@ async function verifyFollow(userToken) {
     id: String(u.id), login: String(u.login || ""),
     follows: !!(chk && Array.isArray(chk.data) && chk.data.length),
   };
+}
+
+/* ---- Dados públicos de canais (app token) — usado pelo modal Parceiros. */
+async function getUsers(logins) {
+  if (!configured() || !Array.isArray(logins) || !logins.length) return {};
+  const qs = logins.map((l) => "login=" + encodeURIComponent(String(l).toLowerCase())).join("&");
+  const j = await helix("/users?" + qs, await appToken());
+  const out = {};
+  for (const u of (j && j.data) || []) {
+    out[String(u.login).toLowerCase()] = {
+      id: String(u.id), login: String(u.login),
+      displayName: String(u.display_name || u.login),
+      avatar: String(u.profile_image_url || ""),
+    };
+  }
+  return out;
+}
+async function getStreams(logins) {
+  if (!configured() || !Array.isArray(logins) || !logins.length) return {};
+  const qs = logins.map((l) => "user_login=" + encodeURIComponent(String(l).toLowerCase())).join("&");
+  const j = await helix("/streams?" + qs, await appToken());
+  const out = {};
+  for (const s of (j && j.data) || []) {
+    out[String(s.user_login).toLowerCase()] = {
+      title: String(s.title || ""), game: String(s.game_name || ""),
+      viewers: Number(s.viewer_count) || 0,
+      startedAt: String(s.started_at || ""),
+      thumb: String(s.thumbnail_url || "").replace("{width}", "320").replace("{height}", "180"),
+    };
+  }
+  return out;
 }
 
 /* accounts.social é JSON — sanitiza e expõe helpers pro gate do voucher. */
@@ -155,8 +189,16 @@ p{font-size:13px;color:#b8ad90;line-height:1.5;margin:0}</style></head>
 setTimeout(function(){try{window.close()}catch(e){}},5000);</script></body></html>`;
 }
 
+/* follows de um canal arbitrário (parceiros): lê accounts.social.twitch. */
+function followsChannel(acc, channel) {
+  const tw = socialOf(acc).twitch;
+  const c = String(channel || "").toLowerCase();
+  return !!(tw && tw.follows && c && tw.follows[c] === true);
+}
+
 module.exports = {
   configured, requiredChannel, newState, takeState, authUrl,
-  exchangeCode, verifyFollow, socialOf, linkedLogin, verifiedChannel, pageHtml,
-  postForm, helix,
+  exchangeCode, verifyFollow, socialOf, linkedLogin, verifiedChannel,
+  followsChannel, getUsers, getStreams, pageHtml,
+  postForm, helix, appToken,
 };

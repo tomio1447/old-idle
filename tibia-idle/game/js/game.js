@@ -6138,6 +6138,10 @@ function bindControls() {
   if (btnStore) btnStore.addEventListener("click", () => {
     if (typeof openStoreModal === "function") openStoreModal();
   });
+  const btnPartners = $("#btn-partners");
+  if (btnPartners) btnPartners.addEventListener("click", () => {
+    if (typeof openPartnersModal === "function") openPartnersModal();
+  });
   const tcBar = $("#tibia-coins");
   if (tcBar && typeof openStoreModal === "function") {
     tcBar.style.cursor = "pointer";

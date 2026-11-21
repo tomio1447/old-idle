@@ -3,6 +3,25 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Botão PARCEIROS na topbar + modal de streamers parceiros
+
+- Novo botão quadrado "PARCEIROS" entre PERSONAGEM e STORE (mesmo tamanho,
+  glow roxo Twitch, ícone oficial da plataforma).
+- Modal lista parceiros (`server/partners.js`): avatar real + nome
+  (helix/users via app token), nível do parceiro, badge AO VIVO/OFFLINE,
+  tempo de live + espectadores quando online, links Twitch/Instagram.
+- Ordenação: online primeiro; quem está há MAIS tempo em live na frente.
+- Voucher exibido como "• • • • •" até o jogador seguir o canal — o botão
+  "Seguir para revelar" abre o mesmo OAuth do gate de voucher, agora
+  parametrizado por canal (`/api/twitch/auth?channel=` + state carrega o
+  canal; apenas canais cadastrados são aceitos).
+- Após o follow, o código aparece + copiar com 1 clique + botão "Resgatar"
+  (abre STORE na aba Vouchers com o código preenchido).
+- Primeiro parceiro: @buto_pvp (voucher BUTO__PVP, Nv. 1).
+- `GET /api/partners?token=` — autenticado; reusa credenciais Twitch já
+  configuradas; auto-refresh da lista a cada 60s no cliente.
+
+---
 ## 2026-11-21 — Login/registro social: Google + Twitch (OAuth)
 
 - Novo `server/oauth.js` + callback compartilhado `GET /api/oauth/callback`

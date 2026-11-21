@@ -67,6 +67,7 @@ const store = require("./store");
 const rmt = require("./rmt");
 const twitch = require("./twitch");
 const oauth = require("./oauth");
+const partners = require("./partners");
 const mailer = require("./mailer");
 
 const PORT = parseInt(process.env.PORT || "8001", 10);
@@ -6332,22 +6333,27 @@ async function main() {
           return sendText(res, 503, twitch.pageHtml("Verificação indisponível",
             "O servidor ainda não tem credenciais do app Twitch (TWITCH_CLIENT_ID/SECRET). Avise a administração.", false),
             "text/html; charset=utf-8");
+        /* ?channel= — follow-gate de um parceiro específico; só canais
+         * cadastrados (parceiros ou o canal exigido) são aceitos. */
+        let chan = String(q.get("channel") || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+        if (chan && chan !== twitch.requiredChannel() &&
+            !partners.channels().includes(chan)) chan = "";
         res.writeHead(302, Object.assign(hardenedHeaders(res), {
-          Location: twitch.authUrl(twitch.newState(token)) }));
+          Location: twitch.authUrl(twitch.newState(token, chan)) }));
         return res.end();
       }
       if (req.method === "GET" && url === "/api/twitch/callback") {
         const q = new URL(req.url, "http://x").searchParams;
-        const sessionToken = twitch.takeState(q.get("state") || "");
-        const acc = sessionToken ? await db.findAccountByToken(sessionToken) : null;
+        const st = twitch.takeState(q.get("state") || "");
+        const acc = st && st.token ? await db.findAccountByToken(st.token) : null;
         const html = (code, t, m, ok) => sendText(res, code, twitch.pageHtml(t, m, ok), "text/html; charset=utf-8");
         if (!acc) return html(400, "Sessão expirada", "Refaça o login no jogo e conecte a Twitch de novo.", false);
         if (q.get("error") || !q.get("code"))
           return html(200, "Conexão cancelada", "Você cancelou ou a Twitch recusou a conexão. Pode fechar esta janela.", false);
         try {
           const tok = await twitch.exchangeCode(q.get("code"));
-          const v = await twitch.verifyFollow(tok.access_token);
-          const chan = twitch.requiredChannel();
+          const chan = st.channel || twitch.requiredChannel();
+          const v = await twitch.verifyFollow(tok.access_token, chan);
           const social = twitch.socialOf(acc);
           social.twitch = {
             id: v.id, login: v.login,
@@ -6367,10 +6373,25 @@ async function main() {
         const q = new URL(req.url, "http://x").searchParams;
         const acc = await db.findAccountByToken(String(q.get("token") || ""));
         if (!acc) return send(res, 401, { ok: false, msg: "Sessão inválida" });
-        return send(res, 200, { ok: true,
+        const chan = String(q.get("channel") || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+        const st = { ok: true,
           configured: twitch.configured(), channel: twitch.requiredChannel(),
           linked: !!twitch.linkedLogin(acc), login: twitch.linkedLogin(acc),
-          verified: twitch.verifiedChannel(acc) });
+          verified: twitch.verifiedChannel(acc) };
+        if (chan) {
+          st.channel = chan;
+          st.verified = twitch.followsChannel(acc, chan);
+        }
+        return send(res, 200, st);
+      }
+      /* ---- PARCEIROS: lista de streamers + status de live + voucher
+       * (mascarado até o jogador seguir o canal — server/partners.js). */
+      if (req.method === "GET" && url === "/api/partners") {
+        const q = new URL(req.url, "http://x").searchParams;
+        const acc = await db.findAccountByToken(String(q.get("token") || ""));
+        if (!acc) return send(res, 401, { ok: false, msg: "Sessão inválida" });
+        const list = await partners.partnersList(acc);
+        return send(res, 200, { ok: true, configured: twitch.configured(), partners: list });
       }
       /* ---- LOGIN SOCIAL (Google + Twitch) ----
        * /api/auth/providers: o cliente só exibe botões dos provedores
