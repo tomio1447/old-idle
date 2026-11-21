@@ -2376,6 +2376,11 @@ function accountAdminGrantLastError(){return ACCOUNT_ADMIN_GRANT_LAST_ERROR||"";
 async function accountAdminSaveCharacter(token, charId, p) {
   const id=String(charId);
   ACCOUNT_ADMIN_GRANT_LAST_ERROR="";
+  /* O payload precisa nascer ANTES dos awaits: a espera da fila de
+   * instância/save + ensureVersions leva centenas de ms e o merge da
+   * autoridade regrava G.p (skills/exp/etc.) com os valores remotos —
+   * serializar depois enviava o estado ANTIGO e o grant parecia não pegar. */
+  const frozenPayload=accountSavePayload(p);
   // Espera da fila de instância FORA da fila de save — enfileirado, o await
   // do rabo oposto fecha ciclo e congela as duas filas.
   if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
@@ -2396,7 +2401,7 @@ async function accountAdminSaveCharacter(token, charId, p) {
     }
     const putOnce=(expected)=>_api("PUT","/api/characters/"+encodeURIComponent(id),
       Object.assign({token,expected_version:Number(expected),admin_grant:true},
-        accountLeaseFields(),accountSavePayload(p)));
+        accountLeaseFields(),frozenPayload));
     let r=await putOnce(summary.saveVersion);
     const applyOk=(data)=>{
       if(data.character)accountMergeCharacterCache([data.character]);

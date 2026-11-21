@@ -1353,6 +1353,11 @@ async function loadCharacter(db, token, id) {
   };
 }
 
+// Identidade e progressão são server-owned. Saves comuns só persistem
+// preferências/visual; XP, skills, gold, kills, bless e cooldowns vêm das
+// transações autoritativas (ou das ferramentas Admin explícitas).
+const PROTECTED_SAVE_KEYS=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
+  "bosses","missions","wardrobe","_accountCosmetics","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests","_pouchBase","_walletSynced"];
 function prepareCharacterSave(c,body,opts){
   opts=opts||{};
   let payload=body.data;
@@ -1363,14 +1368,10 @@ function prepareCharacterSave(c,body,opts){
     return {error:{code:400,body:{ok:false,error:"INVALID_SAVE_DATA",msg:"Save inválido"}}};
   const wrongId=payload.id!==undefined&&String(payload.id)!==String(c.id);
   const wrongName=!!(payload.name&&String(payload.name).toLowerCase()!==String(c.name).toLowerCase());
-  if(wrongId||wrongName)return {error:{code:409,body:{ok:false,error:"CHARACTER_IDENTITY_MISMATCH",
-    msg:"Save bloqueado: os dados pertencem a outro personagem."}}};
-  // Identidade e progressão são server-owned. Saves comuns só persistem
-  // preferências/visual; XP, skills, gold, kills, bless e cooldowns vêm das
-  // transações autoritativas (ou das ferramentas Admin explícitas).
+  if(wrongId||wrongName)return {code:409,body:{ok:false,error:"CHARACTER_IDENTITY_MISMATCH",
+    msg:"Save bloqueado: os dados pertencem a outro personagem."}};
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
-  const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","wardrobe","_accountCosmetics","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests","_pouchBase","_walletSynced"];
+  const protectedKeys=PROTECTED_SAVE_KEYS;
   payload=Object.assign({},payload,{id:String(c.id),name:c.name});
   delete payload.trainingClock;
   let voc=c.voc,level=Math.max(1,Number(c.level)||1);
@@ -1379,6 +1380,11 @@ function prepareCharacterSave(c,body,opts){
     voc=allowed.includes(String(payload.voc))?String(payload.voc):c.voc;
     level=Math.max(1,Math.min(2000,Math.floor(Number(payload.level)||Number(body.level)||Number(c.level)||1)));
     payload.voc=voc;payload.level=level;
+    /* Grant com payload parcial não pode apagar progresso: chave protegida
+     * ausente mantém o valor do banco (o grant só sobrescreve o que envia). */
+    for(const key of protectedKeys)
+      if(payload[key]===undefined&&current[key]!==undefined)
+        payload[key]=cloneJson(current[key]);
     for(const numKey of ["exp","ml","manaSpent","gold","totalKills","stamina"])
       if(payload[numKey]!==undefined)
         payload[numKey]=Math.max(0,Math.floor(Number(payload[numKey])||0));
@@ -1485,6 +1491,12 @@ async function enforceAuthoritativeProgress(db,accountId,prepared){
     if(sentPrefs.imbuements!==undefined&&typeof sanitizeImbuementState==="function"){
       const im=sanitizeImbuementState(sentPrefs.imbuements);if(im)player.imbuements=im;
     }
+    /* p da instância pode estar intermediário (grant parcial, snapshot
+     * legado): chave protegida ausente no player mantém o valor que o save
+     * trouxe (restaurado do banco no prepare). Nunca remove progresso. */
+    for(const key of PROTECTED_SAVE_KEYS)
+      if(player[key]===undefined&&sentPrefs[key]!==undefined)
+        player[key]=cloneJson(sentPrefs[key]);
   }
   prepared.save.data=JSON.stringify(player);prepared.save.level=Math.max(1,Number(player.level)||1);
   prepared.save.voc=String(player.voc||prepared.save.voc);prepared.save.extra.hp=Math.max(0,Number(player.hp)||0);

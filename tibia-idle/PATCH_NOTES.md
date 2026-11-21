@@ -1877,3 +1877,11 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   `annihilator.otbm` foi copiado para `game/maps/`.
 
 ---
+- **Grant admin não reverte mais** (Kina/skills): `accountAdminSaveCharacter`
+  serializava `G.p` só DEPOIS de enfileirar instância/save + ensureVersions —
+  nesse intervalo o merge da autoridade regravava `G.p` com os valores
+  remotos e o PUT saía com o skill antigo. O payload agora é congelado na
+  entrada (`frozenPayload`). Hardening no servidor: `prepareCharacterSave`
+  (adminGrant) e `enforceAuthoritativeProgress` restauram chaves protegidas
+  ausentes (skills/exp/ml/gold/kills/...) a partir do banco — payload
+  parcial ou `item.p` intermediário nunca mais remove progresso.
