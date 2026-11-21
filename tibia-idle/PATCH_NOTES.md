@@ -3,6 +3,12 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Modal Parceiros em identidade Twitch (roxo radiante)
+
+- Restyle completo: card e modal em gradiente roxo Twitch com glow
+  animado (partners-logo-pulse, partner-card-glow, partner-avatar-glow).
+
+---
 ## 2026-11-21 — Follow-gate usa o callback unificado do OAuth
 
 - /api/twitch/auth agora direciona o authorize para OAUTH_REDIRECT_URI

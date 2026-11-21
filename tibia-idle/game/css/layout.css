@@ -5912,31 +5912,72 @@ body.fullhd .scene-overlay { font-size: 13px; }
   color: #a49b84; text-align: center;
 }
 
-/* ---- Modal PARCEIROS (topbar) — cards de streamers com live + voucher. */
-.partners-backdrop .voucher-reward-title { display: flex; align-items: center; gap: 8px; }
-.partners-backdrop .voucher-reward-title svg { flex: none; }
-.partners-card { width: min(460px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
-.partners-body { overflow-y: auto; padding: 0 14px 10px; display: flex; flex-direction: column; gap: 10px; }
-.partners-loading { padding: 22px 8px; text-align: center; color: #a49b84; font-size: 12px; }
-.partner-card {
-  border: 1px solid #3a3348; border-radius: 8px; padding: 10px 12px;
-  background: linear-gradient(180deg, #201d2b 0%, #171522 100%);
+/* ---- Modal PARCEIROS (topbar) — identidade Twitch: roxo radiante,
+ * logo animada e glow pulsante ao redor do streamer. */
+.partners-backdrop .voucher-reward-title {
+  display: flex; align-items: center; gap: 8px; color: #e9dfff;
+  border-bottom-color: rgba(169, 112, 255, .3);
 }
-.partner-card.is-live { border-color: rgba(169, 112, 255, .55); box-shadow: 0 0 12px rgba(145, 70, 255, .18); }
+.partners-backdrop .voucher-reward-title svg {
+  flex: none; animation: partners-logo-pulse 2.2s ease-in-out infinite;
+}
+@keyframes partners-logo-pulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(169, 112, 255, .7)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 9px rgba(190, 140, 255, 1)); transform: scale(1.08); }
+}
+.partners-backdrop .voucher-reward-intro { color: #c9b8ef; }
+.partners-card {
+  width: min(460px, 94vw); max-height: 86vh; display: flex; flex-direction: column;
+  background: linear-gradient(165deg, #2b1a4e 0%, #1b1032 55%, #150b28 100%);
+  border: 1px solid rgba(169, 112, 255, .5); border-radius: 10px;
+  box-shadow: 0 0 34px rgba(145, 70, 255, .28),
+              inset 0 1px 0 rgba(190, 148, 255, .18);
+}
+.partners-body { overflow-y: auto; padding: 0 14px 10px; display: flex; flex-direction: column; gap: 10px; }
+.partners-loading { padding: 22px 8px; text-align: center; color: #b3a3d9; font-size: 12px; }
+.partner-card {
+  position: relative; border: 1px solid rgba(169, 112, 255, .45);
+  border-radius: 9px; padding: 10px 12px;
+  background: linear-gradient(180deg, #2a1b47 0%, #1d1233 100%);
+  box-shadow: 0 0 16px rgba(145, 70, 255, .22),
+              inset 0 0 24px rgba(103, 58, 183, .12);
+  animation: partner-card-glow 3.2s ease-in-out infinite;
+}
+@keyframes partner-card-glow {
+  0%, 100% {
+    box-shadow: 0 0 14px rgba(145, 70, 255, .2), inset 0 0 22px rgba(103, 58, 183, .1);
+    border-color: rgba(169, 112, 255, .4);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(169, 112, 255, .45), inset 0 0 30px rgba(103, 58, 183, .2);
+    border-color: rgba(199, 154, 255, .65);
+  }
+}
+.partner-card.is-live {
+  border-color: rgba(199, 154, 255, .7);
+  box-shadow: 0 0 22px rgba(169, 112, 255, .4), inset 0 0 26px rgba(103, 58, 183, .18);
+}
 .partner-head { display: flex; align-items: center; gap: 10px; }
 .partner-avatar {
-  width: 52px; height: 52px; border-radius: 6px; flex: none; object-fit: cover;
-  border: 1px solid #4a3a6b; background: #14101f;
+  width: 52px; height: 52px; border-radius: 8px; flex: none; object-fit: cover;
+  border: 1.5px solid #a06bff; background: #14101f;
+  box-shadow: 0 0 12px rgba(169, 112, 255, .55), 0 0 3px rgba(220, 190, 255, .8);
+  animation: partner-avatar-glow 2.6s ease-in-out infinite;
+}
+@keyframes partner-avatar-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(169, 112, 255, .5), 0 0 2px rgba(220, 190, 255, .7); }
+  50% { box-shadow: 0 0 20px rgba(190, 140, 255, .85), 0 0 6px rgba(230, 205, 255, 1); }
 }
 .partner-avatar--icon { display: flex; align-items: center; justify-content: center; }
 .partner-id { flex: 1; min-width: 0; }
-.partner-name { font-size: 14px; font-weight: 800; color: #efe6ff; }
-.partner-sub { font-size: 10px; color: #9d8fc0; }
+.partner-name { font-size: 14px; font-weight: 800; color: #f3ebff; text-shadow: 0 0 10px rgba(169, 112, 255, .5); }
+.partner-sub { font-size: 10px; color: #b3a0dd; }
 .partner-live {
   display: inline-flex; align-items: center; gap: 5px; flex: none;
   font-size: 10px; font-weight: 800; letter-spacing: .6px; color: #ff5b6a;
-  background: rgba(200, 40, 60, .14); border: 1px solid rgba(255, 91, 106, .4);
+  background: rgba(200, 40, 60, .16); border: 1px solid rgba(255, 91, 106, .5);
   border-radius: 4px; padding: 3px 7px;
+  box-shadow: 0 0 10px rgba(255, 59, 79, .3);
 }
 .partner-live-dot {
   width: 7px; height: 7px; border-radius: 50%; background: #ff3b4f;
@@ -5948,36 +5989,38 @@ body.fullhd .scene-overlay { font-size: 13px; }
 }
 .partner-offline {
   flex: none; font-size: 10px; font-weight: 800; letter-spacing: .6px;
-  color: #8d8698; background: rgba(120, 110, 140, .12);
-  border: 1px solid #3a3644; border-radius: 4px; padding: 3px 7px;
+  color: #a395c9; background: rgba(140, 120, 190, .12);
+  border: 1px solid rgba(140, 120, 190, .35); border-radius: 4px; padding: 3px 7px;
 }
-.partner-stream-meta { margin-top: 8px; font-size: 11px; color: #b6a8d8; }
-.partner-stream-meta b { color: #e8d9ff; }
-.partner-offline-meta { color: #6f6880; }
+.partner-stream-meta { margin-top: 8px; font-size: 11px; color: #c3b2e8; }
+.partner-stream-meta b { color: #efe4ff; }
+.partner-offline-meta { color: #7d6f9e; }
 .partner-stream-title {
-  margin-top: 2px; font-size: 11px; color: #8f84ab;
+  margin-top: 2px; font-size: 11px; color: #9c8cc7;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .partner-voucher {
   display: flex; align-items: center; gap: 8px; margin-top: 9px;
-  padding: 7px 9px; border: 1px dashed #4a3a6b; border-radius: 6px;
-  background: rgba(20, 16, 31, .6);
+  padding: 7px 9px; border: 1px dashed rgba(169, 112, 255, .5); border-radius: 6px;
+  background: rgba(24, 12, 46, .65);
 }
 .partner-voucher-code {
   flex: 1; font-family: "Consolas", monospace; font-size: 15px; font-weight: 800;
   letter-spacing: 2.5px; color: #ffd94a; cursor: pointer; user-select: all;
+  text-shadow: 0 0 8px rgba(255, 217, 74, .35);
 }
 .partner-voucher-code.copied { color: #9ce84a; }
-.partner-voucher-hidden { color: #6f6880; letter-spacing: 4px; cursor: default; }
+.partner-voucher-hidden { color: #8a7bb0; letter-spacing: 4px; cursor: default; }
 .partner-follow-btn, .partner-redeem-btn {
   flex: none; padding: 6px 11px; border-radius: 5px; cursor: pointer;
   font-size: 11px; font-weight: 700;
 }
 .partner-follow-btn {
-  background: linear-gradient(180deg, #7a3fd0 0%, #5c2ba3 100%);
-  color: #fff; border: 1px solid #a06bff;
+  background: linear-gradient(180deg, #9146ff 0%, #6a28c8 100%);
+  color: #fff; border: 1px solid #be8fff;
+  box-shadow: 0 0 12px rgba(145, 70, 255, .45);
 }
-.partner-follow-btn:hover { filter: brightness(1.15); }
+.partner-follow-btn:hover { filter: brightness(1.18); box-shadow: 0 0 18px rgba(169, 112, 255, .7); }
 .partner-redeem-btn {
   background: linear-gradient(180deg, #3f6b1e 0%, #2a4d12 100%);
   color: #d8ffb0; border: 1px solid #5b8c2e;
@@ -5986,12 +6029,12 @@ body.fullhd .scene-overlay { font-size: 13px; }
 .partner-socials { display: flex; gap: 12px; margin-top: 9px; }
 .partner-socials a {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11px; color: #b6a8d8; text-decoration: none;
+  font-size: 11px; color: #c3b2e8; text-decoration: none;
 }
-.partner-socials a:hover { color: #e0d0ff; }
+.partner-socials a:hover { color: #efe4ff; text-shadow: 0 0 8px rgba(169, 112, 255, .6); }
 #partners-status {
   display: block; min-height: 16px; margin: 4px 14px 10px;
-  color: #a49b84; text-align: center;
+  color: #b3a3d9; text-align: center;
 }
 .store-cos-grid .app-card { cursor: default; }
 .store-cos-grid .cos-buy { width: 100%; margin-top: 3px; }
