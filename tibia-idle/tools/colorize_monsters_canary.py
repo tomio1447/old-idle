@@ -140,6 +140,13 @@ CANARY_COLORS = {
     "sorcerer-s-apparition": (95, 114, 52, 76),
     "druid-s-apparition": (114, 48, 114, 95),
     "monk-s-apparition": (114, 48, 114, 95),
+    # --- the first dragon (looktype 947 colorizável; addons 3 = cristais)
+    "the-first-dragon": (94, 80, 101, 79),  # boss oficial
+    "tazhadur":       (24, 119, 19, 95),  # verde oficial
+    "kalyassa":       (56, 113, 19, 95),  # vermelha oficial
+    "gelidrazah-the-frozen": (19, 11, 0, 0),  # azul-gelo oficial
+    "ice-dragon":     (0, 9, 0, 0),       # gelo oficial (sem addon)
+    "dragon-warden":  (5, 5, 8, 8),       # dourado oficial (sem addon)
     # Rage Squid / Squid Warden compartilham looktype 1059. As quatro cores
     # abaixo são as definidas pelo Canary; a máscara do DAT separa cérebro,
     # corpo e tentáculos. Não aplicar filtro CSS no renderer.
@@ -230,7 +237,9 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "acolyte-of-the-cult", "adept-of-the-cult", "enlightened-of-the-cult"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
-CANARY_ADDONS = {"pirat-bombardier": 2, "pirat-cutthroat": 1, "pirat-mate": 3,
+CANARY_ADDONS = {"the-first-dragon": 3, "tazhadur": 3, "kalyassa": 3,
+    "gelidrazah-the-frozen": 3,
+    "pirat-bombardier": 2, "pirat-cutthroat": 1, "pirat-mate": 3,
                  "pirat-scoundrel": 0, "pirat-artillerist": 2, "elite-pirat": 0,
                  "cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
                   "fury": 1,

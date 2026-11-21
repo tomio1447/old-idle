@@ -1885,3 +1885,14 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   (adminGrant) e `enforceAuthoritativeProgress` restauram chaves protegidas
   ausentes (skills/exp/ml/gold/kills/...) a partir do banco — payload
   parcial ou `item.p` intermediário nunca mais remove progresso.
+
+- **The First Dragon — outfits sem cor corrigidos**: os 6 monstros com
+  looktype 947 (colorizável) renderizavam o template cinza — sheets
+  re-geradas com cores e addons oficiais do Canary: The First Dragon
+  (94/80/101/79, addons 3), Tazhadur (24/119/19/95, addons 3), Kalyassa
+  (56/113/19/95, addons 3), Gelidrazah the Frozen (19/11/0/0, addons 3),
+  Ice Dragon (0/9/0/0) e Dragon Warden (5/5/8/8). Zorvorax (928),
+  Unbeatable Dragon/Dragon Servant (39), Dragon Essence (248),
+  Fallen Challenger/Haunted Dragon (231), Somewhat Beatable (34),
+  Spirit of Fertility (11), Angry Plant (120) e Dragon Wrath (351)
+  conferidos — já estavam com as cores próprias do sprite.
