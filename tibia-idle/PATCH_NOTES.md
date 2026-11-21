@@ -3,6 +3,21 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Sprites: Distorted Heart/Robe, outfit colors dos phantoms/apparitions
+
+- `distorted-heart`/`distorted-robe` eram placeholders "?": re-renderizados
+  do DAT convertido (cids 34142/34149). Preços conferidos na wiki: Yasir
+  2.100 / 1.200 gp — já estavam certos.
+- Paleta de outfits truncada em 96 cores (oficial tem 133): índices 96-132
+  resolviam por módulo em cores erradas. Corrigida em `tibia_assets.py`
+  (render) e `outfit.js` (jogo) com a tabela oficial completa.
+- Re-render dos sheets com cores oficiais do Canary .lua: distorted-
+  phantom (113/94/132/76 = tons de vermelho — estava cinza), capricious
+  (81/114/85/83), infernal (114/80/94/78), mould (106/60/131/116),
+  knight (19/76/74/114) e monk apparition (114/48/114/95 addon 1).
+- `wand-of-defiance`: sprite atual já é o cid 16096 oficial (re-render
+  idêntico).
+---
 ## 2026-11-21 — Fix: "Associar Criatura" (Cyclopedia > Charms) em caçada online
 
 - Assign/clear de charm estava sempre bloqueado em caçadas autoritativas
