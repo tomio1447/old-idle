@@ -1046,6 +1046,49 @@ function roostBindExchange() {
   for (const slug in ROOST_MONSTERS)
     GAMEDATA.monsters[slug] = ROOST_MONSTERS[slug];
 
+  /* Geometria real dos sheets (célula = PNG/cols×4). Sem registro o
+   * monsterPlayable() reprova o slug — boss invisível no modal e no
+   * canvas. Humanoides clássicos têm 3 colunas (2 frames de walk no
+   * DAT); avatares e criaturas 15.x têm 9. */
+  const ROOST_MOB_SHEETS = {
+    "adventurer-group":     { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "eldritch-dragon-lord": { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "ice-horror":           { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "the-gravedigger":      { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "bonelords-phylactery": { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "yorik-youngbook":      { cw: 37, ch: 37, cols: 3, rows: 4 },
+    "percy-peacetinker":    { cw: 36, ch: 36, cols: 3, rows: 4 },
+    "grendel-greenlunch":   { cw: 37, ch: 37, cols: 3, rows: 4 },
+    "fiona-firstdream":     { cw: 39, ch: 39, cols: 9, rows: 4 },
+    "nigel-neverguess":     { cw: 37, ch: 37, cols: 9, rows: 4 },
+    "avatar-of-steel":      { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "avatar-of-light":      { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "avatar-of-nature":     { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "avatar-of-storm":      { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "avatar-of-balance":    { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "bright-crystal":       { cw: 40, ch: 40, cols: 9, rows: 4 },
+    "ice-crawler":          { cw: 49, ch: 49, cols: 3, rows: 4 },
+    "bonelord-totem":       { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "zharvorins-soulcage":  { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "myzareths-soulcage":   { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "scariths-soulcage":    { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "elyraxs-soulcage":     { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "zharvorins-spirit":    { cw: 51, ch: 51, cols: 9, rows: 4 },
+    "myzareths-spirit":     { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "scariths-spirit":      { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "elyraxs-spirit":       { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "enthralled-dragon":    { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "an-eye":               { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "bone-barrier":         { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "wraithfire":           { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "pulsating-lava":       { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "eruption":             { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "flame-totem":          { cw: 64, ch: 64, cols: 9, rows: 4 },
+  };
+  if (typeof MOBSHEETS !== "undefined" && MOBSHEETS)
+    for (const slug in ROOST_MOB_SHEETS)
+      if (!MOBSHEETS[slug]) MOBSHEETS[slug] = ROOST_MOB_SHEETS[slug];
+
   /* Hunts técnicas invisíveis — câmaras dos 5 bossrooms. */
   GAMEDATA.hunts = GAMEDATA.hunts || {};
   for (const bossId in ROOST_ROOMS) {

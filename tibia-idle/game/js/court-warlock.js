@@ -382,6 +382,26 @@ const SB_MONSTERS = {
   "raubritter-marksman": RAUB_MARKSMAN,
 };
 
+/* Geometria real dos sheets 15.x (9 colunas × 4 direções; célula = PNG/9×4). */
+const SB_MOB_SHEETS = {
+  "night-harpy":           { cw: 57, ch: 57, cols: 9, rows: 4 },
+  "raubritter-skirmisher": { cw: 38, ch: 38, cols: 9, rows: 4 },
+  "raubritter-chastener":  { cw: 40, ch: 40, cols: 9, rows: 4 },
+  "raubritter-marksman":   { cw: 41, ch: 38, cols: 9, rows: 4 },
+};
+/* Boss + adds do encontro do Court Warlock. */
+const CW_MOB_SHEETS = {
+  "court-warlock":               { cw: 40, ch: 40, cols: 9, rows: 4 },
+  "poisoned-raubritter":         { cw: 50, ch: 50, cols: 9, rows: 4 },
+  "frozen-raubritter":           { cw: 57, ch: 57, cols: 9, rows: 4 },
+  "raging-raubritter":           { cw: 51, ch: 51, cols: 9, rows: 4 },
+  "energised-raubritter":        { cw: 51, ch: 51, cols: 9, rows: 4 },
+  "enraged-poisoned-raubritter": { cw: 50, ch: 50, cols: 9, rows: 4 },
+  "enraged-frozen-raubritter":   { cw: 64, ch: 64, cols: 9, rows: 4 },
+  "enraged-raging-raubritter":   { cw: 46, ch: 46, cols: 9, rows: 4 },
+  "enraged-energised-raubritter":{ cw: 44, ch: 44, cols: 9, rows: 4 },
+};
+
 /* ── Arean Outskirts — hunt 400+ mista (Raubritters + Night Harpy,
  * Isle of Ada 15.20). ── */
 const AO_ITEMS = {
@@ -491,6 +511,13 @@ SB_MONSTERS["night-harpy"] = NIGHT_HARPY;
     for (const slug in SB_MONSTERS) MONSTERDATA[slug] = SB_MONSTERS[slug];
   GAMEDATA.monsters = GAMEDATA.monsters || {};
   for (const slug in SB_MONSTERS) GAMEDATA.monsters[slug] = SB_MONSTERS[slug];
+
+  /* Sheets 15.x geradas por monstro (cw/ch = PNG/9×4); sem registro aqui
+   * monsterPlayable() reprova o slug e o mob fica invisível no modal e
+   * no canvas. */
+  if (typeof MOBSHEETS !== "undefined" && MOBSHEETS)
+    for (const slug in SB_MOB_SHEETS)
+      if (!MOBSHEETS[slug]) MOBSHEETS[slug] = SB_MOB_SHEETS[slug];
 
   GAMEDATA.hunts = GAMEDATA.hunts || {};
   GAMEDATA.hunts["stag-bastion"] = {
@@ -699,6 +726,10 @@ function courtWarlockBossCleanup(c) { if (c && c.cw) delete c.cw; }
     for (const slug in CW_MONSTERS) MONSTERDATA[slug] = CW_MONSTERS[slug];
   GAMEDATA.monsters = GAMEDATA.monsters || {};
   for (const slug in CW_MONSTERS) GAMEDATA.monsters[slug] = CW_MONSTERS[slug];
+
+  if (typeof MOBSHEETS !== "undefined" && MOBSHEETS)
+    for (const slug in CW_MOB_SHEETS)
+      if (!MOBSHEETS[slug]) MOBSHEETS[slug] = CW_MOB_SHEETS[slug];
 
   GAMEDATA.hunts = GAMEDATA.hunts || {};
   GAMEDATA.hunts["court-warlock-room"] = {

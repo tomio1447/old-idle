@@ -3,6 +3,19 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Monstros invisíveis no menu e in-game (MOBSHEETS)
+
+- court-warlock.js e roost-graveborn.js definiam monstros e registravam
+  GAMEDATA/MONSTERDATA, mas nunca registravam MOBSHEETS — monsterPlayable()
+  reprovava o slug, mobImg() devolvia espaço vazio no modal e mobCell()
+  null no canvas: monstros sumiam no menu e ingame.
+- Registradas as geometrias reais dos sheets (célula = PNG/colsx4):
+  night-harpy + 3 raubritters (Stag Bastion/Arean Outskirts), court-warlock
+  + 8 adds enraged/base, 5 bosses do Roost e ~30 entidades dos encontros
+  (avatars, soulcages, spirits, totems, ice-crawler 3x4, humanoides 3x4).
+- Cache-busters mobsheet-fix-v1.
+
+---
 ## 2026-11-21 — Charms: Melhorar também funciona durante caçada online
 
 - "Melhorar"/"Desbloquear" eram bloqueados online (charmLockedOnline)
