@@ -873,6 +873,22 @@ function charmSelectedChar() {
   let sel = chars.find((c) => String(c.id) === String(CYCLO.charmChar || ""));
   if (!sel) sel = chars.find((c) => String(c.id) === activeId) || chars[0] || null;
   if (sel) CYCLO.charmChar = String(sel.id);
+  /* Overlay otimista do assign/clear: um sync de conta concorrente pode
+   * reidratar o roster com o blob anterior ao PUT/instance-patch — o
+   * charmRace sumia por alguns segundos e o detalhe "voltava para a
+   * primeira criatura da lista". Segura o valor local até o servidor
+   * ecoar o mesmo valor (ou TTL expirar). */
+  const pend = CYCLO._pendingCharm;
+  if (pend && sel) {
+    const cur = (sel.charmRace || {})[pend.id] || null;
+    if (cur === pend.race) CYCLO._pendingCharm = null;
+    else if (Date.now() - pend.at > 15000) CYCLO._pendingCharm = null;
+    else if (String(sel.id) === pend.charId) {
+      sel.charmRace = Object.assign({}, sel.charmRace);
+      if (pend.race) sel.charmRace[pend.id] = pend.race;
+      else delete sel.charmRace[pend.id];
+    }
+  }
   return { chars: chars, selP: sel };
 }
 
@@ -1016,6 +1032,7 @@ function renderCycloCharms(p, el) {
     const id = cycloCharmIdFromEl(clr) || CYCLO.charmSel;
     const r = clearCharm(player, id);   // assign é por personagem
     if (!r.ok) { toast(r.erro); return; }
+    CYCLO._pendingCharm = { charId: String(player.id), id: r.id || id, race: null, at: Date.now() };
     toast(`Runa removida da criatura para <b>${player.name}</b>.`);
     charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
     charmSyncCombat(player, r.id || id, "", "clear");
@@ -1027,6 +1044,7 @@ function renderCycloCharms(p, el) {
     const id = cycloCharmIdFromEl(asg) || CYCLO.charmSel;
     const r = assignCharm(player, id, slug);  // grava só no charmRace DESTE char
     if (!r.ok) { toast(r.erro); return; }
+    CYCLO._pendingCharm = { charId: String(player.id), id: r.id || id, race: slug, at: Date.now() };
     toast(`Runa associada a <b>${GAMEDATA.monsters[slug].name}</b> para <b>${player.name}</b>.`);
     charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
     charmSyncCombat(player, r.id || id, slug, "assign");

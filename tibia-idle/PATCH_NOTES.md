@@ -3,6 +3,17 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Charms: seleção de criatura não oscila mais após Associar
+
+- Ao clicar em "Associar Criatura", o painel mostrava a primeira criatura
+  da lista por alguns segundos até voltar à correta. Causa: um sync de
+  conta concorrente reidratava o roster com o blob anterior ao
+  PUT/instance-patch e o `charmRace` recém-associado sumia temporariamente.
+- `CYCLO._pendingCharm`: overlay otimista em `charmSelectedChar()` — o
+  assign/clear local é mantido na UI até o servidor ecoar o mesmo valor
+  (ou TTL de 15s). Não toca outros personagens nem outros charms.
+
+---
 ## 2026-11-21 — Sprites: Distorted Heart/Robe, outfit colors dos phantoms/apparitions
 
 - `distorted-heart`/`distorted-robe` eram placeholders "?": re-renderizados
