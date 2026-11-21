@@ -849,13 +849,17 @@ function openStoreVoucherModal(r) {
   const m = r.modal || {};
   const rewards = Array.isArray(r.rewards) ? r.rewards : [];
   const social = m.social && typeof m.social === "object" ? m.social : null;
+  /* Tema Twitch (roxo radiante) quando o voucher é de streamer — detectado
+   * por link Twitch no bloco social do modal. */
+  const isTw = !!(social && (Array.isArray(social.links) ? social.links : [])
+    .some((l) => /twitch/i.test(String((l && (l.name || l.url)) || ""))));
 
   const bd = document.createElement("div");
   bd.id = "voucher-reward-backdrop";
-  bd.className = "voucher-reward-backdrop";
+  bd.className = "voucher-reward-backdrop" + (isTw ? " partners-backdrop" : "");
   bd.innerHTML = `
-    <div class="voucher-reward-card" role="dialog" aria-modal="true">
-      <div class="voucher-reward-title">${m.title || "Voucher resgatado!"}
+    <div class="voucher-reward-card${isTw ? " voucher-tw" : ""}" role="dialog" aria-modal="true">
+      <div class="voucher-reward-title">${isTw ? VOUCHER_SOCIAL_ICONS.twitch : ""}<span>${m.title || "Voucher resgatado!"}</span>
         <button type="button" class="sm voucher-reward-close" aria-label="Fechar">✕</button>
       </div>
       ${m.intro ? `<div class="voucher-reward-intro">${m.intro}</div>` : ""}
@@ -873,32 +877,36 @@ function openStoreVoucherModal(r) {
             <span class="voucher-reward-link-handle">${l.handle || l.url || ""}</span>
           </a>`).join("")}
       </div>` : ""}
+      <div class="voucher-tw-actions">
+        <button type="button" class="voucher-tw-btn" id="voucher-reward-ok">OK</button>
+      </div>
     </div>`;
   document.body.appendChild(bd);
   const close = () => bd.remove();
   bd.addEventListener("click", (e) => { if (e.target === bd) close(); });
   bd.querySelector(".voucher-reward-close").addEventListener("click", close);
+  bd.querySelector("#voucher-reward-ok").addEventListener("click", close);
 }
 
 /* Gate social do voucher de streamer: o servidor respondeu `needTwitch`
- * — o jogador precisa conectar a Twitch (OAuth) e seguir o canal. O modal
- * abre o pop-up de autorização e faz poll em /api/twitch/status; quando
- * `verified` vira true, fecha e refaz o resgate automaticamente. */
+ * — o jogador precisa conectar a Twitch (OAuth) e seguir o canal. O botão
+ * COLETAR verifica o follow: se já segue, resgata; se a Twitch não está
+ * vinculada, abre o pop-up OAuth e o poll coleta assim que confirmar. */
 function openVoucherTwitchGate(r, retry) {
   const old = document.getElementById("voucher-twitch-backdrop");
   if (old) old.remove();
   const chan = String((r && r.channel) || "buto_pvp");
   const bd = document.createElement("div");
   bd.id = "voucher-twitch-backdrop";
-  bd.className = "voucher-reward-backdrop";
+  bd.className = "voucher-reward-backdrop partners-backdrop";
   bd.innerHTML = `
-    <div class="voucher-reward-card voucher-twitch-card" role="dialog" aria-modal="true">
-      <div class="voucher-reward-title">Siga o streamer para resgatar
+    <div class="voucher-reward-card voucher-twitch-card voucher-tw" role="dialog" aria-modal="true">
+      <div class="voucher-reward-title">${VOUCHER_SOCIAL_ICONS.twitch}<span>Siga o streamer para resgatar</span>
         <button type="button" class="sm voucher-reward-close" aria-label="Fechar">✕</button>
       </div>
       <div class="voucher-reward-intro">
         Este voucher exige que sua conta esteja <b>seguindo @${chan} na Twitch</b>.
-        Conecte sua conta Twitch para confirmarmos o follow — leva segundos.
+        Clique em COLETAR — conectamos sua Twitch para confirmar o follow.
       </div>
       <a class="voucher-reward-link" href="https://www.twitch.tv/${chan}" target="_blank" rel="noopener noreferrer">
         ${voucherSocialIcon({ name: "Twitch" })}
@@ -912,53 +920,67 @@ function openVoucherTwitchGate(r, retry) {
           <span class="voucher-reward-ico">${voucherRewardIcon(rw)}</span>
           <span class="voucher-reward-label">${rw.label || ""}</span>
         </div>`).join("") + `</div>` : ""}
-      <div class="voucher-twitch-actions">
-        <button type="button" class="voucher-twitch-connect" id="voucher-twitch-connect">Conectar com Twitch</button>
-        <button type="button" class="voucher-twitch-again" id="voucher-twitch-again" style="display:none">Verificar novamente</button>
+      <div class="voucher-tw-actions">
+        <button type="button" class="voucher-tw-btn" id="voucher-twitch-connect">COLETAR</button>
       </div>
       <div class="tiny voucher-twitch-status" id="voucher-twitch-status"></div>
     </div>`;
   document.body.appendChild(bd);
 
   const statusEl = bd.querySelector("#voucher-twitch-status");
-  const againBtn = bd.querySelector("#voucher-twitch-again");
-  let poll = null;
+  const btn = bd.querySelector("#voucher-twitch-connect");
+  let poll = null, busy = false;
   const stopPoll = () => { if (poll) { clearInterval(poll); poll = null; } };
   const close = () => { stopPoll(); bd.remove(); };
+  const finish = () => { stopPoll(); close(); if (typeof retry === "function") retry(); };
 
   const openOAuth = () => {
-    window.open("/api/twitch/auth?token=" + encodeURIComponent(sessionToken()),
+    window.open("/api/twitch/auth?token=" + encodeURIComponent(sessionToken())
+      + "&channel=" + encodeURIComponent(chan),
       "gi-twitch-auth", "width=540,height=700,menubar=no,toolbar=no,location=yes");
   };
-  bd.querySelector("#voucher-twitch-connect").addEventListener("click", openOAuth);
-  againBtn.addEventListener("click", openOAuth);
 
-  if (r && r.configured === false) {
-    statusEl.textContent = "A verificação Twitch não está configurada no servidor — avise a administração.";
-    statusEl.style.color = "#ff9a6a";
-  }
+  /* COLETAR: já segue → resgata; Twitch não vinculada → OAuth (o poll
+   * coleta ao confirmar); vinculada sem follow → orienta seguir. */
+  const collect = async () => {
+    if (busy) return;
+    busy = true; btn.disabled = true; btn.textContent = "VERIFICANDO...";
+    try {
+      const st = await storeTwitchStatus(sessionToken(), chan);
+      if (st && st.ok && st.verified) { finish(); return; }
+      if (st && st.ok && st.linked) {
+        statusEl.textContent = "Conectado como @" + st.login + " — você ainda não segue @" + chan + ". Siga na Twitch e clique em COLETAR de novo.";
+        statusEl.style.color = "#f2c96b";
+      } else if (st && st.ok && st.configured === false) {
+        statusEl.textContent = "A verificação Twitch não está configurada no servidor — avise a administração.";
+        statusEl.style.color = "#ff9a6a";
+      } else {
+        statusEl.textContent = "Autorize sua Twitch na janela que abriu — confirmamos o follow automaticamente.";
+        statusEl.style.color = "#c9b8ef";
+        openOAuth();
+      }
+    } catch (e) {
+      statusEl.textContent = "Erro de rede — tente de novo.";
+      statusEl.style.color = "#ff9a6a";
+    } finally {
+      busy = false; btn.disabled = false; btn.textContent = "COLETAR";
+    }
+  };
+  btn.addEventListener("click", collect);
 
+  /* Poll pós-OAuth: quando a verificação conclui, coleta sem novo clique. */
   const refresh = async () => {
     let st;
-    try { st = await storeTwitchStatus(sessionToken()); } catch (e) { return; }
+    try { st = await storeTwitchStatus(sessionToken(), chan); } catch (e) { return; }
     if (!st || !st.ok) return;
     if (st.verified) {
       statusEl.textContent = "✔ Follow confirmado — resgatando...";
       statusEl.style.color = "#9ce84a";
       stopPoll();
-      setTimeout(() => { close(); if (typeof retry === "function") retry(); }, 600);
-      return;
-    }
-    if (st.linked) {
-      statusEl.textContent = "Conectado como @" + st.login + " — você ainda não segue @" + chan + ". Siga na Twitch e clique em Verificar novamente.";
-      statusEl.style.color = "#f2c96b";
-      againBtn.style.display = "";
-    } else if (!statusEl.textContent) {
-      statusEl.textContent = "Clique em Conectar com Twitch para vincular sua conta.";
+      setTimeout(finish, 600);
     }
   };
   poll = setInterval(refresh, 2500);
-  refresh();
 
   bd.addEventListener("click", (e) => { if (e.target === bd) close(); });
   bd.querySelector(".voucher-reward-close").addEventListener("click", close);

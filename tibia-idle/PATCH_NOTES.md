@@ -3,6 +3,19 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Modais de voucher em roxo Twitch + botão COLETAR
+
+- Gate "Siga o streamer" e modal de recompensa adotam a identidade roxa
+  dos parceiros (gradiente #2b1a4e→#1b1032, glow, logo Twitch animada).
+- Gate ganhou botão COLETAR: se já segue → resgata; Twitch não vinculada
+  → abre OAuth e coleta automaticamente ao confirmar; vinculada sem
+  follow → orienta seguir o canal e tentar de novo.
+- Modal de recompensa ganhou botão OK para fechar.
+- Fix: gate/status passavam a verificar sempre o canal padrão — agora o
+  ?channel= do parceiro correto vai no OAuth e no poll (FLOWERS0800
+  verificava buto_pvp antes deste fix).
+
+---
 ## 2026-11-21 — Novo parceiro: bruno_flowers (voucher FLOWERS0800)
 
 - partners.js: segunda entrada (channel bruno_flowers) — listado no modal

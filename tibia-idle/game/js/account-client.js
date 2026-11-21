@@ -2774,8 +2774,9 @@ async function storeAdminSummary(token) {
 }
 /* Gate social do voucher de streamer: poll do status da verificação Twitch
  * enquanto o pop-up OAuth está aberto (server/twitch.js). */
-async function storeTwitchStatus(token) {
-  const r = await _api("GET", "/api/twitch/status?token=" + encodeURIComponent(token), null, token);
+async function storeTwitchStatus(token, channel) {
+  const r = await _api("GET", "/api/twitch/status?token=" + encodeURIComponent(token)
+    + (channel ? "&channel=" + encodeURIComponent(channel) : ""), null, token);
   return r.data || { ok: false };
 }
 

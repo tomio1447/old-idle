@@ -5911,6 +5911,58 @@ body.fullhd .scene-overlay { font-size: 13px; }
   display: block; min-height: 16px; margin: 2px 14px 12px;
   color: #a49b84; text-align: center;
 }
+/* ---- Tema Twitch (roxo radiante) do modal de voucher de streamer ---- */
+.voucher-tw {
+  background: linear-gradient(165deg, #2b1a4e 0%, #1b1032 55%, #150b28 100%);
+  border-color: rgba(169, 112, 255, .5); border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.85), 0 0 34px rgba(145,70,255,.3),
+    inset 0 1px 0 rgba(190,148,255,.18);
+}
+.voucher-tw .voucher-reward-title {
+  color: #e9dfff; border-bottom-color: rgba(169,112,255,.3);
+  background: linear-gradient(180deg, #341f5e 0%, #241340 100%);
+}
+.voucher-tw .voucher-reward-title svg { animation: partners-logo-pulse 2.2s ease-in-out infinite; }
+.voucher-tw .voucher-reward-close {
+  background: #2b1a4e; color: #cdb8f5; border-color: rgba(169,112,255,.45);
+}
+.voucher-tw .voucher-reward-close:hover { border-color: #bf94ff; color: #fff; }
+.voucher-tw .voucher-reward-intro { color: #c9b8ef; }
+.voucher-tw .voucher-reward-intro b { color: #efe4ff; }
+.voucher-tw .voucher-reward-row {
+  background: #231640; border-color: rgba(169,112,255,.28);
+}
+.voucher-tw .voucher-reward-ico { background: #180e30; border-color: rgba(169,112,255,.35); }
+.voucher-tw .voucher-reward-label { color: #efe4ff; text-shadow: 0 0 8px rgba(169,112,255,.35); }
+.voucher-tw .voucher-reward-social {
+  background: #1d1138; border-color: rgba(169,112,255,.3);
+}
+.voucher-tw .voucher-reward-social-label { color: #b79ef0; }
+.voucher-tw .voucher-reward-link {
+  background: #251647; border-color: rgba(169,112,255,.3);
+}
+.voucher-tw .voucher-reward-link:hover { border-color: #bf94ff; background: #2d1c56; }
+.voucher-tw .voucher-reward-link-name { color: #eee5ff; }
+.voucher-tw .voucher-reward-link-handle { color: #9d86cc; }
+.voucher-tw .voucher-twitch-status { color: #b3a3d9; }
+/* Botões roxos: COLETAR (gate) e OK (recompensa recebida) */
+.voucher-tw-actions {
+  display: flex; gap: 8px; margin: 10px 14px 4px;
+}
+.voucher-tw-btn {
+  flex: 1; padding: 11px 12px; cursor: pointer;
+  font-size: 12.5px; font-weight: 800; letter-spacing: .6px;
+  color: #fff; background: linear-gradient(180deg, #7a3fd0 0%, #5c2ba3 100%);
+  border: 1px solid #a06bff; border-radius: 6px;
+  box-shadow: 0 0 14px rgba(145,70,255,.45);
+  animation: voucher-tw-btn-glow 2.4s ease-in-out infinite;
+}
+.voucher-tw-btn:hover:not(:disabled) { background: linear-gradient(180deg, #8a4be0 0%, #6633b3 100%); }
+.voucher-tw-btn:disabled { opacity: .65; cursor: wait; }
+@keyframes voucher-tw-btn-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(145,70,255,.35); }
+  50% { box-shadow: 0 0 20px rgba(169,112,255,.65); }
+}
 
 /* ---- Modal PARCEIROS (topbar) — identidade Twitch: roxo radiante,
  * logo animada e glow pulsante ao redor do streamer. */
