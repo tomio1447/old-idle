@@ -3,6 +3,12 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — CSP libera CDN da Twitch (avatares dos parceiros)
+
+- img-src ganhou https://static-cdn.jtvnw.net — o avatar do canal no modal
+  Parceiros era bloqueado pelo Content-Security-Policy.
+
+---
 ## 2026-11-21 — "Mover para o depot" no menu do item da backpack
 
 - Nova opção no menu de contexto dos itens da mochila (ao lado de

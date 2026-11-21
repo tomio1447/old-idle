@@ -336,7 +336,7 @@ function accountCanSelfAdmin(acc){
 function hardenedHeaders(res){const headers={
   "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
   "Permissions-Policy":"camera=(), microphone=(), geolocation=()",
-  "Content-Security-Policy":"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://arena.ai https://*.arena.ai",
+  "Content-Security-Policy":"default-src 'self'; img-src 'self' data: blob: https://static-cdn.jtvnw.net; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://arena.ai https://*.arena.ai",
 };if(res._corsOrigin){headers["Access-Control-Allow-Origin"]=res._corsOrigin;headers.Vary="Origin";}return headers;}
 function sendSyncExpired(res,reason){
   res.writeHead(200,Object.assign(hardenedHeaders(res),{"Content-Type":"text/event-stream; charset=utf-8",
