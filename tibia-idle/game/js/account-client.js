@@ -698,6 +698,20 @@ function accountSelectInstanceAmmo(token,charId,slug,automatic){
     return {ok:false,msg:r.data.msg||"Não foi possível trocar a munição"};
   });
 }
+/* Assign/clear de charm dentro da instância autoritativa: o charmRace é por
+ * personagem mas vive no p da engine — sem o patch, a extração terminal
+ * regravaria o mapa antigo e a associação feita durante a caçada sumia. */
+function accountSelectInstanceCharm(token,charId,charmId,race,op){
+  return accountQueueInstance(async()=>{
+    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
+    const r=await _api("POST","/api/instance/charm",Object.assign({token,char_id:Number(charId),
+      charm:String(charmId||""),race:String(race||""),op:String(op||"assign"),
+      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+    if(r.data.ok){accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance&&r.data.instance.state,id:r.data.charm};}
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+    return {ok:false,msg:r.data.msg||"Não foi possível aplicar o charm",error:r.data.error};
+  });
+}
 /* Equipa/desequipa um item da bag ou Loot Pouch na instância ativa. Sem isso
  * o tick autoritativo (200ms) restaura o equipamento anterior — o falcon bow
  * "voltava" depois de equipar o crossbow. */

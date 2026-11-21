@@ -3,6 +3,21 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Fix: "Associar Criatura" (Cyclopedia > Charms) em caçada online
+
+- Assign/clear de charm estava sempre bloqueado em caçadas autoritativas
+  (toast "fora de caçada online") — e com a PT caçando 24/7 o botão parecia
+  quebrado. Novo endpoint `POST /api/instance/charm` faz o patch
+  autoritativo do `p.charmRace` na instância em execução (mesmo padrão do
+  /api/instance/ammo): a extração terminal preserva a associação e o bônus
+  já vale no combate em andamento.
+- Desbloquear (compra) permanece bloqueado online — o débito de charm
+  points duplicaria na extração (save do char + delta da instância).
+- charmPoolSync agora espelha `_charmPointsBase` para chars não-ativos:
+  sem isso, salvar o char selecionado injetava a diferença inteira do pool
+  de volta (charm points duplicados).
+- charmRace também propaga para a entidade de combate local na hora.
+---
 ## 2026-11-21 — Fix: Forge Bonus/Charms zerados no Analyzer (caçadas online)
 
 - Dois bugs impediam os bônus de forja (Momentum/Onslaught/Transcendence/

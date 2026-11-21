@@ -843,6 +843,10 @@ function charmPoolSync(selP) {
   if (live && selP !== live) {
     selP.charms = Object.assign({}, live.charms);
     selP.charmPoints = live.charmPoints;
+    /* O delta de charmPoints no save usa _charmPointsBase — sem espelhar a
+     * base, um char não-ativo com base velha injetava a diferença inteira do
+     * pool de novo (pontos duplicados a cada assign/clear salvo). */
+    selP._charmPointsBase = live.charmPoints;
   }
   ensureCyclopedia(selP);
   return selP;
@@ -970,11 +974,29 @@ function renderCycloCharms(p, el) {
   });
   if (!selP) return;
   const player = charmPoolSync(selP);
-  /* Durante instância autoritativa o save local não persiste (a engine é
-   * dona do estado) — unlock/assign reverteria. Bloqueia com aviso. */
+  /* Assign/clear propagam o charmRace para a entidade de combate local e,
+   * se o char participa da instância autoritativa, gravam via patch
+   * dedicado — a extração terminal preserva (era o motivo do bloqueio). */
+  const charmSyncCombat = (target, charmId, race, op) => {
+    const c = (typeof G !== "undefined" && G) ? G.combat : null;
+    if (c) {
+      const ents = Array.isArray(c.players) ? c.players : (c.player ? [c.player] : []);
+      const ent = ents.find((e) => e && e.p &&
+        String(e.p.id !== undefined && e.p.id !== null ? e.p.id : e.id) === String(target.id));
+      if (ent && ent.p) ent.p.charmRace = Object.assign({}, target.charmRace);
+    }
+    if (typeof accountSelectInstanceCharm === "function" &&
+        typeof accountInstanceActive === "function" && accountInstanceActive() &&
+        typeof accountSessionToken === "function") {
+      accountSelectInstanceCharm(accountSessionToken(), target.id, charmId, race, op).catch(() => {});
+    }
+  };
+  /* Desbloquear debita do pool da conta — durante instância a extração
+   * somaria o débito duas vezes (save + delta da instância). Mantém o
+   * bloqueio só para a compra. */
   const charmLockedOnline = () => {
     if (typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
-      toast("Charms só podem ser alterados fora de uma caçada online.");
+      toast("Desbloquear charms só fora de uma caçada online.");
       return true;
     }
     return false;
@@ -991,16 +1013,15 @@ function renderCycloCharms(p, el) {
   });
   const clr = $("#charm-clear");
   if (clr) clr.addEventListener("click", () => {
-    if (charmLockedOnline()) return;
     const id = cycloCharmIdFromEl(clr) || CYCLO.charmSel;
     const r = clearCharm(player, id);   // assign é por personagem
     if (!r.ok) { toast(r.erro); return; }
     toast(`Runa removida da criatura para <b>${player.name}</b>.`);
     charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
+    charmSyncCombat(player, r.id || id, "", "clear");
   });
   const asg = $("#charm-assign");
   if (asg) asg.addEventListener("click", () => {
-    if (charmLockedOnline()) return;
     const selEl = $("#charm-race-sel");
     const slug = selEl && selEl.value;
     const id = cycloCharmIdFromEl(asg) || CYCLO.charmSel;
@@ -1008,6 +1029,7 @@ function renderCycloCharms(p, el) {
     if (!r.ok) { toast(r.erro); return; }
     toast(`Runa associada a <b>${GAMEDATA.monsters[slug].name}</b> para <b>${player.name}</b>.`);
     charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
+    charmSyncCombat(player, r.id || id, slug, "assign");
   });
 }
 
