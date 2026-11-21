@@ -2314,8 +2314,12 @@ async function accountAdminSaveCharacter(token, charId, p) {
   // do rabo oposto fecha ciclo e congela as duas filas.
   if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
   return accountQueueSave(async()=>{
-    if(ACCOUNT_SAVE_CONFLICTS.has(id)||!accountLeaseAllowsSimulation()){
-      ACCOUNT_ADMIN_GRANT_LAST_ERROR="Sessão sem controle (lease) para gravar o grant.";
+    if(ACCOUNT_SAVE_CONFLICTS.has(id)){
+      ACCOUNT_ADMIN_GRANT_LAST_ERROR="Conflito de salvamento desta sessão (outra aba gravou o mesmo personagem). Recarregue o jogo.";
+      return false;
+    }
+    if(!accountLeaseAllowsSimulation()){
+      ACCOUNT_ADMIN_GRANT_LAST_ERROR="Sessão sem controle (lease) — outra aba/dispositivo segura o personagem. Feche a outra aba ou use Takeover.";
       return false;
     }
     let cache=await accountEnsureVersions(token,[id]);

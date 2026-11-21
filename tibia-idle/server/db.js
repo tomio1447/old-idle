@@ -3021,7 +3021,7 @@ async function MysqlStore() {
              ELSE 0 END, 0) - ?))
          WHERE id = ?`,
         [spent,aid]);
-      const [rows]=await conn.query("SELECT cosmetics FROM accounts WHERE id=?",[aid]);
+      const [rows]=await conn.query("SELECT cosmetics FROM accounts WHERE id=? FOR UPDATE",[aid]);
       let cos=null;
       if(rows[0]&&rows[0].cosmetics){
         try{cos=typeof rows[0].cosmetics==="string"?JSON.parse(rows[0].cosmetics):rows[0].cosmetics;}catch(e){cos=null;}
@@ -4137,7 +4137,7 @@ async function MysqlStore() {
         if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
-            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
             const aid=acctRows[0]?Number(acctRows[0].account_id):null;if(!aid)continue;
             if(aid!==Number(accountId)){
               const [instRows]=await conn.query(
@@ -4148,7 +4148,7 @@ async function MysqlStore() {
             const firstAcc=!shared;
             if(!shared){
               let s=null;
-              const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=?",[aid]);
+              const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=? FOR UPDATE",[aid]);
               if(srows[0]&&srows[0].shared_inventory){try{s=JSON.parse(srows[0].shared_inventory);}catch(e){}}
               shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
               sharedByAcc.set(aid,shared);
@@ -4171,7 +4171,7 @@ async function MysqlStore() {
           const tk=projection&&projection.taskKills;
           if(!tk||typeof tk!=="object")continue;
           try{
-            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
             const aid=accRows[0]&&Number(accRows[0].account_id);
             if(aid)await this.guildCreditKills(aid,tk,conn);
           }catch(e){console.error("[guild] credit kills:",e&&e.message);}
@@ -4233,7 +4233,7 @@ async function MysqlStore() {
         if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
-            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
             const aid=acctRows[0]?Number(acctRows[0].account_id):null;if(!aid)continue;
             if(aid!==Number(accountId)){
               // Convidado: preserva se a conta tiver OUTRA instância ativa
@@ -4246,7 +4246,7 @@ async function MysqlStore() {
             const firstAcc=!shared;
             if(!shared){
               let s=null;
-              const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=?",[aid]);
+              const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=? FOR UPDATE",[aid]);
               if(srows[0]&&srows[0].shared_inventory){try{s=JSON.parse(srows[0].shared_inventory);}catch(e){}}
               shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
               sharedByAcc.set(aid,shared);
@@ -4270,7 +4270,7 @@ async function MysqlStore() {
           const tk=projection&&projection.taskKills;
           if(!tk||typeof tk!=="object")continue;
           try{
-            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
             const aid=accRows[0]&&Number(accRows[0].account_id);
             if(aid)await this.guildCreditKills(aid,tk,conn);
           }catch(e){console.error("[guild] credit kills:",e&&e.message);}
@@ -4280,14 +4280,14 @@ async function MysqlStore() {
         // Gold é por conta: propaga o saldo autoritativo para accounts.gold.
         const walletByAcc=new Map();
         for(const projection of next.characters||[]){
-          const [chars]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+          const [chars]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
           if(!chars[0])continue;
           let data={};try{data=typeof projection.data==="string"?JSON.parse(projection.data):(projection.data||{});}catch(e){}
           walletByAcc.set(Number(chars[0].account_id),Math.max(0,Math.floor(Number(data.gold)||0)));
         }
         for(const [aid,gold] of walletByAcc.entries()){
           await conn.query("UPDATE accounts SET gold=?, gold_migrated=1 WHERE id=?",[gold,aid]);
-          const [siblings]=await conn.query("SELECT id, data FROM characters WHERE account_id=?",[aid]);
+          const [siblings]=await conn.query("SELECT id, data FROM characters WHERE account_id=? FOR UPDATE",[aid]);
           for(const sib of siblings){
             let sd={};try{sd=typeof sib.data==="string"?JSON.parse(sib.data):(sib.data||{});}catch(e){sd={};}
             sd.gold=gold;
@@ -4905,7 +4905,7 @@ async function MysqlStore() {
         // espelha o novo saldo no data.gold dos chars (mesma regra do wallet sync)
         const [acc] = await conn.query("SELECT gold FROM accounts WHERE id=?", [Number(opts.leader_account_id)]);
         const newGold = acc[0] ? Math.max(0, Number(acc[0].gold) || 0) : 0;
-        const [chars] = await conn.query("SELECT id, data FROM characters WHERE account_id=?",
+        const [chars] = await conn.query("SELECT id, data FROM characters WHERE account_id=? FOR UPDATE",
           [Number(opts.leader_account_id)]);
         for (const ch of chars) {
           let d = {}; try { d = typeof ch.data === "string" ? JSON.parse(ch.data) : (ch.data || {}); } catch (e) { d = {}; }
@@ -5124,7 +5124,7 @@ async function MysqlStore() {
           gold_delta: amt, points_delta: 0 });
         const [acc] = await conn.query("SELECT gold FROM accounts WHERE id=?", [Number(accountId)]);
         const newGold = acc[0] ? Math.max(0, Number(acc[0].gold) || 0) : 0;
-        const [chars] = await conn.query("SELECT id, data FROM characters WHERE account_id=?",
+        const [chars] = await conn.query("SELECT id, data FROM characters WHERE account_id=? FOR UPDATE",
           [Number(accountId)]);
         for (const ch of chars) {
           let d = {}; try { d = typeof ch.data === "string" ? JSON.parse(ch.data) : (ch.data || {}); } catch (e) { d = {}; }

@@ -3,6 +3,20 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Fix grants do painel admin + ER_CHECKREAD nos ticks
+
+- A forja do admin "parava de funcionar" porque o grant era recusado sem
+  lease/apos conflito de save e a mensagem culpava sempre o lease. Agora
+  distingue: conflito de save pede reload; falta de lease pede fechar a
+  outra aba ou Takeover.
+- ER_CHECKREAD (errno 1020) derrubava o instanceAuthorityTick a cada tick
+  na conta afetada: SELECT consistente da linha de accounts/characters
+  seguido de UPDATE na mesma tx falha quando outra tx toca a linha.
+  Adicionado FOR UPDATE nos SELECTs (shared_inventory, cosmetics,
+  characters) — convencao ja usada em 4572/3149 — o lock na leitura
+  serializa escritores e elimina o check-read.
+
+---
 ## 2026-11-21 — Ícone de item na barra de cooldown ao usar potion/runa
 
 - Ao beber potion de HP/mana (ou runa de cura), o ícone do item aparece
