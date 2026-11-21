@@ -523,7 +523,7 @@ function renderSkills(p) {
   for (const k of order) {
     const isMl = k === "magic";
     const lvl = isMl ? effMagic(p) : effSkill(p, k);
-    const baseLvl = isMl ? p.ml : p.skills[k];
+    const baseLvl = isMl ? p.ml : (p.skills || {})[k];
     const prog = isMl ? mlProgress(p) : skillProgress(p, k);
     const bonus = lvl - baseLvl;
     // Valor principal = TOTAL efetivo; +bonus fica muted (detalhe no tooltip).

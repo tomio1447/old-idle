@@ -3,6 +3,16 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Fix crash "p.skills undefined" no load/treino
+
+- normalizePlayer agora garante skills (10s), skillTries, ml e manaSpent —
+  contas criadas via login social e snapshots antigos podiam vir sem o
+  bloco, quebrando effSkill → renderStats → startGameReady e a área de
+  treino (TypeError "reading 'sword'").
+- Guards defensivos em effSkill/skillBreakdown/renderSkills para players
+  não-normalizados (membros remotos de party).
+
+---
 ## 2026-11-21 — Redesign do modal PVP (Guerras de Guild)
 
 - Restyle das 5 abas nos tokens do mockup: cards #21242b, bordas #363b47,

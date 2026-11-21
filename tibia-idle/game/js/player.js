@@ -378,7 +378,7 @@ function stanceSkillBonusLabel(p, kind) {
 function skillBreakdown(p, which) {
   const isMl = which === "magic";
   const parts = [];
-  const base = isMl ? (p.ml || 0) : (p.skills[which] || 10);
+  const base = isMl ? (p.ml || 0) : ((p.skills || {})[which] || 10);
   parts.push({ label: "base", value: base });
 
   const items = gearSkillBonus(p, which);
@@ -440,7 +440,8 @@ function skillBreakdownText(p, which) {
 /* Skill efetiva (base + bonus do equip) */
 function effSkill(p, which) {
   const g = gearStats(p);
-  let v = p.skills[which] || 10;
+  const sk = p.skills || {};
+  let v = sk[which] || 10;
   if (which === "sword") v += g.sword + g.melee;
   else if (which === "axe") v += g.axe + g.melee;
   else if (which === "club") v += g.club + g.melee;

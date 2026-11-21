@@ -605,6 +605,12 @@ function normalizePlayer(p) {
   p.promotedAt = p.promotedAt || null;
   p.missions = p.missions || {};
   p.bosses = p.bosses || {};
+  // Contas criadas via login social e snapshots antigos podem vir sem o
+  // bloco de skills — sem isso effSkill/gearStats quebram no render.
+  p.skills = Object.assign({ fist: 10, sword: 10, axe: 10, club: 10, dist: 10, shield: 10 }, p.skills || {});
+  p.skillTries = p.skillTries || {};
+  p.ml = Math.max(0, Math.floor(Number(p.ml) || 0));
+  p.manaSpent = Math.max(0, Math.floor(Number(p.manaSpent) || 0));
   p.instanceMode = p.instanceMode || null;
   if (!Number.isFinite(Number(p.stamina))) p.stamina = FULL_STAMINA_SECONDS;
   else p.stamina = Math.max(0, Math.min(FULL_STAMINA_SECONDS, Number(p.stamina)));
