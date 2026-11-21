@@ -5,7 +5,7 @@
  *   1000×645 window, 3 menu tabs (Wheel/Gem/Fragment),
  *   money/fragment resource panel, summary toggle, preset bar.
  */
-.wheel-window { width: 100%; max-width: 980px; background: #1a1d24; border: 1px solid #2a2d34; border-radius: 4px; overflow: hidden; }
+.wheel-window { width: 100%; max-width: 1140px; background: #1a1d24; border: 1px solid #2a2d34; border-radius: 4px; overflow: hidden; }
 .wheel-menu-tabs { display: flex; gap: 0; background: #12151a; border-bottom: 1px solid #2a2d34; }
 .wheel-menu-tab { flex: 1; padding: 8px 12px; font-size: 11px; color: #666; text-align: center; cursor: pointer; border: none; background: transparent; transition: all .15s; font-weight: bold; }
 .wheel-menu-tab:hover { color: #c0c0c0; background: #1b1e24; }
@@ -204,7 +204,15 @@
 
 /* modal standalone: painel direito limitado pela viewport */
 .modal .wheel-right { max-height:min(560px, calc(100vh - 280px)); }
-.modal-bg .modal.wide:has(.wheel-window) { width:min(1080px, calc(100vw - 16px)); }
+.modal-bg.wide .modal:has(.wheel-window) { width:min(1180px, calc(100vw - 16px)); }
+/* modal standalone: inspetor com largura fixa — toda a folga do workspace
+ * vai para o palco da roda em vez de sobrar como espaco vazio */
+.wheel-body.wod-workspace .wod-inspector { flex: 0 0 360px; max-width: 360px; }
+.wheel-body.wod-workspace .wod-inspector.wheel-right { min-width: 0; }
+@media (max-width: 900px) {
+  .wheel-body.wod-workspace { flex-wrap: wrap; }
+  .wheel-body.wod-workspace .wod-inspector { flex: 1 1 100%; max-width: none; }
+}
 
 /* quando a aba Roda esta ativa, a janela do personagem assume o tamanho da
  * janela do OTClient (wheel.otui: 1000x645 — mainPanel 968x522) para que a
@@ -224,17 +232,21 @@
  * Mockup "wod" — workspace 2 colunas: palco circular da roda + inspetor
  * ══════════════════════════════════════════════════════════════════ */
 .wheel-body.wod-workspace {
-  gap: 20px;
-  padding: 16px 18px;
+  gap: 14px;
+  padding: 10px 12px;
   background: #17191e;
   align-items: stretch;
 }
-/* Palco escuro da roda */
+/* Palco escuro da roda — cresce para ocupar todo o espaco livre do
+ * workspace; a roda e escalada via wheelFitCanvas para preencher o palco. */
 .wod-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 10px;
   background: radial-gradient(circle at center, #222630 0%, #111317 75%);
   border: 1px solid #2f333d;
   border-radius: 6px;

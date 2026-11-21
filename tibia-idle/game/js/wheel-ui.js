@@ -542,13 +542,15 @@ function renderFragmentWorkshop(p) {
 
 /* Escala o canvas 522x522 (transform) para ocupar o espaco livre do
  * container — reduz em telas apertadas e amplia (ate 1.45x) quando ha
- * folga, mantendo a composicao do cliente intacta em qualquer tamanho. */
+ * folga, mantendo a composicao do cliente intacta em qualquer tamanho.
+ * host = .wod-stage (flex:1) — ja exclui o inspetor lateral; so resta
+ * descontar o padding do proprio palco. */
 function wheelFitCanvas(root) {
   var wrap = root && root.querySelector ? root.querySelector(".wheel-canvas-wrap") : null;
   if (!wrap) return;
   var cv = wrap.querySelector(".wheel-canvas-area");
   if (!cv) return;
-  var host = wrap.parentElement; // .wheel-body
+  var host = wrap.parentElement; // .wod-stage
   var embedded = !!(root.closest && root.closest(".chard-wheel-embed")) ||
     (wrap.closest && wrap.closest(".chard-wheel-embed"));
   var cs = host && typeof getComputedStyle === "function" ? getComputedStyle(host) : null;
@@ -564,7 +566,7 @@ function wheelFitCanvas(root) {
   if (embedded) {
     availH = host && host.clientHeight > 0 ? host.clientHeight - padY : 0;
   } else {
-    availH = Math.max(0, (window.innerHeight || 900) - 300);
+    availH = Math.max(0, (window.innerHeight || 900) - 280);
   }
   var s;
   if (embedded) {
@@ -578,7 +580,7 @@ function wheelFitCanvas(root) {
     if (availW > 0) s = Math.min(s, availW / 522);
     if (availH > 0) s = Math.min(s, availH / 522);
     if (s === 99) s = 1;
-    s = Math.min(1.25, s);
+    s = Math.min(1.45, s);
   }
   wrap.style.width = Math.round(522 * s) + "px";
   var scaledH = Math.round(522 * s);

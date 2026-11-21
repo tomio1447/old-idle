@@ -3,6 +3,23 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-20 — Fix: espaço em branco no modal da Wheel of Destiny
+
+- `.wod-stage` (palco da roda) não tinha `flex-grow` — encolhia para o
+  conteúdo (522px) e a folga do workspace ia para o inspetor / ficava
+  vazia. Agora `flex:1 1 auto`: o palco absorve todo o espaço livre.
+- `wheelFitCanvas` passa a medir o palco real (`.wod-stage`, flex:1) —
+  antes media o host encolhido e a roda nunca escalava acima de 522px.
+- Inspetor lateral com largura fixa (360px standalone / 330px embutido)
+  em vez de `flex:1` — a folga horizontal vai toda para a roda.
+- Modal standalone da wheel alargado (1180px) e escala máxima 1.25→1.45;
+  seletor `.modal-bg.wide .modal:has(.wheel-window)` corrigido (a classe
+  `wide` mora no `.modal-bg`, não no `.modal` — nunca aplicava).
+- Paddings do workspace/palco reduzidos; wrap em telas <900px empilha
+  inspetor abaixo da roda.
+- Cache-buster `wod-fit-v1`.
+
+---
 
 ## 2026-11-20 — Fix: Desbloquear de charm não persistia
 
