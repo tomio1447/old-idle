@@ -3295,12 +3295,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 
 /* botão da topbar: retrato + nome do char + descrição CONTA embaixo —
  * tudo compactado para caber no quadrado (antes o label vazia pela borda) */
-#btn-switch { gap: 2px; padding: 3px; justify-content: center; }
-#btn-switch .topbar-hero-avatar { width: 40px; height: 30px; }
-#btn-switch-portrait canvas { height: 27px !important; max-width: 38px !important; }
-#btn-switch .topbar-hero-name { font-size: 10px; max-width: 64px; }
+#btn-switch { gap: 3px; padding: 3px; justify-content: center; }
+#btn-switch .topbar-hero-avatar { width: 44px; height: 38px; }
+#btn-switch-portrait canvas { height: 35px !important; max-width: 42px !important; }
 #btn-switch .topbar-btn-label {
-  font-size: 7.5px; font-weight: 800; letter-spacing: .8px;
+  font-size: 8px; font-weight: 800; letter-spacing: .8px;
   color: #a8915c; line-height: 1; text-transform: uppercase;
 }
 .topbar-hero-alert {
