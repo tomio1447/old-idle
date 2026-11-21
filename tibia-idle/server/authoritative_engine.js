@@ -9949,7 +9949,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   moveLootPouchToBag,moveBagToPouchAuth,authAddItemToBag,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,
   playerCritChancePct,playerCritExtraPct,rollPlayerCrit,imbCombatTotals,charmTotals,applyCharmDamage,
-  tryCharmOffensive,buyCharm,assignCharm,clearCharm,afterPlayerHit,
+  tryCharmOffensive,buyCharm,upgradeCharm,assignCharm,clearCharm,charmTierOf,afterPlayerHit,
   forgeProcChanceForEquipped,forgeOnslaughtChancePct,forgeRollOnslaught,forgeEquippedTier,
   forgeBootAmplificationPct,forgeTryRuse,forgeTryMomentum,forgeTryTranscendence,
   forgeTranscendenceDamagePct,forgeIncomingDamageMul,forgeAvatarActive,forgeNoteCombatAction,

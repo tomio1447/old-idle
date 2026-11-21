@@ -5151,6 +5151,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
         localHelperPresets=playerRef.helperPresets,localHelperActivePreset=playerRef.helperActivePreset,
         localCharms=playerRef.charms,localCharmRace=playerRef.charmRace,
         localCharmPoints=playerRef.charmPoints,localCharmsPagos=playerRef.charmsPagos,
+        localCharmPointsBase=playerRef._charmPointsBase,
         localBestiary=playerRef.bestiary,localProf=playerRef.prof,
         localLootConfig=(playerRef.lootConfig&&typeof playerRef.lootConfig==="object"&&
           !Array.isArray(playerRef.lootConfig))?{
@@ -5164,10 +5165,13 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
       playerRef.charmsPagos=Object.assign({}, remote.p.charmsPagos||{}, localCharmsPagos||{});
       playerRef.bestiary=Object.assign({}, remote.p.bestiary||{}, localBestiary||{});
       const rp=Number(remote.p.charmPoints), lp=Number(localCharmPoints);
-      const localOnlyUnlock=Object.keys(localCharms||{}).some((k)=>localCharms[k]&&!(remote.p.charms||{})[k]);
-      if(localOnlyUnlock&&Number.isFinite(lp))playerRef.charmPoints=lp;
+      /* charmPoints/_charmPointsBase são client-owned (como helperPresets):
+       * débitos locais (buy/upgrade) precisam sobreviver até o eco do pool
+       * via shared — se o remoto sobrescrever, um save no intervalo credita
+       * o gasto de volta (débito duplicado em sentido inverso). */
+      if(Number.isFinite(lp))playerRef.charmPoints=lp;
       else if(Number.isFinite(rp))playerRef.charmPoints=rp;
-      else if(Number.isFinite(lp))playerRef.charmPoints=lp;
+      if(localCharmPointsBase!==undefined)playerRef._charmPointsBase=localCharmPointsBase;
       if(typeof ensureCyclopedia==="function")ensureCyclopedia(playerRef);
       if(remote.p.exp!==undefined)playerRef.exp=Number(remote.p.exp)||0;
       if(remote.p.level!==undefined)playerRef.level=Math.max(1,Number(remote.p.level)||1);

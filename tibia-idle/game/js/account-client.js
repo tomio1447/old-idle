@@ -2237,6 +2237,11 @@ function accountApplySharedInventory(shared) {
   if (!ACCOUNT_SAVE_PENDING && shared.charmPoints !== undefined) {
     p.charmPoints = Math.max(0, Math.floor(Number(shared.charmPoints) || 0));
   }
+  /* Baseline do merge por DELTA do save: sem ela o merge grava o pool
+   * absoluto (debitos locais de charm passariam a ser "a verdade"), e o
+   * commit de pool em instância (buy/upgrade) não consegue zerar o delta
+   * — o débito sairia duplicado (save + extração). */
+  p._charmPointsBase = Math.max(0, Math.floor(Number(p.charmPoints) || 0));
   p._sharedInv = 1;
   // Reward Chest é DA CONTA: ao aplicar o shared (troca de personagem,
   // SSE de outra aba, /api/me), atualiza o badge "!" — todos os personagens

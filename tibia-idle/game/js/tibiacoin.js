@@ -98,7 +98,10 @@ function migrateAccountCharms(acc) {
       const raw = roster[id] && roster[id].p;
       if (!raw || typeof raw !== "object") continue;
       if (raw.charms && typeof raw.charms === "object" && !Array.isArray(raw.charms)) {
-        for (const cid of Object.keys(raw.charms)) if (raw.charms[cid]) acc.charms[cid] = true;
+        for (const cid of Object.keys(raw.charms)) if (raw.charms[cid])
+          acc.charms[cid] = Math.max(
+            Math.min(3, Math.max(1, Math.floor(Number(acc.charms[cid])) || 1)),
+            Math.min(3, Math.max(1, Math.floor(Number(raw.charms[cid])) || 1)));
       }
       acc.charmPoints += Math.max(0, Math.floor(Number(raw.charmPoints) || 0));
     }

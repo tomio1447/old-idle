@@ -3,6 +3,21 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Charms: Melhorar também funciona durante caçada online
+
+- "Melhorar"/"Desbloquear" eram bloqueados online ()
+  — quem caça o tempo todo nunca conseguia usar. Agora as operações de pool
+  (buy/upgrade) viram op do  no p autoritativo.
+- Contabilidade exactly-once: o débito sai pela extração do p da instância;
+   shifta  para o save comum sair com
+  delta 0 (antes debitaria 2x). Falha do patch → rollback local sem cobrança.
+-  passou a ser baseline no 
+  e a ser preservado no merge da autoridade (charmPoints/base viram campos
+  client-owned como helperPresets).
+- Tier é espelhado nos demais membros da MESMA conta dentro da instância.
+- Migração do pool local (tibiacoin) preserva tiers (não achata p/ true).
+
+---
 ## 2026-11-21 — Charms: níveis (tiers) oficiais + procs restaurados
 
 - **Níveis de charm (WU 2024)**: cada charm agora tem 3 estágios com custos

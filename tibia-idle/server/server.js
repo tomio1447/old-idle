@@ -52,7 +52,8 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
   destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authAddItemToBag,
   equipFromContainerAuth, unequipFromContainerAuth, depotActionAuth,
-  assignCharm: authAssignCharm, clearCharm: authClearCharm } = require("./authoritative_engine");
+  assignCharm: authAssignCharm, clearCharm: authClearCharm,
+  buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm } = require("./authoritative_engine");
 const { forgeCanFuse, forgeFuseAuth } = require("./forge");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const { createPvpController, PVP_MAPS, pvpMapLocal, pvpRectCenter, pvpApplyBattlePreset,
@@ -3341,7 +3342,7 @@ async function charmInstanceOp(db,body){
   const charId=Number(body.char_id),expected=Number(body.expected_version),instanceId=String(body.instance_id||""),
     op=String(body.op||""),charmId=String(body.charm||""),race=String(body.race||"");
   if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||
-     !/^[a-f0-9]{64}$/.test(instanceId)||(op!=="assign"&&op!=="clear"))
+     !/^[a-f0-9]{64}$/.test(instanceId)||(op!=="assign"&&op!=="clear"&&op!=="buy"&&op!=="upgrade"))
     return {code:400,body:{ok:false,error:"INVALID_CHARM_OP",msg:"Operação de charm inválida"}};
   const character=await db.findCharacter(charId);
   if(!character||Number(character.account_id)!==Number(acc.id))
@@ -3356,9 +3357,24 @@ async function charmInstanceOp(db,body){
     const item=descriptor.authority&&descriptor.authority.players&&
       descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
     if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
-    const r=op==="clear"?authClearCharm(item.p,charmId):authAssignCharm(item.p,charmId,race);
+    const r=op==="clear"?authClearCharm(item.p,charmId)
+      :op==="assign"?authAssignCharm(item.p,charmId,race)
+      :op==="buy"?authBuyCharm(item.p,charmId)
+      :authUpgradeCharm(item.p,charmId);
     if(!r||!r.ok){rejection=(r&&r.erro)||"Operação de charm recusada";return null;}
     applied=r;
+    /* Unlock/tier é pool da CONTA: espelha o novo estágio nos demais
+     * membros da mesma conta na instância (o débito de pontos fica só no
+     * p do target — a extração aplica o delta uma única vez). */
+    if(op==="buy"||op==="upgrade"){
+      const accId=Number(item.p&&item.p.accountId)||0;
+      for(const entry of descriptor.authority.players||[]){
+        if(!entry||!entry.p||entry===item)continue;
+        if(accId&&Number(entry.p.accountId)!==accId)continue;
+        if(!accId&&String(entry.id)!==String(charId))continue;
+        entry.p.charms=Object.assign({},entry.p.charms,{[r.id]:item.p.charms[r.id]});
+      }
+    }
     descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
   },lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,

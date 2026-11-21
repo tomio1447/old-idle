@@ -1008,33 +1008,59 @@ function renderCycloCharms(p, el) {
       accountSelectInstanceCharm(accountSessionToken(), target.id, charmId, race, op).catch(() => {});
     }
   };
-  /* Desbloquear debita do pool da conta — durante instância a extração
-   * somaria o débito duas vezes (save + delta da instância). Mantém o
-   * bloqueio só para a compra. */
-  const charmLockedOnline = () => {
-    if (typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
-      toast("Desbloquear charms só fora de uma caçada online.");
-      return true;
-    }
-    return false;
+  /* Pool da conta em caçada online: o débito real sai pela extração do p
+   * autoritativo (patch /api/instance/charm buy|upgrade). O shift do
+   * _charmPointsBase zera o delta do save comum — sem isso o débito
+   * duplicaria (save + extração). Se o patch falhar, restaura o base e o
+   * save seguinte carrega o débito uma vez. */
+  const charmPoolCommit = (target, spent, charmId, op) => {
+    if (typeof onlineAuthorityCombat !== "function" || !onlineAuthorityCombat()) return;
+    const c = (typeof G !== "undefined" && G) ? G.combat : null;
+    const ents = c ? (Array.isArray(c.players) ? c.players : (c.player ? [c.player] : [])) : [];
+    const inInstance = ents.some((e) => e && e.p &&
+      String(e.p.id !== undefined && e.p.id !== null ? e.p.id : e.id) === String(target.id));
+    if (!inInstance) return;
+    const base = Number(target._charmPointsBase);
+    /* Sem base o save grava o pool ABSOLUTO (já debitado) — mandar o op
+     * junto debitaria duas vezes. Nesse caso o save comum resolve sozinho. */
+    if (!Number.isFinite(base)) return;
+    const prevPts = Number(target.charmPoints) || 0;
+    const prevCharms = Object.assign({}, target.charms);
+    /* Falha do patch = a operação não valeu: reverte pontos + tier local
+     * (rollback limpo, sem cobrança) e devolve a base pro save sair zerado. */
+    const restore = () => {
+      target._charmPointsBase = base;
+      target.charmPoints = prevPts + spent;
+      target.charms = prevCharms;
+      if (typeof renderAll === "function") renderAll();
+      const cyc = $("#cyclo-panel .cyclo-body");
+      if (cyc) renderCycloCharms(G && G.p ? G.p : target, cyc);
+    };
+    target._charmPointsBase = Math.max(0, base - spent);
+    if (typeof accountSelectInstanceCharm === "function" &&
+        typeof accountInstanceActive === "function" && accountInstanceActive() &&
+        typeof accountSessionToken === "function") {
+      accountSelectInstanceCharm(accountSessionToken(), target.id, charmId, "", op)
+        .then((res) => { if (!res || !res.ok) restore(); }).catch(restore);
+    } else restore();
   };
   const buy = $("#charm-buy");
   if (buy) buy.addEventListener("click", () => {
-    if (charmLockedOnline()) return;
     const id = cycloCharmIdFromEl(buy) || CYCLO.charmSel;
     const r = buyCharm(player, id);   // pool da conta — debita 1x só
     if (!r.ok) { toast(r.erro); return; }
     const cid = r.id || id;
+    charmPoolCommit(player, CHARMS[cid].custo || 0, cid, "buy");
     toast(`Charm <b>${CHARMS[cid].nome}</b> desbloqueado na conta!`);
     charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
   });
   const upg = $("#charm-upgrade");
   if (upg) upg.addEventListener("click", () => {
-    if (charmLockedOnline()) return;
     const id = cycloCharmIdFromEl(upg) || CYCLO.charmSel;
     const r = upgradeCharm(player, id);   // pool da conta — debita 1x só
     if (!r.ok) { toast(r.erro); return; }
     const cid = r.id || id;
+    charmPoolCommit(player, charmCostAt(cid, r.tier || 2), cid, "upgrade");
     toast(`Charm <b>${CHARMS[cid].nome}</b> melhorado p/ nível ${r.tier}!`);
     charmSaveChar(player); renderAll(); renderCycloCharms(p, el);
   });
