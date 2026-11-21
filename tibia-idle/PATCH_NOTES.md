@@ -17,6 +17,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
   label compactados para caber no quadrado da topbar.
 
 ---
+## 2026-11-21 — Charms: select de criatura nao fecha mais sozinho
+
+- O live tick do modal reconstruia a aba a cada mudanca de XP (a cada
+  kill), destruindo o <select> aberto de "Associar Criatura". Dois fixes:
+  (1) nao re-renderiza enquanto um SELECT/INPUT/TEXTAREA dentro do modal
+  tem foco — o dropdown aberto fica intocado; (2) a assinatura usa o %% de
+  XP exibido (expProgress) em vez do valor bruto, que mudava a cada kill.
+
+---
 ## 2026-11-21 — Botao CONTA com "!" de pontos pendentes + modal instantaneo
 
 - Botao da topbar agora mostra a descricao "CONTA" (label visivel,

@@ -213,8 +213,18 @@ function chardLiveTick() {
   const el = $("#chard-body");
   const p = (typeof G !== "undefined" && G) ? G.p : null;
   if (!el || !p) { chardStopLive(); return; }
+  /* Controle de formulário focado (select aberto, input digitando):
+   * re-renderizar agora destruiria o dropdown/cursor — adia pro próximo
+   * tick, quando a sig ainda divergir. */
+  const ae = document.activeElement;
+  if (ae && el.contains(ae) &&
+      /^(SELECT|INPUT|TEXTAREA)$/.test(ae.tagName)) return;
   const pend = charPendingPoints(p);
-  const sig = [p.level, Math.floor(p.xp || 0), Math.floor(p.hp || 0),
+  /* XP entra como % exibido (expProgress), não o valor bruto — o raw muda
+   * a cada kill e reconstruía a aba toda hora (fecha select aberto). */
+  const xpPct = typeof expProgress === "function" ? Math.floor(expProgress(p))
+    : Math.floor((p.xp || 0) / 1000);
+  const sig = [p.level, xpPct, Math.floor(p.hp || 0),
     Math.floor(p.mana || 0), Math.floor(p.stamina || 0),
     Math.floor((typeof p.gold === "number" ? p.gold : 0)),
     pend.wheel, pend.prof, CHARD.tab,
