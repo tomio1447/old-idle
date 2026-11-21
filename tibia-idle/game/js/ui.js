@@ -1746,6 +1746,77 @@ function equipOnOtherCharacter(from, to, slug, instId) {
   return true;
 }
 
+/* ---- Catalisadores de Proficiência: "Usar em <char>" ----
+ * Lista os personagens da conta (inclui o próprio) e aplica o XP na
+ * proficiência da arma que o alvo empunha — regra oficial. */
+function profCatalystMenuOptions(p, slug) {
+  if (typeof proficiencyCatalystXp !== "function" || !proficiencyCatalystXp(slug)) return [];
+  const xp = proficiencyCatalystXp(slug);
+  const activeId = String((typeof characterId === "function" ? characterId(p) : (p && p.id)) || "");
+  const accountChars = (typeof accountCharacterCacheRead === "function" && accountCharacterCacheRead())
+    || (typeof G !== "undefined" && G.accountChars) || [];
+  const roster = typeof getCharacters === "function" ? getCharacters() : [];
+  const source = accountChars.length
+    ? roster.filter((c) => accountChars.some((a) => String(a.id) === String(c.id)))
+    : roster.slice();
+  const opts = [];
+  const seen = new Set();
+  for (const other of source) {
+    const oid = String((typeof characterId === "function" ? characterId(other) : (other && other.id)) || "");
+    if (!oid || seen.has(oid)) continue;
+    seen.add(oid);
+    const target = oid === activeId ? p : other; // self usa o blob vivo
+    const wSlug = (typeof profEquippedSlug === "function" ? profEquippedSlug(target) : null)
+      || (target.equip && target.equip.weapon && target.equip.weapon.item) || null;
+    const wOk = !!(wSlug && (typeof profHasTree !== "function" || profHasTree(wSlug)));
+    const wName = wOk ? (itemName(wSlug) || wSlug) : null;
+    const lvl = wOk && typeof profLevel === "function" ? profLevel(target, wSlug) : 0;
+    opts.push({
+      label: `Usar em ${target.name || oid}`,
+      hint: wOk ? `+${fmtFull(xp)} XP · ${wName} Nv.${lvl}` : "sem arma c/ proficiência",
+      action: () => {
+        Promise.resolve(useProfCatalystOnChar(p, target, slug))
+          .then((ok) => { if (ok && typeof renderAll === "function") renderAll(); });
+      },
+    });
+  }
+  return opts;
+}
+
+/* Usa 1 catalisador da mochila do ator no personagem alvo (mesma conta).
+ * Online vai pela rota autoritativa (mochila é compartilhada no servidor);
+ * offline aplica local no blob do alvo. */
+function useProfCatalystOnChar(from, to, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it || !from || !to) return false;
+  if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof sessionToken === "function" && sessionToken() && from.id && to.id &&
+      typeof accountUseProfCatalyst === "function") {
+    return accountUseProfCatalyst(sessionToken(), from.id, to.id, slug)
+      .then((result) => {
+        if (result && result.ok) {
+          const wName = result.weapon ? (itemName(result.weapon) || result.weapon) : "";
+          toast(`<b>${it.n}</b> em <b>${to.name}</b>: +${fmtFull(result.gained || 0)} XP${wName ? ` (${wName})` : ""}${result.levelUp ? ` · Nv.+${result.levelUp}` : ""}`, "rare");
+          addLog("info", `Usou <b>${it.n}</b> em <b>${to.name}</b>: +${fmtFull(result.gained || 0)} XP de proficiência${wName ? ` (${wName})` : ""}.`);
+          return true;
+        }
+        toast((result && result.msg) || "Não foi possível usar o catalisador.", "bad");
+        return false;
+      });
+  }
+  if (!from.bag || (from.bag[slug] || 0) < 1) { toast("O item não está na mochila.", "bad"); return false; }
+  const r = typeof proficiencyCatalystUse === "function" ? proficiencyCatalystUse(to, slug) : { ok: false };
+  if (!r.ok) { toast(`${to.name}: ${r.msg || "sem arma com proficiência."}`, "bad"); return false; }
+  from.bag[slug] -= 1;
+  if (from.bag[slug] <= 0) delete from.bag[slug];
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(to);
+  if (typeof save === "function") save();
+  const wName = r.weapon ? (itemName(r.weapon) || r.weapon) : "";
+  toast(`<b>${it.n}</b> em <b>${to.name}</b>: +${fmtFull(r.gained)} XP${wName ? ` (${wName})` : ""}${r.levelUp ? ` · Nv.+${r.levelUp}` : ""}`, "rare");
+  addLog("info", `Usou <b>${it.n}</b> em <b>${to.name}</b>: +${fmtFull(r.gained)} XP de proficiência${wName ? ` (${wName})` : ""}.`);
+  return true;
+}
+
 /* Vende um item da mochila (unica via de venda manual fora da Loot Pouch) */
 function sellBagItem(p, slug, instId) {
   const it = GAMEDATA.items[slug];
@@ -1836,6 +1907,9 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
       action: () => { if (equipFromBag(p, slug, instId)) refresh(); },
     });
     opts.push(...partyEquipMenuOptions(p, slug, instId, false));
+  }
+  if (typeof proficiencyCatalystXp === "function" && proficiencyCatalystXp(slug)) {
+    opts.push(...profCatalystMenuOptions(p, slug));
   }
   // moedas viram gold direto; o resto só é vendido pela Loot Pouch
   if (currencyValue(slug)) {

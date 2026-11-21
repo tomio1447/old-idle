@@ -40561,7 +40561,7 @@ window.TILEDATA = {
   "51584": {"n": "item 51584"},
   "51585": {"n": "item 51585"},
   "51586": {"n": "item 51586"},
-  "51587": {"n": "item 51587"},
+  "51587": {"n": "lesser proficiency catalyst"},
   "51588": {"n": "proficiency catalyst"},
   "51589": {"n": "greater proficiency catalyst"},
   "51592": {"n": "item 51592"},

@@ -55,6 +55,13 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   assignCharm: authAssignCharm, clearCharm: authClearCharm,
   buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm } = require("./authoritative_engine");
 const { forgeCanFuse, forgeFuseAuth } = require("./forge");
+/* Catalisadores de Weapon Proficiency — tabela + lógica compartilhada com
+ * o cliente. O require interno de proficiency.js resolve os globals que o
+ * engine acabou de ligar (window.PROFDATA, GAMEDATA.items, itemLiberado). */
+const PROF_CATALYSTS_MOD = (() => {
+  try { return require("../game/js/proficiency-catalysts.js"); }
+  catch (e) { return null; }
+})();
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const { createPvpController, PVP_MAPS, pvpMapLocal, pvpRectCenter, pvpApplyBattlePreset,
   pvpFilterVisualState, pvpResumeLiveOnBoot, pvpAuthCacheGet, pvpAuthCacheSet,
@@ -4273,6 +4280,100 @@ async function equipOtherCharacterItem(db,body){
     equip:p.equip||{},bag:p.bag||{},lootPouch:p.lootPouch||{},itemInstances:p.itemInstances||[]})};
 }
 
+/* "Usar em <char>" dos catalisadores de proficiência (Lesser/Proficiency/
+ * Greater): consome 1 unidade da mochila COMPARTILHADA da conta e credita
+ * o XP oficial na proficiência da arma que o alvo empunha. Regras: */
+async function useProficiencyCatalyst(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const sourceId=Number(body.char_id),targetId=Number(body.target_id);
+  const slug=String(body.slug||"");
+  const xpAmt=PROF_CATALYSTS_MOD?PROF_CATALYSTS_MOD.proficiencyCatalystXp(slug):0;
+  if(!Number.isSafeInteger(sourceId)||sourceId<=0||!Number.isSafeInteger(targetId)||targetId<=0||!xpAmt)
+    return {code:400,body:{ok:false,error:"INVALID_CATALYST_USE",msg:"Uso de catalisador inválido"}};
+  const sourceChar=await db.findCharacter(sourceId);
+  if(!sourceChar||Number(sourceChar.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const targetChar=await db.findCharacter(targetId);
+  if(!targetChar||Number(targetChar.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"TARGET_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,sourceId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const state=typeof row.state==="string"?(()=>{try{return JSON.parse(row.state);}catch(e){return null;}})():row.state;
+    const players=(state&&state.authority&&state.authority.players)||[];
+    const targetInInstance=players.some((item)=>String(item&&item.id)===String(targetId));
+    if(!targetInInstance)
+      return {code:409,body:{ok:false,error:"TARGET_IN_ACTIVE_INSTANCE",
+        msg:"O personagem alvo está fora da caçada ativa — a mochila compartilhada está dentro da instância."}};
+    let rejection=null;
+    let last=null;
+    let synced=null;
+    let out=null;
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await db.instanceGet(Number(row.account_id));
+      if(!current||current.status!=="active")
+        return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+      const result=await db.instancePatchState(Number(current.account_id),acc.id,String(current.instance_id),
+        Number(current.version),(serialized)=>{
+          let descriptor=null;
+          try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+          const entries=(descriptor.authority&&descriptor.authority.players)||[];
+          const targetEntry=entries.find((item)=>String(item&&item.id)===String(targetId));
+          if(!targetEntry||!targetEntry.p){rejection="O personagem alvo não participa desta instância";return null;}
+          const tp=targetEntry.p;
+          /* A bag é REF COMPARTILHADA entre os membros da conta
+           * (shareInstanceContainers) — debitar nela vale para todos. */
+          if((Number(tp.bag&&tp.bag[slug])||0)<1){
+            rejection="O catalisador não está na mochila da conta";return null;}
+          const r=PROF_CATALYSTS_MOD.proficiencyCatalystUse(tp,slug);
+          if(!r||!r.ok){rejection=(r&&r.msg)||"O alvo não empunha arma com proficiência";return null;}
+          const preSnapshot={bag:Object.assign({},tp.bag||{}),pouch:Object.assign({},tp.lootPouch||{})};
+          tp.bag[slug]-=1;if(tp.bag[slug]<=0)delete tp.bag[slug];
+          synced=syncInstancePouchCopies(entries,targetId,preSnapshot);
+          out={weapon:r.weapon,gained:r.gained,xp:r.xp,levelUp:r.levelUp,prof:tp.prof||null};
+          descriptor=materializeAuthority(descriptor);
+          return JSON.stringify(descriptor);
+        },lease);
+      if(result.ok){
+        let sharedSync=null;
+        if(synced){
+          await persistSharedPouchSync(db,acc,synced);
+          try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+        }
+        await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,
+          version:Number(result.instance.version),status:result.instance.status,source:"use-catalyst",
+          holderId:String(body.holder_id||"")});
+        return {code:200,body:Object.assign({ok:true,instance:instanceSummary(result.instance,true),
+          ...(sharedSync?{sharedInventory:sharedSync}:{})},out||{})};
+      }
+      if(result.error==="LEASE_REQUIRED")
+        return {code:423,body:{ok:false,error:"LEASE_REQUIRED",msg:"O controle desta conta foi transferido antes do uso terminar."}};
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")
+        return {code:400,body:{ok:false,error:result.error,msg:rejection||"Não foi possível usar o catalisador",
+          instance:instanceSummary(result.instance,true)}};
+      last=result;
+    }
+    return {code:409,body:{ok:false,error:"INSTANCE_VERSION_CONFLICT",msg:"A instância foi alterada por outra sessão.",
+      instance:last&&instanceSummary(last.instance,true)}};
+  }
+  // Cidade: a mochila compartilhada vem hidratada no blob do alvo; consome
+  // + aplica XP e o persistClaimedPlayer reconcilia shared + save mirror.
+  let p=await loadCityPlayer(db,acc,targetChar);
+  if((Number(p.bag&&p.bag[slug])||0)<1)
+    return {code:400,body:{ok:false,error:"NO_ITEM",msg:"O catalisador não está na mochila da conta"}};
+  const r=PROF_CATALYSTS_MOD.proficiencyCatalystUse(p,slug);
+  if(!r||!r.ok)
+    return {code:400,body:{ok:false,error:"USE_FAILED",msg:(r&&r.msg)||"O alvo não empunha arma com proficiência"}};
+  p.bag[slug]-=1;if(p.bag[slug]<=0)delete p.bag[slug];
+  const persisted=await persistClaimedPlayer(db,acc,targetChar,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,
+    bag:p.bag||{},prof:p.prof||{},
+    weapon:r.weapon,gained:r.gained,xp:r.xp,levelUp:r.levelUp})};
+}
+
 /** Move Loot Pouch → backpack (autoritativo). lootPouch é protected no PUT. */
 /** Move backpack → Loot Pouch (autoritativo). A bag é compartilhada e, no
  * PUT comum, o movimento local "voltava" (o servidor restaura a bag da
@@ -6261,6 +6362,10 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/characters/equip-other") {
         const r = await equipOtherCharacterItem(db, await readBody(req));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/characters/use-catalyst") {
+        const r = await useProficiencyCatalyst(db, await readBody(req));
         return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url.startsWith("/api/characters/")) {

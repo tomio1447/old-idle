@@ -3,6 +3,24 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Catalisadores de Proficiência (oficial 15.25)
+
+- Lesser/Proficiency/Greater Proficiency Catalyst (cids 51587-51589)
+  dão +5.000/+25.000/+100.000 XP na proficiência da arma empunhada —
+  regra oficial TibiaWiki. Lesser criada (item + ícone 32x32 do
+  appearances.dat 15.x + nome no tiledata).
+- Menu da mochila: "Usar em <char>" lista os personagens da conta
+  (inclui o próprio) com hint da arma + nível atual; XP clampado no
+  máximo da árvore e level-ups reportados no toast/log.
+- POST /api/characters/use-catalyst: consome 1x da mochila
+  compartilhada e credita o XP — em caçada ativa faz patch na
+  instância (shared sync + publish), na cidade hidrata o blob do alvo
+  e persiste. Alvo fora da instância ativa é rejeitado (mesma regra do
+  equip-other).
+- Market: os 3 catalisadores passam a aparecer na categoria Others
+  (antes t:loot caía em valuables, banida do market).
+
+---
 ## 2026-11-21 — Status bar: recursos da Forja
 
 - A barra Status do painel de equipamento agora mostra Dust (com limite

@@ -116,6 +116,9 @@ function marketFee(price) {
 
 /* Determina categoria Canary/OTC a partir de GAMEDATA / MARKETDATA */
 function marketItemCat(slug) {
+  /* Catalisadores de proficiência são vendáveis (oficial: "Others") — sem
+   * o override, t:"loot" cairia em "valuables", categoria banida. */
+  if (typeof PROF_CATALYSTS !== "undefined" && PROF_CATALYSTS[slug]) return "others";
   const gd = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
   const md = (typeof MARKETDATA !== "undefined" && MARKETDATA.items[slug]) || {};
   const t = gd.t || md.t || "";

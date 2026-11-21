@@ -845,6 +845,48 @@ function accountEquipOnOtherCharacter(token,sourceId,targetId,slug,source,instId
     return {ok:false,msg:r.data.msg||"Não foi possível equipar",code:r.code};
   });
 }
+/* "Usar em <char>" dos catalisadores de proficiência: consome 1 unidade da
+ * mochila compartilhada e credita XP na proficiência da arma que o alvo
+ * empunha — tudo no servidor (instância ativa ou cidade). */
+function accountUseProfCatalyst(token,sourceId,targetId,slug){
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(targetId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(sourceId),target_id:Number(targetId),
+      slug:String(slug||""),
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/characters/use-catalyst",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(r.data.instance&&typeof accountInstanceApply==="function")
+        accountInstanceApply(r.data.instance);
+      try{
+        if(typeof getCharacters==="function"){
+          const roster=getCharacters();
+          const tgt=roster.find((c)=>String(c.id)===id);
+          if(tgt){
+            if(r.data.prof)tgt.prof=r.data.prof;
+            if(r.data.bag)tgt.bag=r.data.bag;
+            if(typeof saveCharacterToRoster==="function")saveCharacterToRoster(tgt);
+            try{
+              if(typeof G!=="undefined"&&G&&G.p&&G.p.id)
+                localStorage.setItem("tibia-idle-active-character-v1",String(G.p.id));
+            }catch(e){/* storage opcional */}
+          }
+        }
+      }catch(e){/* roster é best-effort */}
+      return r.data;
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return r.data;
+  });
+}
 function accountClearInstanceLootPouch(token,charId){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
