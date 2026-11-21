@@ -3,6 +3,15 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Gate Twitch do voucher mostra as recompensas
+
+- A resposta `needTwitch` do /api/store/voucher agora inclui `rewards`
+  (mesmo helper estruturado do resgate — vip/mount/coinsNt/coins/items).
+- O modal "Siga o streamer para resgatar" exibe a lista "Ao confirmar o
+  follow você recebe:" com os ícones de cada recompensa antes do botão
+  Conectar com Twitch.
+
+---
 ## 2026-11-21 — Botão PARCEIROS na topbar + modal de streamers parceiros
 
 - Novo botão quadrado "PARCEIROS" entre PERSONAGEM e STORE (mesmo tamanho,

@@ -896,6 +896,13 @@ function openVoucherTwitchGate(r, retry) {
         <span class="voucher-reward-link-name">Twitch</span>
         <span class="voucher-reward-link-handle">@${chan}</span>
       </a>
+      ${Array.isArray(r && r.rewards) && r.rewards.length ? `
+      <div class="voucher-reward-intro" style="margin-bottom:2px"><b>Ao confirmar o follow você recebe:</b></div>
+      <div class="voucher-reward-list">` +
+        r.rewards.map((rw) => `<div class="voucher-reward-row">
+          <span class="voucher-reward-ico">${voucherRewardIcon(rw)}</span>
+          <span class="voucher-reward-label">${rw.label || ""}</span>
+        </div>`).join("") + `</div>` : ""}
       <div class="voucher-twitch-actions">
         <button type="button" class="voucher-twitch-connect" id="voucher-twitch-connect">Conectar com Twitch</button>
         <button type="button" class="voucher-twitch-again" id="voucher-twitch-again" style="display:none">Verificar novamente</button>

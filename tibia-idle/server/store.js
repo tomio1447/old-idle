@@ -480,6 +480,24 @@ const VOUCHERS = {
 const VOUCHER_CANON = {};
 for (const c of Object.keys(VOUCHERS)) VOUCHER_CANON[c.replace(/_/g, "")] = c;
 
+/* Lista estruturada de recompensas: o modal do cliente renderiza com
+ * ícone próprio por `kind` (vip/mount/coinsNt/coins/items). O nome da
+ * montaria vem do catálogo de cosméticos (appearancedata). Usada tanto
+ * na resposta final quanto no preview do gate social (needTwitch). */
+function voucherRewardsPreview(v) {
+  const mountNome = v.mount && cosmeticCatalog().mounts[String(v.mount)]
+    ? cosmeticCatalog().mounts[String(v.mount)].nome : String(v.mount || "");
+  const rewards = [];
+  if (v.vipDays) rewards.push({ kind: "vip", label: "+" + Math.floor(Number(v.vipDays)) + " dias de VIP" });
+  if (v.mount) rewards.push({ kind: "mount", mount: String(v.mount), label: "Montaria " + mountNome });
+  if (v.coinsNt) rewards.push({ kind: "coinsNt", label: "+" + Math.floor(Number(v.coinsNt)) + " NT Tibia Coins" });
+  if (v.coins) rewards.push({ kind: "coins", label: "+" + Math.floor(Number(v.coins)) + " Tibia Coins" });
+  const itemQty = (Array.isArray(v.items) ? v.items : [])
+    .reduce((n, it) => n + Math.max(1, Math.floor(Number(it && it.qty) || 1)), 0);
+  if (itemQty) rewards.push({ kind: "items", label: itemQty + " item(ns) no depot da conta" });
+  return rewards;
+}
+
 async function redeemVoucher(db, body) {
   const acc = await db.findAccountByToken(body && body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
@@ -513,6 +531,7 @@ async function redeemVoucher(db, body) {
       return { code: 200, body: { ok: false, needTwitch: true, channel: chan,
         configured: twitch.configured(),
         linked: !!(tw && tw.login), login: tw && tw.login ? String(tw.login) : "",
+        rewards: voucherRewardsPreview(v),
         msg: "Conecte sua Twitch e siga @" + chan + " para resgatar este voucher." } };
     }
   }
@@ -603,17 +622,9 @@ async function redeemVoucher(db, body) {
     if (entregues.length) await db.setAccountSharedInventory(acc.id, shared);
   }
 
-  /* Lista estruturada de recompensas: o modal do cliente renderiza com
-   * ícone próprio por `kind` (vip/mount/coinsNt/coins/items). O nome da
-   * montaria vem do catálogo de cosméticos (appearancedata). */
-  const mountNome = v.mount && cosmeticCatalog().mounts[String(v.mount)]
-    ? cosmeticCatalog().mounts[String(v.mount)].nome : String(v.mount || "");
-  const rewards = [];
-  if (v.vipDays) rewards.push({ kind: "vip", label: "+" + Math.floor(Number(v.vipDays)) + " dias de VIP" });
-  if (v.mount) rewards.push({ kind: "mount", mount: String(v.mount), label: "Montaria " + mountNome });
-  if (v.coinsNt) rewards.push({ kind: "coinsNt", label: "+" + Math.floor(Number(v.coinsNt)) + " NT Tibia Coins" });
-  if (v.coins) rewards.push({ kind: "coins", label: "+" + Math.floor(Number(v.coins)) + " Tibia Coins" });
-  if (entregues.length) rewards.push({ kind: "items", label: entregues.length + " item(ns) no depot da conta" });
+  /* Lista estruturada de recompensas (mesmo helper do preview do gate —
+   * o helper já inclui a linha de itens a partir de v.items). */
+  const rewards = voucherRewardsPreview(v);
 
   return { code: 200, body: {
     ok: true, code, coins, coinsNt, vipUntil, vip: vipUntil > Date.now(),
