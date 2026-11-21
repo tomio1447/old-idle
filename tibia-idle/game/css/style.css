@@ -1468,6 +1468,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .forge-client-rates.wide { justify-content: center; }
 .forge-client-rate-row { display: flex; justify-content: space-between; gap: 6px; min-height: 14px; }
 .forge-client-rate-row b.red, .forge-client-cost.red { color: #ff3e3e; }
+.forge-client-cost.green { color: #9ce84a; }
 .forge-client-mini-btn {
   height: 18px;
   color: #e8e8e8;

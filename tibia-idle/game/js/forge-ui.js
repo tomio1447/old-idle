@@ -138,6 +138,7 @@ function renderForgeFusionPanel(p, ref) {
   var useCore = !!FORGE_UI.useCore;
   var chk = info ? forgeCanFuse(p, ref, useCore) : { ok: false, msg: 'Select an item for fusion.' };
   var gold = info ? forgeFusionGoldCost(info.slug, info.tier) : 0;
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
   var sameTier = info ? forgeBagInstanceRefs(p, info.slug, info.tier).length : 0;
   var dustOk = (p.dust || 0) >= FORGE_FUSION.dustCost;
   var coreOk = (p.exaltedCores || 0) >= 1;
@@ -171,7 +172,7 @@ function renderForgeFusionPanel(p, ref) {
     +       forgeClientItemTile(info ? info.slug : null, '', '', '', 30)
     +       forgeClientItemTile(info ? info.slug : null, '', '', '', 30)
     +     '</div>'
-    +     forgeClientCostValue(fmtFull(gold), 'red')
+    +     forgeClientCostValue(fmtFull(gold), gold ? (haveGold >= gold ? 'green' : 'red') : '')
     +     '<button class="forge-client-action" id="forge-fuse-apply"' + (chk.ok ? '' : ' disabled') + '>Fuse</button>'
     +   '</div>'
     + '</div>'
@@ -194,6 +195,7 @@ function renderForgeTransferPanel(p, donorRef) {
   var targetInfo = FORGE_UI.targetSlug ? forgeItemSummary(p, FORGE_UI.targetSlug) : null;
   var chk = targetInfo ? forgeCanTransfer(p, donorRef, FORGE_UI.targetSlug) : { ok: false, msg: 'No valid target available.' };
   var gold = donor ? forgeTransferGoldCost(donor.slug, donor.tier) : 0;
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
   var htmlTargets = '<div class="forge-client-target-grid">';
   for (var i = 0; i < targets.length; i++) {
     var t = targets[i];
@@ -223,7 +225,7 @@ function renderForgeTransferPanel(p, donorRef) {
     +     '<div class="forge-client-rate-row"><span>Result Tier:</span><b class="red">T' + (donor ? Math.max(0, donor.tier - 1) : 0) + '</b></div>'
     +   '</div>'
     +   '<div class="forge-client-result-box">'
-    +     forgeClientCostValue(fmtFull(gold), 'red')
+    +     forgeClientCostValue(fmtFull(gold), gold ? (haveGold >= gold ? 'green' : 'red') : '')
     +     '<button class="forge-client-action" id="forge-transfer-apply"' + (chk.ok ? '' : ' disabled') + '>Transfer</button>'
     +   '</div>'
     + '</div>'

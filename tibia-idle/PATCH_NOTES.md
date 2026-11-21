@@ -3,6 +3,14 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Forge: custo verde quando o ouro cobre
+
+- O valor em gp das abas Fusion e Transfer ficava sempre vermelho, mesmo
+  com ouro suficiente. Agora usa a mesma fonte do forgeCanFuse
+  (accountGold) — verde quando o saldo cobre o custo, vermelho quando
+  falta, neutro sem item selecionado.
+
+---
 ## 2026-11-21 — Annihilator: trigger no sqm parado + cart nao reseta + modal compacto
 
 - Modal de recompensa só abre com o personagem PARADO sobre o sqm do
