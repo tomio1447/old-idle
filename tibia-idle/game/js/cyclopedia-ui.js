@@ -955,6 +955,8 @@ function renderCycloCharms(p, el) {
                 <span class="gi-charm-cost">${fmtFull(c.custo)} pts</span>
                 <span class="gi-charm-tag">${c.elemento ? c.elemento : c.tipo}</span>
               </div>
+              ${race && typeof mobImg === "function"
+                ? `<span class="gi-charm-race" title="${(GAMEDATA.monsters[race] && GAMEDATA.monsters[race].name) || race}">${mobImg(race, 24)}</span>` : ""}
             </button>`;
           }).join("") || `<div class="tiny dim">Nenhum charm nesse filtro.</div>`}
         </div>

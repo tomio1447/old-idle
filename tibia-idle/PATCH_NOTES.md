@@ -3,6 +3,13 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Charms: sprite da criatura associada no card
+
+- O card do charm na grade agora mostra a sprite da criatura associada
+  no canto superior direito (gi-charm-race, mobImg 24px, tooltip com o
+  nome). Padding direito do card aumentado para nao sobrepor o nome.
+
+---
 ## 2026-11-21 — Monstros invisíveis no menu e in-game (MOBSHEETS)
 
 - court-warlock.js e roost-graveborn.js definiam monstros e registravam
