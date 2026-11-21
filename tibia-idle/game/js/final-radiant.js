@@ -31,10 +31,11 @@ const MAIOR_DOMUS_ROOM = {
   boss:  { x: 1023, y: 1026, z: 7 },   // bossspawn
 };
 
-/* HP oficial ainda desconhecido (wiki "?") — 10.000 de teste a pedido. */
+/* HP oficial (Boss Difficulty 1 — Calmera Wiki/TibiaWiki): Maior Domus
+ * 460.000 como o Mimar Haffar; Phosphorus forma final 1.500.000. */
 const MAIOR_DOMUS_STATS = {
   name: "Maior Domus",
-  hp: 10000,
+  hp: 460000,
   exp: 3500000,
   damage: 2000,
   armor: 0,
@@ -42,7 +43,7 @@ const MAIOR_DOMUS_STATS = {
 };
 const PHOSPHORUS_STATS = {
   name: "Phosphorus",
-  hp: 10000,
+  hp: 1500000,
   exp: 16000000,
   damage: 2600,
   armor: 0,

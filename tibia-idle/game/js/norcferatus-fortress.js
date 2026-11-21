@@ -417,10 +417,11 @@ function bloodyTusksVargKills(p) {
 }
 
 function bloodyTusksQuestState(p) {
-  const bosses = (p && p.bosses) || {};
   const vk = bloodyTusksVargKills(p);
   const m1 = vk >= 5 || !!(p && p.missionsDone && p.missionsDone["norcferatus-fortress"]);
-  const m2 = Number(bosses["vladrukh"] && bosses["vladrukh"].kills) > 0;
+  const m2 = typeof accountBossKilled === "function"
+    ? accountBossKilled(p, "vladrukh")
+    : Number(p && p.bosses && p.bosses["vladrukh"] && p.bosses["vladrukh"].kills) > 0;
   const done = (p && p.missionsDone) || {};
   return {
     reqLevel: (p && Number(p.level)) >= 400,

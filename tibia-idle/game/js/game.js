@@ -2063,13 +2063,31 @@ function bossLootText(boss) {
     `${l.chance}% ${l.max > 1 ? "até " + l.max + "x " : ""}${itemName(l.item)}`);
 }
 
+/* Kill de boss vale para a CONTA inteira: qualquer personagem que
+ * derrotou o boss libera o requisito para os demais (as quests são
+ * 1x/conta — ex.: a Kina mata Mimar Haffar/Maior Domus e o Pally já
+ * entra na Radiant Skyhold). Agrega o char atual + os demais do cache
+ * da conta (snapshot/data em accountCharacterCacheRead). */
+function accountBossKilled(p, slug) {
+  const killedIn = (bosses) =>
+    !!(bosses && bosses[slug] && Number(bosses[slug].kills) > 0);
+  if (killedIn(p && p.bosses)) return true;
+  if (typeof accountCharacterCacheRead !== "function") return false;
+  for (const row of (accountCharacterCacheRead() || [])) {
+    if (!row || (p && p.id != null && String(row.id) === String(p.id))) continue;
+    const d = row.snapshot || (() => {
+      try { return typeof row.data === "string" ? JSON.parse(row.data) : row.data; }
+      catch (e) { return null; }
+    })();
+    if (killedIn(d && d.bosses)) return true;
+  }
+  return false;
+}
+
 /* The Pale Worm: matou os outros bosses listados no requirement? */
 function feastBossesKilled(p, ids) {
   if (!p || !Array.isArray(ids)) return false;
-  for (const id of ids) {
-    const st = p.bosses && p.bosses[id];
-    if (!st || !(Number(st.kills) > 0)) return false;
-  }
+  for (const id of ids) if (!accountBossKilled(p, id)) return false;
   return true;
 }
 
@@ -2081,9 +2099,8 @@ function bossAccessChecklist(p, boss) {
     items.push({ ok: (p.level || 0) >= req.level, label: "Nível " + req.level + "+" });
   if (req.killsRequired && Array.isArray(req.killsRequired)) {
     for (const id of req.killsRequired) {
-      const st = p.bosses && p.bosses[id];
       const name = (BOSS_DEFS[id] && BOSS_DEFS[id].name) || id;
-      items.push({ ok: !!(st && (Number(st.kills) > 0)), label: name });
+      items.push({ ok: accountBossKilled(p, id), label: name });
     }
   }
   if (req.mission) {
@@ -2156,8 +2173,7 @@ function huntRequirementCheck(p, hu) {
     return { ok: false, reason: req.text || ("Requer nível " + req.level) };
   if (Array.isArray(req.killsRequired)) {
     for (const id of req.killsRequired) {
-      const st = p.bosses && p.bosses[id];
-      if (!(st && Number(st.kills) > 0))
+      if (!accountBossKilled(p, id))
         return { ok: false, reason: req.text || ("Derrotar " + id) };
     }
   }

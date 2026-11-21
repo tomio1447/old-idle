@@ -785,8 +785,9 @@ function stagMissionKills(p, huntId, slug) {
 }
 
 function stagQuestState(p) {
-  const bosses = (p && p.bosses) || {};
-  const cwDead = Number(bosses["court-warlock"] && bosses["court-warlock"].kills) > 0;
+  const cwDead = typeof accountBossKilled === "function"
+    ? accountBossKilled(p, "court-warlock")
+    : Number(p && p.bosses && p.bosses["court-warlock"] && p.bosses["court-warlock"].kills) > 0;
   const m1k = stagMissionKills(p, "stag-bastion", "kills");
   const m2k = stagMissionKills(p, "arean-outskirts", "night-harpy");
   const done = (p && p.missionsDone) || {};

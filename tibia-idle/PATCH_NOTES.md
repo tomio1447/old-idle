@@ -3,6 +3,18 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — HP oficial Maior Domus/Phosphorus + kill de boss por conta
+
+- final-radiant.js: HP oficial dificuldade 1 — Maior Domus 460.000,
+  Phosphorus 1.500.000 (antes 10.000 de teste).
+- accountBossKilled(p, slug): kill de boss passa a valer para a CONTA —
+  qualquer personagem que derrotou libera o requisito para os demais.
+  Agrega o char atual + os demais do cache da conta. Aplicado em:
+  huntRequirementCheck (gate Radiant Skyhold), feastBossesKilled,
+  bossAccessChecklist e os estados das quests Make Believe, Stag Bastion,
+  Norcferatus, Roost Graveborn e Book World.
+
+---
 ## 2026-11-21 — Voucher já resgatado exibe modal de prêmios
 
 - Resposta de claim duplicado agora carrega rewards+modal — o cliente

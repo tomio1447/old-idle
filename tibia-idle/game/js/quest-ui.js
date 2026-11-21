@@ -295,7 +295,9 @@ function questMonsterListHtml(q) {
 function renderBossQuestDetail(q, ui) {
   const p = G.p;
   const rows = (q.objectives || []).map((slug, index) => {
-    const done = Number(p.bosses && p.bosses[slug] && p.bosses[slug].kills) > 0;
+    const done = typeof accountBossKilled === "function"
+      ? accountBossKilled(p, slug)
+      : Number(p.bosses && p.bosses[slug] && p.bosses[slug].kills) > 0;
     const monster = typeof MONSTERDATA !== "undefined" && MONSTERDATA[slug];
     const name = monster && monster.name || slug.replace(/-/g, " ");
     return `<div class="shop-row">${questBossImg(slug, 28)}<span class="info">${name}${index === q.objectives.length - 1 ? " — Final" : ""}</span><b>${done ? "1/1" : "0/1"}</b></div>`;

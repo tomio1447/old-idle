@@ -228,10 +228,11 @@ function bookWorldMissionKills(p) {
 }
 
 function bookWorldQuestState(p) {
-  const bosses = (p && p.bosses) || {};
   const m1k = bookWorldMissionKills(p);
   const m1 = m1k >= 1000 || !!(p && p.missionsDone && p.missionsDone["book-world"]);
-  const m2 = Number(bosses["sir-leonard"] && bosses["sir-leonard"].kills) > 0;
+  const m2 = typeof accountBossKilled === "function"
+    ? accountBossKilled(p, "sir-leonard")
+    : Number(p && p.bosses && p.bosses["sir-leonard"] && p.bosses["sir-leonard"].kills) > 0;
   const done = (p && p.missionsDone) || {};
   return {
     reqLevel: (p && Number(p.level)) >= 150,

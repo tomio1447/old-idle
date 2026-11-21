@@ -808,8 +808,10 @@ function roostMissionKills(p, huntId) {
 const ROOST_CHAIN = ["adventurer-group", "eldritch-dragon-lord", "ice-horror", "the-gravedigger"];
 
 function roostState(p) {
-  const bosses = (p && p.bosses) || {};
-  const killed = (slug) => Number(bosses[slug] && bosses[slug].kills) > 0;
+  const killed = (slug) =>
+    typeof accountBossKilled === "function"
+      ? accountBossKilled(p, slug)
+      : Number(p && p.bosses && p.bosses[slug] && p.bosses[slug].kills) > 0;
   const m1k = roostMissionKills(p, "unhallowed-crypt");
   const m1 = m1k >= 500 || !!(p && p.missionsDone && p.missionsDone["unhallowed-crypt"]);
   const chainKills = ROOST_CHAIN.filter(killed).length;
