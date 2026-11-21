@@ -3,6 +3,20 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Fix: Forge Bonus/Charms zerados no Analyzer (caçadas online)
+
+- Dois bugs impediam os bônus de forja (Momentum/Onslaught/Transcendence/
+  Ruse) e charms de aparecer no Analyzer em caçadas autoritativas (online):
+  1) o merge de `incoming.stats` em applyOnlineAuthorityState sobrescrevia
+  `forgeTrack`/`charmTrack` acumulados no cliente com a cópia congelada do
+  descriptor (mesmo bug antigo do damageTrack/takenTrack — agora todos os
+  trackers de analyzer são preservados);
+  2) `t:"forge"` e `t:"charm"` não estavam no keep-set do cap de 120 eventos
+  — em lotes cheios eram descartados sistematicamente.
+- O materialize agora também remove damageTrack/takenTrack/forgeTrack/
+  charmTrack do `state.stats` (trackers são do cliente; deathTrack segue
+  autoritativo do servidor).
+---
 ## 2026-11-21 — Fix CRÍTICO: nível dos personagens zerando (level 1)
 
 - O backfill de "level/exp por conta" (dc5fc64f) falhava silenciosamente

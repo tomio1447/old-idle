@@ -9732,6 +9732,12 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
       return out;
     })()}:null;
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;
+  // Trackers de analyzer são acumulados NO CLIENTE a partir dos eventos —
+  // a cópia congelada que entrou no descriptor na criação da instância não
+  // pode ecoar de volta: o merge do cliente preserva os seus, mas uma
+  // sessão nova adotaria o snapshot velho. deathTrack fica (autoridade).
+  delete descriptor.state.stats.damageTrack;delete descriptor.state.stats.takenTrack;
+  delete descriptor.state.stats.forgeTrack;delete descriptor.state.stats.charmTrack;
   // Hunt wipe mostra corpse+contador; boss wipe só corpses permadead (sem timer).
   descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe"&&!authIsBossFight(auth);
   // Grid dimensions: o renderer usa combat.gridW/gridH para calcular o
@@ -9770,7 +9776,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   const MAX_AUTH_EVENTS=120;
   let events=Array.isArray(auth.events)?auth.events:[];
   if(events.length>MAX_AUTH_EVENTS){
-    const keep=new Set(["taken","hit","kill","death","heal","heal-friend","say","dust","areafx","chain","mobheal","spawn","spawn-blink","boss-spawn-wait","buff","cured","break","miss","block","effect","spite-qte","malice-qte","mega-qte"]);
+    const keep=new Set(["taken","hit","kill","death","heal","heal-friend","say","dust","areafx","chain","mobheal","spawn","spawn-blink","boss-spawn-wait","buff","cured","break","miss","block","effect","spite-qte","malice-qte","mega-qte","forge","charm"]);
     events=events.filter((e)=>keep.has(e&&e.t)).concat(events.filter((e)=>!keep.has(e&&e.t))).slice(0,MAX_AUTH_EVENTS);
   }
   descriptor.state.events=events;

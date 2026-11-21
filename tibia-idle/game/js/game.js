@@ -5310,9 +5310,13 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     // Damage) pareciam “valores do último segundo” em vez do total da sessão.
     const keepDamageTrack=previous.stats&&previous.stats.damageTrack;
     const keepTakenTrack=previous.stats&&previous.stats.takenTrack;
+    const keepForgeTrack=previous.stats&&previous.stats.forgeTrack;
+    const keepCharmTrack=previous.stats&&previous.stats.charmTrack;
     previous.stats=Object.assign({},previous.stats||{},incoming.stats);
     if(keepDamageTrack&&typeof keepDamageTrack==="object")previous.stats.damageTrack=keepDamageTrack;
     if(keepTakenTrack&&typeof keepTakenTrack==="object")previous.stats.takenTrack=keepTakenTrack;
+    if(keepForgeTrack&&typeof keepForgeTrack==="object")previous.stats.forgeTrack=keepForgeTrack;
+    if(keepCharmTrack&&typeof keepCharmTrack==="object")previous.stats.charmTrack=keepCharmTrack;
     previous.stats.supplyUsed=Object.assign({},incoming.stats.supplyUsed||{});
     previous.stats.supplyCost=Number(incoming.stats.supplyCost)||0;
     previous.stats.loot=Object.assign({},incoming.stats.loot||previous.stats.loot||{});
