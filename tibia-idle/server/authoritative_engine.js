@@ -37,6 +37,9 @@ require("../game/js/darklight-core.js").registerLoot(MONSTERS);
 // Gloom Pillars: drops oficiais ausentes do dump Canary (might ring /
 // ultimate mana potion / lightning legs / green gem).
 require("../game/js/gloom-pillars.js").registerLoot(MONSTERS);
+// Stonerefiner (Corym Mines): loot reduzido em 50% — chance de cada
+// entrada dividida por 2, mesma redução aplicada no cliente.
+require("../game/js/stonerefiner.js").registerLoot(MONSTERS);
 // True Asuras - Thalassara (400+): a True Feverbloom Asura é do update
 // Forbidden Gardens (15.30) e não existe no dump Canary — a ficha vem do
 // patch da hunt (stats oficiais tibia.com/TibiaWiki balanceados sobre as

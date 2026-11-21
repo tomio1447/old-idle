@@ -33,8 +33,32 @@ const STONEREFINER_LOOT_ITEMS = {
   "half-digested-stones":  { n: "half-digested stones", s: null, t: "loot", cid: 27369, w: 2.00, sell: 60, npcSell: 60 },
 };
 
-/* Médias da criatura (Canary: 800 hp, 500 exp, 100 dano, 20 armor). */
-const STONEREFINER_AVG = { hp: 800, exp: 500, damage: 100, armor: 20, gold: 202.5 };
+/* Médias da criatura (Canary: 800 hp, 500 exp, 100 dano, 20 armor).
+ * gold ~metade do Canary: o loot foi reduzido em 50% (ver registerLoot). */
+const STONEREFINER_AVG = { hp: 800, exp: 500, damage: 100, armor: 20, gold: 101.25 };
+
+/* Loot reduzido em 50% (pedido do jogador): a chance de cada entrada da
+ * tabela do Canary é dividida por 2 — o min/max de cada drop não muda
+ * (mesma regra do engine: chance é multiplicada, quantidade nunca).
+ * `registerLoot` segue o padrão do putrefactory.js: o cliente aplica em
+ * GAMEDATA.monsters/MONSTERDATA e a autoridade chama com MONSTERS no boot.
+ * O marker evita dupla aplicação quando os catálogos dividem o objeto. */
+const STONEREFINER_LOOT_MUL = 0.5;
+
+const STONEREFINER_PATCH = {
+  registerLoot(monsters) {
+    const def = monsters && monsters["stonerefiner"];
+    if (!def || !Array.isArray(def.loot)) return;
+    if (def._stoneLootMul === STONEREFINER_LOOT_MUL) return;
+    def.loot = def.loot.map((l) =>
+      l && typeof l.chance === "number"
+        ? Object.assign({}, l, { chance: l.chance * STONEREFINER_LOOT_MUL })
+        : l);
+    def._stoneLootMul = STONEREFINER_LOOT_MUL;
+  },
+};
+
+if (typeof module !== "undefined" && module.exports) module.exports = STONEREFINER_PATCH;
 
 (function registerStonerefiner() {
   if (typeof GAMEDATA === "undefined") return;
@@ -53,6 +77,14 @@ const STONEREFINER_AVG = { hp: 800, exp: 500, damage: 100, armor: 20, gold: 202.
       if (def.w != null && items[slug].w == null) items[slug].w = def.w;
     }
   }
+
+  // Ficha no catálogo + loot -50%. MONSTERDATA também é patchado porque
+  // o combate usa `GAMEDATA.monsters[slug] || MONSTERDATA[slug]`.
+  GAMEDATA.monsters = GAMEDATA.monsters || {};
+  if (!GAMEDATA.monsters["stonerefiner"] && typeof MONSTERDATA !== "undefined" && MONSTERDATA["stonerefiner"])
+    GAMEDATA.monsters["stonerefiner"] = MONSTERDATA["stonerefiner"];
+  STONEREFINER_PATCH.registerLoot(GAMEDATA.monsters);
+  if (typeof MONSTERDATA !== "undefined") STONEREFINER_PATCH.registerLoot(MONSTERDATA);
 
   if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
   GAMEDATA.hunts["stonerefiner"] = {

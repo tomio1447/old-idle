@@ -3,6 +3,18 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Stonerefiner: loot -50%
+
+- A chance de cada entrada da tabela de loot do Stonerefiner (Canary)
+  foi dividida por 2 — platinum coin 50.93%→25.47%, rare earth
+  39.75%→19.88%, coal 27.98%→13.99% etc. Quantidade min/max de cada
+  drop não muda (mesma regra do engine: chance multiplica, count nunca).
+- Implementado como patch registerLoot idempotente em
+  game/js/stonerefiner.js (padrão putrefactory.js): o cliente aplica em
+  GAMEDATA.monsters/MONSTERDATA e a autoridade chama com MONSTERS no
+  boot — cliente e servidor ficam iguais. avgGold do card 202.5→101.25.
+
+---
 ## 2026-11-21 — Catalisadores de Proficiência (oficial 15.25)
 
 - Lesser/Proficiency/Greater Proficiency Catalyst (cids 51587-51589)
