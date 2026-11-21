@@ -1902,3 +1902,10 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   wallpaper Verão 2026, e removidas as "bolinhas" — `#bg-particles` +
   spawn loop em client-background.js + CSS `.bg-particle`/`bgFloat`.
   O background agora aparece limpo; grid sutil e label de versão mantidos.
+
+- **404 de máscara montada resolvido**: addons montados sem área colorível
+  no DAT não geram `.mounted.mask.png` (52 casos, ex.: knight-m-a1) e o
+  preload/renderer pediam o arquivo mesmo assim. Novo manifesto
+  `MOUNTED_MASKS` (mountedmaskdata.js, gerado por
+  `tools/gen_mounted_masks.py`) lista os sufixos existentes por outfit —
+  preload e AppearanceRenderer só requisitam máscaras que existem.

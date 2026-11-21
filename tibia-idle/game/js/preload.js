@@ -362,7 +362,11 @@ function preloadGameAssets(p, label) {
         if (addons & 2) suffixes.push('-a2');
         for (const suffix of suffixes) {
           paths.add('assets/appearance/outfit/' + appearance.id + suffix + '.mounted.base.png');
-          if (appearance.sexo !== 'avatar')
+          /* Máscara montada só existe quando o addon tem área colorível no
+           * DAT (MOUNTED_MASKS lista os sufixos gerados) — pedir fora da
+           * lista gera 404 garantido (ex.: knight-m-a1). */
+          const mmasks = (typeof MOUNTED_MASKS !== "undefined" && MOUNTED_MASKS[appearance.id]) || [];
+          if (appearance.sexo !== 'avatar' && mmasks.indexOf(suffix) !== -1)
             paths.add('assets/appearance/outfit/' + appearance.id + suffix + '.mounted.mask.png');
         }
       }

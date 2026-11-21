@@ -559,7 +559,12 @@ const AppearanceRenderer = {
       }
       const hasIdleMask = !idleMeta || !Array.isArray(idleMeta.masks) ||
         idleMeta.masks.indexOf(suf) !== -1;
-      const mask = hasIdleMask ? Sprites.get(
+      /* Máscara montada existe só quando o addon tem área colorível no DAT
+       * (MOUNTED_MASKS lista os sufixos gerados) — pedir fora dela dá 404. */
+      const hasMountedMask = !wantMounted ||
+        ((typeof MOUNTED_MASKS !== "undefined" && MOUNTED_MASKS[id]) || [])
+          .indexOf(suf) !== -1;
+      const mask = (hasIdleMask && hasMountedMask) ? Sprites.get(
         `assets/appearance/outfit/${id}${suf}${assetMode}.mask.png`) : null;
       if (mask && !mask.complete) return null;
       imgs.push([base, mask]);
