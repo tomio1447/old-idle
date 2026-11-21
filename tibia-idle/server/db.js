@@ -740,12 +740,17 @@ JsonStore.prototype.setAccountLevelExp = function (accountId, level, exp) {
  * _applyAccountLevel do MySQL. */
 JsonStore.prototype._applyAccountLevel = function (row, acc) {
   if (!row || !acc) return row;
-  const level = Math.max(1, Math.floor(Number(acc.level) || 1));
-  const exp = Math.max(0, Math.floor(Number(acc.exp) || 0));
-  row.level = level;
   let data = row.data, parsed = null;
   if (typeof data === "string") { try { parsed = JSON.parse(data); } catch (e) {} }
   else if (data && typeof data === "object") parsed = data;
+  /* Nunca injeta MENOS que o progresso gravado no próprio char: uma conta
+   * atrasada (backfill que falhou) rebaixava o level na leitura e o save
+   * seguinte gravava o rebaixamento — destruindo o progresso real. O max
+   * também auto-cura a conta no próximo setAccountLevelExp. */
+  const level = Math.max(1, Math.floor(Number(acc.level) || 1),
+    Math.floor(Number(row.level) || 1), parsed ? Math.floor(Number(parsed.level) || 1) : 1);
+  const exp = Math.max(Math.floor(Number(acc.exp) || 0), parsed ? Math.floor(Number(parsed.exp) || 0) : 0);
+  row.level = level;
   if (parsed) { parsed.level = level; parsed.exp = exp; row.data = typeof data === "string" ? JSON.stringify(parsed) : parsed; }
   return row;
 };
@@ -3611,13 +3616,16 @@ async function MysqlStore() {
      * compartilham o mesmo progresso. */
     _applyAccountLevel(row, acc) {
       if (!row || !acc) return row;
-      const level = Math.max(1, Math.floor(Number(acc.level) || 1));
-      const exp = Math.max(0, Math.floor(Number(acc.exp) || 0));
-      row.level = level;
       let data = row.data;
       let parsed = null;
       if (typeof data === "string") { try { parsed = JSON.parse(data); } catch (e) {} }
       else if (data && typeof data === "object") parsed = data;
+      /* Nunca injeta MENOS que o progresso gravado no próprio char — ver
+       * comentário no JsonStore._applyAccountLevel. */
+      const level = Math.max(1, Math.floor(Number(acc.level) || 1),
+        Math.floor(Number(row.level) || 1), parsed ? Math.floor(Number(parsed.level) || 1) : 1);
+      const exp = Math.max(Math.floor(Number(acc.exp) || 0), parsed ? Math.floor(Number(parsed.exp) || 0) : 0);
+      row.level = level;
       if (parsed) { parsed.level = level; parsed.exp = exp; row.data = typeof data === "string" ? JSON.stringify(parsed) : parsed; }
       return row;
     },
@@ -3627,14 +3635,17 @@ async function MysqlStore() {
            FROM characters c LEFT JOIN accounts a ON a.id = c.account_id WHERE c.id = ?`, [Number(id)]);
       const row = rows[0] || null;
       if (!row) return null;
-      const level = Math.max(1, Math.floor(Number(row.acc_level) || 1));
-      const exp = Math.max(0, Math.floor(Number(row.acc_exp) || 0));
+      const accLevel = Math.max(1, Math.floor(Number(row.acc_level) || 1));
+      const accExp = Math.max(0, Math.floor(Number(row.acc_exp) || 0));
       delete row.acc_level; delete row.acc_exp;
-      row.level = level;
       let data = row.data;
       let parsed = null;
       if (typeof data === "string") { try { parsed = JSON.parse(data); } catch (e) {} }
       else if (data && typeof data === "object") parsed = data;
+      const level = Math.max(accLevel, Math.floor(Number(row.level) || 1),
+        parsed ? Math.floor(Number(parsed.level) || 1) : 1);
+      const exp = Math.max(accExp, parsed ? Math.floor(Number(parsed.exp) || 0) : 0);
+      row.level = level;
       if (parsed) { parsed.level = level; parsed.exp = exp; row.data = typeof data === "string" ? JSON.stringify(parsed) : parsed; }
       return row;
     },
@@ -6019,13 +6030,30 @@ async function ensureSchema(pool) {
   // Backfill (uma vez): display_name = login; level/exp = maior char da conta.
   try {
     await pool.query("UPDATE accounts SET display_name = login WHERE display_name IS NULL");
-    await pool.query(
-      `UPDATE accounts a SET
-         a.level = (SELECT COALESCE(MAX(c.level),1) FROM characters c WHERE c.account_id = a.id),
-         a.exp = COALESCE((SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(c2.data,'$.exp')) AS UNSIGNED)
-           FROM characters c2 WHERE c2.account_id = a.id ORDER BY c2.level DESC LIMIT 1),0)
-       WHERE a.level = 1 AND a.exp = 0`);
-  } catch (e) { /* backfill best-effort */ }
+    /* Backfill idempotente em JS: a versão em SQL morria inteira quando um
+     * data blob não era JSON válido (JSON_EXTRACT aborta o UPDATE) e o
+     * catch escondia — todas as contas ficaram level=1/exp=0. Agora roda
+     * por conta, tolera data inválido e só SOBE o progresso da conta. */
+    const [accRows] = await pool.query("SELECT id, level FROM accounts");
+    for (const acc of accRows) {
+      const [chars] = await pool.query(
+        "SELECT level, data FROM characters WHERE account_id=?", [acc.id]);
+      let lvl = 1, exp = 0;
+      for (const c of chars) {
+        let d = null;
+        if (typeof c.data === "string") { try { d = JSON.parse(c.data); } catch (e) {} }
+        else if (c.data && typeof c.data === "object") d = c.data;
+        const cl = Math.max(1, Math.floor(Number(c.level) || 1),
+          Math.floor(Number(d && d.level) || 1));
+        const ce = Math.max(0, Math.floor(Number(d && d.exp) || 0));
+        if (cl > lvl) { lvl = cl; exp = ce; }
+        else if (cl === lvl && ce > exp) exp = ce;
+      }
+      if (lvl > Math.max(1, Math.floor(Number(acc.level) || 1)))
+        await pool.query("UPDATE accounts SET level=?, exp=? WHERE id=?",
+          [lvl, exp, acc.id]);
+    }
+  } catch (e) { console.error("[db] backfill level/exp da conta:", e && e.message); }
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     account_id INT UNSIGNED NOT NULL,

@@ -3,6 +3,24 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Fix CRÍTICO: nível dos personagens zerando (level 1)
+
+- O backfill de "level/exp por conta" (dc5fc64f) falhava silenciosamente
+  (JSON_EXTRACT abortava o UPDATE inteiro em data inválido e o catch
+  engolia) — todas as contas ficaram level=1/exp=0.
+- findCharacter/_applyAccountLevel injetavam o level da conta na leitura:
+  todo char lia level 1, e o save seguinte gravava 1 na coluna e no blob
+  — destruindo o progresso real (Tomio Ek 183 -> 1).
+- Fix: a injeção agora usa MAX(conta, coluna, data) — nunca rebaixa, e o
+  save seguinte auto-cura a conta (setAccountLevelExp só sobe).
+- Backfill reescrito em JS por conta: tolera data inválido, roda a cada
+  boot, grow-only. Escalares protegidos (exp/ml/gold/manaSpent/
+  totalKills/stamina) sanitizam para número no save — exp:{} legado não
+  propaga mais.
+- Reparo de dados: Tomio Ek restaurado para level 183 / exp 95.986.908
+  (snapshot_history) + sanitização de campos {} em 9 chars.
+
+---
 ## 2026-11-21 — Fix grants do painel admin + ER_CHECKREAD nos ticks
 
 - A forja do admin "parava de funcionar" porque o grant era recusado sem

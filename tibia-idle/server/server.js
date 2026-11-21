@@ -1370,6 +1370,9 @@ function prepareCharacterSave(c,body,opts){
     voc=allowed.includes(String(payload.voc))?String(payload.voc):c.voc;
     level=Math.max(1,Math.min(2000,Math.floor(Number(payload.level)||Number(body.level)||Number(c.level)||1)));
     payload.voc=voc;payload.level=level;
+    for(const numKey of ["exp","ml","manaSpent","gold","totalKills","stamina"])
+      if(payload[numKey]!==undefined)
+        payload[numKey]=Math.max(0,Math.floor(Number(payload[numKey])||0));
   }else{
     payload.voc=c.voc;
     for(const key of protectedKeys){
@@ -1377,6 +1380,12 @@ function prepareCharacterSave(c,body,opts){
       else delete payload[key];
     }
     payload.level=level;
+    // Escalares são SEMPRE número — blobs legados com valor {} (objeto)
+    // sanitizam pra 0 em vez de propagar o tipo errado no data salvo.
+    // ("kills" fica fora: é mapa slug→count legítimo.)
+    for(const numKey of ["exp","ml","manaSpent","gold","totalKills","stamina"])
+      if(payload[numKey]!==undefined)
+        payload[numKey]=Math.max(0,Math.floor(Number(payload[numKey])||0));
   }
   return {save:{
     id:Number(c.id),expectedVersion:Number(body.expected_version),voc,level,
