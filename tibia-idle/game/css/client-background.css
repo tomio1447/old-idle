@@ -17,27 +17,7 @@
     linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
   background-size: 48px 48px; pointer-events: none;
 }
-#bg-particles { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
-.bg-particle {
-  position: absolute; border-radius: 50%;
-  animation: bgFloat linear infinite; opacity: 0;
-}
-.bg-particle.fire {
-  background: radial-gradient(circle, rgba(255,180,40,.55) 0%, transparent 70%);
-  box-shadow: 0 0 12px rgba(255,140,20,.35), 0 0 30px rgba(255,100,10,.18);
-  width: 4px; height: 4px;
-}
-.bg-particle.arcane {
-  background: radial-gradient(circle, rgba(100,160,255,.50) 0%, transparent 70%);
-  box-shadow: 0 0 10px rgba(80,140,240,.30), 0 0 24px rgba(50,100,220,.16);
-  width: 3px; height: 3px;
-}
-@keyframes bgFloat {
-  0%   { transform: translateY(0) translateX(0); opacity: 0; }
-  8%   { opacity: .8; }
-  20%  { opacity: .5; }
-  100% { transform: translateY(-110vh) translateX(25px); opacity: 0; }
-}
+/* Partículas removidas (a pedido): o wallpaper aparece sem bolinhas. */
 #login-overlay {
   position: fixed; inset: 0; z-index: 1;
   /* Sem filtro escuro sobre o wallpaper (a pedido). */

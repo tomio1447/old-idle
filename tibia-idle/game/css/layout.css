@@ -5132,7 +5132,8 @@ body {
 
 /* -------------------------- login */
 #login {
-  background: radial-gradient(ellipse at center, rgba(31,34,40,.55) 0%, rgba(18,20,24,.85) 75%);
+  /* Sem véu escuro: o wallpaper Verão 2026 aparece limpo (a pedido). */
+  background: transparent;
 }
 
 #login .box {

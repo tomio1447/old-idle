@@ -1896,3 +1896,9 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   Fallen Challenger/Haunted Dragon (231), Somewhat Beatable (34),
   Spirit of Fertility (11), Angry Plant (120) e Dragon Wrath (351)
   conferidos — já estavam com as cores próprias do sprite.
+
+- **Tela de login sem véu/partículas** (a pedido): removido o
+  `radial-gradient` escuro de `#login` (layout.css) que esmaecia o
+  wallpaper Verão 2026, e removidas as "bolinhas" — `#bg-particles` +
+  spawn loop em client-background.js + CSS `.bg-particle`/`bgFloat`.
+  O background agora aparece limpo; grid sutil e label de versão mantidos.
