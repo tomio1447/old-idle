@@ -65,6 +65,7 @@ let SharedInv = null;
 try { SharedInv = require("./shared_inventory"); } catch (e) { SharedInv = null; }
 const store = require("./store");
 const rmt = require("./rmt");
+const twitch = require("./twitch");
 const mailer = require("./mailer");
 
 const PORT = parseInt(process.env.PORT || "8001", 10);
@@ -6233,6 +6234,59 @@ async function main() {
         const body = await readBody(req);
         const r = await store.redeemVoucher(db, body);
         return send(res, r.code, r.body);
+      }
+      /* ---- TWITCH OAUTH (gate social de vouchers, ex.: BUTO__PVP) ----
+       * /api/twitch/auth: popup do cliente → 302 pro authorize da Twitch.
+       * /api/twitch/callback: confirma o follow e grava accounts.social.
+       * /api/twitch/status: o cliente faz poll até `verified` ficar true. */
+      if (req.method === "GET" && url === "/api/twitch/auth") {
+        const q = new URL(req.url, "http://x").searchParams;
+        const token = String(q.get("token") || "");
+        const acc = await db.findAccountByToken(token);
+        if (!acc) return sendText(res, 401, "Sessão inválida — faça login no jogo.", "text/plain; charset=utf-8");
+        if (!twitch.configured())
+          return sendText(res, 503, twitch.pageHtml("Verificação indisponível",
+            "O servidor ainda não tem credenciais do app Twitch (TWITCH_CLIENT_ID/SECRET). Avise a administração.", false),
+            "text/html; charset=utf-8");
+        res.writeHead(302, Object.assign(hardenedHeaders(res), {
+          Location: twitch.authUrl(twitch.newState(token)) }));
+        return res.end();
+      }
+      if (req.method === "GET" && url === "/api/twitch/callback") {
+        const q = new URL(req.url, "http://x").searchParams;
+        const sessionToken = twitch.takeState(q.get("state") || "");
+        const acc = sessionToken ? await db.findAccountByToken(sessionToken) : null;
+        const html = (code, t, m, ok) => sendText(res, code, twitch.pageHtml(t, m, ok), "text/html; charset=utf-8");
+        if (!acc) return html(400, "Sessão expirada", "Refaça o login no jogo e conecte a Twitch de novo.", false);
+        if (q.get("error") || !q.get("code"))
+          return html(200, "Conexão cancelada", "Você cancelou ou a Twitch recusou a conexão. Pode fechar esta janela.", false);
+        try {
+          const tok = await twitch.exchangeCode(q.get("code"));
+          const v = await twitch.verifyFollow(tok.access_token);
+          const chan = twitch.requiredChannel();
+          const social = twitch.socialOf(acc);
+          social.twitch = {
+            id: v.id, login: v.login,
+            follows: Object.assign({}, social.twitch && social.twitch.follows, { [chan]: v.follows }),
+            at: Date.now(),
+          };
+          if (typeof db.setAccountSocial === "function") await db.setAccountSocial(acc.id, social);
+          return html(200, "Twitch conectada",
+            v.follows
+              ? "@" + v.login + " segue @" + chan + " — a verificação foi registrada. Pode fechar esta janela."
+              : "@" + v.login + " ainda não segue @" + chan + ". Siga na Twitch e tente de novo.", v.follows);
+        } catch (e) {
+          return html(502, "Falha na verificação", "Não foi possível confirmar com a Twitch agora. Tente novamente.", false);
+        }
+      }
+      if (req.method === "GET" && url === "/api/twitch/status") {
+        const q = new URL(req.url, "http://x").searchParams;
+        const acc = await db.findAccountByToken(String(q.get("token") || ""));
+        if (!acc) return send(res, 401, { ok: false, msg: "Sessão inválida" });
+        return send(res, 200, { ok: true,
+          configured: twitch.configured(), channel: twitch.requiredChannel(),
+          linked: !!twitch.linkedLogin(acc), login: twitch.linkedLogin(acc),
+          verified: twitch.verifiedChannel(acc) });
       }
       if (req.method === "GET" && url === "/api/store/history") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");

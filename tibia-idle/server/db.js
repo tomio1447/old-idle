@@ -830,6 +830,14 @@ JsonStore.prototype.accountWardrobe = function (accountId, recipeId, alternative
   this._save();
   return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters, shared), sharedInventory: shared });
 };
+/* Verificação social (OAuth Twitch) — JSON simples por conta. */
+JsonStore.prototype.setAccountSocial = function (accountId, social) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.social = social && typeof social === "object" ? social : {};
+  this._save();
+  return a;
+};
 JsonStore.prototype.setAccountCosmetics = function (accountId, cosmetics) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
@@ -2905,7 +2913,7 @@ async function MysqlStore() {
   function hydrateAccount(row) {
     if (!row) return null;
     const out = Object.assign({}, row);
-    for (const [col, key] of [["missions", "missions"], ["missions_done", "missionsDone"], ["tutorial", "tutorial"], ["cosmetics", "cosmetics"]]) {
+    for (const [col, key] of [["missions", "missions"], ["missions_done", "missionsDone"], ["tutorial", "tutorial"], ["cosmetics", "cosmetics"], ["social", "social"]]) {
       let v = row[col];
       if (typeof v === "string") {
         try { v = JSON.parse(v); } catch (e) { v = {}; }
@@ -3110,6 +3118,10 @@ async function MysqlStore() {
         return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters, shared), sharedInventory: shared });
       } catch (error) { await conn.rollback(); throw error; }
       finally { conn.release(); }
+    },
+    async setAccountSocial(accountId, social) {
+      await this.run("UPDATE accounts SET social=? WHERE id=?",
+        [JSON.stringify(social && typeof social === "object" ? social : {}), Number(accountId)]);
     },
     async setAccountCosmetics(accountId, cosmetics) {
       const conn = await pool.getConnection(), W = require("./wardrobe");
@@ -5966,6 +5978,9 @@ async function ensureSchema(pool) {
     "ADD COLUMN display_name VARCHAR(24) DEFAULT NULL",
     "ADD COLUMN level INT UNSIGNED NOT NULL DEFAULT 1",
     "ADD COLUMN exp BIGINT UNSIGNED NOT NULL DEFAULT 0",
+    /* Verificação social (OAuth Twitch: id/login/follows por canal) —
+     * gate do voucher do streamer; ver server/twitch.js. */
+    "ADD COLUMN social MEDIUMTEXT NULL",
   ]) { try { await pool.query("ALTER TABLE accounts " + col); } catch (e) { /* já existe */ } }
   try { await pool.query("ALTER TABLE accounts ADD UNIQUE KEY uq_accounts_display_name (display_name)"); }
   catch (e) { /* já existe */ }

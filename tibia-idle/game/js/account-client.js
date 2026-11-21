@@ -2761,6 +2761,13 @@ async function storeAdminSummary(token) {
   const r = await _api("GET", "/api/store/admin", null, token);
   return r.data || { ok: false, msg: "Falha ao carregar o faturamento" };
 }
+/* Gate social do voucher de streamer: poll do status da verificação Twitch
+ * enquanto o pop-up OAuth está aberto (server/twitch.js). */
+async function storeTwitchStatus(token) {
+  const r = await _api("GET", "/api/twitch/status?token=" + encodeURIComponent(token), null, token);
+  return r.data || { ok: false };
+}
+
 async function storeRedeemVoucher(token, code) {
   const r = await _api("POST", "/api/store/voucher", { token, code });
   if (r.data && r.data.ok) {

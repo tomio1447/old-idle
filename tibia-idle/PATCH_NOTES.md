@@ -3,6 +3,25 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Voucher de streamer exige follow real na Twitch (OAuth)
+
+- Novo `server/twitch.js`: fluxo OAuth completo — `/api/twitch/auth` redireciona
+  pro authorize da Twitch (escopo `user:read:follows`), `/api/twitch/callback`
+  confirma via `GET /helix/channels/followed` se o jogador segue o canal e grava
+  em `accounts.social.twitch`, `/api/twitch/status` expõe `linked/verified` pro
+  poll do cliente. Sem precisar de autorização do streamer.
+- Voucher `BUTO__PVP` ganha `twitchFollow: "buto_pvp"` — `redeemVoucher`
+  responde `needTwitch` ANTES do claim (voucher não é consumido).
+- Cliente: modal de gate "Siga o streamer para resgatar" com botão Conectar
+  com Twitch (pop-up OAuth), poll de status a cada 2,5s e re-resgate
+  automático ao confirmar o follow; "Verificar novamente" repete o OAuth.
+- `accounts.social` (MEDIUMTEXT) migrado no boot + `setAccountSocial` nos
+  dois stores; hidratação em `hydrateAccount`.
+- Requer env: `TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET` (app em
+  dev.twitch.tv, Redirect URL = `TWITCH_REDIRECT_URI`) — sem credenciais o
+  gate avisa que a verificação está indisponível.
+
+---
 ## 2026-11-20 — Fix: espaço em branco no modal da Wheel of Destiny
 
 - `.wod-stage` (palco da roda) não tinha `flex-grow` — encolhia para o

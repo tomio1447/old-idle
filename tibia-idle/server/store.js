@@ -8,6 +8,7 @@
 
 const crypto = require("crypto");
 const https = require("https");
+const twitch = require("./twitch");
 
 const MP_ACCESS_TOKEN = String(process.env.MP_ACCESS_TOKEN || "").trim();
 const MP_PUBLIC_KEY = String(process.env.MP_PUBLIC_KEY || "").trim();
@@ -456,8 +457,11 @@ const VOUCHERS = {
     label: "3 dias de VIP + montaria Roaring Lion + 250 NT Tibia Coins" },
   /* Cupom de divulgação do streamer buto__pvp — além das recompensas,
    * `modal` instrui o cliente a abrir o pop-up de agradecimento com os
-   * links sociais do criador (render em store-ui.js). */
+   * links sociais do criador (render em store-ui.js). `twitchFollow`
+   * exige verificação OAuth real: o jogador precisa seguir o canal na
+   * Twitch antes do resgate (server/twitch.js). */
   BUTO__PVP: { coinsNt: 250, vipDays: 3, mount: "shock-head",
+    twitchFollow: "buto_pvp",
     label: "3 dias de VIP + montaria Shock Head + 250 NT Tibia Coins",
     modal: {
       title: "Obrigado por apoiar nosso streamer!",
@@ -494,6 +498,23 @@ async function redeemVoucher(db, body) {
     const st = await db.voucherStateGet(code);
     if (st && st.deleted) return { code: 400, body: { ok: false, msg: "Voucher inválido" } };
     if (st && st.paused) return { code: 400, body: { ok: false, msg: "Voucher pausado temporariamente" } };
+  }
+
+  /* Gate social (OAuth Twitch): o voucher pode exigir seguir um canal —
+   * a verificação real fica em accounts.social.twitch, gravada pelo fluxo
+   * /api/twitch/auth + /api/twitch/callback (server/twitch.js). Falhar o
+   * gate NÃO consome o voucher (checado antes do voucherClaim).
+   * `configured:false` avisa o cliente que faltam credenciais do app. */
+  if (v.twitchFollow) {
+    const chan = String(v.twitchFollow).toLowerCase();
+    const tw = twitch.socialOf(acc).twitch;
+    const follows = !!(tw && tw.follows && tw.follows[chan] === true);
+    if (!follows) {
+      return { code: 200, body: { ok: false, needTwitch: true, channel: chan,
+        configured: twitch.configured(),
+        linked: !!(tw && tw.login), login: tw && tw.login ? String(tw.login) : "",
+        msg: "Conecte sua Twitch e siga @" + chan + " para resgatar este voucher." } };
+    }
   }
 
   // Reserva o resgate ANTES de creditar: o UNIQUE (code, account_id) decide
