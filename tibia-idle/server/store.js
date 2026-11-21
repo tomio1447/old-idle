@@ -512,7 +512,7 @@ function voucherRewardsPreview(v) {
   if (v.outfit) {
     const okey = cosmeticCanonical(v.outfit);
     const nome = cosmeticCatalog().outfits[okey] ? cosmeticCatalog().outfits[okey].nome : String(v.outfit);
-    rewards.push({ kind: "outfit", sprite: okey + "-f", label: "Outfit " + nome + " + addons 1 e 2" });
+    rewards.push({ kind: "outfit", sprite: okey + "-m", label: "Outfit " + nome + " + addons 1 e 2" });
   }
   if (v.skillBoostHours)
     rewards.push({ kind: "boost", label: "+" + Math.floor(Number(v.skillBoostHours)) + "h de skill boost +50%" });

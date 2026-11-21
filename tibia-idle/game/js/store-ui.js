@@ -826,9 +826,15 @@ function voucherRewardIcon(rw) {
     return `<img src="assets/ui/coins/tibia-coins.gif" style="width:30px;height:30px;image-rendering:pixelated" alt="">`;
   if (kind === "outfit") {
     const id = String(rw.sprite || rw.outfit || "");
-    return `<div class="voucher-rw-sprite" style="width:56px;height:56px;` +
+    const data = (typeof APPEARANCE_DATA !== "undefined" ? APPEARANCE_DATA
+      : (typeof window !== "undefined" && window.APPEARANCES) || {});
+    const o = (data.outfits || []).find((x) => String(x.id) === id) || {};
+    const cw = Number(o.cw) || 64, ch = Number(o.ch) || 64;
+    const cols = Number(o.cols) || 3, rows = Number(o.rows) || 4;
+    const box = 56;
+    return `<div class="voucher-rw-sprite" style="width:${box}px;height:${box}px;` +
       `background-image:url('assets/appearance/outfit/${id}.base.png');` +
-      `background-size:cover;background-position:center;` +
+      `background-size:${cw * cols}px ${ch * rows}px;background-position:0 0;` +
       `background-repeat:no-repeat;image-rendering:pixelated"></div>`;
   }
   if (kind === "boost")
