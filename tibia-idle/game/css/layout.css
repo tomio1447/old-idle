@@ -3005,6 +3005,9 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   font: 800 10px/14px Verdana, sans-serif;
   vertical-align: middle;
 }
+/* o display inline-flex vence o [hidden] do UA — sem isso o "!" aparecia
+ * em TODAS as abas independente do atributo */
+.chard-tab-alert[hidden] { display: none; }
 .chard-char-card:hover:not(:disabled) { background: #26221a; border-color: #6b6455; }
 .chard-char-card.is-current { border-color: var(--gold, #d4af37); background: #35301f; cursor: default; }
 .chard-char-portrait {
