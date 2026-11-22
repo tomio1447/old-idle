@@ -1917,3 +1917,10 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   (ficam só CONFIG e Cidade), os itens de info não encolhem e a faixa
   rola na horizontal. `rebuildMobileMenuActions` passa a listar os
   botões descendentes da topbar — o sheet Menu estava vazio de ações.
+
+- **4 monstros recoloridos com dados oficiais**: vibrant-phantom
+  (1298: 85,85,88,91), glooth-bandit (129: 115,80,114,114) e
+  glooth-brigand (137: 114,114,110,114) com lookHead/Body/Legs/Feet do
+  canary .lua; true-feverbloom-asura (1068: 62,61,114,15 — fora do dump
+  15.30, derivada pixel-a-pixel do sprite oficial da wiki: pele verde,
+  cabelo preto, flores rosa).

@@ -204,6 +204,14 @@ CANARY_COLORS = {
     "acolyte-of-the-cult": (95, 100, 100, 19),
     "adept-of-the-cult": (95, 94, 94, 19),
     "enlightened-of-the-cult": (0, 0, 0, 0),
+    # Glooth (Oramond): looktypes 129/137 com cores do canary .lua.
+    "glooth-bandit":  (115, 80, 114, 114),
+    "glooth-brigand": (114, 114, 110, 114),
+    # Soul War (Furious Crater): looktype 1298, cores do canary .lua.
+    "vibrant-phantom": (85, 85, 88, 91),
+    # True Feverbloom Asura (15.30, fora do dump): cores derivadas do
+    # sprite oficial da wiki (verde 62/61, preto 114, flores rosa 15).
+    "true-feverbloom-asura": (62, 61, 114, 15),
 }
 
 # monstros com looktype "sem mascara" que ainda assim devem ser regerados com
@@ -247,7 +255,7 @@ CANARY_ADDONS = {"the-first-dragon": 3, "tazhadur": 3, "kalyassa": 3,
                   "werelion": 3,
                   "dawnfire-asura": 1, "midnight-asura": 1, "frost-flower-asura": 3,
                   "true-dawnfire-asura": 1, "true-midnight-asura": 1,
-                  "true-frost-flower-asura": 0,
+                  "true-frost-flower-asura": 0, "true-feverbloom-asura": 0,
                   "bashmu": 3, "juvenile-bashmu": 0,
                   "grand-commander-soeren": 2,
                   "preceptor-lazare": 0,
