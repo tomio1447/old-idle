@@ -498,7 +498,15 @@ function accountSaveInstance(token,state){
     if(r.code===409){
       accountInstanceApply(r.data.instance||null);
       try{window.dispatchEvent(new CustomEvent("tibia-idle-instance-conflict"));}catch(e){}
-      if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
+      /* Create recusado porque a row ANTIGA segue 'active' (o end anterior
+       * apanhou 409 e foi abandonado): sem encerrá-la, todo create seguinte
+       * apanha 409 para sempre — ping-pong de ~45s até o watchdog. O apply
+       * acima vinculou a row velha com a version fresca; encerra-a com o
+       * end (que agora retenta em conflito) e a próxima geração cria limpo. */
+      if(isCreate&&r.data.instance&&String(r.data.instance.status||"")==="active"&&
+         typeof accountEndInstance==="function")
+        accountEndInstance(token,"replaced-stale").catch(()=>{});
+      else if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
     }else if(isCreate&&r.code&&r.code!==0){
       // Erro definitivo no create (party estrangeira, requisito, estado
       // inválido): retry não resolve — o loop de confirmação aborta com a
@@ -1759,25 +1767,33 @@ function accountRefreshInstance(token){
 function accountEndInstance(token,reason){
   ACCOUNT_INSTANCE_EPOCH+=1;const endEpoch=ACCOUNT_INSTANCE_EPOCH;ACCOUNT_INSTANCE_CAN_CREATE=false;
   return accountQueueInstance(async()=>{
-    if(!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return true;
-    if(!accountLeaseAllowsSimulation())return false;
-    const r=await _api("POST","/api/instance/end",Object.assign({token,
-      char_id:typeof sessionCharId==="function"?sessionCharId():null,
-      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version,reason:reason||"finished"},accountLeaseFields()));
-    if(r.data.ok){
-      // O tick final do end avança save_version; sem este merge o PUT seguinte
-      // sai com expected_version obsoleto e gera 409 rotineiro no templo.
-      if(r.data.characters&&r.data.characters.length)accountMergeCharacterCache(r.data.characters);
-      const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
-      if(newerGeneration)ACCOUNT_INSTANCE_CAN_CREATE=true;return true;}
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);
-    if(r.code===409){
-      accountInstanceApply(r.data.instance||null);
-      // Mesma regra do ok acima: se uma geração nova já começou (boss entry),
-      // o create enfileirado não pode morrer com CAN_CREATE zerado por este
-      // apply — só restaura quando nada ativo foi reatado.
-      if(ACCOUNT_INSTANCE_EPOCH!==endEpoch&&ACCOUNT_INSTANCE.status!=="active")
-        ACCOUNT_INSTANCE_CAN_CREATE=true;
+    /* Retry em 409: um tick pode bumpar a version entre o último apply e
+     * este end — abandonar no 1º conflito deixava a row ANTIGA 'active' no
+     * servidor, e ela recusava TODOS os creates seguintes com 409 (arena
+     * órfã → watchdog 45s). O apply traz a version fresca; tenta de novo. */
+    for(let attempt=0;attempt<4;attempt++){
+      if(!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return true;
+      if(!accountLeaseAllowsSimulation())return false;
+      const r=await _api("POST","/api/instance/end",Object.assign({token,
+        char_id:typeof sessionCharId==="function"?sessionCharId():null,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version,reason:reason||"finished"},accountLeaseFields()));
+      if(r.data.ok){
+        // O tick final do end avança save_version; sem este merge o PUT seguinte
+        // sai com expected_version obsoleto e gera 409 rotineiro no templo.
+        if(r.data.characters&&r.data.characters.length)accountMergeCharacterCache(r.data.characters);
+        const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
+        if(newerGeneration)ACCOUNT_INSTANCE_CAN_CREATE=true;return true;}
+      if(r.code===423){accountLeaseMarkLost(r.data.msg);return false;}
+      if(r.code===409){
+        accountInstanceApply(r.data.instance||null);
+        // Mesma regra do ok acima: se uma geração nova já começou (boss entry),
+        // o create enfileirado não pode morrer com CAN_CREATE zerado por este
+        // apply — só restaura quando nada ativo foi reatado.
+        if(ACCOUNT_INSTANCE_EPOCH!==endEpoch&&ACCOUNT_INSTANCE.status!=="active")
+          ACCOUNT_INSTANCE_CAN_CREATE=true;
+        continue;
+      }
+      return false;
     }
     return false;
   });

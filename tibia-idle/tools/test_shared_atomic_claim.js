@@ -93,6 +93,12 @@ must(equipBody.includes("attempt<4") && equipBody.includes("Number(current.versi
   "equipInstanceItem sem retry com version fresca");
 must(clientSource.includes("INSTANCE_VERSION_CONFLICT") && /accountEquipItem[\s\S]*?attempt<2/.test(clientSource),
   "cliente sem retry único de INSTANCE_VERSION_CONFLICT no equip");
+// End de instância: abandonar no 1º 409 deixava a row 'active' — todo create
+// seguinte apanhava 409 até o watchdog de 45s ("servidor não confirmou").
+must(/accountEndInstance[\s\S]*?attempt<4/.test(clientSource),
+  "accountEndInstance sem retry de INSTANCE_VERSION_CONFLICT");
+must(clientSource.includes('"replaced-stale"'),
+  "create não encerra a row stale ativa que bloqueia novas instâncias");
 
 // ------------------------------------------------------------- funcionais
 async function main() {
