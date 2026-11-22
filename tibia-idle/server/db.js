@@ -1357,6 +1357,21 @@ JsonStore.prototype.setAccountSharedInventory = function (accountId, s) {
   this._save();
   return a;
 };
+/* read-modify-write atômico do shared (paridade com o MySQL: lá é um
+ * SELECT FOR UPDATE + UPDATE na mesma tx). No JsonStore tudo é síncrono —
+ * o mutator roda direto no objeto vivo e persiste uma vez. Retorna o
+ * shared resultante (ou null se o mutator abortar com false). */
+JsonStore.prototype.accountSharedInventoryMutate = function (accountId, mutator) {
+  const s = this.accountSharedInventory(accountId);
+  if (!s) return null;
+  /* Mesmo contrato do MySQL: muta uma CÓPIA — retornar false aborta sem
+   * efeito (sem clone, o mutator alteraria a referência viva da conta). */
+  const work = JSON.parse(JSON.stringify(s));
+  const out = mutator(work);
+  if (out === false) return null;
+  this.setAccountSharedInventory(accountId, work);
+  return work;
+};
 JsonStore.prototype.setAccountGold = function (accountId, gold) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
@@ -3290,6 +3305,45 @@ async function MysqlStore() {
         [JSON.stringify(s || empty), Number(accountId)]);
       return this.findAccountById(accountId);
     },
+    /* read-modify-write ATÔMICO do shared_inventory: SELECT FOR UPDATE +
+     * UPDATE na mesma tx. O padrão antigo (accountSharedInventory → muta →
+     * setAccountSharedInventory solto) era last-writer-wins contra o write
+     * do tick da instância — o blob velho sobrescrevia claim/equip (reward
+     * "voltava" para o baú, item equipado sumia). O mutator recebe o shared
+     * VIVO e aplica só o delta dele; retornar false aborta sem gravar. */
+    async accountSharedInventoryMutate(accountId, mutator) {
+      for (;;) {
+        const conn = await pool.getConnection();
+        let retry = false;
+        try {
+          await conn.beginTransaction();
+          const [rows] = await conn.query(
+            "SELECT shared_inventory FROM accounts WHERE id = ? FOR UPDATE", [Number(accountId)]);
+          let s = rows[0] ? rows[0].shared_inventory : null;
+          if (typeof s === "string") { try { s = JSON.parse(s); } catch (e) { s = null; } }
+          const needsBootstrap = !s || s.v !== 1 || !s.legacyPouchDone || !s.forgeResourcesDone ||
+            !s.stashSharedDone || !s.staminaSharedDone || !s.charmsSharedDone;
+          if (needsBootstrap) {
+            // Migrações lazy vivem em accountSharedInventory — roda fora da
+            // tx e tenta de novo (caminho executado uma única vez por conta).
+            await conn.rollback(); retry = true;
+          } else {
+            s = SharedInv ? SharedInv.normalizeSharedInventory(s) : s;
+            const out = await mutator(s);
+            if (out === false) { await conn.rollback(); return null; }
+            await conn.query("UPDATE accounts SET shared_inventory = ? WHERE id = ?",
+              [JSON.stringify(s), Number(accountId)]);
+            await conn.commit();
+            return s;
+          }
+        } catch (error) {
+          try { await conn.rollback(); } catch (e) {}
+          throw error;
+        } finally { conn.release(); }
+        if (!retry) return null;
+        await this.accountSharedInventory(accountId);
+      }
+    },
     async updateCoins(id, coins) {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
       return this.findAccountById(id);
@@ -3818,7 +3872,11 @@ async function MysqlStore() {
         if (rows.some((row) => ["hunt", "boss"].includes(row.zone))) {
           await conn.rollback(); return { ok: false, error: "TRAINING_IN_COMBAT" };
         }
-        const [accounts] = await conn.query("SELECT vip_until FROM accounts WHERE id=?", [Number(accountId)]);
+        /* FOR UPDATE na row da conta: a tx escreve shared_inventory no fim —
+         * sem o lock, um accountSharedInventoryMutate concorrente (claim de
+         * reward/equip) entre o read e o write era sobrescrito pelo blob
+         * velho (reward "voltava", item sumia). */
+        const [accounts] = await conn.query("SELECT vip_until FROM accounts WHERE id=? FOR UPDATE", [Number(accountId)]);
         /* Stamina da CONTA: pool (shared.stamina) espelhado em cada p antes
          * do advance — o regen interno materializa a janela uma única vez
          * (1s/s ativo, 0,5 ocioso) e a extração devolve com carimbo. */
@@ -4083,20 +4141,58 @@ async function MysqlStore() {
         await conn.commit();return {ok:true,instance:saved[0]};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
     },
-    async instancePatchState(ownerAccountId,requesterAccountId,instanceId,expectedVersion,patchState,lease){
-      const conn=await pool.getConnection();
-      try{await conn.beginTransaction();
-        if(!await lockValidLease(conn,requesterAccountId,lease)){await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};}
-        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(ownerAccountId)]),row=rows[0];
-        if(!row||row.status!=="active"){await conn.rollback();return {ok:false,error:"INSTANCE_NOT_ACTIVE"};}
-        if(String(row.instance_id)!==String(instanceId||"")||Number(row.version)!==Number(expectedVersion)){
-          await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};}
-        const next=patchState(row.state);if(!next){await conn.rollback();return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};}
-        await conn.query("UPDATE account_instances SET state=?,version=version+1,updated_at=? WHERE account_id=?",
-          [next,new Date(lease?lease.now:Date.now()),Number(ownerAccountId)]);
-        const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(ownerAccountId)]);
-        await conn.commit();return {ok:true,instance:saved[0]};
-      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    async instancePatchState(ownerAccountId,requesterAccountId,instanceId,expectedVersion,patchState,lease,opts){
+      /* Caminho quente (batalha PvP / world boss): o descritor vivo está em
+       * memória — o provider (instanceHotAuthApi, injetado pelo server.js)
+       * o entrega e o mutex por conta-dono serializa com os ticks. Sem isso
+       * o patch parseava+serializava ~5MB segurando a row lock enquanto ~15
+       * contas tickavam a mesma row — collect/equip ficavam atrás na fila
+       * ("servidor trava"). A checagem de versão não se aplica no hit: o
+       * descritor vivo É a autoridade atual — quem valida é a própria
+       * mutação contra o estado real. */
+      const hotApi=opts&&"hotAuth"in opts?opts.hotAuth
+        :(typeof this.instanceHotAuthApi==="function"?this.instanceHotAuthApi():null);
+      const serialize=(opts&&opts.serialize)||this.instanceAuthSerialize||((key,fn)=>fn());
+      const runPatch=async()=>{
+        const conn=await pool.getConnection();
+        try{await conn.beginTransaction();
+          if(!await lockValidLease(conn,requesterAccountId,lease)){await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};}
+          if(hotApi){
+            const [rows]=await conn.query(
+              "SELECT account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,party_version,active_character_id,saved_at,started_at,worker_cursor_at,worker_total_ms,ended_at,terminal_reason FROM account_instances WHERE account_id=?",
+              [Number(ownerAccountId)]),row=rows[0];
+            if(!row||row.status!=="active"){await conn.rollback();return {ok:false,error:"INSTANCE_NOT_ACTIVE"};}
+            if(String(row.instance_id)!==String(instanceId||"")){
+              await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};}
+            /* Gate: só entra no caminho quente se a instância JÁ está no
+             * cache (world boss/pvp são semeados no create/1º tick). Sem o
+             * peek, hotApi.get SEMEARIA uma hunt/boss normal — o patch
+             * ficaria só em memória, sem tick para persistir = perda. */
+            if(typeof hotApi.peek!=="function"||hotApi.peek(row)){
+              const hot=await hotApi.get(row,conn);
+              if(hot){
+                const next=patchState(hot.descriptor);
+                if(!next){await conn.rollback();return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:Object.assign({},row,{state:hot.descriptor})};}
+                hot.descriptor=typeof next==="string"?JSON.parse(next):next;
+                hot.dirty=true;hot.savedAt=0;
+                await conn.commit();
+                return {ok:true,instance:Object.assign({},row,{state:hot.descriptor})};
+              }
+            }
+            // Sem cache vivo (hunt/boss normal): caminho da row.
+          }
+          const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(ownerAccountId)]),row=rows[0];
+          if(!row||row.status!=="active"){await conn.rollback();return {ok:false,error:"INSTANCE_NOT_ACTIVE"};}
+          if(String(row.instance_id)!==String(instanceId||"")||Number(row.version)!==Number(expectedVersion)){
+            await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};}
+          const next=patchState(row.state);if(!next){await conn.rollback();return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};}
+          await conn.query("UPDATE account_instances SET state=?,version=version+1,updated_at=? WHERE account_id=?",
+            [next,new Date(lease?lease.now:Date.now()),Number(ownerAccountId)]);
+          const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(ownerAccountId)]);
+          await conn.commit();return {ok:true,instance:saved[0]};
+        }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+      };
+      return hotApi?serialize(Number(ownerAccountId),runPatch):runPatch();
     },
     async instanceWorkerCandidates(limit){
       const rows=await this.query(
@@ -4148,7 +4244,7 @@ async function MysqlStore() {
         if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
-            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
+            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
             const aid=acctRows[0]?Number(acctRows[0].account_id):null;if(!aid)continue;
             if(aid!==Number(accountId)){
               const [instRows]=await conn.query(
@@ -4182,7 +4278,7 @@ async function MysqlStore() {
           const tk=projection&&projection.taskKills;
           if(!tk||typeof tk!=="object")continue;
           try{
-            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
+            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
             const aid=accRows[0]&&Number(accRows[0].account_id);
             if(aid)await this.guildCreditKills(aid,tk,conn);
           }catch(e){console.error("[guild] credit kills:",e&&e.message);}
@@ -4235,16 +4331,49 @@ async function MysqlStore() {
         if(elapsed<50){await conn.commit();return {ok:true,
           instance:hot?Object.assign({},row,{state:hot.descriptor}):row,characters:[],elapsed:0};}
         const advanced=advanceState(hot?hot.descriptor:row.state,elapsed,now,hot||undefined),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
-        next.state=await syncBlessWallets(conn,next.state);
         const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
+        /* Caminho quente: a cauda pesada (locks FOR UPDATE em characters/
+         * accounts + writes por projeção) roda SÓ quando há o que persistir
+         * — terminal, pouch/forge sujos, ou o checkpoint do blob a cada
+         * persistMs. World boss: ~15 contas tickando a MESMA row antes
+         * seguravam ~60 locks por ~300ms cada — todo clique (claim/equip/
+         * save) esperava na fila ("servidor trava"). Entre persists o tick
+         * só avança o descritor vivo + move o cursor. taskKills das janelas
+         * puladas acumulam no `hot` e entram no próximo persist. */
+        const persistMs=Number(hotApi&&hotApi.persistMs)||4000;
+        const heavy=!hot||!!next.terminalReason||dirty.pouch.size>0||dirty.forge.size>0||
+          (now-(Number(hot.savedAt)||0))>=persistMs||hot.dirty===true;
+        if(hot){
+          if(hot.taskKills===undefined)hot.taskKills=null;
+          if(!heavy){
+            for(const projection of next.characters||[]){
+              const tk=projection&&projection.taskKills;
+              if(!tk||typeof tk!=="object")continue;
+              const acc=hot.taskKills||(hot.taskKills=new Map());
+              const cur=acc.get(Number(projection.id))||{};
+              for(const k of Object.keys(tk))cur[k]=(Number(cur[k])||0)+(Number(tk[k])||0);
+              acc.set(Number(projection.id),cur);
+            }
+          }else if(hot.taskKills){
+            for(const projection of next.characters||[]){
+              const acc=hot.taskKills.get(Number(projection.id));
+              if(!acc)continue;
+              const tk=projection.taskKills&&typeof projection.taskKills==="object"?projection.taskKills:{};
+              for(const k of Object.keys(acc))tk[k]=(Number(tk[k])||0)+(Number(acc[k])||0);
+              projection.taskKills=tk;
+            }
+            hot.taskKills=null;
+          }
+        }
+        if(heavy)next.state=await syncBlessWallets(conn,next.state);
         // Inventário da conta: no tick TERMINAL, extrai bag/lootPouch/depot dos
         // personagens para accounts.shared_inventory e espelha o shared no data
         // salvo de cada um (containers são da conta, não do personagem).
         const sharedByAcc=new Map(),sharedMirror=new Map();
-        if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
+        if(heavy&&(next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
-            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
+            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
             const aid=acctRows[0]?Number(acctRows[0].account_id):null;if(!aid)continue;
             if(aid!==Number(accountId)){
               // Convidado: preserva se a conta tiver OUTRA instância ativa
@@ -4270,18 +4399,18 @@ async function MysqlStore() {
             }
           }
         }
-        for(const projection of next.characters||[])await conn.query(
+        if(heavy)for(const projection of next.characters||[])await conn.query(
           `UPDATE characters SET data=?,level=?,voc=?,hp=?,mp=?,max_hp=?,max_mp=?,save_version=save_version+1
            WHERE id=?`,
           [sharedMirror.get(Number(projection.id))||projection.data,projection.level,projection.voc,projection.hp,projection.mp,
            projection.max_hp,projection.max_mp,Number(projection.id)]);
         // Guild tasks: o engine emite taskKills por projeção (delta da
         // janela) — credita nas tasks do dia da conta, mesma transação.
-        for(const projection of next.characters||[]){
+        if(heavy)for(const projection of next.characters||[]){
           const tk=projection&&projection.taskKills;
           if(!tk||typeof tk!=="object")continue;
           try{
-            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
+            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
             const aid=accRows[0]&&Number(accRows[0].account_id);
             if(aid)await this.guildCreditKills(aid,tk,conn);
           }catch(e){console.error("[guild] credit kills:",e&&e.message);}
@@ -4290,8 +4419,8 @@ async function MysqlStore() {
           await conn.query("UPDATE accounts SET shared_inventory=? WHERE id=?",[JSON.stringify(shared),aid]);
         // Gold é por conta: propaga o saldo autoritativo para accounts.gold.
         const walletByAcc=new Map();
-        for(const projection of next.characters||[]){
-          const [chars]=await conn.query("SELECT account_id FROM characters WHERE id=? FOR UPDATE",[Number(projection.id)]);
+        if(heavy)for(const projection of next.characters||[]){
+          const [chars]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
           if(!chars[0])continue;
           let data={};try{data=typeof projection.data==="string"?JSON.parse(projection.data):(projection.data||{});}catch(e){}
           walletByAcc.set(Number(chars[0].account_id),Math.max(0,Math.floor(Number(data.gold)||0)));
@@ -4310,9 +4439,9 @@ async function MysqlStore() {
            * fim) — os ~5MB deixam de circular a cada tick de cada cliente.
            * Entre persists só o cursor avança (sem bump de version: o cliente
            * deixa de tomar VERSION_CONFLICT a cada tick alheio). */
-          const persistMs=Number(hotApi.persistMs)||4000;
-          const persist=!!next.terminalReason||(now-(Number(hot.savedAt)||0))>=persistMs;
+          const persist=!!next.terminalReason||(now-(Number(hot.savedAt)||0))>=persistMs||hot.dirty===true;
           if(persist){
+            hot.dirty=false;
             const str=typeof next.state==="string"?next.state:JSON.stringify(next.state);
             /* CAS por version: sem FOR UPDATE, uma escrita externa (checkpoint,
              * patch) podia commitar entre a leitura da head e este UPDATE.
@@ -4340,7 +4469,7 @@ async function MysqlStore() {
             ended_at:next.terminalReason?new Date(now):row.ended_at,
             state:hot.descriptor});
           const ids=(next.characters||[]).map((p)=>Number(p.id));let characters=[];
-          if(ids.length){const marks=ids.map(()=>"?").join(",");[characters]=await conn.query(
+          if(heavy&&ids.length){const marks=ids.map(()=>"?").join(",");[characters]=await conn.query(
             `SELECT * FROM characters WHERE id IN (${marks})`,ids);}
           await conn.commit();return {ok:true,instance:saved,characters,elapsed,terminalReason:next.terminalReason||null};
         }

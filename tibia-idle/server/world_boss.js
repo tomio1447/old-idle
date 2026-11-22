@@ -575,19 +575,27 @@ function createWorldBossController(opts) {
       const fixedTarget = chars.find((c) => !c.dead) || null;
       let shared = null;
       if (typeof db.accountSharedInventory === "function") {
-        try { shared = await db.accountSharedInventory(accountId); } catch (e) { shared = null; }
-      }
-      if (shared) {
-        if (crystalBoss) {
-          topUpRewardBundle(shared, bundleId, MAJOR_CRYSTAL_TOKEN,
-            MAJOR_CRYSTAL_PER_ACCOUNT * chars.length, source);
-        }
-        for (const reward of fixedLoot) {
-          topUpRewardBundle(shared, bundleId, reward.item, reward.count, source);
-        }
-        if (typeof db.setAccountSharedInventory === "function") {
-          try { await db.setAccountSharedInventory(accountId, shared); }
-          catch (e) { console.error("[world-boss] shared reward account=" + accountId, e && e.message); }
+        /* Top-up no bundle dentro da tx atômica (FOR UPDATE) — o write solto
+         * do blob clobberava claims/mutations concorrentes. */
+        const topUp = (s) => {
+          if (crystalBoss) {
+            topUpRewardBundle(s, bundleId, MAJOR_CRYSTAL_TOKEN,
+              MAJOR_CRYSTAL_PER_ACCOUNT * chars.length, source);
+          }
+          for (const reward of fixedLoot) {
+            topUpRewardBundle(s, bundleId, reward.item, reward.count, source);
+          }
+        };
+        if (typeof db.accountSharedInventoryMutate === "function") {
+          try { shared = await db.accountSharedInventoryMutate(accountId, topUp); }
+          catch (e) { shared = null; console.error("[world-boss] shared reward account=" + accountId, e && e.message); }
+        } else {
+          try {
+            shared = await db.accountSharedInventory(accountId);
+            topUp(shared);
+            if (typeof db.setAccountSharedInventory === "function")
+              await db.setAccountSharedInventory(accountId, shared);
+          } catch (e) { console.error("[world-boss] shared reward account=" + accountId, e && e.message); }
         }
       }
       for (const target of chars) {

@@ -1332,10 +1332,17 @@ async function loadCharacter(db, token, id) {
     // Stamina é DA CONTA: materializa o tempo ocioso (0,5s/s) no pool e
     // persiste; o apply espelha o pool no personagem (todos compartilham).
     if (SharedInv && typeof db.accountSharedInventory === "function") {
-      sharedInventory = await db.accountSharedInventory(acc.id);
-      SharedInv.regenSharedStamina(sharedInventory, Date.now(), 0.5, parsed.stamina);
-      if (typeof db.setAccountSharedInventory === "function")
-        await db.setAccountSharedInventory(acc.id, sharedInventory);
+      if (typeof db.accountSharedInventoryMutate === "function") {
+        sharedInventory = await db.accountSharedInventoryMutate(acc.id, (s) => {
+          SharedInv.regenSharedStamina(s, Date.now(), 0.5, parsed.stamina);
+        });
+      }
+      if (!sharedInventory) {
+        sharedInventory = await db.accountSharedInventory(acc.id);
+        SharedInv.regenSharedStamina(sharedInventory, Date.now(), 0.5, parsed.stamina);
+        if (typeof db.setAccountSharedInventory === "function")
+          await db.setAccountSharedInventory(acc.id, sharedInventory);
+      }
       SharedInv.applySharedToPlayer(parsed, sharedInventory);
       SharedInv.applyAccountMissionsToPlayer(parsed, acc);
       require("./wardrobe").applyToPlayer(parsed, acc);
@@ -1518,35 +1525,99 @@ async function enforceAuthoritativeProgress(db,accountId,prepared){
  * shared de volta no save do personagem (mirror). Em save COMUM (cidade),
  * bag/depot/itemInstances vêm do cliente (o PUT é o canal de persistência
  * do depot), mas lootPouch/rewardChest permanecem do shared (server-owned). */
-async function splitSharedInventory(db, acc, p, authoritative) {
+/* Remove do shared VIVO só o que um claim tirou do chest (nunca sobrescreve
+ * o baú com a cópia do personagem: um bundle entregue por outra extração
+ * concorrente não pode ser derrubado). removeBundleIds = pacotes que o
+ * claim esvaziou e eliminou no descritor. */
+function chestRemovalApply(shared, removal) {
+  if (!shared || !removal) return;
+  shared.rewardChest = shared.rewardChest && typeof shared.rewardChest === "object" &&
+    !Array.isArray(shared.rewardChest) ? shared.rewardChest : {};
+  for (const slug of Object.keys(removal.items || {})) {
+    const n = Math.max(0, (Number(shared.rewardChest[slug]) || 0) - (Number(removal.items[slug]) || 0));
+    if (n > 0) shared.rewardChest[slug] = n; else delete shared.rewardChest[slug];
+  }
+  const bundles = Array.isArray(shared.rewardChestBundles) ? shared.rewardChestBundles : [];
+  for (const b of bundles) {
+    const rid = b && (b.id || b.bundleId);
+    const items = rid != null && removal.bundles ? removal.bundles[String(rid)] : null;
+    if (!items || !b.items) continue;
+    for (const slug of Object.keys(items)) {
+      const n = Math.max(0, (Number(b.items[slug]) || 0) - (Number(items[slug]) || 0));
+      if (n > 0) b.items[slug] = n; else delete b.items[slug];
+    }
+  }
+  const dropIds = new Set((removal.removeBundleIds || []).map(String));
+  for (let i = bundles.length - 1; i >= 0; i--) {
+    const b = bundles[i], rid = b && (b.id || b.bundleId);
+    if (rid != null && dropIds.has(String(rid))) bundles.splice(i, 1);
+  }
+  shared.rewardChestBundles = bundles;
+}
+
+/* Diff do chest pré→pós-claim (itens removidos por slug e por bundle +
+ * ids de pacotes eliminados) — aplicado no shared VIVO pela tx atômica. */
+function chestRemovalDiff(preChest, preBundles, postChest, postBundles) {
+  const items = {}, bundles = {}, removeBundleIds = [];
+  for (const slug of Object.keys(preChest || {})) {
+    const removed = (Number(preChest[slug]) || 0) - (Number((postChest || {})[slug]) || 0);
+    if (removed > 0) items[slug] = removed;
+  }
+  const postIds = new Set((postBundles || []).map((b) => String(b && (b.id || b.bundleId))));
+  for (const pb of preBundles || []) {
+    const rid = pb && (pb.id || pb.bundleId); if (rid == null) continue;
+    const post = (postBundles || []).find((b) => String(b && (b.id || b.bundleId)) === String(rid));
+    if (!post) { removeBundleIds.push(String(rid)); continue; }
+    const bitems = {};
+    for (const slug of Object.keys(pb.items || {})) {
+      const removed = (Number(pb.items[slug]) || 0) - (Number((post.items || {})[slug]) || 0);
+      if (removed > 0) bitems[slug] = removed;
+    }
+    if (Object.keys(bitems).length) bundles[String(rid)] = bitems;
+  }
+  return { items, bundles, removeBundleIds };
+}
+
+async function splitSharedInventory(db, acc, p, authoritative, opts) {
   if (!SharedInv || typeof db.accountSharedInventory !== "function") return null;
-  const shared = await db.accountSharedInventory(acc.id);
-  if (authoritative) {
-    /* Loot Pouch é DA CONTA: extrai por DELTA contra a baseline hidratada
-     * (o extract sobrescreveria o shared com a cópia — ressuscitando itens
-     * vendidos fora da instância). Demais containers seguem extract. */
-    const prevPouch = Object.assign({}, shared.lootPouch || {});
-    const mergedPouch = SharedInv.pouchDelta ? SharedInv.pouchDelta(prevPouch, p) : null;
-    SharedInv.extractSharedFromPlayer(p, shared);
-    if (mergedPouch) shared.lootPouch = mergedPouch;
-  } else {
+  const removal = opts && opts.chestRemoval || null;
+  const doSplit = (shared) => {
+    /* rewardChest é SEMPRE server-owned (muda só via /api/reward/claim e o
+     * merge terminal): preserva o do shared VIVO nos DOIS caminhos — a cópia
+     * do personagem pode estar atrasada e "ressuscitar" o baú coletado. */
     const keep = {
       lootPouch: Object.assign({}, shared.lootPouch),
       supplyStash: Object.assign({}, shared.supplyStash),
       rewardChest: Object.assign({}, shared.rewardChest),
       rewardChestBundles: shared.rewardChestBundles.slice(),
     };
+    const mergedPouch = authoritative && SharedInv.pouchDelta
+      ? SharedInv.pouchDelta(keep.lootPouch, p) : null;
     SharedInv.extractSharedFromPlayer(p, shared);
-    shared.lootPouch = keep.lootPouch;
-    shared.supplyStash = keep.supplyStash;
+    shared.lootPouch = authoritative && mergedPouch ? mergedPouch
+      : authoritative ? shared.lootPouch : keep.lootPouch;
+    if (!authoritative) shared.supplyStash = keep.supplyStash;
     shared.rewardChest = keep.rewardChest;
     shared.rewardChestBundles = keep.rewardChestBundles;
+    if (removal) chestRemovalApply(shared, removal);
+    // Stamina da conta: a extração gravou o espelho (com guarda de carimbo);
+    // materializa a cauda ociosa até agora e espelha o pool de volta no save.
+    SharedInv.regenSharedStamina(shared, Date.now(), 0.5, p.stamina);
+  };
+  /* A mutação roda dentro de SELECT FOR UPDATE + UPDATE na mesma tx —
+   * sem isso o read-modify-write solto era last-writer-wins contra o write
+   * do tick: o blob velho sobrescrevia o claim (reward "voltava") ou o
+   * sync do equip (item sumia). */
+  let shared = null;
+  if (typeof db.accountSharedInventoryMutate === "function") {
+    shared = await db.accountSharedInventoryMutate(acc.id, doSplit);
+    if (!shared) return null;
+  } else {
+    shared = await db.accountSharedInventory(acc.id);
+    doSplit(shared);
+    if (typeof db.setAccountSharedInventory === "function")
+      await db.setAccountSharedInventory(acc.id, shared);
   }
-  // Stamina da conta: a extração gravou o espelho (com guarda de carimbo);
-  // materializa a cauda ociosa até agora e espelha o pool de volta no save.
-  SharedInv.regenSharedStamina(shared, Date.now(), 0.5, p.stamina);
-  if (typeof db.setAccountSharedInventory === "function")
-    await db.setAccountSharedInventory(acc.id, shared);
   SharedInv.applySharedToPlayer(p, shared);
   return shared;
 }
@@ -1566,12 +1637,22 @@ async function loadCityPlayer(db, acc, character) {
   p._walletSynced = 1;
   if (SharedInv && typeof db.accountSharedInventory === "function") {
     try {
-      const shared = await db.accountSharedInventory(acc.id);
       // Stamina da conta: tempo ocioso (0,5s/s) materializado no pool; o
-      // apply espelha — todos os personagens veem o mesmo saldo.
-      SharedInv.regenSharedStamina(shared, Date.now(), 0.5, p.stamina);
-      if (typeof db.setAccountSharedInventory === "function")
-        await db.setAccountSharedInventory(acc.id, shared);
+      // apply espelha — todos os personagens veem o mesmo saldo. A gravação
+      // é atômica (FOR UPDATE) — o write solto do blob inteiro clobberava
+      // claims/equips concorrentes (reward "voltava", item sumia).
+      let shared = null;
+      if (typeof db.accountSharedInventoryMutate === "function") {
+        shared = await db.accountSharedInventoryMutate(acc.id, (s) => {
+          SharedInv.regenSharedStamina(s, Date.now(), 0.5, p.stamina);
+        });
+      }
+      if (!shared) {
+        shared = await db.accountSharedInventory(acc.id);
+        SharedInv.regenSharedStamina(shared, Date.now(), 0.5, p.stamina);
+        if (typeof db.setAccountSharedInventory === "function")
+          await db.setAccountSharedInventory(acc.id, shared);
+      }
       SharedInv.applySharedToPlayer(p, shared);
       SharedInv.applyAccountMissionsToPlayer(p, acc);
       require("./wardrobe").applyToPlayer(p, acc);
@@ -1663,6 +1744,31 @@ async function saveCharacter(db, body, id) {
     character:accountCharacterSummary(updated,account.gold),account:accountPublicView(account),
     instance:patchedInstance?instanceSummary(patchedInstance,false):null,
     ...(sharedInventory?{sharedInventory}:{})}};
+}
+
+/* Cache quente compartilhado (PvP/World Boss): o descritor vivo em memória
+ * é a autoridade — usado por instanceAuthorityTick (avanço) e pelo caminho
+ * quente de instancePatchState (mutações sem blob/row-lock). */
+function instanceHotAuthApi(){
+  return {persistMs:PVP_AUTH_PERSIST_MS,drop:pvpAuthCacheDrop,
+    // Peek sem semear: instancePatchState só usa o caminho quente quando a
+    // instância JÁ é quente (world boss/pvp são semeados no create/1º tick).
+    peek:(row)=>pvpAuthCacheGet(row&&row.instance_id),
+    get:async(row,conn)=>{
+      let hot=pvpAuthCacheGet(row.instance_id);
+      if(hot&&Number(hot.rowVersion)===Number(row.version))return hot;
+      // Miss ou drift (escrita externa — patch/encerramento): recarrega.
+      const [s]=await conn.query("SELECT state FROM account_instances WHERE account_id=?",[Number(row.account_id)]);
+      const ser=s[0]?s[0].state:null;
+      if(ser==null)return hot;
+      const descriptor=typeof ser==="string"?JSON.parse(ser):ser;
+      hot={descriptor,rowVersion:Number(row.version),savedAt:Date.now()};
+      pvpAuthCacheSet(row.instance_id,hot);
+      return hot;
+    }};
+}
+function instancePatchHotOpts(resolved){
+  return (resolved&&(resolved.pvp||resolved.worldBoss))?{hotAuth:instanceHotAuthApi()}:null;
 }
 
 const TRAINING_STORE={exercise:{charges:14470,gold:10000000,tc:0,bonus:1.25},lasting:{charges:20000,gold:0,tc:150,bonus:1.5}};
@@ -1776,7 +1882,7 @@ async function syncCityWallet(db,acc,p){
   if(typeof db.setAccountGold==="function")
     await db.setAccountGold(acc.id,Math.max(0,Math.floor(Number(p.gold)||0)));
 }
-async function persistClaimedPlayer(db,acc,character,p,lease,claimedCount){
+async function persistClaimedPlayer(db,acc,character,p,lease,claimedCount,sharedOps){
   await syncCityWallet(db,acc,p);
 
   const result=await db.saveCharactersVersioned(acc.id,[{
@@ -1787,7 +1893,7 @@ async function persistClaimedPlayer(db,acc,character,p,lease,claimedCount){
   if(!result.ok)return saveConflictResponse(result,acc);
   let sharedInventory=null;
   if(SharedInv&&typeof db.accountSharedInventory==="function")
-    sharedInventory=await splitSharedInventory(db,acc,p,true);
+    sharedInventory=await splitSharedInventory(db,acc,p,true,sharedOps);
   const updated=result.characters[0];
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"reward-claim",updated,false);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"reward-claim"});
@@ -1915,38 +2021,51 @@ async function claimRewardChest(db,body){
   const resolved=await resolveInstanceRow(db,acc,charId);
   if(resolved.error)return resolved.error;
   const row=resolved.row;
-  let claimedCount=0;
+  let claimedCount=0,chestRemoval=null;
   if(row&&row.status==="active"){
+    const hotOpts=instancePatchHotOpts(resolved);
     let last=null;
     for(let attempt=0;attempt<4;attempt++){
       const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
       if(!current||current.status!=="active")break;
-      let claimedPlayer=null;
+      let claimedPlayer=null,removal=null;
       const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
         let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
         const item=descriptor.authority&&descriptor.authority.players&&
           descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
         if(!item||!item.p)return null;
+        rewardChestEnsure(item.p);
+        const preChest=Object.assign({},item.p.rewardChest);
+        const preBundles=(item.p.rewardChestBundles||[]).map((b)=>({id:b&&(b.id||b.bundleId),items:Object.assign({},(b&&b.items)||{})}));
         claimedCount=applyRewardChestClaim(item.p,body);
         claimedPlayer=cloneJson(item.p);
+        removal=chestRemovalDiff(preChest,preBundles,item.p.rewardChest,item.p.rewardChestBundles);
         /* Rebase da pouch no descriptor: o delta do claim já é extraído por
          * persistClaimedPlayer (clone acima, com a baseline antiga). Sem o
          * rebase, o split terminal/dirty via pouchDelta somava o MESMO delta
          * de novo — cada claim dentro de instância duplicava os itens. A
          * pouch é ref compartilhada entre membros da conta
-         * (shareInstanceContainers): rebaseia todos que apontam para ela. */
+         * (shareInstanceContainers): rebaseia todos que apontam para ela.
+         * rewardChest/bundles também são refs por conta: re-unifica com a
+         * cópia CANÔNICA clameada — uma cópia divergente ressuscitava o baú
+         * no shareInstanceContainers (merge por máximo). */
         for(const entry of (descriptor.authority&&descriptor.authority.players)||[]){
-          if(entry&&entry.p&&entry.p.lootPouch===item.p.lootPouch)
+          if(!entry||!entry.p)continue;
+          if(Number(entry.accountId||(entry.p&&entry.p.accountId)||0)===Number(acc.id)&&entry!==item){
+            entry.p.rewardChest=item.p.rewardChest;
+            entry.p.rewardChestBundles=item.p.rewardChestBundles;
+          }
+          if(entry.p.lootPouch===item.p.lootPouch)
             entry.p._pouchBase=Object.assign({},entry.p.lootPouch||{});
         }
         descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
-      },lease);
+      },lease,hotOpts);
       last=result;
       if(result.ok){
         await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
           status:result.instance.status,source:"reward-claim",holderId:String(body.holder_id||"")});
         const fresh=await db.findCharacter(charId);
-        return persistClaimedPlayer(db,acc,fresh||character,claimedPlayer,lease,claimedCount);
+        return persistClaimedPlayer(db,acc,fresh||character,claimedPlayer,lease,claimedCount,{chestRemoval:removal});
       }
       if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a coleta"}};
       if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
@@ -1957,8 +2076,12 @@ async function claimRewardChest(db,body){
         instance:instanceSummary(last.instance,true)}};
   }
   let p=await loadCityPlayer(db,acc,character);
+  rewardChestEnsure(p);
+  const cityPreChest=Object.assign({},p.rewardChest);
+  const cityPreBundles=(p.rewardChestBundles||[]).map((b)=>({id:b&&(b.id||b.bundleId),items:Object.assign({},(b&&b.items)||{})}));
   claimedCount=applyRewardChestClaim(p,body);
-  return persistClaimedPlayer(db,acc,character,p,lease,claimedCount);
+  chestRemoval=chestRemovalDiff(cityPreChest,cityPreBundles,p.rewardChest,p.rewardChestBundles);
+  return persistClaimedPlayer(db,acc,character,p,lease,claimedCount,{chestRemoval});
 }
 
 async function getDailyReward(db,body){
@@ -2580,12 +2703,20 @@ async function prepareInstanceState(db,acc,input){
     // no membro (a instância combate com os containers compartilhados).
     if(SharedInv&&typeof db.accountSharedInventory==="function"){
       try{
-        const shared=await db.accountSharedInventory(Number(c.account_id));
         // Stamina da conta: materializa o gap ocioso (0,5s/s) no pool antes
         // de espelhar — o tick da instância drena o pool por conta.
-        SharedInv.regenSharedStamina(shared,Date.now(),0.5,canonical.stamina);
-        if(typeof db.setAccountSharedInventory==="function")
-          await db.setAccountSharedInventory(Number(c.account_id),shared);
+        let shared=null;
+        if(typeof db.accountSharedInventoryMutate==="function"){
+          shared=await db.accountSharedInventoryMutate(Number(c.account_id),(s)=>{
+            SharedInv.regenSharedStamina(s,Date.now(),0.5,canonical.stamina);
+          });
+        }
+        if(!shared){
+          shared=await db.accountSharedInventory(Number(c.account_id));
+          SharedInv.regenSharedStamina(shared,Date.now(),0.5,canonical.stamina);
+          if(typeof db.setAccountSharedInventory==="function")
+            await db.setAccountSharedInventory(Number(c.account_id),shared);
+        }
         SharedInv.applySharedToPlayer(canonical,shared);
         if(typeof db.findAccountById==="function"){
           try{
@@ -3253,19 +3384,7 @@ async function tickInstance(db,body){
   // host — exatamente o cenário que o FOR UPDATE afogava (o servidor
   // "travava" justo no last hit, quando o tick terminal encadeava a
   // extração de N contas sob a lock).
-  if(resolved.pvp||resolved.worldBoss)tickOpts.hotAuth={persistMs:PVP_AUTH_PERSIST_MS,drop:pvpAuthCacheDrop,
-    get:async(row,conn)=>{
-      let hot=pvpAuthCacheGet(row.instance_id);
-      if(hot&&Number(hot.rowVersion)===Number(row.version))return hot;
-      // Miss ou drift (escrita externa — ammo patch/checkpoint): recarrega.
-      const [s]=await conn.query("SELECT state FROM account_instances WHERE account_id=?",[Number(row.account_id)]);
-      const ser=s[0]?s[0].state:null;
-      if(ser==null)return hot;
-      const descriptor=typeof ser==="string"?JSON.parse(ser):ser;
-      hot={descriptor,rowVersion:Number(row.version),savedAt:Date.now()};
-      pvpAuthCacheSet(row.instance_id,hot);
-      return hot;
-    }};
+  if(resolved.pvp||resolved.worldBoss)tickOpts.hotAuth=instanceHotAuthApi();
   const runTick=()=>db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceWithVisuals,lease,
     Object.keys(tickOpts).length?tickOpts:undefined);
   /* Batalha: serialização in-process (mutex por conta-dono), NÃO pela lock
@@ -3769,14 +3888,24 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
 async function persistSharedPouchSync(db,acc,synced){
   if(!synced||!SharedInv||typeof db.accountSharedInventory!=="function")return;
   try{
-    const shared=await db.accountSharedInventory(acc.id);
-    shared.lootPouch=Object.assign({},synced.pouch||{});
-    if(synced.bag)shared.bag=Object.assign({},synced.bag||{});
-    if(Array.isArray(synced.depot))shared.depot=synced.depot.slice();
-    if(synced.supplyStash)shared.supplyStash=Object.assign({},synced.supplyStash);
-    if(Array.isArray(synced.instances))
-      shared.itemInstances=synced.instances.map((i)=>Object.assign({},i));
-    await db.setAccountSharedInventory(acc.id,shared);
+    const apply=(shared)=>{
+      shared.lootPouch=Object.assign({},synced.pouch||{});
+      if(synced.bag)shared.bag=Object.assign({},synced.bag||{});
+      if(Array.isArray(synced.depot))shared.depot=synced.depot.slice();
+      if(synced.supplyStash)shared.supplyStash=Object.assign({},synced.supplyStash);
+      if(Array.isArray(synced.instances))
+        shared.itemInstances=synced.instances.map((i)=>Object.assign({},i));
+    };
+    /* Mesma tx FOR UPDATE do split: sem isso o read-modify-write solto era
+     * last-writer-wins contra o claim — o blob velho sobrescrevia o baú
+     * coletado (reward "voltava") ou o sync do equip (item sumia). */
+    if(typeof db.accountSharedInventoryMutate==="function")
+      await db.accountSharedInventoryMutate(acc.id,apply);
+    else{
+      const shared=await db.accountSharedInventory(acc.id);
+      apply(shared);
+      await db.setAccountSharedInventory(acc.id,shared);
+    }
     try{publishSync(acc.id,"character",{id:null,saveVersion:0,source:"pouch-shared"});}catch(e){}
   }catch(e){console.warn("[pouch] falha ao sincronizar shared:",e&&e.message);}
 }
@@ -4135,36 +4264,51 @@ async function equipInstanceItem(db,body){
   const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
   const row=resolved.row;
   if(row&&row.status==="active"){
-    const expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
-    if(!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+    const expected0=Number(body.expected_version),instanceId=String(body.instance_id||"");
+    if(!Number.isSafeInteger(expected0)||expected0<1||!/^[a-f0-9]{64}$/.test(instanceId))
       return {code:400,body:{ok:false,error:"INVALID_EQUIP",msg:"Instância inválida para equipar"}};
     if(String(row.instance_id)!==instanceId)
       return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-    let rejection=null,synced=null;
-    const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
-      let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
-      const item=descriptor.authority&&descriptor.authority.players&&
-        descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
-      if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
-      // A bag é DA CONTA: guarda o estado antes da mutação para propagar o
-      // delta às cópias dos demais personagens e gravar no shared — sem
-      // isto, desequipar em um personagem não aparecia na bag de outro e o
-      // tick terminal sobrescrevia o shared com a última cópia (itens
-      // sumiam ao final da boss fight).
-      const preSnapshot={
-        pouch:Object.assign({},item.p.lootPouch||{}),
-        bag:Object.assign({},item.p.bag||{}),
-        ...(depotAction?{depot:(item.p.depot||[]).slice()}:{})
-      };
-      let r;
-      if(depotAction)r=depotActionAuth(item.p,{action:depotAction,ref:slug,source:body.source,slot:body.slot,qty:body.qty});
-      else if(unequip)r=unequipFromContainerAuth(item.p,String(body.slot||""),String(body.dest||"bag"));
-      else r=equipFromContainerAuth(item.p,String(body.slug||""),String(body.source||"bag"),
-        {instId:body.inst_id?String(body.inst_id):null});
-      if(!r||!r.ok){rejection=(r&&r.msg)||"Não foi possível equipar";return null;}
-      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
-      descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
-    },lease);
+    let rejection=null,synced=null,last=null;
+    /* Retry no conflito de versão: um tick (ou outro clique) bumpa a version
+     * entre o resolve e o patch — sem retry o equip falhava e o preview
+     * otimista do cliente revertia: o item "sumia" na UI até o próximo
+     * tick. Na retentativa usa a version FRESCA da row (a mutação valida
+     * contra o estado real — item já movido é rejeitado com segurança). */
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
+      if(!current||current.status!=="active"||String(current.instance_id)!==instanceId){last={ok:false,error:"INSTANCE_NOT_ACTIVE",instance:current};break;}
+      const expected=attempt===0?expected0:Number(current.version);
+      rejection=null;
+      const result=await db.instancePatchState(current.account_id,acc.id,instanceId,expected,(serialized)=>{
+        let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+        const item=descriptor.authority&&descriptor.authority.players&&
+          descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+        if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+        // A bag é DA CONTA: guarda o estado antes da mutação para propagar o
+        // delta às cópias dos demais personagens e gravar no shared — sem
+        // isto, desequipar em um personagem não aparecia na bag de outro e o
+        // tick terminal sobrescrevia o shared com a última cópia (itens
+        // sumiam ao final da boss fight).
+        const preSnapshot={
+          pouch:Object.assign({},item.p.lootPouch||{}),
+          bag:Object.assign({},item.p.bag||{}),
+          ...(depotAction?{depot:(item.p.depot||[]).slice()}:{})
+        };
+        let r;
+        if(depotAction)r=depotActionAuth(item.p,{action:depotAction,ref:slug,source:body.source,slot:body.slot,qty:body.qty});
+        else if(unequip)r=unequipFromContainerAuth(item.p,String(body.slot||""),String(body.dest||"bag"));
+        else r=equipFromContainerAuth(item.p,String(body.slug||""),String(body.source||"bag"),
+          {instId:body.inst_id?String(body.inst_id):null});
+        if(!r||!r.ok){rejection=(r&&r.msg)||"Não foi possível equipar";return null;}
+        synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
+        descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+      },lease);
+      last=result;
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
+      synced=null; // mutação não commitou — descarta o sync desta tentativa
+    }
+    const result=last||{ok:false,error:"INSTANCE_VERSION_CONFLICT"};
     if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
       body:{ok:false,error:result.error,msg:rejection||"Não foi possível equipar",
         instance:instanceSummary(result.instance,true)}};
@@ -5024,24 +5168,34 @@ async function marketMutateBag(db, acc, character, body, mutate, source) {
  * item via `marketReceiveItem` quando ele mesmo compra; isto cobre o caso em
  * que a contra-parte da oferta não é quem disparou a request). */
 async function marketDeliverToDepot(db, accountId, slug, tier, qty) {
-  if (!slug || !SharedInv || typeof db.accountSharedInventory !== "function" ||
-      typeof db.setAccountSharedInventory !== "function") return false;
-  const shared = await db.accountSharedInventory(accountId);
-  shared.depot = Array.isArray(shared.depot) ? shared.depot : [];
-  shared.itemInstances = Array.isArray(shared.itemInstances) ? shared.itemInstances : [];
+  if (!slug || !SharedInv || typeof db.accountSharedInventory !== "function") return false;
   qty = Math.max(1, Math.floor(Number(qty) || 1));
-  if (authItemNeedsBagInstance(slug)) {
-    for (let i = 0; i < qty; i++) {
-      shared.seq = (Number(shared.seq) || 0) + 1;
-      const inst = { id: "mk-" + shared.seq.toString(36) + "-" + i,
-        slug, loc: "depot", tier: Math.max(0, Math.floor(Number(tier) || 0)) };
-      shared.itemInstances.push(inst);
-      shared.depot.push(inst.id);
+  /* Entrega no depot compartilhado dentro da tx atômica — o write solto do
+   * blob clobberava mutations concorrentes (claim de reward/equip do tick). */
+  const deliver = (shared) => {
+    shared.depot = Array.isArray(shared.depot) ? shared.depot : [];
+    shared.itemInstances = Array.isArray(shared.itemInstances) ? shared.itemInstances : [];
+    if (authItemNeedsBagInstance(slug)) {
+      for (let i = 0; i < qty; i++) {
+        shared.seq = (Number(shared.seq) || 0) + 1;
+        const inst = { id: "mk-" + shared.seq.toString(36) + "-" + i,
+          slug, loc: "depot", tier: Math.max(0, Math.floor(Number(tier) || 0)) };
+        shared.itemInstances.push(inst);
+        shared.depot.push(inst.id);
+      }
+    } else {
+      for (let i = 0; i < qty; i++) shared.depot.push(slug);
     }
+  };
+  if (typeof db.accountSharedInventoryMutate === "function") {
+    const s = await db.accountSharedInventoryMutate(accountId, deliver);
+    if (!s) return false;
   } else {
-    for (let i = 0; i < qty; i++) shared.depot.push(slug);
+    if (typeof db.setAccountSharedInventory !== "function") return false;
+    const shared = await db.accountSharedInventory(accountId);
+    deliver(shared);
+    await db.setAccountSharedInventory(accountId, shared);
   }
-  await db.setAccountSharedInventory(accountId, shared);
   publishSync(accountId, "character", { action: "market-delivery", slug, qty });
   return true;
 }
@@ -5756,6 +5910,13 @@ async function marketBank(db, token) {
 
 async function main() {
   const db = await getDb();
+
+  // Caminho quente (PvP/world boss) para instancePatchState: descritor vivo
+  // em memória + mutex por conta-dono — instancePatchState usa estes
+  // providers quando a instância é quente (os ~24 call sites ganham de
+  // graça, sem passar opts).
+  db.instanceHotAuthApi = instanceHotAuthApi;
+  db.instanceAuthSerialize = pvpAuthSerialize;
 
   // garante metodos de sessao no JsonStore
   if (!db.findAccountByToken) {

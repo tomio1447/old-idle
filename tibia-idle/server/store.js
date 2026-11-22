@@ -622,42 +622,49 @@ async function redeemVoucher(db, body) {
   // id na lista; stackáveis entram como slug por unidade. Cap de 30 slots.
   const entregues = [];
   const needsShared = (Array.isArray(v.items) && v.items.length) || v.skillBoostHours;
-  if (needsShared &&
-      typeof db.accountSharedInventory === "function" &&
-      typeof db.setAccountSharedInventory === "function") {
-    const shared = await db.accountSharedInventory(acc.id);
-    shared.seq = Math.max(0, Math.floor(Number(shared.seq) || 0));
-    shared.itemInstances = Array.isArray(shared.itemInstances) ? shared.itemInstances : [];
-    shared.depot = Array.isArray(shared.depot) ? shared.depot : [];
-    /* Skill boost de voucher: empilha sobre o tempo restante vigente. */
-    if (v.skillBoostHours) {
-      const h = Math.max(0, Math.floor(Number(v.skillBoostHours)));
-      shared.skillBoostUntil = Math.max(Date.now(),
-        Math.floor(Number(shared.skillBoostUntil) || 0)) + h * 3600 * 1000;
-    }
-    const usedIds = new Set(shared.itemInstances.map((i) => String(i && i.id)));
-    const nextId = () => {
-      let id;
-      do { id = "ai-" + (++shared.seq).toString(36); } while (usedIds.has(id));
-      usedIds.add(id);
-      return id;
-    };
-    for (const it of (Array.isArray(v.items) ? v.items : [])) {
-      const slug = String((it && it.slug) || "");
-      const qty = Math.max(1, Math.floor(Number(it && it.qty) || 1));
-      if (!slug) continue;
-      for (let k = 0; k < qty && shared.depot.length < 30; k++) {
-        if (it.instanced) {
-          const id = nextId();
-          shared.itemInstances.push({ id, slug, loc: "depot", tier: Math.max(0, Number(it.tier) || 0) });
-          shared.depot.push(id);
-        } else {
-          shared.depot.push(slug);
-        }
-        entregues.push(slug);
+  if (needsShared && typeof db.accountSharedInventory === "function") {
+    const deliver = (shared) => {
+      shared.seq = Math.max(0, Math.floor(Number(shared.seq) || 0));
+      shared.itemInstances = Array.isArray(shared.itemInstances) ? shared.itemInstances : [];
+      shared.depot = Array.isArray(shared.depot) ? shared.depot : [];
+      /* Skill boost de voucher: empilha sobre o tempo restante vigente. */
+      if (v.skillBoostHours) {
+        const h = Math.max(0, Math.floor(Number(v.skillBoostHours)));
+        shared.skillBoostUntil = Math.max(Date.now(),
+          Math.floor(Number(shared.skillBoostUntil) || 0)) + h * 3600 * 1000;
       }
+      const usedIds = new Set(shared.itemInstances.map((i) => String(i && i.id)));
+      const nextId = () => {
+        let id;
+        do { id = "ai-" + (++shared.seq).toString(36); } while (usedIds.has(id));
+        usedIds.add(id);
+        return id;
+      };
+      for (const it of (Array.isArray(v.items) ? v.items : [])) {
+        const slug = String((it && it.slug) || "");
+        const qty = Math.max(1, Math.floor(Number(it && it.qty) || 1));
+        if (!slug) continue;
+        for (let k = 0; k < qty && shared.depot.length < 30; k++) {
+          if (it.instanced) {
+            const id = nextId();
+            shared.itemInstances.push({ id, slug, loc: "depot", tier: Math.max(0, Number(it.tier) || 0) });
+            shared.depot.push(id);
+          } else {
+            shared.depot.push(slug);
+          }
+          entregues.push(slug);
+        }
+      }
+      if (!entregues.length && !v.skillBoostHours) return false; // nada a gravar
+    };
+    /* Entrega atômica (FOR UPDATE): o write solto do blob clobberava
+     * mutations concorrentes (claim/equip durante a compra). */
+    if (typeof db.accountSharedInventoryMutate === "function") {
+      await db.accountSharedInventoryMutate(acc.id, deliver);
+    } else if (typeof db.setAccountSharedInventory === "function") {
+      const shared = await db.accountSharedInventory(acc.id);
+      if (deliver(shared) !== false) await db.setAccountSharedInventory(acc.id, shared);
     }
-    if (entregues.length || v.skillBoostHours) await db.setAccountSharedInventory(acc.id, shared);
   }
 
   /* Lista estruturada de recompensas (mesmo helper do preview do gate —

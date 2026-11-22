@@ -787,24 +787,34 @@ function accountEquipItem(token,charId,opts){
   if(ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
     return accountQueueInstance(async()=>{
       if(!accountLeaseAllowsSimulation())return {ok:false};
-      const r=await _api("POST","/api/instance/equip",Object.assign({
-        token,char_id:Number(charId),
-        unequip:!!opts.unequip,depot_action:opts.depotAction||null,ref:opts.ref||null,
-        slug:String(opts.slug||""),
-        slot:String(opts.slot||""),
-        source:String(opts.source||"bag"),
-        dest:String(opts.dest||"bag"),
-        inst_id:opts.instId?String(opts.instId):null,
-        qty:Number(opts.qty)||0,
-        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
-      if(r.data.ok){
-        // A bag é da conta: o servidor sincronizou o shared com o delta do
-        // equip/desequip — aplica para a troca de personagem (e o /api/me
-        // de outras abas) ver o item desequipado na backpack.
-        return accountEquipmentResult(r.data,charId);
+      /* Retry único em conflito de versão: um tick (ou outro clique) bumpa a
+       * version entre o último apply e este request — o 409 traz a row
+       * fresca, o apply atualiza ACCOUNT_INSTANCE.version e a retentativa
+       * já vai com a versão certa. Sem isso o preview otimista revertia e
+       * o item "sumia" da UI até o próximo tick. */
+      for(let attempt=0;attempt<2;attempt++){
+        const r=await _api("POST","/api/instance/equip",Object.assign({
+          token,char_id:Number(charId),
+          unequip:!!opts.unequip,depot_action:opts.depotAction||null,ref:opts.ref||null,
+          slug:String(opts.slug||""),
+          slot:String(opts.slot||""),
+          source:String(opts.source||"bag"),
+          dest:String(opts.dest||"bag"),
+          inst_id:opts.instId?String(opts.instId):null,
+          qty:Number(opts.qty)||0,
+          instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+        if(r.data.ok){
+          // A bag é da conta: o servidor sincronizou o shared com o delta do
+          // equip/desequip — aplica para a troca de personagem (e o /api/me
+          // de outras abas) ver o item desequipado na backpack.
+          return accountEquipmentResult(r.data,charId);
+        }
+        if(r.code===423){accountLeaseMarkLost(r.data.msg);break;}
+        if(r.data.instance)await accountInstanceApply(r.data.instance);
+        if(r.data.error!=="INSTANCE_VERSION_CONFLICT")
+          return {ok:false,msg:r.data.msg||"Não foi possível equipar"};
       }
-      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
-      return {ok:false,msg:r.data.msg||"Não foi possível equipar"};
+      return {ok:false,msg:"A instância foi alterada — tente de novo."};
     });
   }
   return accountQueueSave(async()=>{
