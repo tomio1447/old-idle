@@ -880,9 +880,7 @@ async function wbEnterSharedCombat(ev) {
   }
 }
 
-function wbExitCombat(reason) {
-  if (WB.combat && WB.combat.exiting) return;
-  if (WB.combat) WB.combat.exiting = true;
+function wbExitCombatNow(reason) {
   const hadCombat = !!WB.combat;
   WB.combat = null;
   WB.pendingDmg = 0;
@@ -905,11 +903,26 @@ function wbExitCombat(reason) {
       goToCity();
     }
   } catch (e) { /* ignore */ }
-  if (hadCombat && typeof toast === "function") {
-    if (reason === "success") toast(wbT("wb.success", "World Boss derrotado! Recompensas no Reward Chest."), "ok");
-    else if (reason === "fail") toast(wbT("wb.fail", "World Boss falhou."), "bad");
+  if (hadCombat && typeof toast === "function" && reason !== "success") {
+    if (reason === "fail") toast(wbT("wb.fail", "World Boss falhou."), "bad");
     else if (reason === "account-failed") toast(wbT("wb.accountFail", "Seus personagens morreram — removido do evento."), "bad");
   }
+}
+
+function wbExitCombat(reason) {
+  if (WB.combat && WB.combat.exiting) return;
+  if (WB.combat) WB.combat.exiting = true;
+  /* Fluxo de vitória igual ao boss normal: mensagem na tela na hora e
+   * retorno ao templo ~3s depois — o exit instantâneo apagava a arena
+   * antes do jogador ver o resultado. O saque já está no Reward Chest
+   * (grantSuccessRewards roda antes do publish "success"). */
+  if (reason === "success" && WB.combat) {
+    if (typeof toast === "function")
+      toast(wbT("wb.success", "World Boss derrotado! Recompensas no Reward Chest."), "ok");
+    setTimeout(() => wbExitCombatNow("success"), 3000);
+    return;
+  }
+  wbExitCombatNow(reason);
 }
 
 async function wbFlushReport() {

@@ -8195,6 +8195,10 @@ function tickAuthSpawnQueue(auth,now){
 }
 function respawn(auth,now){spawnHuntWave(auth,now,{force:true,keepPack:true});}
 function fullWipe(auth){
+  // Nunca sobrescreve um terminal já decidido no mesmo step: o boss pode
+  // morrer no tick em que a PT está toda caída — "party-wipe" apagava o
+  // "boss-defeated" e o fluxo de vitória (loot/toast/retorno) morria junto.
+  if(auth.ended)return;
   // Wipe = custo da bless: o flag comprado é consumido aqui (não em morte
   // individual). Os caminhos de revive pago re-setam blessed=true abaixo.
   for(const item of auth.players||[]){if(item&&item.p)item.p.blessed=false;}
@@ -9957,9 +9961,25 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState,opts)
   const pvpFrozenIds=auth.pvpBattle
     ?new Set((visual.players||[]).filter((v)=>v&&v.self).map((v)=>String(v.id))):null;
   const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);
-  const requested=Math.floor(total/AUTH_STEP_MS),steps=Math.min(250000,requested);auth.carryMs=total-steps*AUTH_STEP_MS;
-  for(let i=0;i<steps;i++){auth.clock+=AUTH_STEP_MS;step(auth,auth.clock,{freezeVisual,dt:AUTH_STEP_MS,pvpFrozenIds});if(auth.ended){auth.carryMs=0;break;}}
-  auth.clock=Math.max(auth.clock,Number(checkpointAt)||auth.clock);
+  const requested=Math.floor(total/AUTH_STEP_MS),steps=Math.min(250000,requested);
+  /* Orçamento de tempo real por chamada: um elapsed grande (aba em segundo
+   * plano, catchup de worker) rodava dezenas de milhares de steps síncronos
+   * dentro do handler — o event loop congelava e o servidor "travava"
+   * justo quando o boss recebia o last hit. O restante vira dívida em
+   * carryMs e é drenado nas chamadas seguintes (o relógio simulado só
+   * avança o que de fato rodou — auth.clock = checkpoint - dívida). */
+  const stepBudgetMs=Math.max(0,Number(opts&&opts.stepBudgetMs)||0),
+    budgetStart=stepBudgetMs>0?Date.now():0;
+  let runSteps=0;
+  for(let i=0;i<steps;i++){
+    auth.clock+=AUTH_STEP_MS;
+    step(auth,auth.clock,{freezeVisual,dt:AUTH_STEP_MS,pvpFrozenIds});
+    runSteps=i+1;
+    if(auth.ended)break;
+    if(stepBudgetMs>0&&(runSteps&15)===0&&Date.now()-budgetStart>=stepBudgetMs)break;
+  }
+  auth.carryMs=auth.ended?0:total-runSteps*AUTH_STEP_MS;
+  auth.clock=Math.max(auth.clock,(Number(checkpointAt)||auth.clock)-auth.carryMs);
   // Batalha PvP: 40 chars gravados a CADA tick de cada cliente travavam o
   // combate. Persiste a cada 60s e no fim (sem XP/loot na guerra; o estado
   // completo segue na autoridade, inclusive após restart).

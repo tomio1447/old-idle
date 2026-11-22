@@ -4,6 +4,35 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-22 — Boss/World Boss morto: fluxo restaurado + anti-travamento
+
+- Servidor não "trava" mais no last hit: a simulação autoritativa por
+  chamada agora tem orçamento de tempo real (AUTH_TICK_STEP_BUDGET_MS=150ms
+  tick, 400ms worker, 2s end). Antes, um catchup grande (aba em segundo
+  plano, cursor velho) rodava até ~250 mil steps síncronos dentro da
+  transação FOR UPDATE — o event loop congelava e o pool de conexões
+  esgotava. O restante vira dívida em carryMs no estado e drena nas
+  chamadas seguintes.
+- World Boss passa a usar o mesmo caminho "quente" do PvP: descritor em
+  memória + mutex in-process + CAS de versão, em vez de FOR UPDATE na row
+  — M contas tickando a mesma instância não se estrangulam mais na lock
+  (o afogamento máximo acontecia justo no tick terminal do boss).
+- fullWipe não sobrescreve mais um terminal já decidido no mesmo step:
+  boss morto com a PT toda caída mantinha virando "party-wipe" — agora
+  permanece "boss-defeated" e o fluxo de vitória dispara.
+- Fluxo de boss morto corrigido no cliente: antes, o retorno ao templo
+  era agendado com setTimeout(0) ao receber o terminal — o combate era
+  destruído antes do evento kill (loot/toast) drenar (~140ms depois).
+  Agora a saída espera ~3s após a morte visível (bossVictoryExitDelayMs)
+  em todos os caminhos terminais (snapshot, tick sem estado, SSE e
+  reconnect). Se o evento kill foi truncado do snapshot (cap de 120),
+  um fallback anuncia a vitória mesmo assim.
+- World Boss: wbExitCombat("success") mostra o toast de vitória na hora
+  e desmonta a arena ~3s depois (era instantâneo, apagando o resultado).
+- Cache-buster: boss-death-flow-v1 (game.js, world-boss-ui.js).
+
+---
+
 ## 2026-11-22 — Wheel of Destiny: visual no padrão da cidade
 
 - Interior da roda retematizado da paleta fria OTC (#1a1d24/#12151a/

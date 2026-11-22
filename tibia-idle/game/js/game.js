@@ -3992,6 +3992,7 @@ function drainEvents() {
         // geram "kill" com c.boss setado — não devem disparar o toast.
         if (e.boss && c.boss) {
           c.bossDefeated = true;
+          c.bossDefeatedAt = Date.now();
           const isWorldBoss = !!(c.worldBoss || c.boss.worldBoss);
           if (!onlineAuth && !isWorldBoss) {
             const st = bossState(G.p, c.boss.id);
@@ -4520,6 +4521,15 @@ function combatInstanceEntryPending(){
   if(!started||(Date.now()-started)>12000)return false;
   return typeof accountInstanceActive!=="function"||!accountInstanceActive();
 }
+/* Fluxo de boss morto: a saída ao templo deve acontecer ~3s DEPOIS da
+ * morte visível (evento kill → toast de loot → retorno), nunca antes do
+ * dreno — o setTimeout(0) antigo destruía o combate antes do evento de
+ * kill agendado aparecer e a arena "morria" sem mensagem. */
+function bossVictoryExitDelayMs(reason){
+  if(reason!=="boss-defeated")return 0;
+  const c=G&&G.combat,at=Number(c&&c.bossDefeatedAt)||0;
+  return at?Math.max(0,3000-(Date.now()-at)):3500;
+}
 /* O PUT de create pode morrer em condições transitórias — epoch de um end
  * concorrente, CAN_CREATE zerado por um apply(null) corrido, lease piscando
  * na troca de geração, 409/NETWORK. Sem confirmação a arena fica órfã e o
@@ -4884,7 +4894,7 @@ async function requestOnlineRuntimeRecovery(options){
         setTimeout(()=>{
           if (typeof annihilatorReturnToLobby === "function" && annihilatorReturnToLobby(G.combat, remote.terminalReason)) return;
           if(G.combat)stopHunt(true);
-        },0);
+        },bossVictoryExitDelayMs(remote.terminalReason));
       }else if(G.combat){
         if(typeof wbExitCombat==="function")wbExitCombat("fail");
         else clearInstanceSession(remote.terminalReason||"remote-ended",true);
@@ -5568,6 +5578,22 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
   if(terminalReason){
     if(combatInstanceEntryPending())return true;
     clearInstanceSession(terminalReason,true);
+    // Vitória de boss: se o evento kill foi truncado do snapshot (cap de
+    // 120 eventos), anuncia mesmo assim — sem isto a arena saía muda.
+    if(terminalReason==="boss-defeated"&&previous&&!previous._bossDefeatAnnounced&&
+       !(previous.worldBoss||(previous.boss&&previous.boss.worldBoss))){
+      const killQueued=(previous.events||[]).some((ev)=>
+        ev&&ev.t==="kill"&&ev.boss&&Number(ev.ts)>Date.now()-50);
+      if(!killQueued){
+        previous._bossDefeatAnnounced=true;previous.bossDefeated=true;
+        previous.bossDefeatedAt=previous.bossDefeatedAt||Date.now();
+        if(previous.boss){
+          addLog("level",`Boss <b>${previous.boss.name}</b> derrotado!`);
+          if(typeof toast==="function")toast(`Boss derrotado: <b>${previous.boss.name}</b>`,"level");
+          if(typeof renderBosses==="function")renderBosses(G.p);
+        }
+      }
+    }
     setTimeout(()=>{
       if(!G.combat)return;
       if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
@@ -5579,7 +5605,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
           addLog("info","A stamina de um membro acabou — a party foi transferida para a <b>Área de Treino</b>.");
         startTrainingArea();
       }
-    },0);
+    },bossVictoryExitDelayMs(terminalReason));
   }
   // O loop redesenha canvas/HUD; não reconstrua party/modal a cada snapshot.
   return true;
@@ -5617,7 +5643,7 @@ function requestOnlineAuthorityTick(){
         if (typeof annihilatorReturnToLobby === "function" && annihilatorReturnToLobby(G.combat, result.terminalReason)) return;
         if(G.combat)stopHunt(true);
         if(result.terminalReason==="stamina"&&typeof startTrainingArea==="function")startTrainingArea();
-      },0);
+      },bossVictoryExitDelayMs(result.terminalReason));
     }else if(!result||!result.ok)requestOnlineRuntimeRecovery();
   }).catch(()=>{requestOnlineRuntimeRecovery();}).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }
@@ -5647,7 +5673,7 @@ if(typeof window!=="undefined"){
         setTimeout(()=>{
           if (typeof annihilatorReturnToLobby === "function" && annihilatorReturnToLobby(G.combat, remote.terminalReason || detail.terminalReason)) return;
           if(G.combat)stopHunt(true);
-        },0);
+        },bossVictoryExitDelayMs(remote.terminalReason||detail.terminalReason));
       }
       return;
     }

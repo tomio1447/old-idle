@@ -96,6 +96,13 @@ const INSTANCE_WORKER_MAX_STEP_MS=Math.max(100,parseInt(process.env.INSTANCE_WOR
 // calcular o período offline. Sem essa janela, uma party podia sofrer wipe
 // no primeiro tick de boot e ser enviada ao templo durante manutenção.
 const INSTANCE_WORKER_STARTUP_GRACE_MS=Math.max(0,parseInt(process.env.INSTANCE_WORKER_STARTUP_GRACE_MS||"5000",10)||0);
+// Simulação síncrona máxima por tick/claim: o catchup inteiro dentro do
+// handler (até 250k steps ≈ 14h simuladas) congelava o event loop — o
+// servidor "travava" justo no last hit do boss. O restante vira dívida
+// em carryMs no estado e drena nas chamadas seguintes.
+const AUTH_TICK_STEP_BUDGET_MS=Math.max(50,parseInt(process.env.AUTH_TICK_STEP_BUDGET_MS||"150",10)||150);
+const AUTH_WORKER_STEP_BUDGET_MS=Math.max(50,parseInt(process.env.AUTH_WORKER_STEP_BUDGET_MS||"400",10)||400);
+const AUTH_END_STEP_BUDGET_MS=Math.max(100,parseInt(process.env.AUTH_END_STEP_BUDGET_MS||"2000",10)||2000);
 // Identidade deste processo — o cliente usa bootId em /api/health para
 // detectar restart mesmo quando a porta volta rápido com a mesma URL.
 const SERVER_BOOT_ID=crypto.randomBytes(16).toString("hex");
@@ -2833,6 +2840,11 @@ async function createWorldBossSharedInstance(db,event){
     saved_at:stamp,started_at:stamp,
   },JSON.stringify(initialized));
   if(!saved||!saved.ok)return {ok:false,error:(saved&&saved.error)||"SAVE_FAILED"};
+  // Semeia o descritor quente (mesmo caminho do PvP): a warzone tem M
+  // contas tickando a mesma row do host — sem o cache quente cada tick
+  // re-parseava o blob sob FOR UPDATE e o pool afogava no last hit.
+  pvpAuthCacheSet(instanceId,{descriptor:initialized,
+    rowVersion:Number(saved.instance&&saved.instance.version)||1,savedAt:Date.now()});
   try{
     await publishInstanceForRow(db,saved.instance,{
       id:saved.instance.instance_id,version:Number(saved.instance.version)||1,
@@ -3231,12 +3243,17 @@ async function tickInstance(db,body){
         if(fresh){auth.blockedCells=fresh;if(state.state)state.state.blockedCells=fresh;}
       }
     }catch(_e){}
-    return advanceAuthorityState(state,elapsed,checkpointAt,visual,hot?{inPlace:true,rawState:true}:undefined);
+    return advanceAuthorityState(state,elapsed,checkpointAt,visual,
+      Object.assign(hot?{inPlace:true,rawState:true}:{},{stepBudgetMs:AUTH_TICK_STEP_BUDGET_MS}));
   };
   const tickOpts={};
   if((resolved.worldBoss||resolved.pvp)&&Number(ownerId)!==Number(acc.id))tickOpts.leaseAccountId=acc.id;
-  // Batalha PvP: descritor quente em memória (ver hotAuth em instanceAuthorityTick).
-  if(resolved.pvp)tickOpts.hotAuth={persistMs:PVP_AUTH_PERSIST_MS,drop:pvpAuthCacheDrop,
+  // Batalha PvP e World Boss: descritor quente em memória (ver hotAuth em
+  // instanceAuthorityTick). A warzone tem M contas tickando a MESMA row do
+  // host — exatamente o cenário que o FOR UPDATE afogava (o servidor
+  // "travava" justo no last hit, quando o tick terminal encadeava a
+  // extração de N contas sob a lock).
+  if(resolved.pvp||resolved.worldBoss)tickOpts.hotAuth={persistMs:PVP_AUTH_PERSIST_MS,drop:pvpAuthCacheDrop,
     get:async(row,conn)=>{
       let hot=pvpAuthCacheGet(row.instance_id);
       if(hot&&Number(hot.rowVersion)===Number(row.version))return hot;
@@ -4572,7 +4589,8 @@ async function movePouchToBag(db,body){
  * no save do personagem e o shared antigo o "mascarava" ao trocar de
  * personagem/reload (e a venda da pouch parecia nunca acontecer). */
 function finalizeEndStateTick(serialized,elapsed,checkpointAt){
-  const out=advanceAuthorityState(serialized,elapsed,checkpointAt);
+  const out=advanceAuthorityState(serialized,elapsed,checkpointAt,null,
+    {stepBudgetMs:AUTH_END_STEP_BUDGET_MS});
   if(out&&!out.terminalReason){
     try{
       let descriptor=typeof out.state==="string"?JSON.parse(out.state):out.state;

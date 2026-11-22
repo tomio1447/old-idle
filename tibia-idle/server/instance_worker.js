@@ -8,8 +8,15 @@
 "use strict";
 const {advanceAuthorityState}=require("./authoritative_engine");
 
+// Catchup por claim limitado em tempo real: um período offline grande
+// rodava milhares de steps síncronos dentro da claim (GET_LOCK+FOR UPDATE)
+// e congelava o event loop inteiro. A dívida fica em carryMs no estado e
+// drena nas claims seguintes — o catchup só se espalha no tempo.
+const WORKER_STEP_BUDGET_MS=Math.max(50,Number(process.env.AUTH_WORKER_STEP_BUDGET_MS)||400);
+
 function advanceInstanceClock(serialized,elapsed,checkpointAt){
-  const authoritative=advanceAuthorityState(serialized,elapsed,checkpointAt);
+  const authoritative=advanceAuthorityState(serialized,elapsed,checkpointAt,null,
+    {stepBudgetMs:WORKER_STEP_BUDGET_MS});
   if(authoritative)return authoritative;
   let state=serialized;
   if(typeof state==="string")state=JSON.parse(state);
