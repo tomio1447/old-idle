@@ -348,6 +348,11 @@ async function accountReleaseLease(token){
 
 let ACCOUNT_INSTANCE={id:"",version:0,status:null};
 let ACCOUNT_INSTANCE_EPOCH=0,ACCOUNT_INSTANCE_CAN_CREATE=false;
+/* Última rejeição definitiva de um PUT de create (403/pending irrecuperável).
+ * O loop de confirmação da entrada de boss/hunt aborta e devolve o erro real
+ * ao jogador em vez de esperar o watchdog genérico de 45s. */
+let ACCOUNT_INSTANCE_CREATE_REJECT="";
+function accountInstanceCreateRejection(){return ACCOUNT_INSTANCE_CREATE_REJECT;}
 let ACCOUNT_INSTANCE_QUEUE=Promise.resolve(true);
 let ACCOUNT_INSTANCE_LAST_PROMISE=ACCOUNT_INSTANCE_QUEUE;
 function accountQueueInstance(task){
@@ -386,7 +391,7 @@ function accountRemoteInstanceMatchesCombat(inst){
   if(instHunt)return instHunt===localHunt;
   return true;
 }
-function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=true;}
+function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=true;ACCOUNT_INSTANCE_CREATE_REJECT="";}
 async function accountLoadInstance(token){
   // Consulte antes de tickar: uma conta sem instância ativa deve receber 200
   // com null, não provocar o 410 esperado de /tick no console do navegador.
@@ -449,8 +454,28 @@ function accountSaveInstance(token,state){
     // congela as duas — o PUT create do boss nunca saía do navegador.
     if(typeof accountLastSavePromise==="function")await accountLastSavePromise();
     return accountQueueInstance(async()=>{
-    if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
-    if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
+    if(epoch!==ACCOUNT_INSTANCE_EPOCH||!state)return false;
+    const isCreate=ACCOUNT_INSTANCE.status!=="active"&&ACCOUNT_INSTANCE_CAN_CREATE;
+    // O lease pode piscar durante a troca de geração (end→create): um create
+    // que ainda é a geração atual espera o lease voltar em vez de morrer na
+    // fila — a arena órfã derrubava o jogador no watchdog de 45s. Ticks e
+    // checkpoints atrás deste task também seriam no-ops sem lease.
+    if(!accountLeaseAllowsSimulation()){
+      if(!isCreate)return false;
+      const leaseDeadline=Date.now()+8000;
+      while(!accountLeaseAllowsSimulation()&&Date.now()<leaseDeadline&&
+            epoch===ACCOUNT_INSTANCE_EPOCH&&ACCOUNT_INSTANCE_CAN_CREATE)
+        await new Promise((resolve)=>setTimeout(resolve,250));
+      if(!accountLeaseAllowsSimulation()||epoch!==ACCOUNT_INSTANCE_EPOCH||
+         !ACCOUNT_INSTANCE_CAN_CREATE){
+        console.warn("[instance] create adiado: lease indisponível");return false;}
+    }
+    if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE){
+      // Um apply(null) concorrente zerou o CAN_CREATE — a geração morreu; o
+      // loop de confirmação da entrada enfileira uma nova se a luta seguir.
+      console.warn("[instance] create drop: CAN_CREATE zerado por apply concorrente");
+      return false;
+    }
     // A linha vinculada precisa descrever o combate sendo salvo. Se um GET
     // concorrente a reatou a outra instância (a hunt que está sendo
     // encerrada, por ex.), o PUT sai como CREATE — nunca como checkpoint
@@ -461,12 +486,25 @@ function accountSaveInstance(token,state){
     const r=await _api("PUT","/api/instance",Object.assign({token,char_id:state.activeCharacterId||
       (typeof sessionCharId==="function"?sessionCharId():null),instance_id:boundOk?ACCOUNT_INSTANCE.id:null,
       expected_version:boundOk?ACCOUNT_INSTANCE.version:0,state},accountLeaseFields()));
-    if(r.data.ok){accountInstanceApply(r.data.instance);return true;}
+    if(isCreate&&r.data.pending){
+      // "Aguardando a instância do líder": convidado de party sem sala
+      // compartilhada — a vinculação vem do GET/tick, não deste PUT. Não
+      // aplique null (mataria o CAN_CREATE e desarmaria a entrada).
+      console.warn("[instance] create pendente — aguardando instância do líder");
+      return false;
+    }
+    if(r.data.ok){ACCOUNT_INSTANCE_CREATE_REJECT="";accountInstanceApply(r.data.instance);return true;}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409){
       accountInstanceApply(r.data.instance||null);
       try{window.dispatchEvent(new CustomEvent("tibia-idle-instance-conflict"));}catch(e){}
       if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
+    }else if(isCreate&&r.code&&r.code!==0){
+      // Erro definitivo no create (party estrangeira, requisito, estado
+      // inválido): retry não resolve — o loop de confirmação aborta com a
+      // mensagem real em vez do timeout genérico de 45s.
+      ACCOUNT_INSTANCE_CREATE_REJECT=r.data.msg||"O servidor recusou a instância.";
+      console.warn("[instance] create rejeitado",r.code,r.data.error||"",r.data.msg||"");
     }else if(typeof console!=="undefined"){
       console.warn("[instance] save recusado",r.code,r.data.error||"",r.data.msg||"");
     }
@@ -1723,7 +1761,14 @@ function accountEndInstance(token,reason){
       const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
       if(newerGeneration)ACCOUNT_INSTANCE_CAN_CREATE=true;return true;}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
-    if(r.code===409)accountInstanceApply(r.data.instance||null);
+    if(r.code===409){
+      accountInstanceApply(r.data.instance||null);
+      // Mesma regra do ok acima: se uma geração nova já começou (boss entry),
+      // o create enfileirado não pode morrer com CAN_CREATE zerado por este
+      // apply — só restaura quando nada ativo foi reatado.
+      if(ACCOUNT_INSTANCE_EPOCH!==endEpoch&&ACCOUNT_INSTANCE.status!=="active")
+        ACCOUNT_INSTANCE_CAN_CREATE=true;
+    }
     return false;
   });
 }

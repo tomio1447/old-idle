@@ -3,6 +3,27 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-22 — Boss/hunt entry: confirmação de instância em loop (fix crítico)
+
+- Bug crítico: ao iniciar boss fight, o PUT de create podia morrer
+  silenciosamente na fila de instância em condições transitórias (lease
+  expirando entre o end da hunt e o create, CAN_CREATE zerado por um
+  apply(null) concorrente, 409 do end), e o retry único não garantia
+  nova tentativa — arena órfã até o watchdog de 45s derrubar com
+  "O servidor não confirmou a instância. Retornando ao templo."
+- Novo confirmOnlineInstanceCreate: re-enfileira uma geração nova a cada
+  falha até ~40s (antes do watchdog), para boss E hunts. Aborta com a
+  mensagem real do servidor em rejeição definitiva (403/pending).
+- accountSaveInstance: create agora espera o lease voltar (até 8s) em vez
+  de morrer instantâneo; drops logam motivo; resposta `pending` preserva
+  CAN_CREATE; erro 4xx definitivo marca ACCOUNT_INSTANCE_CREATE_REJECT.
+- accountEndInstance: restaura CAN_CREATE no caminho 409 quando uma
+  geração nova já começou (o ok já restaurava; o conflito esquecia).
+- server saveInstance: create de boss de convidado em party de outra
+  conta agora recebe 403 BOSS_REQUIRES_OWN_PARTY com mensagem clara —
+  antes retornava `pending` para sempre (a sala é da conta líder).
+- Cache-buster: instance-confirm-v1 (game.js, account-client.js).
+---
 ## 2026-11-22 — Wheel of Destiny: bônus do Winter Update 2026
 
 - Mitigação corrigida pro valor oficial: MITIGATION_INCREASE 0,03%/ponto

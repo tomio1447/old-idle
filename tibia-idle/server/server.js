@@ -3055,6 +3055,11 @@ async function saveInstance(db,body){
     if(party&&Number(party.leader_id)!==activeId&&!shared&&!bossCreate)
       return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
     if(party&&Number(party.owner_account_id)!==Number(acc.id)){
+      // Create de boss de convidado de party estrangeira: `pending` nunca se
+      // resolve (a sala é da conta líder) — a arena ficava órfã até o
+      // watchdog de 45s. Recuse já com o motivo real.
+      if(!shared&&bossCreate)return {code:403,body:{ok:false,error:"BOSS_REQUIRES_OWN_PARTY",
+        msg:"Saia da party de outra conta para enfrentar um boss."}};
       if(!shared)return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
       const own=await db.instanceGet(acc.id);
       if(own&&own.status==="active"&&String(own.instance_id)!==String(shared.instance_id))

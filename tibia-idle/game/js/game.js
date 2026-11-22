@@ -2815,16 +2815,16 @@ function startBoss(id, force, arenaReady) {
   G.combat.instanceStartedAt = Date.now();
   G.inCity = false;
   if(typeof persistActiveInstance==="function")persistActiveInstance();
-  // Se o PUT de create falhar (409/epoch), o online não ticka e o boss fica
-  // forever em arenaBossSpawn.pending — re-tenta uma vez.
-  if (typeof accountLastInstancePromise === "function") {
+  // Se o PUT de create falhar (409/epoch/lease transitório), o online não
+  // ticka e o boss fica forever em arenaBossSpawn.pending — confirme em loop
+  // até a instância vincular ou o servidor rejeitar de vez.
+  if (typeof confirmOnlineInstanceCreate === "function") {
     const bossId = id;
-    accountLastInstancePromise().then((ok) => {
-      if (ok || !G.combat || !G.combat.boss || G.combat.boss.id !== bossId) return;
-      if (typeof accountInstanceActive === "function" && accountInstanceActive()) return;
-      if (typeof accountBeginInstance === "function") accountBeginInstance();
-      if (typeof persistActiveInstance === "function") persistActiveInstance();
-    }).catch(() => {});
+    confirmOnlineInstanceCreate(
+      () => typeof accountInstanceActive === "function" && accountInstanceActive() &&
+            typeof ACCOUNT_INSTANCE !== "undefined" && ACCOUNT_INSTANCE &&
+            String(ACCOUNT_INSTANCE.bossId || "") === bossId,
+      () => !!(G.combat && G.combat.boss && G.combat.boss.id === bossId));
   }
   const spawnWait=typeof bossArenaSpawnDelayMs==="function"?bossArenaSpawnDelayMs(id):5000;
   if(id!=="goshnar-s-megalomania"&&spawnWait>0)
@@ -3015,6 +3015,16 @@ function startHuntAfterLease(id, instanceMode, force) {
       else G.huntMapReady = true;
       spawnWave(G.combat, G.p);
       if(typeof persistActiveInstance==="function")persistActiveInstance();
+      // Mesma proteção da entrada de boss: create que morre na fila deixava
+      // a hunt órfã até o watchdog de 45s — confirme em loop.
+      if (typeof confirmOnlineInstanceCreate === "function") {
+        const huntId = id;
+        confirmOnlineInstanceCreate(
+          () => typeof accountInstanceActive === "function" && accountInstanceActive() &&
+                typeof ACCOUNT_INSTANCE !== "undefined" && ACCOUNT_INSTANCE &&
+                String(ACCOUNT_INSTANCE.huntId || "") === huntId,
+          () => !!(G.combat && !G.combat.boss && G.combat.huntId === huntId));
+      }
       addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
       toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
       // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
@@ -4509,6 +4519,32 @@ function combatInstanceEntryPending(){
   const started=Number(c.instanceStartedAt)||0;
   if(!started||(Date.now()-started)>12000)return false;
   return typeof accountInstanceActive!=="function"||!accountInstanceActive();
+}
+/* O PUT de create pode morrer em condições transitórias — epoch de um end
+ * concorrente, CAN_CREATE zerado por um apply(null) corrido, lease piscando
+ * na troca de geração, 409/NETWORK. Sem confirmação a arena fica órfã e o
+ * watchdog de 45s derruba o jogador ("O servidor não confirmou..."). Re-
+ * enfileira uma geração nova a cada falha até ~40s (antes do watchdog).
+ * Rejeição definitiva (403/pending) aborta com a mensagem real do servidor. */
+function confirmOnlineInstanceCreate(isBound,isCurrent){
+  if(typeof accountLastInstancePromise!=="function")return;
+  const deadline=Date.now()+40000;
+  (async()=>{
+    while(isCurrent()&&!isBound()&&Date.now()<deadline){
+      const settled=await accountLastInstancePromise();
+      if(!isCurrent()||isBound())return;
+      if(settled&&typeof accountInstanceActive==="function"&&accountInstanceActive())return;
+      const rejected=typeof accountInstanceCreateRejection==="function"?accountInstanceCreateRejection():"";
+      if(rejected){
+        if(typeof toast==="function")toast(rejected+" Retornando ao templo.","bad");
+        setTimeout(()=>{if(isCurrent()&&typeof stopHunt==="function")stopHunt(true);},0);
+        return;
+      }
+      if(typeof accountBeginInstance==="function")accountBeginInstance();
+      if(typeof persistActiveInstance==="function")persistActiveInstance();
+      await new Promise((res)=>setTimeout(res,1200));
+    }
+  })().catch(()=>{});
 }
 /* FX/fala/projéteis do canvas + speech nas entidades. Sem isso, reconnect
  * ou troca de hunt deixava areafx/palavras mágicas congelados na tela. */
