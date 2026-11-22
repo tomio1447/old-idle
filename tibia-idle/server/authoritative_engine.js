@@ -40,6 +40,9 @@ require("../game/js/gloom-pillars.js").registerLoot(MONSTERS);
 // Stonerefiner (Corym Mines): loot reduzido em 50% — chance de cada
 // entrada dividida por 2, mesma redução aplicada no cliente.
 require("../game/js/stonerefiner.js").registerLoot(MONSTERS);
+// Roshamuul: o miniboss Mawhawk sempre dropa 1x Dream Matter — mesma
+// correção de loot aplicada no catálogo do cliente.
+require("../game/js/roshamuul.js").registerLoot(MONSTERS);
 // True Asuras - Thalassara (400+): a True Feverbloom Asura é do update
 // Forbidden Gardens (15.30) e não existe no dump Canary — a ficha vem do
 // patch da hunt (stats oficiais tibia.com/TibiaWiki balanceados sobre as
@@ -631,7 +634,9 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"],cat:"hard",pack:10,packMin:6,packMax:10},
   "buried-cathedral":{monsters:["ripper-spectre","gazer-spectre","burster-spectre","arachnophobica"],cat:"hard",pack:10,packMin:6,packMax:10},
   "ingol-terrain":{monsters:["harpy","crape-man","liodile","boar-man","carnivostrich"],cat:"hard",pack:10,packMin:6,packMax:10},
-  "roshamuul":{monsters:["guzzlemaw","frazzlemaw","silencer"],cat:"hard",pack:10,packMin:6,packMax:10,spawnWeights:{guzzlemaw:40,frazzlemaw:40,silencer:20}},
+  "roshamuul":{monsters:["guzzlemaw","frazzlemaw","silencer"],cat:"hard",pack:10,packMin:6,packMax:10,
+    bossMobs:["mawhawk"],
+    spawnWeights:{guzzlemaw:4000,frazzlemaw:4000,silencer:2000,mawhawk:1}},
   "prison-1":{monsters:["lost-soul","plaguesmith","demon-outcast","betrayed-wraith","dark-torturer"],cat:"hard",pack:10,packMin:6,packMax:10},
   "prison-2":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker"],cat:"hard",pack:10,packMin:6,packMax:10},
   "prison-3":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker","plaguesmith","juggernaut"],cat:"hard",pack:10,packMin:6,packMax:10},

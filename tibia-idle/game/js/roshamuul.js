@@ -8,6 +8,13 @@
  *
  * Chances de spawn: Guzzlemaw 40%, Frazzlemaw 40%, Silencer 20%.
  *
+ * Miniboss raro: Mawhawk (lookType 595) — 0,01% por slot de spawn
+ * (peso 1 num total de 10001). Entra via hunt.bossMobs + spawnWeights,
+ * mesmo padrão dos mini bosses da Falcon Bastion; o peso fracionário
+ * não funciona no roll inteiro do engine, por isso os pesos vêm
+ * escalados x100. Loot vai pro Reward Chest e sempre traz 1x Dream
+ * Matter (drop garantido adicionado por registerLoot).
+ *
  * Coordenadas absolutas do RME: centerroom {1073,1001,7},
  * playerspawn {1069,1004,7}, spawnradius {1069,998,7}..{1079,1005,7}.
  *
@@ -37,7 +44,24 @@ const ROSHAMUUL_LOOT_ITEMS = {
   "frazzle-skin":                  { n: "frazzle skin", s: null, t: "loot", cid: 20199, w: 1.90, sell: 400, npcSell: 400 },
   "silencer-claws":                { n: "silencer claws", s: null, t: "loot", cid: 20200, w: 4.20, sell: 390, npcSell: 390 },
   "silencer-resonating-chamber":   { n: "silencer resonating chamber", s: null, t: "loot", cid: 20201, w: 3.50, sell: 600, npcSell: 600 },
+  "unrealized-dream":              { n: "unrealized dream", s: null, t: "loot", cid: 20264, w: 33.00, sell: 0, npcSell: 0 },
 };
+
+/* Mawhawk: drop oficial garantido de 1x Dream Matter (Canary loota a
+ * tabela comum; o sempre-drop é o que financia a Guzzlemaw Wall).
+ * `registerLoot` segue o padrão do putrefactory.js: o cliente aplica
+ * em GAMEDATA.monsters/MONSTERDATA, o engine aplica no MONSTERS. */
+const ROSHAMUUL_PATCH = {
+  registerLoot(monsters) {
+    const m = monsters && monsters["mawhawk"];
+    if (!m) return;
+    if (!Array.isArray(m.loot)) m.loot = [];
+    if (!m.loot.some((l) => l && l.item === "dream-matter"))
+      m.loot.push({ chance: 100, max: 1, item: "dream-matter" });
+  },
+};
+
+if (typeof module !== "undefined" && module.exports) module.exports = ROSHAMUUL_PATCH;
 
 /* Médias ponderadas 40/40/20 (Canary: hp/exp/dano/armor). */
 const ROSHAMUUL_AVG = { hp: 5280, exp: 4936, damage: 423, armor: 73, gold: 120 };
@@ -67,7 +91,10 @@ const ROSHAMUUL_AVG = { hp: 5280, exp: 4936, damage: 423, armor: 73, gold: 120 }
     packMin: 6,
     packMax: 10,
     monsters: ["guzzlemaw", "frazzlemaw", "silencer"],
-    spawnWeights: { guzzlemaw: 40, frazzlemaw: 40, silencer: 20 },
+    bossMobs: ["mawhawk"],
+    /* Pesos x100 para o roll inteiro do engine: mawhawk 1/10001 ≈ 0,01%
+     * por slot; os demais mantêm a proporção oficial 40/40/20. */
+    spawnWeights: { guzzlemaw: 4000, frazzlemaw: 4000, silencer: 2000, mawhawk: 1 },
     color: "#6a4458",
     scene: "desert",
     otbm: ROSHAMUUL.otbm,
@@ -84,6 +111,9 @@ const ROSHAMUUL_AVG = { hp: 5280, exp: 4936, damage: 423, armor: 73, gold: 120 }
     avgGold: ROSHAMUUL_AVG.gold,
     respawn: 1,
   };
+
+  ROSHAMUUL_PATCH.registerLoot(GAMEDATA.monsters);
+  if (typeof MONSTERDATA !== "undefined") ROSHAMUUL_PATCH.registerLoot(MONSTERDATA);
 
   if (typeof MISSION_DEFS !== "undefined") {
     MISSION_DEFS.roshamuul = {

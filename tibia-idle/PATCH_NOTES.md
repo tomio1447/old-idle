@@ -3,6 +3,26 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+## 2026-11-21 — Roshamuul: miniboss Mawhawk (0,01%)
+
+- Mawhawk agora pode aparecer na hunt Roshamuul (Guzzlemaw Valley) com
+  chance de 0,01% por slot de spawn — peso 1 num total de 10001 via
+  hunt.bossMobs + spawnWeights (mesmo padrão dos mini bosses da Falcon
+  Bastion; pesos dos 3 regulares escalados x100 p/ 4000/4000/2000, a
+  proporção 40/40/20 não muda).
+- Ele spawna como miniboss (mob.boss): o loot vai pro Reward Chest com
+  bundle próprio e SEMPRE contém 1x Dream Matter — chance:100 max:1
+  adicionado por ROSHAMUUL_PATCH.registerLoot (aplicado em
+  GAMEDATA.monsters/MONSTERDATA no cliente e no MONSTERS do engine).
+- Item novo no catálogo: unrealized-dream (cid 20264, 33 oz, sem
+  comprador NPC — sell 0), drop oficial de 30% do Mawhawk; ícone
+  renderizado do DAT 15.x (game/assets/item/unrealized-dream.png).
+- Paridade: engine HUNTS["roshamuul"] com bossMobs + pesos iguais; roll
+  inteiro do servidor e roll float do cliente dão exatamente 1/10001.
+- Teste: tools/test_roshamuul.js cobre pesos, bossMobs, amostra 400k de
+  pickHuntSpawnSlug (~40 mawhawks esperados), loot garantido e sprites.
+
+---
 ## 2026-11-21 — Log: fonte de dano/cura +35%
 
 - Linhas de dano e cura do log de combate renderizam com fonte 35%

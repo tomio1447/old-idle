@@ -3,7 +3,10 @@
  * 1. OTBM publicado em game/maps (byte-igual ao beta-maps) com piso z=7:
  *    centerroom {1073,1001,7}, playerspawn {1069,1004,7} e spawnradius
  *    {1069,998,7}..{1079,1005,7} com chão.
- * 2. Hunt 250+ com as 3 criaturas do Canary e spawn 40/40/20.
+ * 2. Hunt 250+ com as 3 criaturas do Canary e spawn 40/40/20 (pesos
+ *    escalados x1000/x100 pro roll inteiro) + miniboss raro Mawhawk
+ *    (0,01% por slot = 1/10001, sempre dropa 1x Dream Matter no
+ *    Reward Chest).
  * 3. Loot: creature products no catálogo com preço NPC da TibiaWiki.
  * 4. Missão 250 kills (100+100+50). Catálogo HUNTS 250+ lista a hunt.
  */
@@ -52,9 +55,12 @@ for (const id of usedIds) {
   must(h.cat === "hard" && h.pack === 10 && h.packMin === 6 && h.packMax === 10, "hunt sem cat hard/pack");
   must(JSON.stringify(h.monsters) === JSON.stringify(MOBS),
     "monstros da hunt divergentes do Canary");
-  must(h.spawnWeights && h.spawnWeights.guzzlemaw === 40 &&
-    h.spawnWeights.frazzlemaw === 40 && h.spawnWeights.silencer === 20,
-    "spawnWeights 40/40/20 ausentes");
+  must(JSON.stringify(h.bossMobs) === JSON.stringify(["mawhawk"]),
+    "bossMobs sem o miniboss mawhawk: " + JSON.stringify(h.bossMobs));
+  must(h.spawnWeights && h.spawnWeights.guzzlemaw === 4000 &&
+    h.spawnWeights.frazzlemaw === 4000 && h.spawnWeights.silencer === 2000 &&
+    h.spawnWeights.mawhawk === 1,
+    "spawnWeights escalados (4000/4000/2000/1 = 0,01% mawhawk) ausentes");
   must(h.otbm === "roshamuul" && h.otbmFloor === 7, "hunt sem otbm/floor");
   must(JSON.stringify(h.otbmSpawn) === JSON.stringify({ x: 1069, y: 1004, z: 7 }) &&
     JSON.stringify(h.otbmMobBounds) === JSON.stringify({ x: 1069, y: 998, w: 11, h: 8, z: 7 }),
@@ -65,24 +71,38 @@ for (const id of usedIds) {
   const src = fs.readFileSync(path.join(root, "server", "authoritative_engine.js"), "utf8");
   must(src.includes('"roshamuul":{monsters:["guzzlemaw","frazzlemaw","silencer"]'),
     "servidor sem HUNTS de roshamuul");
+  must(src.includes('bossMobs:["mawhawk"]') &&
+    src.includes('mawhawk:1'),
+    "servidor sem mawhawk em bossMobs/peso 1");
   const auth = { kind: "hunt", huntId: "roshamuul", ended: false, mobs: [], pendingSpawns: [],
     spawnPool: [], spawnIds: ["srv-r1", "srv-r2", "srv-r3"], pack: 3, wave: 0,
     gridW: 30, gridH: 30, spawnPoints: [{ cx: 10, cy: 10, x: 0.35, y: 0.35, sx: 0.35, sy: 0.35 }],
     clock: Date.now(), rngState: 424242, fiendishChance: 0, influencedChance: 0 };
   engine.spawnHuntWave(auth, Date.now());
-  must(auth.spawnPool.length === 3 && MOBS.every((s) => auth.spawnPool.includes(s)),
-    "pool online não inclui as 3 criaturas: " + JSON.stringify(auth.spawnPool));
+  must(auth.spawnPool.length === 4 && MOBS.every((s) => auth.spawnPool.includes(s)) &&
+    auth.spawnPool.includes("mawhawk"),
+    "pool online não inclui as 3 criaturas + mawhawk: " + JSON.stringify(auth.spawnPool));
 
-  const counts = { guzzlemaw: 0, frazzlemaw: 0, silencer: 0 };
+  const counts = { guzzlemaw: 0, frazzlemaw: 0, silencer: 0, mawhawk: 0 };
   const sample = { kind: "hunt", huntId: "roshamuul", rngState: 7 };
-  for (let i = 0; i < 1000; i++) {
+  const SAMPLES = 400000;
+  for (let i = 0; i < SAMPLES; i++) {
     const slug = engine.pickHuntSpawnSlug(sample);
     counts[slug] = (counts[slug] || 0) + 1;
   }
-  must(counts.guzzlemaw > 300 && counts.guzzlemaw < 500 &&
-    counts.frazzlemaw > 300 && counts.frazzlemaw < 500 &&
-    counts.silencer > 120 && counts.silencer < 280,
+  // 4000/4000/2000/1 sobre 10001: ~40%/~40%/~20% e ~0,01% de mawhawk.
+  must(counts.guzzlemaw > 150000 && counts.guzzlemaw < 170000 &&
+    counts.frazzlemaw > 150000 && counts.frazzlemaw < 170000 &&
+    counts.silencer > 70000 && counts.silencer < 90000,
     "amostra 40/40/20 fora do esperado: " + JSON.stringify(counts));
+  // Esperado ~40 em 400k; faixa larga só garante a taxa de ~0,01%.
+  must(counts.mawhawk >= 10 && counts.mawhawk <= 120,
+    "taxa do miniboss mawhawk fora de ~0,01%: " + counts.mawhawk);
+  const mh = engine.MONSTERS.mawhawk;
+  must(mh && mh.looktype === 595, "mawhawk sem def/looktype 595 no MONSTERS");
+  const dm = (mh.loot || []).filter((l) => l && l.item === "dream-matter");
+  must(dm.length === 1 && dm[0].chance === 100 && dm[0].max === 1,
+    "mawhawk sem 1x dream-matter garantido: " + JSON.stringify(mh.loot));
 }
 
 {
@@ -109,6 +129,23 @@ for (const id of usedIds) {
         slug + ": loot sem preço (autoseller pularia): " + l.item);
     }
   }
+  // Miniboss Mawhawk: tabela inteira resolvível no catálogo + sprites.
+  {
+    const maw = engine.MONSTERS.mawhawk;
+    must(fs.existsSync(path.join(game, "assets", "mob", "mawhawk.png")),
+      "mawhawk sem spritesheet");
+    for (const l of maw.loot) {
+      const it = items[l.item];
+      must(it, "mawhawk: item de loot fora do catálogo: " + l.item);
+      must(fs.existsSync(path.join(game, "assets", "item", l.item + ".png")),
+        "mawhawk: loot sem sprite de item: " + l.item);
+      const sellable = Number(it.npcSell) > 0 || Number(it.sell) > 0;
+      const questy = l.item === "cluster-of-solace" || l.item === "dream-matter" ||
+        l.item === "unrealized-dream";
+      must(sellable || questy,
+        "mawhawk: loot sem preço (autoseller pularia): " + l.item);
+    }
+  }
   must(items["frazzle-tongue"] && items["frazzle-tongue"].sell === 700, "frazzle-tongue sem sell 700");
   must(items["frazzle-skin"] && items["frazzle-skin"].sell === 400, "frazzle-skin sem sell 400");
   must(items["silencer-claws"] && items["silencer-claws"].sell === 390, "silencer-claws sem sell 390");
@@ -128,7 +165,7 @@ for (const id of usedIds) {
   must(uiSrc.includes('"HUNTS 250+"') && uiSrc.includes('"roshamuul"'),
     "hunt-sections.js sem roshamuul na seção HUNTS 250+");
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
-  must(html.includes("roshamuul.js?v=roshamuul-v1") && html.includes("js/ui.js?v="),
+  must(html.includes("roshamuul.js?v=roshamuul-") && html.includes("js/ui.js?v="),
     "cache-busts do Roshamuul ausentes no index");
 }
 
@@ -143,4 +180,4 @@ must(engine.MONSTERS.silencer && engine.MONSTERS.silencer.skills &&
     (s && String(s.n || s.name || "").toLowerCase().includes("silencer"))),
   "Silencer sem skill reducer do Canary");
 
-console.log("ok: roshamuul (mapa + hunt 250+ + loot Canary + spawn 40/40/20 + missão 250 kills)");
+console.log("ok: roshamuul (mapa + hunt 250+ + loot Canary + spawn 40/40/20 + miniboss mawhawk 0,01% + missão 250 kills)");
