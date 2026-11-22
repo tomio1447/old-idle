@@ -12,6 +12,7 @@
 "use strict";
 const fs=require("fs"),path=require("path");
 const engine=require("../server/authoritative_engine");
+const engineSrc=fs.readFileSync(path.join(__dirname,"..","server","authoritative_engine.js"),"utf8");
 const gameSrc=fs.readFileSync(path.join(__dirname,"..","game","js","game.js"),"utf8");
 const wbSrc=fs.readFileSync(path.join(__dirname,"..","game","js","world-boss-ui.js"),"utf8");
 const serverSrc=fs.readFileSync(path.join(__dirname,"..","server","server.js"),"utf8");
@@ -28,6 +29,14 @@ must(wbSrc.includes("function wbExitCombatNow")&&wbSrc.includes('wbExitCombatNow
 must(serverSrc.includes("AUTH_TICK_STEP_BUDGET_MS")&&serverSrc.includes("resolved.worldBoss)tickOpts.hotAuth"),
   "tick sem orçamento de steps / world boss fora do hot path");
 must(workerSrc.includes("WORKER_STEP_BUDGET_MS"),"worker sem orçamento de steps");
+// Cooldown do boss: carimbo por engajamento (authMarkBossEngaged), não na
+// entrada — instância quebrada nunca confirmada não queima a tentativa.
+must(engineSrc.includes("function authMarkBossEngaged")&&engineSrc.includes("authMarkBossEngaged(auth)"),
+  "engine sem carimbo de lastFight por engajamento");
+must(!/initializeAuthority[\s\S]{0,4000}lastFight\s*=\s*auth\.clock/.test(engineSrc.split("function initializeAuthority")[1].split("function materializeAuthority")[0]),
+  "initializeAuthority ainda carimbando lastFight no create");
+must(gameSrc.includes("bossFightEngaged(G.combat)")&&gameSrc.includes("bossStampFight"),
+  "cliente sem carimbo de cooldown por engajamento no stopHunt");
 
 function player(overrides){
   return Object.assign({id:1,name:"Tester",voc:"knight",level:800,exp:engine.expForLevel(800),

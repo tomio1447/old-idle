@@ -3560,6 +3560,7 @@ function applyOutgoingLeech(auth,p,dmg,slug,now){
 }
 function afterPlayerHit(auth,p,tgt,dealt,now){
   if(!(dealt>0)||!p)return;
+  if(tgt&&tgt.boss)authMarkBossEngaged(auth);
   applyOutgoingLeech(auth,p,dealt,tgt&&tgt.slug,now);
   tryCharmOffensive(auth,p,tgt,now);
 }
@@ -4024,6 +4025,7 @@ function absorbMagicShield(auth,item,p,dmg,now,pos,element){
 }
 function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
   dmg=Math.max(0,Math.floor(Number(dmg)||0));
+  if(mob&&mob.boss)authMarkBossEngaged(auth); // boss atacando a PT = luta engajada
   if(dmg<=0)return 0;
   /* Hazard (Gnomprona, crystalserver): todo hit do monstro hazard leva
    * damage boost +2%/nível e tem 7,5% de chance de CRIT (+50% de dano
@@ -8194,11 +8196,28 @@ function tickAuthSpawnQueue(auth,now){
   auth.pendingSpawns=auth.pendingSpawns.filter((sp)=>!sp.done);
 }
 function respawn(auth,now){spawnHuntWave(auth,now,{force:true,keepPack:true});}
+/* Cooldown do boss só conta quando a luta ENGAGE: o boss deu ou levou dano
+ * (ou a luta já encerrou por combate). Instância quebrada/orphan — create
+ * nunca confirmado, watchdog matando a row sem tick — não carimba nada.
+ * Carimba TODOS os membros: a tentativa é por personagem (party.js gate). */
+function authMarkBossEngaged(auth){
+  if(!auth||auth._bossFightEngaged||String(auth.kind||"")!=="boss"||!auth.bossId||
+     (typeof authIsWorldBoss==="function"&&authIsWorldBoss(auth)))return;
+  auth._bossFightEngaged=true;
+  for(const item of auth.players||[]){
+    const p=item&&item.p;if(!p)continue;
+    p.bosses=p.bosses||{};p.bosses[auth.bossId]=p.bosses[auth.bossId]||{};
+    p.bosses[auth.bossId].lastFight=auth.clock;
+  }
+}
 function fullWipe(auth){
   // Nunca sobrescreve um terminal já decidido no mesmo step: o boss pode
   // morrer no tick em que a PT está toda caída — "party-wipe" apagava o
   // "boss-defeated" e o fluxo de vitória (loot/toast/retorno) morria junto.
   if(auth.ended)return;
+  // Wipe dentro de uma arena de boss = tentativa consumida (mesmo se o
+  // grupo morreu pros adds sem encostar no boss).
+  authMarkBossEngaged(auth);
   // Wipe = custo da bless: o flag comprado é consumido aqui (não em morte
   // individual). Os caminhos de revive pago re-setam blessed=true abaixo.
   for(const item of auth.players||[]){if(item&&item.p)item.p.blessed=false;}
@@ -9322,7 +9341,7 @@ function step(auth,now,opts){if(auth.ended)return;
       const isHuntMiniBoss=auth.kind==="hunt";
       // Boss de arena (kind=boss) encerra a luta; mini boss de HUNT não —
       // a caçada continua, só o loot vai para o Reward Chest.
-      if(!isHuntMiniBoss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;}
+      if(!isHuntMiniBoss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;authMarkBossEngaged(auth);}
       if(leader){
         const bossKey=auth.bossId||mob.slug;
         leader.p.bosses[bossKey]=leader.p.bosses[bossKey]||{};
@@ -9394,6 +9413,13 @@ function step(auth,now,opts){if(auth.ended)return;
     }
   }
 
+  // Cooldown do boss: "engajou" quando o boss levou dano (funis player→mob
+  // que não passam por afterPlayerHit — DoT, reflect, áreas — entram aqui).
+  // Boss batendo na PT entra via absorbIncomingDamage(mob.boss).
+  if(auth.kind==="boss"&&!auth._bossFightEngaged){
+    const bm=(auth.mobs||[]).find((m)=>m&&m.boss);
+    if(bm&&Number(bm.maxHp)>0&&Number(bm.hp)<Number(bm.maxHp))authMarkBossEngaged(auth);
+  }
   // Batalha PvP não usa fullWipe — respawn contínuo até o fim do timer.
   if(!auth.pvpBattle&&auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
   if(auth.pvpBattle)pvpBattleTick(auth,now,opts&&opts.dt);
@@ -9605,8 +9631,9 @@ function initializeAuthority(descriptor,instanceId,now){
         deathAbsorbs:true,
       });
     }
-    const leader=players[0]&&players[0].p;
-    if(leader&&auth.bossId){leader.bosses[auth.bossId]=leader.bosses[auth.bossId]||{};leader.bosses[auth.bossId].lastFight=auth.clock;}
+    // lastFight NÃO é carimbado aqui: o cooldown do boss só conta quando a
+    // luta engaja (authMarkBossEngaged). Carimbar no create queimava a
+    // tentativa em instância quebrada/orphan que nunca chegou ao combate.
     if(auth.bossId==="goshnar-s-megalomania"){
       auth.mega={bossSpawnAt:auth.clock+MEGA_BOSS_SPAWN_MS,bossSpawned:false,pendingBoss:null,
         phase:"waiting",immune:true,personal:{},pendingIntents:[]};

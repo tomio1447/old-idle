@@ -2001,6 +2001,35 @@ function bossState(p, id) {
   return p.bosses[id];
 }
 
+/* O cooldown do boss só vale quando a luta realmente aconteceu: o boss deu
+ * ou levou dano, ou a luta encerrou (vitória/wipe). Uma instância quebrada
+ * — create nunca confirmado, watchdog matando antes do combate — não pode
+ * queimar a tentativa. _bossFightEngaged vem do dreno de eventos (hit/
+ * kill/taken) para o caso de o HP já ter voltado ao máximo na saída. */
+function bossFightEngaged(c) {
+  if (!c || !c.boss) return false;
+  if (c.bossDefeated || c._bossFightEngaged) return true;
+  const mobs = Array.isArray(c.mobs) ? c.mobs : [],
+    bid = String((c.boss && (c.boss.id || c.boss.slug)) || ""),
+    bm = mobs.find((m) => m && (m.boss || String(m.slug || "") === bid)),
+    bmax = bm ? (Number(bm.maxHp) || Number(bm.def && bm.def.hp) || 0) : 0;
+  if (bm && bmax > 0 && Number(bm.hp) < bmax) return true;
+  const ps = (Array.isArray(c.players) && c.players.length ? c.players
+    : (c.player ? [c.player] : [])).concat(G.p ? [{ p: G.p }] : []);
+  for (const pl of ps) {
+    const p = (pl && pl.p) || pl;
+    if (p && typeof maxStats === "function") {
+      const mx = Number(maxStats(p).hp) || 0;
+      if (mx > 0 && Number(p.hp) < mx) return true;
+    }
+  }
+  return false;
+}
+function bossStampFight(p, bossId) {
+  if (!BOSS_COOLDOWNS_ENABLED || !p || !bossId) return;
+  bossState(p, bossId).lastFight = Date.now();
+}
+
 function bossReadyInfo(p, boss) {
   if (boss.unavailable) return { ok: false, reason: "Em breve", left: 0 };
   const enforceRequirement = boss.requirement &&
@@ -2799,8 +2828,9 @@ function startBoss(id, force, arenaReady) {
            typeof accountEndInstance === "function" && typeof sessionToken === "function") {
     accountEndInstance(sessionToken(), "boss-reentry").catch(() => {});
   }
-  const st = bossState(G.p, id);
-  st.lastFight = BOSS_COOLDOWNS_ENABLED ? Date.now() : 0;
+  // lastFight NÃO é carimbado na entrada: instância quebrada (create não
+  // confirmado/orphan) não pode queimar a tentativa. O cooldown sai no
+  // stopHunt quando a luta realmente engajou (bossFightEngaged).
   // Esta reinicialização só faz parte da regra de requisito da Timira.
   if (BOSS_REQUIREMENTS_ENABLED && id === "timira-the-many-headed") {
     const mst = missionState(G.p, "marapur-nagas");
@@ -3132,6 +3162,14 @@ function resetTemplePlayerPosition() {
 
 function stopHunt(skipMapLoading, opts) {
   opts = opts || {};
+  // Cooldown do boss só quando a luta engajou (boss deu/levou dano, venceu
+  // ou a PT wipeou) — instância quebrada não queima a tentativa.
+  if (G.combat && G.combat.boss && bossFightEngaged(G.combat)) {
+    const _bid = G.combat.boss.id || G.combat.boss.slug,
+      _pls = (Array.isArray(G.combat.players) && G.combat.players.length
+        ? G.combat.players : [{ p: G.p }]);
+    for (const _pl of _pls) bossStampFight((_pl && _pl.p) || _pl, _bid);
+  }
   // Megalomania: ao voltar ao templo (morte/wipe), ejetar do lobby.
   // Fire-and-forget: leave-fight no servidor já encerra a sala se vazia;
   // epoch bump dentro de megaLobbyLeaveFight cancela PUTs em voo.
@@ -3395,6 +3433,12 @@ function drainEvents() {
   const ey = (e) => (e.y !== undefined && e.y !== null)
     ? e.y : (c.player ? c.player.y : 0.5);
   for (const e of ready) {
+    // Qualquer troca de dano dentro de uma arena de boss marca a tentativa
+    // como consumida — serve de prova para o cooldown no stopHunt mesmo se
+    // o HP já voltou ao máximo quando o combate encerrar.
+    if (c.boss && !c._bossFightEngaged &&
+        (e.t === "hit" || e.t === "kill" || e.t === "taken"))
+      c._bossFightEngaged = true;
     switch (e.t) {
       case "hit": {
         // Cor do NUMERO de dano: fisico em VERMELHO contra criaturas de
