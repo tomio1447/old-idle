@@ -169,9 +169,10 @@ function rebuildMobileMenuActions() {
   const host = document.getElementById("mobile-menu-actions");
   const topbar = document.querySelector("#app .topbar");
   if (!host || !topbar) return;
-  const skip = { "btn-config": 1 };
+  const skip = { "btn-config": 1, "btn-city": 1 };
   const bits = [];
-  topbar.querySelectorAll(":scope > button").forEach((btn) => {
+  // Os botões moram dentro de .topbar-hero e .topbar-btns — pegar descendentes.
+  topbar.querySelectorAll("button").forEach((btn) => {
     if (!btn.id || skip[btn.id]) return;
     if (btn.hidden || btn.style.display === "none") return;
     const label = (btn.textContent || "").replace(/\s+/g, " ").trim() || btn.id;

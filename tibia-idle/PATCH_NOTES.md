@@ -1909,3 +1909,11 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   `MOUNTED_MASKS` (mountedmaskdata.js, gerado por
   `tools/gen_mounted_masks.py`) lista os sufixos existentes por outfit —
   preload e AppearanceRenderer só requisitam máscaras que existem.
+
+- **Topbar mobile corrigida**: as regras escondiam `.topbar > button`
+  (filho direto), mas todos os botões moram dentro de `.topbar-hero`
+  (absoluto) e `.topbar-btns` (faixa wrap) — no celular a topbar
+  empilhava 3 linhas de ações. Agora hero + faixa são escondidos
+  (ficam só CONFIG e Cidade), os itens de info não encolhem e a faixa
+  rola na horizontal. `rebuildMobileMenuActions` passa a listar os
+  botões descendentes da topbar — o sheet Menu estava vazio de ações.

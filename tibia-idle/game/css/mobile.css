@@ -196,17 +196,29 @@ html[data-ui-mode="mobile"] .alpha-brand-logo .brand-logo {
 html[data-ui-mode="mobile"] .brand-credits {
   font-size: 10px;
 }
-html[data-ui-mode="mobile"] .topbar > button {
-  display: none !important; /* ações no sheet / dock Menu */
+/* Todos os botões de ação (quadrados .topbar-hero + faixa .topbar-btns)
+   vão para o sheet do dock Menu; na topbar ficam só CONFIG e Cidade.
+   Os botões não são filhos diretos de .topbar — estão nos wrappers. */
+html[data-ui-mode="mobile"] .topbar .topbar-hero,
+html[data-ui-mode="mobile"] .topbar .topbar-btns > button {
+  display: none !important;
 }
-html[data-ui-mode="mobile"] .topbar #btn-config {
+html[data-ui-mode="mobile"] .topbar .topbar-btns {
+  flex-basis: auto;
+  flex: none;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+html[data-ui-mode="mobile"] .topbar #btn-config,
+html[data-ui-mode="mobile"] .topbar #btn-city {
   display: inline-flex !important;
   min-height: 40px;
   flex: none;
 }
-html[data-ui-mode="mobile"] .topbar #btn-city {
-  display: inline-flex !important;
-  min-height: 40px;
+/* Itens de info não encolhem — a faixa rola na horizontal se faltar espaço. */
+html[data-ui-mode="mobile"] .topbar .row.small,
+html[data-ui-mode="mobile"] .topbar #tibia-coins,
+html[data-ui-mode="mobile"] .topbar .topbar-clock {
   flex: none;
 }
 html[data-ui-mode="mobile"] .server-status {
