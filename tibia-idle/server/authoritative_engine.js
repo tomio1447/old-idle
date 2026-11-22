@@ -2046,7 +2046,10 @@ const IMB_SKILL_FX={
   Swiftness:{speed:[0,10,15,30]},
 };
 const CURE_ORDEM=["cursed","fire","energy","bleed","poison","freezing"];
-const WHEEL_FOCUS_SPELLS=["exori-flam","exori-mort","exori-frigo","exori-gran-flam","exori-gran-mort","exori-gran-frigo","exori-vis","exori-gran-vis","exevo-flam-hur","exevo-frigo-hur","exevo-vis-hur","exevo-mort-hur","exevo-gran-flam-hur","exevo-gran-frigo-hur","exevo-gran-vis-hur"];
+/* Augments multi-magia da wheel (Winter Update 2026) — espelha wheeldata.js */
+const WHEEL_FOCUS_SPELLS=["exevo-gran-mas-flam","exevo-gran-mas-vis"];           // Hell's Core + Rage of the Skies
+const WHEEL_SPECIAL_SPELLS=["exori-amp-vis","exori-gran-vis","exori-gran-flam"]; // Lightning + Strong Energy/Flame Strike
+const WHEEL_FORKED_SPELLS=["exevo-fur-frigo","exevo-fur-tera"];                  // Forked Glacier + Forked Thorns
 const SERVER_BESTIARY_RATE=2;
 const BOSS_CATS={bane:{kills:30,pts:5},archfoe:{kills:10,pts:15},nemesis:{kills:5,pts:50}};
 function hasteActive(p,now){
@@ -3358,11 +3361,13 @@ function wheelSkillBonus(p,which){
 }
 function wheelApplySpellBoost(p,spellId){
   if(WHEEL_FN&&typeof WHEEL_FN.wheelApplySpellBoost==="function")return WHEEL_FN.wheelApplySpellBoost(p,spellId);
-  const out={damagePct:0,healPct:0,cooldownMs:0,manaPct:0,lifeLeech:0,manaLeech:0,critChance:0,critDamage:0};
+  const out={damagePct:0,healPct:0,cooldownMs:0,manaPct:0,manaFlat:0,lifeLeech:0,manaLeech:0,critChance:0,critDamage:0};
   if(!p||!p.wheel||!p.wheel.slots||!spellId)return out;
   const voc=p.voc||"knight";
   let baseId=spellId;
   if(voc==="sorcerer"&&WHEEL_FOCUS_SPELLS.indexOf(spellId)!==-1)baseId="__focus__";
+  if(voc==="sorcerer"&&WHEEL_SPECIAL_SPELLS.indexOf(spellId)!==-1)baseId="__special__";
+  if(voc==="druid"&&WHEEL_FORKED_SPELLS.indexOf(spellId)!==-1)baseId="__forked__";
   const list=WHEEL_SPELL_UPGRADES[voc];if(!Array.isArray(list))return out;
   const u=list.find((row)=>row&&row.name===baseId);if(!u)return out;
   let grade=0;
@@ -3375,7 +3380,7 @@ function wheelApplySpellBoost(p,spellId){
   const merge=(src)=>{if(!src)return;for(const k of Object.keys(src))bonus[k]=(bonus[k]||0)+src[k];};
   if(grade>=1)merge(u.g1);if(grade>=2)merge(u.g2);
   out.damagePct=bonus.damage||0;out.healPct=bonus.heal||0;
-  out.cooldownMs=(bonus.cooldown||0)*1000;out.manaPct=bonus.manaCost||0;
+  out.cooldownMs=(bonus.cooldown||0)*1000;out.manaPct=bonus.manaCost||0;out.manaFlat=bonus.manaFlat||0;
   out.lifeLeech=bonus.lifeLeech||0;out.manaLeech=bonus.manaLeech||0;
   out.critChance=bonus.criticalChance||0;out.critDamage=bonus.criticalDamage||0;
   return out;
@@ -3933,7 +3938,11 @@ function spellGroupBusy(p,s,now){
   return false;
 }
 function startSpellCooldown(p,s,now){
-  if(!s)return;p._spellCd=p._spellCd||{};p._spellCd[s.id]=now+Number(s.cd||1000);
+  if(!s)return;
+  let cd=Number(s.cd||1000);
+  const wh=p&&p.wheel?wheelApplySpellBoost(p,s.id):null;
+  if(wh&&wh.cooldownMs)cd=Math.max(1000,cd-wh.cooldownMs);
+  p._spellCd=p._spellCd||{};p._spellCd[s.id]=now+cd;
   if(s.grupos){p._groupCd=p._groupCd||{};
     for(const g of Object.keys(s.grupos))p._groupCd[g]=now+Number(s.grupos[g]||s.cd||1000);}
 }
@@ -6320,6 +6329,7 @@ function healPlayers(auth,now){
         let manaCost=Number(s.mana||0);
         const wh=wheelApplySpellBoost(p,s.id);
         if(wh.manaPct)manaCost=Math.max(0,Math.round(manaCost*(1-wh.manaPct/100)));
+        if(wh.manaFlat)manaCost=Math.max(0,manaCost-wh.manaFlat);
         p.mp=Math.max(0,p.mp-manaCost);
         addManaSpent(p,manaCost,auth);
         p.hp=Math.min(max.hp,p.hp+amount);
@@ -9099,9 +9109,15 @@ function step(auth,now,opts){if(auth.ended)return;
             }
             auth.events.push({t:"say",text:s.words||String(s.name||"").toLowerCase(),whoId:String(item.id),
               x:source.x,y:source.y,screen:true,ts:visualTs+40});
-            if(s.mana){p.mp=Math.max(0,p.mp-s.mana);addManaSpent(p,s.mana,auth);}
+            if(s.mana){
+              let _mc=Number(s.mana||0);const _wh=p.wheel?wheelApplySpellBoost(p,s.id):null;
+              if(_wh&&_wh.manaPct)_mc=Math.max(0,Math.round(_mc*(1-_wh.manaPct/100)));
+              if(_wh&&_wh.manaFlat)_mc=Math.max(0,_mc-_wh.manaFlat);
+              p.mp=Math.max(0,p.mp-_mc);addManaSpent(p,_mc,auth);
+            }
             if(!p._spellCd)p._spellCd={};
-            p._spellCd[s.id]=(now||Date.now())+(s.cd||2000);
+            const _whCd=p.wheel?wheelApplySpellBoost(p,s.id):null;
+            p._spellCd[s.id]=(now||Date.now())+Math.max(1000,(s.cd||2000)-((_whCd&&_whCd.cooldownMs)||0));
             p._lastSpellAt=now||Date.now();
             p._offensiveCd=(now||Date.now())+2000;
             if(s.grupos){p._groupCd=p._groupCd||{};

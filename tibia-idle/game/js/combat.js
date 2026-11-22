@@ -2661,6 +2661,7 @@ function castSpellById(c, p, target, now, id) {
   if (typeof wheelApplySpellBoost === "function" && p.wheel) {
     const _wb = wheelApplySpellBoost(p, id);
     if (_wb.manaPct) wheelManaCost = Math.max(0, Math.round(s.mana * (1 - _wb.manaPct / 100)));
+    if (_wb.manaFlat) wheelManaCost = Math.max(0, wheelManaCost - _wb.manaFlat);
   }
   p.mp -= wheelManaCost;
   addManaSpent(p, combatManaSkillGain(c, wheelManaCost));
@@ -3490,6 +3491,7 @@ function tryHeal(c, p, now) {
       if (typeof wheelApplySpellBoost === "function" && p.wheel) {
         const _wm = wheelApplySpellBoost(p, idCura);
         if (_wm.manaPct) _curaMana = Math.max(0, Math.round(s.mana * (1 - _wm.manaPct / 100)));
+        if (_wm.manaFlat) _curaMana = Math.max(0, _curaMana - _wm.manaFlat);
       }
       cdStart(p, idCura, s, now);
       if (typeof forgeTryMomentum === "function") {

@@ -16,7 +16,9 @@ var _wd = (typeof WHEEL_SLOTS !== "undefined")
       WHEEL_SLOTS: WHEEL_SLOTS, WHEEL_CONNECTED: WHEEL_CONNECTED, WHEEL_ROOTS: WHEEL_ROOTS,
       WHEEL_CONFIG: WHEEL_CONFIG, WHEEL_HP: WHEEL_HP, WHEEL_MP: WHEEL_MP, WHEEL_CAP: WHEEL_CAP,
       WHEEL_SKILL: WHEEL_SKILL, WHEEL_LEECH: WHEEL_LEECH, WHEEL_MIT_PER_POINT: WHEEL_MIT_PER_POINT,
-      WHEEL_STAGE_ABILITY: WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES: WHEEL_SPELL_UPGRADES
+      WHEEL_STAGE_ABILITY: WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES: WHEEL_SPELL_UPGRADES,
+      WHEEL_FOCUS_SPELLS: WHEEL_FOCUS_SPELLS, WHEEL_SPECIAL_SPELLS: WHEEL_SPECIAL_SPELLS,
+      WHEEL_FORKED_SPELLS: WHEEL_FORKED_SPELLS, WHEEL_PSEUDO_SPELLS: WHEEL_PSEUDO_SPELLS
     }
   : (typeof require === "function" ? require("./wheeldata.js") : {});
 var _WHEEL_SLOTS = _wd.WHEEL_SLOTS || {};
@@ -31,6 +33,10 @@ var _WHEEL_LEECH = _wd.WHEEL_LEECH || {};
 var _WHEEL_MIT_PER_POINT = _wd.WHEEL_MIT_PER_POINT;
 var _WHEEL_STAGE_ABILITY = _wd.WHEEL_STAGE_ABILITY || {};
 var _WHEEL_SPELL_UPGRADES = _wd.WHEEL_SPELL_UPGRADES || {};
+var _WHEEL_FOCUS_SPELLS = _wd.WHEEL_FOCUS_SPELLS || [];
+var _WHEEL_SPECIAL_SPELLS = _wd.WHEEL_SPECIAL_SPELLS || [];
+var _WHEEL_FORKED_SPELLS = _wd.WHEEL_FORKED_SPELLS || [];
+var _WHEEL_PSEUDO_SPELLS = _wd.WHEEL_PSEUDO_SPELLS || {};
 
 var _wg = (typeof ensureWheelGems !== "undefined")
   ? null
@@ -235,7 +241,7 @@ function wheelUnlockedSpells(p) {
     if (!spec.spell) continue;
     if ((p.wheel.slots[id] || 0) < spec.max) continue;
     var sp = spec.spell[voc];
-    if (sp && sp !== "__focus__" && !seen[sp]) { seen[sp] = 1; out.push(sp); }
+    if (sp && !_WHEEL_PSEUDO_SPELLS[sp] && !seen[sp]) { seen[sp] = 1; out.push(sp); }
   }
   return out;
 }
@@ -298,7 +304,7 @@ function wheelTotals(p) {
         else if (sk === "magic") t.magic++; else if (sk === "fist") t.fist++;
       }
       if (spec.leech) { t.lifeLeech += spec.leech === "life" ? _WHEEL_LEECH.life : 0; t.manaLeech += spec.leech === "mana" ? _WHEEL_LEECH.mana : 0; }
-      if (spec.spell && spec.spell[voc] && spec.spell[voc] !== "__focus__" && t.spells.indexOf(spec.spell[voc]) === -1) t.spells.push(spec.spell[voc]);
+      if (spec.spell && spec.spell[voc] && !_WHEEL_PSEUDO_SPELLS[spec.spell[voc]] && t.spells.indexOf(spec.spell[voc]) === -1) t.spells.push(spec.spell[voc]);
       if (spec.instant && spec.instant[voc]) t.instants.push(spec.instant[voc]);
     }
   }
@@ -352,18 +358,19 @@ function wheelSpellUpgrade(p, spellId) {
   return null;
 }
 
-var WHEEL_FOCUS_SPELLS = ["exori-flam","exori-mort","exori-frigo","exori-gran-flam","exori-gran-mort","exori-gran-frigo","exori-vis","exori-gran-vis","exevo-flam-hur","exevo-frigo-hur","exevo-vis-hur","exevo-mort-hur","exevo-gran-flam-hur","exevo-gran-frigo-hur","exevo-gran-vis-hur"];
-
 function wheelApplySpellBoost(p, spellId) {
   var voc = p.voc || "knight";
-  var out = { damagePct: 0, healPct: 0, cooldownMs: 0, manaPct: 0, lifeLeech: 0, manaLeech: 0, critChance: 0, critDamage: 0, extraTarget: 0, area: false };
+  var out = { damagePct: 0, healPct: 0, cooldownMs: 0, manaPct: 0, manaFlat: 0, lifeLeech: 0, manaLeech: 0, critChance: 0, critDamage: 0, extraTarget: 0, area: false };
   var baseId = spellId;
-  if (voc === "sorcerer" && WHEEL_FOCUS_SPELLS.indexOf(spellId) !== -1) baseId = "__focus__";
+  if (voc === "sorcerer" && _WHEEL_FOCUS_SPELLS.indexOf(spellId) !== -1) baseId = "__focus__";
+  if (voc === "sorcerer" && _WHEEL_SPECIAL_SPELLS.indexOf(spellId) !== -1) baseId = "__special__";
+  if (voc === "druid" && _WHEEL_FORKED_SPELLS.indexOf(spellId) !== -1) baseId = "__forked__";
   var u = wheelSpellUpgrade(p, baseId);
   if (u) {
     var b = u.bonus;
     out.damagePct = b.damage || 0; out.healPct = b.heal || 0;
     out.cooldownMs = (b.cooldown || 0) * 1000; out.manaPct = b.manaCost || 0;
+    out.manaFlat = b.manaFlat || 0;
     out.lifeLeech = b.lifeLeech || 0; out.manaLeech = b.manaLeech || 0;
     out.critChance = b.criticalChance || 0; out.critDamage = b.criticalDamage || 0;
     out.extraTarget = b.additionalTarget || 0; out.area = !!b.area;

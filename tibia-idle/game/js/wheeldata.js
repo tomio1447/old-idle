@@ -20,7 +20,7 @@ const WHEEL_MP =  { knight: 1, paladin: 3, sorcerer: 6, druid: 6, monk: 2 };
 const WHEEL_CAP = { knight: 5, paladin: 4, sorcerer: 2, druid: 2, monk: 5 };
 const WHEEL_SKILL = { knight: "melee", paladin: "distance", sorcerer: "magic", druid: "magic", monk: "fist" };
 const WHEEL_LEECH = { life: 0.75, mana: 0.25 };
-const WHEEL_MIT_PER_POINT = 0.00075; // fracao por ponto -> 0,075% (valor oficial pos Vocation Adjustments 2026 / crystalserver MITIGATION_INCREASE)
+const WHEEL_MIT_PER_POINT = 0.0003; // fracao por ponto -> 0,03% (oficial MITIGATION_INCREASE 0.03; max 800 pts = 24%)
 
 /* Configuracao de pontos (player_wheel.cpp / configmanager) */
 const WHEEL_CONFIG = {
@@ -126,6 +126,7 @@ const WHEEL_CONNECTED = {
 const WHEEL_SLOTS = {
   // ============================= VERDE =============================
   "GREEN_50":      { color:"green", max:50, min:0,   cap:true,
+                     spell:{ druid:"__forked__" },
                      border:["top_left",1] },
   "GREEN_TOP_75":  { color:"green", max:75, min:50,  mana:true, leech:"life",
                      border:["top_left",3] },
@@ -134,10 +135,10 @@ const WHEEL_SLOTS = {
   "GREEN_TOP_100": { color:"green", max:100, min:125, hp:true,
                      border:["top_left",6] },
   "GREEN_MIDDLE_100":{ color:"green", max:100, min:125, hp:true,
-                     spell:{ knight:"exori-mas", paladin:"exori-gran-con", sorcerer:"utamo-vita", druid:"exura-gran-mas-res", monk:"exura-mas-nia" },
+                     spell:{ knight:"exori-mas", paladin:"exori-gran-con", sorcerer:"exevo-mort-ora", druid:"exura-gran-mas-res", monk:"exura-mas-nia" },
                      border:["top_left",5] },
   "GREEN_BOTTOM_100":{ color:"green", max:100, min:125, hp:true,
-                     spell:{ knight:"exura-gran-ico", paladin:"utamo-tempo-san", sorcerer:"exevo-vis-hur", druid:"exevo-tera-hur", monk:"exori-med-pug" },
+                     spell:{ knight:"exura-gran-ico", paladin:"exevo-dir-san", sorcerer:"exevo-vis-hur", druid:"exevo-tera-hur", monk:"exori-med-pug" },
                      border:["top_left",4] },
   "GREEN_TOP_150": { color:"green", max:150, min:225, mit:true, leech:"mana",
                      border:["top_left",8] },
@@ -157,7 +158,7 @@ const WHEEL_SLOTS = {
   "RED_TOP_100":   { color:"red", max:100, min:125, mana:true, skill:true,
                      border:["top_right",6] },
   "RED_MIDDLE_100":{ color:"red", max:100, min:125, mana:true,
-                     spell:{ knight:"exeta-amp-res", paladin:"exana-amp-res", sorcerer:"exori-kor", druid:"exura-gran-sio", monk:"exori-amp-pug" },
+                     spell:{ knight:"exori-scu", paladin:"exana-amp-res", sorcerer:"__special__", druid:"exura-gran-sio", monk:"exori-amp-pug" },
                      border:["top_right",5] },
   "RED_BOTTOM_100":{ color:"red", max:100, min:125, mana:true,
                      border:["top_right",4] },
@@ -166,11 +167,11 @@ const WHEEL_SLOTS = {
   "RED_BOTTOM_150":{ color:"red", max:150, min:225, hp:true, leech:"mana",
                      border:["top_right",7] },
   "RED_200":       { color:"red", max:200, min:375, hp:true, mana:true,
-                     spell:{ knight:"exori-min", paladin:"utito-tempo-san", sorcerer:"__focus__", druid:"exevo-gran-frigo-hur", monk:"exori-mas-nia" },
+                     spell:{ knight:"exori-min", paladin:"exevo-dir-moe", sorcerer:"__focus__", druid:"exevo-gran-frigo-hur", monk:"exori-mas-amp-pug" },
                      border:["top_right",9] },
   // ============================= AZUL =============================
   "BLUE_50":       { color:"blue", max:50, min:0,   mana:true,
-                     spell:{ knight:"exori-min", paladin:"utito-tempo-san", sorcerer:"__focus__", druid:"exevo-gran-frigo-hur", monk:"exori-mas-nia" },
+                     spell:{ knight:"exori-min", paladin:"exevo-dir-moe", sorcerer:"__focus__", druid:"exevo-gran-frigo-hur", monk:"exori-mas-amp-pug" },
                      border:["bottom_left",1] },
   "BLUE_TOP_75":   { color:"blue", max:75, min:50,  hp:true, leech:"mana",
                      border:["bottom_left",2] },
@@ -179,13 +180,14 @@ const WHEEL_SLOTS = {
   "BLUE_TOP_100":  { color:"blue", max:100, min:125, mit:true,
                      border:["bottom_left",4] },
   "BLUE_MIDDLE_100":{ color:"blue", max:100, min:125, mit:true,
-                     spell:{ knight:"exeta-amp-res", paladin:"exana-amp-res", sorcerer:"exori-kor", druid:"exura-gran-sio", monk:"exori-amp-pug" },
+                     spell:{ knight:"exori-scu", paladin:"exana-amp-res", sorcerer:"__special__", druid:"exura-gran-sio", monk:"exori-amp-pug" },
                      border:["bottom_left",5] },
   "BLUE_BOTTOM_100":{ color:"blue", max:100, min:125, mit:true, skill:true,
                      border:["bottom_left",6] },
   "BLUE_TOP_150":  { color:"blue", max:150, min:225, cap:true, leech:"life",
                      border:["bottom_left",8] },
   "BLUE_BOTTOM_150":{ color:"blue", max:150, min:225, cap:true,
+                     spell:{ druid:"__forked__" },
                      border:["bottom_left",7] },
   "BLUE_200":      { color:"blue", max:200, min:375, hp:true, mana:true,
                      spell:{ knight:"exori-gran", paladin:"exevo-mas-san", sorcerer:"exevo-gran-flam-hur", druid:"exura-sio", monk:"exori-mas-pug" },
@@ -198,10 +200,10 @@ const WHEEL_SLOTS = {
   "PURPLE_BOTTOM_75":{ color:"purple", max:75, min:50, mit:true, leech:"mana",
                      border:["bottom_right",2] },
   "PURPLE_TOP_100":{ color:"purple", max:100, min:125, cap:true,
-                     spell:{ knight:"exori-mas", paladin:"exori-gran-con", sorcerer:"utamo-vita", druid:"exura-gran-mas-res", monk:"exura-mas-nia" },
+                     spell:{ knight:"exori-mas", paladin:"exori-gran-con", sorcerer:"exevo-mort-ora", druid:"exura-gran-mas-res", monk:"exura-mas-nia" },
                      border:["bottom_right",6] },
   "PURPLE_MIDDLE_100":{ color:"purple", max:100, min:125, cap:true,
-                     spell:{ knight:"exura-gran-ico", paladin:"utamo-tempo-san", sorcerer:"exevo-vis-hur", druid:"exevo-tera-hur", monk:"exori-med-pug" },
+                     spell:{ knight:"exura-gran-ico", paladin:"exevo-dir-san", sorcerer:"exevo-vis-hur", druid:"exevo-tera-hur", monk:"exori-med-pug" },
                      border:["bottom_right",5] },
   "PURPLE_BOTTOM_100":{ color:"purple", max:100, min:125, cap:true,
                      border:["bottom_right",4] },
@@ -214,51 +216,61 @@ const WHEEL_SLOTS = {
                      border:["bottom_right",9] },
 };
 
-/* Upgrade de magias da wheel (grades 1 e 2) — portado de io_wheel.cpp */
+/* Upgrade de magias da wheel (grades 1 e 2) — Winter Update 2026 (tibiawiki).
+ * Campos: damage/heal (%) sobre base, cooldown (s), manaCost (%), manaFlat (pontos),
+ * lifeLeech/manaLeech (%), criticalChance/criticalDamage (%), additionalTarget,
+ * area, duration (s), damageReduction (%). */
 const WHEEL_SPELL_UPGRADES = {
   knight: [
-    { name: "exori-min",  spell: "Front Sweep",              g1: { lifeLeech: 5 },                         g2: { damage: 14 } },
-    { name: "exori-mas",  spell: "Groundshaker",             g1: { damage: 13 },                          g2: { cooldown: 2 } },
-    { name: "exeta-amp-res", spell: "Chivalrous Challenge",  g1: { manaCost: 20 },                        g2: { additionalTarget: 1 } },
+    { name: "exori-min",  spell: "Front Sweep",              g1: { damage: 40 },                          g2: { area: true } },
+    { name: "exori-mas",  spell: "Groundshaker",             g1: { cooldown: 2 },                         g2: { damage: 12.5 } },
+    { name: "exori-scu",  spell: "Shield Slam",              g1: { lifeLeech: 15 },                       g2: { damageReduction: 25 } },
     { name: "exura-gran-ico", spell: "Intense Wound Cleansing", g1: { heal: 125 },                       g2: { cooldown: 300 } },
-    { name: "exori-gran", spell: "Fierce Berserk",           g1: { manaCost: 30 },                        g2: { damage: 10 } },
+    { name: "exori-gran", spell: "Fierce Berserk",           g1: { manaFlat: 30 },                        g2: { damage: 10 } },
   ],
   paladin: [
-    { name: "utito-tempo-san", spell: "Sharpshooter",        g1: { secondaryGroupCooldown: 8 },          g2: { cooldown: 6 } },
+    { name: "exevo-dir-moe", spell: "Ethereal Barrage",      g1: { lifeLeech: 10 },                       g2: { criticalChance: 10 } },
     { name: "exori-gran-con", spell: "Strong Ethereal Spear",g1: { cooldown: 2 },                         g2: { damage: 380 } },
-    { name: "exana-amp-res", spell: "Divine Dazzle",         g1: { additionalTarget: 1 },                 g2: { duration: 4, cooldown: 4 } },
-    { name: "utamo-tempo-san", spell: "Swift Foot",          g1: { secondaryGroupCooldown: 8 },           g2: { cooldown: 6 } },
-    { name: "exevo-mas-san", spell: "Divine Caldera",        g1: { manaCost: 20 },                        g2: { damage: 9 } },
+    { name: "exana-amp-res", spell: "Divine Dazzle",         g1: { additionalTarget: 2 },                 g2: { duration: 8, cooldown: 8 } },
+    { name: "exevo-dir-san", spell: "Divine Barrage",        g1: { damage: 8 },                           g2: { damage: 12 } },
+    { name: "exevo-mas-san", spell: "Divine Caldera",        g1: { manaFlat: 20 },                        g2: { damage: 10 } },
   ],
   sorcerer: [
-    { name: "utamo-vita", spell: "Magic Shield",             g1: {},                                      g2: { cooldown: 6 } },
-    { name: "exori-kor", spell: "Sap Strength",              g1: { area: true },                          g2: { damageReduction: 1 } },
-    { name: "exevo-vis-hur", spell: "Energy Wave",           g1: { damage: 5 },                           g2: { area: true } },
-    { name: "exevo-gran-flam-hur", spell: "Great Fire Wave", g1: { criticalDamage: 15, criticalChance: 10 }, g2: { damage: 5 } },
-    { name: "__focus__", spell: "Focus Mage Spells",         g1: { damage: 5 },                           g2: { cooldown: 4, secondaryGroupCooldown: 4 } },
+    { name: "exevo-mort-ora", spell: "Death Echo",           g1: { cooldown: 2 },                         g2: { damage: 12 } },
+    { name: "__special__", spell: "Special Spells",          g1: { cooldown: 4 },                         g2: { damage: 50 } },
+    { name: "exevo-vis-hur", spell: "Energy Wave",           g1: { area: true },                          g2: { damage: 10 } },
+    { name: "exevo-gran-flam-hur", spell: "Great Fire Wave", g1: { criticalDamage: 15, criticalChance: 10 }, g2: { damage: 4 } },
+    { name: "__focus__", spell: "Focus Spells",              g1: { damage: 5 },                           g2: { cooldown: 4 } },
   ],
   druid: [
-    { name: "exevo-gran-frigo-hur", spell: "Strong Ice Wave",g1: { manaLeech: 3 },                        g2: { damage: 10 } },
+    { name: "__forked__", spell: "Forked Spells",            g1: { cooldown: 2 },                         g2: { additionalTarget: 1 } },
+    { name: "exura-sio", spell: "Heal Friend",               g1: { heal: 4 },                             g2: { heal: 6 } },
     { name: "exura-gran-mas-res", spell: "Mass Healing",     g1: { heal: 4 },                             g2: { area: true } },
     { name: "exura-gran-sio", spell: "Nature's Embrace",     g1: { heal: 11 },                            g2: { cooldown: 10 } },
-    { name: "exevo-tera-hur", spell: "Terra Wave",           g1: { damage: 7 },                           g2: { lifeLeech: 5 } },
-    { name: "exura-sio", spell: "Heal Friend",               g1: { manaCost: 10 },                        g2: { heal: 6 } },
+    { name: "exevo-gran-frigo-hur", spell: "Strong Ice Wave",g1: { damage: 6 },                           g2: { area: true } },
+    { name: "exevo-tera-hur", spell: "Terra Wave",           g1: { damage: 6.5 },                         g2: { lifeLeech: 10 } },
   ],
   monk: [
-    { name: "exura-mas-nia", spell: "Mass Spirit Mend",      g1: { heal: 8 },                             g2: { area: true } },
-    { name: "exori-amp-pug", spell: "Mystic Repulse",        g1: { cooldown: 4 },                         g2: { damage: 40 } },
-    { name: "exori-med-pug", spell: "Chained Penance",       g1: { additionalTarget: 1 },                 g2: { additionalTarget: 2 } },
-    { name: "exori-mas-pug", spell: "Flurry of Blows",       g1: { lifeLeech: 5 },                        g2: { damage: 12 } },
-    { name: "exori-mas-nia", spell: "Sweeping Takedown",     g1: { manaLeech: 3 },                        g2: { criticalDamage: 25, criticalChance: 10 } },
+    { name: "exura-mas-nia", spell: "Mass Spirit Mend",      g1: { heal: 8 },                             g2: { cooldown: 4 } },
+    { name: "exori-amp-pug", spell: "Mystic Repulse",        g1: { cooldown: 4 },                         g2: { damage: 15 } },
+    { name: "exori-med-pug", spell: "Chained Penance",       g1: { damage: 5 },                           g2: { additionalTarget: 1 } },
+    { name: "exori-mas-pug", spell: "Flurry of Blows",       g1: { area: true },                          g2: { damage: 8 } },
+    { name: "exori-mas-amp-pug", spell: "Thousand Fist Blows", g1: { criticalDamage: 40 },                g2: { cooldown: 4 } },
   ],
 };
+
+/* Grupos de magias afetadas por augments multi-magia (pseudo-ids "__x__") */
+const WHEEL_FOCUS_SPELLS   = ["exevo-gran-mas-flam", "exevo-gran-mas-vis"];                    // Hell's Core + Rage of the Skies
+const WHEEL_SPECIAL_SPELLS = ["exori-amp-vis", "exori-gran-vis", "exori-gran-flam"];           // Lightning + Strong Energy/Flame Strike
+const WHEEL_FORKED_SPELLS  = ["exevo-fur-frigo", "exevo-fur-tera"];                          // Forked Glacier + Forked Thorns
+const WHEEL_PSEUDO_SPELLS  = { "__focus__": 1, "__special__": 1, "__forked__": 1 };
 
 /* Habilidade de ESTAGIO por cor e vocacao */
 const WHEEL_STAGE_ABILITY = {
   green:  { knight: "Gift of Life", paladin: "Gift of Life", sorcerer: "Gift of Life", druid: "Gift of Life", monk: "Gift of Life" },
   red:    { knight: "Executioner's Throw", paladin: "Divine Grenade", sorcerer: "Beam Mastery", druid: "Blessing of the Grove", monk: "Spiritual Outburst" },
   purple: { knight: "Avatar of Steel", paladin: "Avatar of Light", sorcerer: "Avatar of Storm", druid: "Avatar of Nature", monk: "Avatar of Balance" },
-  blue:   { knight: "Combat Mastery", paladin: "Divine Empowerment", sorcerer: "Drain Body", druid: "Twin Burst", monk: "Ascetic" },
+  blue:   { knight: "Combat Mastery", paladin: "Divine Empowerment", sorcerer: "Lord of Destruction", druid: "Twin Bursts", monk: "Ascetic" },
 };
 
 /* Raizes (nos de entrada) */
@@ -267,5 +279,6 @@ const WHEEL_ROOTS = ["GREEN_50", "RED_50", "BLUE_50", "PURPLE_50"];
 if (typeof module !== "undefined") {
   module.exports = { WHEEL_SLOTS, WHEEL_POS, WHEEL_CONNECTED, WHEEL_ROOTS,
     WHEEL_CONFIG, WHEEL_HP, WHEEL_MP, WHEEL_CAP, WHEEL_SKILL, WHEEL_LEECH,
-    WHEEL_MIT_PER_POINT, WHEEL_COLORS, WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES };
+    WHEEL_MIT_PER_POINT, WHEEL_COLORS, WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES,
+    WHEEL_FOCUS_SPELLS, WHEEL_SPECIAL_SPELLS, WHEEL_FORKED_SPELLS, WHEEL_PSEUDO_SPELLS };
 }

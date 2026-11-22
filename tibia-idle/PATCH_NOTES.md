@@ -3,7 +3,47 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
-## 2026-11-21 — Roshamuul: miniboss Mawhawk (0,01%)
+## 2026-11-22 — Wheel of Destiny: bônus do Winter Update 2026
+
+- Mitigação corrigida pro valor oficial: MITIGATION_INCREASE 0,03%/ponto
+  (fração 0,0003 — era 0,00075, 2,5x alto). Máximo em 800 pts = 24%.
+- Augments de Conviction atualizados por vocação (valores oficiais):
+  Knight — Fierce Berserk (-30 mana / +10% dano), Front Sweep (+40% dano /
+  +2 SQM), Groundshaker (-2s / +12,5%), Intense Wound Cleansing (+125% cura
+  / -300s), Shield Slam NOVO (+15% life leech / -25% redução p/ 75%).
+  Paladin — Divine Barrage NOVO (+8%/+12% dano), Ethereal Barrage NOVO
+  (+10% leech / +10% crit), Strong Ethereal Spear (-2s / +380%), Divine
+  Dazzle (+2 alvos / +duração e -8s), Divine Caldera (-20 mana / +10%).
+  Sorcerer — Death Echo NOVO (-2s / +12%), Special Spells NOVO grupo
+  (Lightning, Strong Energy/Flame Strike: -4s / +50%), Energy Wave (área /
+  +10%), Great Fire Wave (15% crit+10% chance / +4%), Focus Spells agora
+  só Hell's Core + Rage of the Skies (+5% / -4s).
+  Druid — Forked Spells NOVO grupo (Forked Glacier/Thorns: -2s / +1 alvo,
+  slots GREEN_50 + BLUE_BOTTOM_150), Heal Friend (+4%/+6% cura), Mass
+  Healing (+4% / área), Nature's Embrace (+11% / -10s), Strong Ice Wave
+  (+6% / área), Terra Wave (+6,5% / +10% leech).
+  Monk — Chained Penance (+5% / +1 alvo), Flurry of Blows (área / +8%),
+  Mass Spirit Mend (+8% cura / -4s), Mystic Repulse (-4s / +15%), Thousand
+  Fist Blows NOVO (+40% crit / -4s).
+- Revelation: sorcerer azul Drain Body → Lord of Destruction; druid azul
+  Twin Burst → Twin Bursts. wheel-data.js: Combat Mastery, Blessing of the
+  Grove, Lord of Destruction e revelations do Monk (Ascetic, Avatar of
+  Balance, Spiritual Outburst) com textos oficiais; modal do Monk ganhou
+  tabela de conviction real (era cópia da do knight).
+- Novo campo manaFlat (redução em pontos de mana) consumido no cast do
+  cliente e do engine; cooldownMs da wheel agora aplicado também no
+  startSpellCooldown e no cast de ataque do engine (paridade com o
+  cliente, que já reduzia).
+- Gem supreme mods 2026: Shield Slam, Intense Wound Cleansing, Divine e
+  Ethereal Barrage, Death Echo, Lightning, Forked Glacier/Thorns, Chained
+  Penance, Thousand Fist Blows (grade I base, escala x1/1,1/1,2/1,5);
+  Revelation Mastery de 150 → 125 pontos oficiais; RM sorcerer Drain Body
+  → Lord of Destruction.
+- Teste: tools/test_wheel_of_destiny.js cobre todos os augments grade II
+  por vocação, grupos __focus__/__special__/__forked__, engine parity,
+  mapping do wheel-data e valores de mitigação.
+
+---
 
 - Mawhawk agora pode aparecer na hunt Roshamuul (Guzzlemaw Valley) com
   chance de 0,01% por slot de spawn — peso 1 num total de 10001 via

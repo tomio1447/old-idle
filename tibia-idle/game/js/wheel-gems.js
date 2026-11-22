@@ -119,12 +119,12 @@ var WHEEL_SUPREME_MODS = {
   General_LifeLeech: { label: "+2% Life Leech", lifeLeech: 2 },
   General_ManaLeech: { label: "+0.8% Mana Leech", manaLeech: 0.8 },
   General_CriticalDamage: { label: "+2% Critical Extra Damage", critDamage: 2 },
-  General_RevelationMastery_GiftOfLife: { label: "RM Gift of Life", revelation: "green", revelationPts: 150 },
+  General_RevelationMastery_GiftOfLife: { label: "RM Gift of Life", revelation: "green", revelationPts: 125 },
   SorcererDruid_UltimateHealing: { label: "Aug. Ultimate Healing", vocs: ["sorcerer", "druid"], spell: "Ultimate Healing", heal: 5 },
 
-  Knight_RevelationMastery_ExecutionersThrow: { label: "RM Executioner's Throw", voc: "knight", revelation: "red", revelationPts: 150 },
-  Knight_RevelationMastery_AvatarOfSteel: { label: "RM Avatar of Steel", voc: "knight", revelation: "purple", revelationPts: 150 },
-  Knight_RevelationMastery_CombatMastery: { label: "RM Combat Mastery", voc: "knight", revelation: "blue", revelationPts: 150 },
+  Knight_RevelationMastery_ExecutionersThrow: { label: "RM Executioner's Throw", voc: "knight", revelation: "red", revelationPts: 125 },
+  Knight_RevelationMastery_AvatarOfSteel: { label: "RM Avatar of Steel", voc: "knight", revelation: "purple", revelationPts: 125 },
+  Knight_RevelationMastery_CombatMastery: { label: "RM Combat Mastery", voc: "knight", revelation: "blue", revelationPts: 125 },
   Knight_AvatarOfSteel_Cooldown: { label: "Aug. Avatar of Steel CD", voc: "knight", spell: "Avatar of Steel", cooldownMs: 900000, momentum: true },
   Knight_ExecutionersThrow_Cooldown: { label: "Aug. Executioner's Throw CD", voc: "knight", spell: "Executioner's Throw", cooldownMs: 2000, momentum: true },
   Knight_ExecutionersThrow_DamageIncrease: { label: "Aug. Executioner's Throw dmg", voc: "knight", spell: "Executioner's Throw", damage: 6 },
@@ -140,10 +140,15 @@ var WHEEL_SUPREME_MODS = {
   Knight_Annihilation_DamageIncrease: { label: "Aug. Annihilation dmg", voc: "knight", spell: "Annihilation", damage: 12 },
   Knight_Annihilation_CriticalExtraDamage: { label: "Aug. Annihilation crit", voc: "knight", spell: "Annihilation", critDamage: 15, spellCritChance: 10 },
   Knight_FairWoundCleansing_HealingIncrease: { label: "Aug. Fair Wound Cleansing", voc: "knight", spell: "Fair Wound Cleansing", heal: 10 },
+  /* Winter Update 2026 */
+  Knight_ShieldSlam_DamageIncrease: { label: "Aug. Shield Slam dmg", voc: "knight", spell: "Shield Slam", damage: 10 },
+  Knight_ShieldSlam_CriticalExtraDamage: { label: "Aug. Shield Slam crit", voc: "knight", spell: "Shield Slam", critDamage: 15, spellCritChance: 10 },
+  Knight_IntenseWoundCleansing_HealingIncrease: { label: "Aug. Intense Wound Cleansing", voc: "knight", spell: "Intense Wound Cleansing", heal: 20 },
+  Knight_IntenseWoundCleansing_Cooldown: { label: "Aug. Intense Wound Cleansing CD", voc: "knight", spell: "Intense Wound Cleansing", cooldownMs: 20000, momentum: true },
 
-  Paladin_RevelationMastery_DivineGrenade: { label: "RM Divine Grenade", voc: "paladin", revelation: "red", revelationPts: 150 },
-  Paladin_RevelationMastery_AvatarOfLight: { label: "RM Avatar of Light", voc: "paladin", revelation: "purple", revelationPts: 150 },
-  Paladin_RevelationMastery_DivineEmpowerment: { label: "RM Divine Empowerment", voc: "paladin", revelation: "blue", revelationPts: 150 },
+  Paladin_RevelationMastery_DivineGrenade: { label: "RM Divine Grenade", voc: "paladin", revelation: "red", revelationPts: 125 },
+  Paladin_RevelationMastery_AvatarOfLight: { label: "RM Avatar of Light", voc: "paladin", revelation: "purple", revelationPts: 125 },
+  Paladin_RevelationMastery_DivineEmpowerment: { label: "RM Divine Empowerment", voc: "paladin", revelation: "blue", revelationPts: 125 },
   Paladin_AvatarOfLight_Cooldown: { label: "Aug. Avatar of Light CD", voc: "paladin", spell: "Avatar of Light", cooldownMs: 900000, momentum: true },
   Paladin_DivineDazzle_Cooldown: { label: "Aug. Divine Dazzle CD", voc: "paladin", spell: "Divine Dazzle", cooldownMs: 4000, momentum: true },
   Paladin_DivineGrenade_DamageIncrease: { label: "Aug. Divine Grenade dmg", voc: "paladin", spell: "Divine Grenade", damage: 6 },
@@ -159,10 +164,15 @@ var WHEEL_SUPREME_MODS = {
   Paladin_DivineEmpowerment_Cooldown: { label: "Aug. Divine Empowerment CD", voc: "paladin", spell: "Divine Empowerment", cooldownMs: 6000, momentum: true },
   Paladin_DivineGrenade_Cooldown: { label: "Aug. Divine Grenade CD", voc: "paladin", spell: "Divine Grenade", cooldownMs: 2000, momentum: true },
   Paladin_Salvation_HealingIncrease: { label: "Aug. Salvation", voc: "paladin", spell: "Salvation", heal: 6 },
+  /* Winter Update 2026 */
+  Paladin_DivineBarrage_DamageIncrease: { label: "Aug. Divine Barrage dmg", voc: "paladin", spell: "Divine Barrage", damage: 5 },
+  Paladin_DivineBarrage_CriticalExtraDamage: { label: "Aug. Divine Barrage crit", voc: "paladin", spell: "Divine Barrage", critDamage: 12, spellCritChance: 10 },
+  Paladin_EtherealBarrage_DamageIncrease: { label: "Aug. Ethereal Barrage dmg", voc: "paladin", spell: "Ethereal Barrage", damage: 5 },
+  Paladin_EtherealBarrage_CriticalExtraDamage: { label: "Aug. Ethereal Barrage crit", voc: "paladin", spell: "Ethereal Barrage", critDamage: 12, spellCritChance: 10 },
 
-  Sorcerer_RevelationMastery_BeamMastery: { label: "RM Beam Mastery", voc: "sorcerer", revelation: "red", revelationPts: 150 },
-  Sorcerer_RevelationMastery_AvatarOfStorm: { label: "RM Avatar of Storm", voc: "sorcerer", revelation: "purple", revelationPts: 150 },
-  Sorcerer_RevelationMastery_DrainBody: { label: "RM Drain Body", voc: "sorcerer", revelation: "blue", revelationPts: 150 },
+  Sorcerer_RevelationMastery_BeamMastery: { label: "RM Beam Mastery", voc: "sorcerer", revelation: "red", revelationPts: 125 },
+  Sorcerer_RevelationMastery_AvatarOfStorm: { label: "RM Avatar of Storm", voc: "sorcerer", revelation: "purple", revelationPts: 125 },
+  Sorcerer_RevelationMastery_LordOfDestruction: { label: "RM Lord of Destruction", voc: "sorcerer", revelation: "blue", revelationPts: 125 },
   Sorcerer_AvatarOfStorm_Cooldown: { label: "Aug. Avatar of Storm CD", voc: "sorcerer", spell: "Avatar of Storm", cooldownMs: 900000, momentum: true },
   Sorcerer_EnergyWave_Cooldown: { label: "Aug. Energy Wave CD", voc: "sorcerer", spell: "Energy Wave", cooldownMs: 1000, momentum: true },
   Sorcerer_GreatDeathBeam_DamageIncrease: { label: "Aug. Great Death Beam dmg", voc: "sorcerer", spell: "Great Death Beam", damage: 10 },
@@ -177,10 +187,15 @@ var WHEEL_SUPREME_MODS = {
   Sorcerer_RageOfTheSkies_CriticalExtraDamage: { label: "Aug. Rage of the Skies crit", voc: "sorcerer", spell: "Rage of the Skies", critDamage: 12, spellCritChance: 10 },
   Sorcerer_GreatEnergyBeam_DamageIncrease: { label: "Aug. Great Energy Beam dmg", voc: "sorcerer", spell: "Great Energy Beam", damage: 10 },
   Sorcerer_GreatEnergyBeam_CriticalExtraDamage: { label: "Aug. Great Energy Beam crit", voc: "sorcerer", spell: "Great Energy Beam", critDamage: 15, spellCritChance: 10 },
+  /* Winter Update 2026 */
+  Sorcerer_DeathEcho_DamageIncrease: { label: "Aug. Death Echo dmg", voc: "sorcerer", spell: "Death Echo", damage: 5 },
+  Sorcerer_DeathEcho_CriticalExtraDamage: { label: "Aug. Death Echo crit", voc: "sorcerer", spell: "Death Echo", critDamage: 12, spellCritChance: 10 },
+  Sorcerer_Lightning_DamageIncrease: { label: "Aug. Lightning dmg", voc: "sorcerer", spell: "Lightning", damage: 10 },
+  Sorcerer_Lightning_CriticalExtraDamage: { label: "Aug. Lightning crit", voc: "sorcerer", spell: "Lightning", critDamage: 15, spellCritChance: 10 },
 
-  Druid_RevelationMastery_BlessingOfTheGrove: { label: "RM Blessing of the Grove", voc: "druid", revelation: "red", revelationPts: 150 },
-  Druid_RevelationMastery_AvatarOfNature: { label: "RM Avatar of Nature", voc: "druid", revelation: "purple", revelationPts: 150 },
-  Druid_RevelationMastery_TwinBursts: { label: "RM Twin Burst", voc: "druid", revelation: "blue", revelationPts: 150 },
+  Druid_RevelationMastery_BlessingOfTheGrove: { label: "RM Blessing of the Grove", voc: "druid", revelation: "red", revelationPts: 125 },
+  Druid_RevelationMastery_AvatarOfNature: { label: "RM Avatar of Nature", voc: "druid", revelation: "purple", revelationPts: 125 },
+  Druid_RevelationMastery_TwinBursts: { label: "RM Twin Burst", voc: "druid", revelation: "blue", revelationPts: 125 },
   Druid_AvatarOfNature_Cooldown: { label: "Aug. Avatar of Nature CD", voc: "druid", spell: "Avatar of Nature", cooldownMs: 900000, momentum: true },
   Druid_NaturesEmbrace_Cooldown: { label: "Aug. Nature's Embrace CD", voc: "druid", spell: "Nature's Embrace", cooldownMs: 5000, momentum: true },
   Druid_TerraBurst_DamageIncrease: { label: "Aug. Terra Burst dmg", voc: "druid", spell: "Terra Burst", damage: 7 },
@@ -189,6 +204,11 @@ var WHEEL_SUPREME_MODS = {
   Druid_IceBurst_CriticalExtraDamage: { label: "Aug. Ice Burst crit", voc: "druid", spell: "Ice Burst", critDamage: 12, spellCritChance: 10 },
   Druid_EternalWinter_DamageIncrease: { label: "Aug. Eternal Winter dmg", voc: "druid", spell: "Eternal Winter", damage: 8 },
   Druid_EternalWinter_CriticalExtraDamage: { label: "Aug. Eternal Winter crit", voc: "druid", spell: "Eternal Winter", critDamage: 12, spellCritChance: 10 },
+  /* Winter Update 2026 */
+  Druid_ForkedGlacier_DamageIncrease: { label: "Aug. Forked Glacier dmg", voc: "druid", spell: "Forked Glacier", damage: 5 },
+  Druid_ForkedGlacier_CriticalExtraDamage: { label: "Aug. Forked Glacier crit", voc: "druid", spell: "Forked Glacier", critDamage: 12, spellCritChance: 10 },
+  Druid_ForkedThorns_DamageIncrease: { label: "Aug. Forked Thorns dmg", voc: "druid", spell: "Forked Thorns", damage: 5 },
+  Druid_ForkedThorns_CriticalExtraDamage: { label: "Aug. Forked Thorns crit", voc: "druid", spell: "Forked Thorns", critDamage: 12, spellCritChance: 10 },
   Druid_TerraWave_DamageIncrease: { label: "Aug. Terra Wave dmg", voc: "druid", spell: "Terra Wave", damage: 5 },
   Druid_TerraWave_CriticalExtraDamage: { label: "Aug. Terra Wave crit", voc: "druid", spell: "Terra Wave", critDamage: 12, spellCritChance: 10 },
   Druid_StrongIceWave_DamageIncrease: { label: "Aug. Strong Ice Wave dmg", voc: "druid", spell: "Strong Ice Wave", damage: 8 },
@@ -196,9 +216,9 @@ var WHEEL_SUPREME_MODS = {
   Druid_HealFriend_HealingIncrease: { label: "Aug. Heal Friend", voc: "druid", spell: "Heal Friend", heal: 5 },
   Druid_MassHealing_HealingIncrease: { label: "Aug. Mass Healing", voc: "druid", spell: "Mass Healing", heal: 5 },
 
-  Monk_RevelationMastery_SpiritualBurst: { label: "RM Spiritual Outburst", voc: "monk", revelation: "red", revelationPts: 150 },
-  Monk_RevelationMastery_AvatarOfBalance: { label: "RM Avatar of Balance", voc: "monk", revelation: "purple", revelationPts: 150 },
-  Monk_RevelationMastery_Ascetic: { label: "RM Ascetic", voc: "monk", revelation: "blue", revelationPts: 150 },
+  Monk_RevelationMastery_SpiritualBurst: { label: "RM Spiritual Outburst", voc: "monk", revelation: "red", revelationPts: 125 },
+  Monk_RevelationMastery_AvatarOfBalance: { label: "RM Avatar of Balance", voc: "monk", revelation: "purple", revelationPts: 125 },
+  Monk_RevelationMastery_Ascetic: { label: "RM Ascetic", voc: "monk", revelation: "blue", revelationPts: 125 },
   Monk_AvatarOfBalance_Cooldown: { label: "Aug. Avatar of Balance CD", voc: "monk", spell: "Avatar of Balance", cooldownMs: 900000, momentum: true },
   Monk_SpiritMend_HealingIncreased: { label: "Aug. Spirit Mend", voc: "monk", spell: "Spirit Mend", heal: 6, noGradeMul: true },
   Monk_SpiritualOutburst_DamageIncrease: { label: "Aug. Spiritual Outburst dmg", voc: "monk", spell: "Spiritual Outburst", damage: 5 },
@@ -211,6 +231,11 @@ var WHEEL_SUPREME_MODS = {
   Monk_GreaterFlurryOfBlows_CriticalExtraDamage: { label: "Aug. Greater Flurry crit", voc: "monk", spell: "Greater Flurry of Blows", critDamage: 8, spellCritChance: 10 },
   Monk_SweepingTakedown_DamageIncrease: { label: "Aug. Sweeping Takedown dmg", voc: "monk", spell: "Sweeping Takedown", damage: 5 },
   Monk_SweepingTakedown_CriticalExtraDamage: { label: "Aug. Sweeping Takedown crit", voc: "monk", spell: "Sweeping Takedown", critDamage: 8, spellCritChance: 10 },
+  /* Winter Update 2026 */
+  Monk_ChainedPenance_DamageIncrease: { label: "Aug. Chained Penance dmg", voc: "monk", spell: "Chained Penance", damage: 5 },
+  Monk_ChainedPenance_CriticalExtraDamage: { label: "Aug. Chained Penance crit", voc: "monk", spell: "Chained Penance", critDamage: 12, spellCritChance: 10 },
+  Monk_ThousandFistBlows_DamageIncrease: { label: "Aug. Thousand Fist Blows dmg", voc: "monk", spell: "Thousand Fist Blows", damage: 5 },
+  Monk_ThousandFistBlows_CriticalExtraDamage: { label: "Aug. Thousand Fist Blows crit", voc: "monk", spell: "Thousand Fist Blows", critDamage: 12, spellCritChance: 10 },
   Monk_FocusSerenity_Cooldown: { label: "Aug. Focus Serenity CD", voc: "monk", spell: "Focus Serenity", cooldownMs: 300000, momentum: true },
   Monk_FocusHarmony_Cooldown: { label: "Aug. Focus Harmony CD", voc: "monk", spell: "Focus Harmony", cooldownMs: 30000, momentum: true },
   Monk_MassSpiritMend_HealingIncrease: { label: "Aug. Mass Spirit Mend", voc: "monk", spell: "Mass Spirit Mend", heal: 5 },
@@ -365,7 +390,7 @@ function wheelApplySupremeToBonus(bonus, voc, key, grade) {
   if (spec.lifeLeech) bonus.lifeLeech += spec.lifeLeech * m;
   if (spec.manaLeech) bonus.manaLeech += spec.manaLeech * m;
   if (spec.critDamage && !spec.spell) bonus.critDamage += spec.critDamage * m;
-  if (spec.revelation) bonus.revelation[spec.revelation] += (spec.revelationPts || 150) * m;
+  if (spec.revelation) bonus.revelation[spec.revelation] += (spec.revelationPts || 125) * m;
   if (spec.momentum) bonus.momentum += grade < 3 ? 0.33 * Math.max(0, grade) : 1;
   if (spec.spell) {
     var sid = wheelGemSpellId(spec.spell);
