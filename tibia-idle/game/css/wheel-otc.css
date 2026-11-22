@@ -5,18 +5,18 @@
  *   1000×645 window, 3 menu tabs (Wheel/Gem/Fragment),
  *   money/fragment resource panel, summary toggle, preset bar.
  */
-.wheel-window { width: 100%; max-width: 1140px; background: #1a1d24; border: 1px solid #2a2d34; border-radius: 4px; overflow: hidden; }
-.wheel-menu-tabs { display: flex; gap: 0; background: #12151a; border-bottom: 1px solid #2a2d34; }
-.wheel-menu-tab { flex: 1; padding: 8px 12px; font-size: 11px; color: #666; text-align: center; cursor: pointer; border: none; background: transparent; transition: all .15s; font-weight: bold; }
-.wheel-menu-tab:hover { color: #c0c0c0; background: #1b1e24; }
-.wheel-menu-tab.active { color: #d4af37; background: #1a1d24; border-bottom: 2px solid #d4af37; }
+.wheel-window { width: 100%; max-width: 1140px; background: repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 1px,rgba(0,0,0,.035) 1px 3px),#221a10; border: 1px solid #5a4a32; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.45); }
+.wheel-menu-tabs { display: flex; gap: 0; background: #1a140d; border-bottom: 2px solid #181410; }
+.wheel-menu-tab { flex: 1; padding: 8px 12px; font-size: 11px; color: #8a8070; text-align: center; cursor: pointer; border: none; background: transparent; transition: all .15s; font-weight: bold; }
+.wheel-menu-tab:hover { color: #d8cfc0; background: #251c11; }
+.wheel-menu-tab.active { color: #d4af37; background: #221a10; border-bottom: 2px solid #d4af37; }
 
 /* ── PRESET / TAB BAR ── */
-.wheel-preset-bar { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: #12151a; border-bottom: 1px solid #2a2d34; font-size: 10px; }
-.wheel-preset-btn { padding: 3px 10px; background: #1b1e24; border: 1px solid #2a2d34; border-radius: 3px; color: #888; cursor: pointer; font-size: 9px; }
+.wheel-preset-bar { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: #1a140d; border-bottom: 1px solid #3a2e22; font-size: 10px; }
+.wheel-preset-btn { padding: 3px 10px; background: #251c11; border: 1px solid #3a2e22; border-radius: 3px; color: #a8a090; cursor: pointer; font-size: 9px; }
 .wheel-preset-btn:hover { border-color: #d4af37; color: #d4af37; }
-.wheel-preset-btn.active { background: #252820; border-color: #d4af37; color: #d4af37; }
-.wheel-preset-name { color: #c0c0c0; font-style: italic; margin-left: auto; }
+.wheel-preset-btn.active { background: #4a3a1a; border-color: #d4af37; color: #d4af37; }
+.wheel-preset-name { color: #d8cfc0; font-style: italic; margin-left: auto; }
 
 /* ── WHEEL BODY ── */
 .wheel-body { display: flex; gap: 10px; padding: 10px; align-items: flex-start; }
@@ -54,8 +54,8 @@
   position: absolute; transform: translate(-50%,-50%);
   width: 36px; height: 36px; padding: 0;
   cursor: pointer;
-  background: #12141c;
-  border: 1px solid #5a6172; border-radius: 6px;
+  background: rgba(18,14,8,.92);
+  border: 1px solid #5a4a32; border-radius: 6px;
   box-shadow: 0 0 0 1px rgba(0,0,0,.75), inset 0 0 8px rgba(0,0,0,.55);
   z-index: 5;
   transition: transform .12s, border-color .12s, box-shadow .12s, opacity .12s;
@@ -77,7 +77,7 @@
 }
 /* estados: disponivel=glow verde | travado=apagado | cheio=cor do quadrante
  * | selecionada=borda/glow ciano (mockup wod) */
-.wheel-node { border-radius: 50%; background: rgba(16,18,24,.82); border-color: #494e59; }
+.wheel-node { border-radius: 50%; background: rgba(18,14,8,.82); border-color: #5a4a32; }
 /* locked sem dim: perks ainda inativos aparecem com a mesma nitidez;
  * o estado continua legível pela borda (glow verde = alocável, cor do
  * quadrante = cheio) */
@@ -91,20 +91,20 @@
 .wheel-node.can:hover { transform: translate(-50%,-50%) scale(1.18); border-color: #f2c96b; z-index: 10; }
 .wheel-node.sel { transform: translate(-50%,-50%) scale(1.15); z-index: 9; border-color: #38bdf8; box-shadow: 0 0 14px rgba(56,189,248,.75), inset 0 0 8px rgba(0,0,0,.55); }
 /* mini contador pts/max abaixo do icone */
-.wod-node-pts { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); background: #101216; border: 1px solid #3c404a; color: #d6d9e0; font-size: 9px; font-weight: 700; line-height: 1; padding: 1px 4px; border-radius: 3px; pointer-events: none; white-space: nowrap; z-index: 1; }
+.wod-node-pts { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); background: #161210; border: 1px solid #4b3a2a; color: #e8dfd0; font-size: 9px; font-weight: 700; line-height: 1; padding: 1px 4px; border-radius: 3px; pointer-events: none; white-space: nowrap; z-index: 1; }
 
 /* ── SEQUÊNCIA DE EVOLUÇÃO ──
  * .wheel-paths: arestas do grafo de perks (trilha). .wp-on: aresta do
  * caminho ate a raiz da fatia selecionada. .wheel-step: caixinha numerada
  * indicando a ordem que as fatias precisam ser completadas (1 primeiro). */
 .wheel-paths { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
-.wheel-paths .wp-edge { stroke: rgba(120,128,150,.30); stroke-width: 1.4; }
+.wheel-paths .wp-edge { stroke: rgba(168,152,120,.30); stroke-width: 1.4; }
 .wheel-paths .wp-edge.wp-on { stroke: #ffe680; stroke-width: 2.6; filter: drop-shadow(0 0 3px rgba(255,230,128,.6)); }
 .wheel-step {
   position: absolute; transform: translate(-50%,-50%);
   min-width: 15px; height: 15px; line-height: 15px; padding: 0 3px;
   font-size: 9px; font-weight: bold; text-align: center;
-  color: #1a1d24; background: #ffe680; border: 1px solid #8f7a2a; border-radius: 3px;
+  color: #221a10; background: #ffe680; border: 1px solid #8f7a2a; border-radius: 3px;
   box-shadow: 0 0 4px rgba(0,0,0,.7);
   z-index: 7; pointer-events: none;
 }
@@ -114,50 +114,50 @@
 .wheel-ctl-col { display: flex; flex-direction: column; gap: 3px; }
 .wheel-ctl-col .sm { min-width: 72px; }
 .wheel-sub-btn { color: #f87171; font-weight: bold; }
-.wheel-sub-btn:disabled { color: #666; opacity: .6; }
+.wheel-sub-btn:disabled { color: #8a8070; opacity: .6; }
 .wheel-max-btn { color: #ffe680; font-weight: bold; border-color: #8f7a2a; }
-.wheel-max-btn:disabled { color: #666; opacity: .6; border-color: #2a2d34; }
+.wheel-max-btn:disabled { color: #8a8070; opacity: .6; border-color: #3a2e22; }
 
 /* ── RIGHT PANEL (summary) ── */
 .wheel-right { flex: 1; min-width: 0; max-height: 522px; overflow-y: auto; font-size: 10px; }
 .wheel-sec { margin-bottom: 8px; }
-.wheel-sec-title { color: #d4af37; font-weight: bold; font-size: 10px; padding: 3px 0; border-bottom: 1px solid #2a2d34; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
+.wheel-sec-title { color: #d4af37; font-weight: bold; font-size: 10px; padding: 3px 0; border-bottom: 1px solid #3a2e22; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
 .wheel-stats .stat-row { padding: 1px 0; }
-.wheel-stats .stat-row .k { color: #888; }
+.wheel-stats .stat-row .k { color: #a8a090; }
 .wheel-stats .stat-row .v { color: #9ce84a; font-weight: bold; }
 
 /* ── MONEY PANEL (bottom) ── */
-.wheel-money-bar { display: flex; gap: 8px; align-items: center; padding: 4px 10px; background: #12151a; border-top: 1px solid #2a2d34; font-size: 10px; }
-.wheel-money-item { display: flex; align-items: center; gap: 4px; padding: 2px 8px; background: #1b1e24; border: 1px solid #2a2d34; border-radius: 3px; color: #c0c0c0; }
+.wheel-money-bar { display: flex; gap: 8px; align-items: center; padding: 4px 10px; background: #1a140d; border-top: 1px solid #3a2e22; font-size: 10px; }
+.wheel-money-item { display: flex; align-items: center; gap: 4px; padding: 2px 8px; background: #251c11; border: 1px solid #3a2e22; border-radius: 3px; color: #d8cfc0; }
 .wheel-money-item img, .wheel-money-item .wm-icon { width: 14px; height: 14px; }
 .wheel-actions-bar { display: flex; gap: 4px; margin-left: auto; }
 .wheel-actions-bar button { font-size: 9px; padding: 2px 8px; }
 
 /* ── TOP INFO ── */
-.wheel-top-info { display: flex; align-items: center; gap: 10px; padding: 6px 10px; font-size: 10px; background: #12151a; border-bottom: 1px solid #2a2d34; }
-.wheel-avail { padding: 2px 8px; background: #1b1e24; border: 1px solid #d4af37; border-radius: 3px; color: #ffe680; font-weight: bold; }
+.wheel-top-info { display: flex; align-items: center; gap: 10px; padding: 6px 10px; font-size: 10px; background: #1a140d; border-bottom: 1px solid #3a2e22; }
+.wheel-avail { padding: 2px 8px; background: #251c11; border: 1px solid #d4af37; border-radius: 3px; color: #ffe680; font-weight: bold; }
 .wheel-add-btn { color: #9ce84a; font-weight: bold; margin-left: 6px; }
-.wheel-add-btn:disabled { color: #666; opacity: .6; }
+.wheel-add-btn:disabled { color: #8a8070; opacity: .6; }
 .wheel-legend { display: flex; gap: 10px; font-size: 9px; }
 .wheel-legend .wl-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
 
 /* ── GEM ATELIER ── */
 .wheel-gem-panel { padding: 10px; }
 .wheel-gem-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.wheel-gem-card { background: #1b1e24; border: 1px solid #2a2d34; border-radius: 4px; padding: 6px; text-align: center; }
-.wheel-gem-card.equipped { border-color: #d4af37; background: #252820; }
+.wheel-gem-card { background: #251c11; border: 1px solid #3a2e22; border-radius: 4px; padding: 6px; text-align: center; }
+.wheel-gem-card.equipped { border-color: #d4af37; background: #4a3a1a; }
 .wheel-gem-card .wgc-icon { width: 40px; height: 40px; margin: 0 auto 3px; border-radius: 4px; display:flex; align-items:center; justify-content:center; }
-.wheel-gem-card .wgc-name { font-size: 9px; color: #c0c0c0; margin-bottom: 4px; }
-.wgc-empty { font-size: 8px; color: #555; }
+.wheel-gem-card .wgc-name { font-size: 9px; color: #d8cfc0; margin-bottom: 4px; }
+.wgc-empty { font-size: 8px; color: #7a7060; }
 .wgc-gem { width: 28px; height: 28px; border-radius: 50%; display:flex; align-items:center; justify-content:center; border: 2px solid #d4af37; }
 .wgc-gem.w-green { background:#166534; } .wgc-gem.w-red { background:#7f1d1d; }
 .wgc-gem.w-blue { background:#1e3a8a; } .wgc-gem.w-purple { background:#581c87; }
 .wgc-gem.q-lesser { border-color:#9ca3af; } .wgc-gem.q-regular { border-color:#60a5fa; } .wgc-gem.q-greater { border-color:#fbbf24; }
 .wgc-q { font-size: 10px; font-weight: bold; color:#fff; }
 .wheel-buy-gems, .wheel-buy-row { display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin: 3px 0; }
-.wheel-buy-row .k { width: 70px; color:#888; font-size:10px; text-transform:capitalize; }
+.wheel-buy-row .k { width: 70px; color:#a8a090; font-size:10px; text-transform:capitalize; }
 .wheel-gem-inv { max-height: 180px; overflow-y:auto; display:flex; flex-direction:column; gap:3px; }
-.wheel-gem-inv-item { display:flex; gap:8px; align-items:center; padding:4px; background:#12151a; border:1px solid #2a2d34; cursor:pointer; }
+.wheel-gem-inv-item { display:flex; gap:8px; align-items:center; padding:4px; background:#1a140d; border:1px solid #3a2e22; cursor:pointer; }
 .wheel-gem-inv-item.active { border-color:#d4af37; }
 .wgi-title { font-size:10px; color:#e8e2d0; }
 .wheel-gem-actions { display:flex; flex-wrap:wrap; gap:4px; }
@@ -166,11 +166,11 @@
 /* ── FRAGMENT PANEL ── */
 .wheel-frag-panel { padding: 10px; }
 .wheel-frag-list { display: flex; flex-direction: column; gap: 4px; max-height: 400px; overflow-y: auto; }
-.wheel-frag-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #1b1e24; border: 1px solid #2a2d34; border-radius: 3px; font-size: 10px; cursor: pointer; }
+.wheel-frag-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #251c11; border: 1px solid #3a2e22; border-radius: 3px; font-size: 10px; cursor: pointer; }
 .wheel-frag-row:hover { border-color: #d4af37; }
 .wheel-frag-row .wfr-icon { width: 24px; height: 24px; }
-.wheel-frag-row .wfr-name { flex: 1; color: #c0c0c0; }
-.wheel-frag-row .wfr-cost { color: #888; }
+.wheel-frag-row .wfr-name { flex: 1; color: #d8cfc0; }
+.wheel-frag-row .wfr-cost { color: #a8a090; }
 
 /* Summary toggle */
 .wheel-summary-toggle { display: flex; justify-content: center; padding: 4px; }
@@ -178,17 +178,17 @@
 
 /* Scroll */
 .wheel-right::-webkit-scrollbar, .wheel-frag-list::-webkit-scrollbar { width: 5px; }
-.wheel-right::-webkit-scrollbar-track, .wheel-frag-list::-webkit-scrollbar-track { background: #0d0f14; }
-.wheel-right::-webkit-scrollbar-thumb, .wheel-frag-list::-webkit-scrollbar-thumb { background: #2a2d34; border-radius: 3px; }
+.wheel-right::-webkit-scrollbar-track, .wheel-frag-list::-webkit-scrollbar-track { background: #14100c; }
+.wheel-right::-webkit-scrollbar-thumb, .wheel-frag-list::-webkit-scrollbar-thumb { background: #3a2e22; border-radius: 3px; }
 
 /* Gift of Life badge */
 .wheel-gift-badge { display: inline-block; padding: 1px 5px; background: #2a5a2a; border: 1px solid #4ade80; border-radius: 2px; color: #4ade80; font-size: 8px; margin-left: 4px; }
 
 /* ── SELEÇÃO (painel da fatia clicada) ── */
-.wheel-sel { background:#12151a; border:1px solid #2a2d34; border-radius:4px; padding:8px; margin-bottom:8px; }
+.wheel-sel { background:#1a140d; border:1px solid #3a2e22; border-radius:4px; padding:8px; margin-bottom:8px; }
 .wheel-sel .wsel-name { font-weight:bold; font-size:12px; margin-top:4px; }
-.wheel-sel .wsel-label { color:#d4af37; font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; margin-top:8px; border-bottom:1px solid #2a2d34; padding-bottom:2px; }
-.wheel-sel .wsel-line { font-size:10px; color:#c8c0b0; line-height:1.5; }
+.wheel-sel .wsel-label { color:#d4af37; font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; margin-top:8px; border-bottom:1px solid #3a2e22; padding-bottom:2px; }
+.wheel-sel .wsel-line { font-size:10px; color:#e8dfd0; line-height:1.5; }
 /* ── Responsivo / embutido ── */
 .wheel-body { flex-wrap:wrap; }
 
@@ -237,7 +237,7 @@
 .wheel-body.wod-workspace {
   gap: 14px;
   padding: 10px 12px;
-  background: #17191e;
+  background: #1e1810;
   align-items: stretch;
 }
 /* Palco escuro da roda — cresce para ocupar todo o espaco livre do
@@ -250,8 +250,8 @@
   align-items: center;
   justify-content: center;
   padding: 10px;
-  background: radial-gradient(circle at center, #222630 0%, #111317 75%);
-  border: 1px solid #2f333d;
+  background: radial-gradient(circle at center, #33271a 0%, #17110a 75%);
+  border: 1px solid #4b3a2a;
   border-radius: 6px;
   box-shadow: inset 0 0 30px rgba(0,0,0,.75);
 }
@@ -260,7 +260,7 @@
 .wod-wheel-container {
   border-radius: 50%;
   border: 2px solid #755b29;
-  background: #0d0f13;
+  background: #14100c;
   box-shadow: 0 0 25px rgba(0,0,0,.85), inset 0 0 18px rgba(0,0,0,.9);
 }
 .wheel-canvas-area { border-radius: 50%; overflow: hidden; }
@@ -271,34 +271,34 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  background: #1e2128;
-  border: 1px solid #323640;
+  background: #251c11;
+  border: 1px solid #4b3a2a;
   border-radius: 6px;
   min-height: 0;
   overflow: hidden;
 }
 .wod-inspector-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .wod-inspector-body::-webkit-scrollbar { width: 5px; }
-.wod-inspector-body::-webkit-scrollbar-track { background: #0d0f14; }
-.wod-inspector-body::-webkit-scrollbar-thumb { background: #323640; border-radius: 3px; }
+.wod-inspector-body::-webkit-scrollbar-track { background: #14100c; }
+.wod-inspector-body::-webkit-scrollbar-thumb { background: #4b3a2a; border-radius: 3px; }
 
 .wod-summary-btn {
   width: 100%;
   padding: 8px 12px;
   font-size: 11px;
   font-weight: 600;
-  color: #e4e7ec;
-  background: #2b303a;
-  border: 1px solid #444b59;
+  color: #e8dfd0;
+  background: #332816;
+  border: 1px solid #5a4a32;
   border-radius: 4px;
   cursor: pointer;
 }
-.wod-summary-btn:hover { background: #363c48; border-color: #e6b84c; }
+.wod-summary-btn:hover { background: #3a2c18; border-color: #e6b84c; }
 
 .wod-slice-card {
   padding: 12px;
-  background: #15171c;
-  border: 1px solid #2d313a;
+  background: #1a140d;
+  border: 1px solid #3a2e22;
   border-radius: 5px;
   display: flex;
   flex-direction: column;
@@ -315,9 +315,9 @@
   font-size: 12px;
   font-weight: 700;
   border-radius: 4px;
-  border: 1px solid #3f4552;
-  background: #262a33;
-  color: #e2e8f0;
+  border: 1px solid #5a4a32;
+  background: #2e2416;
+  color: #e8dfd0;
   cursor: pointer;
 }
 .wod-ctrl-btn:disabled { opacity: .45; cursor: default; }
@@ -330,8 +330,8 @@
 .wod-commit-btn { padding: 10px; font-size: 12px; font-weight: 700; border-radius: 4px; cursor: pointer; }
 .wod-commit-btn.is-confirm { background: linear-gradient(180deg, #b8892d 0%, #835e18 100%); border: 1px solid #f2c96b; color: #fff8e7; }
 .wod-commit-btn.is-confirm:hover { background: linear-gradient(180deg, #bf8b2a 0%, #8a6016 100%); }
-.wod-commit-btn.is-reset { background: #2b2224; border: 1px solid #6e3b42; color: #f87171; }
-.wod-commit-btn.is-reset:hover { background: #3a2a2d; }
+.wod-commit-btn.is-reset { background: #3a2420; border: 1px solid #7a4438; color: #f87171; }
+.wod-commit-btn.is-reset:hover { background: #4a2e28; }
 
 /* a roda embutida ocupa todo o espaco disponivel do workspace */
 .chard-wheel-embed .wod-stage { min-width: 0; }

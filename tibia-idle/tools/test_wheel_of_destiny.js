@@ -14,8 +14,8 @@ must(html.includes("js/wheeldata.js?v=wod-2026-v1"), "index sem wheeldata cache-
 must(html.includes("js/wheel-gems.js?v=wod-2026-v1"), "index sem wheel-gems cache-bust");
 must(html.includes("js/wheel.js?v=wod-2026-v1"), "index sem wheel.js cache-bust");
 must(html.includes("js/wheel-data.js?v=wod-2026-v1"), "index sem wheel-data cache-bust");
-must(html.includes("js/wheel-ui.js?v=wod-fit-v1"), "index sem wheel-ui cache-bust wod-fit");
-must(html.includes("css/wheel-otc.css?v=wheelsave-v1"), "index sem wheel-otc.css cache-bust wheelsave");
+must(html.includes("js/wheel-ui.js?v=wod-cidade-v1"), "index sem wheel-ui cache-bust wod-cidade");
+must(html.includes("css/wheel-otc.css?v=wod-cidade-v1"), "index sem wheel-otc.css cache-bust wod-cidade");
 must(!html.includes("js/wheel-ui.js?v=wheel-fit-screen-v1"), "wheel-ui ainda com cache antigo");
 
 const redecl = /\b(?:var|let|const)\s+WHEEL_(?:SLOTS|POS|CONNECTED|ROOTS|CONFIG|HP|MP|CAP|SKILL|LEECH|MIT_PER_POINT|STAGE_ABILITY|SPELL_UPGRADES|COLORS)\b/;

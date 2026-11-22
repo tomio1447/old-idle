@@ -238,6 +238,12 @@ function openWheelModal() {
   if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
   if (!WHEEL_UI.tab) WHEEL_UI.tab = "wheel";
   WHEEL_UI.summary = WHEEL_UI.summary || false;
+  body.classList.remove(
+    "hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
+    "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell",
+    "ranking-modal-shell", "chard-modal-shell", "imb-modal-shell"
+  );
+  body.classList.add("cidade-modal-shell");
   body.innerHTML = renderWheelModal(p);
   modal.classList.add("show", "wide");
   bindWheelModal();
@@ -613,7 +619,7 @@ function bindWheel(root, rerender) {
     });
   });
   var close = $("#wheel-close");
-  if (close) close.addEventListener("click", function(){ $("#modal").classList.remove("show","wide"); });
+  if (close) close.addEventListener("click", function(){ $("#modal").classList.remove("show","wide"); $("#modal-body").classList.remove("cidade-modal-shell"); });
   var addSelBtn = body.querySelector("#wheel-add-sel");
   if (addSelBtn) addSelBtn.addEventListener("click", function(){
     if (typeof WHEEL_UI === "undefined" || !WHEEL_UI.sel) { toast("Selecione uma fatia da roda."); return; }

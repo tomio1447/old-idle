@@ -4,6 +4,26 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-22 — Wheel of Destiny: visual no padrão da cidade
+
+- Interior da roda retematizado da paleta fria OTC (#1a1d24/#12151a/
+  #2a2d34) para a paleta quente da cidade: painéis marrons (#221a10/
+  #251c11), bordas bronze (#3a2e22/#5a4a32), textos #e8dfd0/#a8a090,
+  ouro #d4af37 mantido como cor de destaque. Cobre abas (Wheel/Gem
+  Atelier/Fragments), preset bar, palco da roda (radial quente +
+  moldura dourada), inspetor, cards de fatia, botões -1/+1/MAX,
+  money bar, gem cards, fragment rows e scrollbars.
+- Modal standalone (openWheelModal) agora recebe o frame
+  cidade-modal-shell (borda biselada Tibia + sombra); planner modal
+  (openWheelPlannerModal) migra de hunts-modal-shell para
+  cidade-modal-shell, com perk rows virando cards bronze, títulos
+  dourados, abas de vocação no padrão cidade e moldura circular
+  dourada na roda SVG.
+- Cache-buster: wod-cidade-v1 (wheel-otc.css, wheel-ui.js,
+  wheel-modal.js, layout.css).
+
+---
+
 ## 2026-11-22 — Maxxenius: loots Raros que faltavam
 
 - Tabela do Maxxenius completada com os drops "Raro" oficiais da wiki que

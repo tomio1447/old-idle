@@ -6351,6 +6351,28 @@ body.fullhd .scene-overlay { font-size: 13px; }
 .wheel-row strong { flex: 0 0 auto; }
 .wheel-row .tiny { flex: 1 1 auto; text-align: right; }
 
+/* Planner da Wheel dentro do shell da cidade — cards bronze, títulos
+ * dourados e abas de vocação no padrão dos painéis da cidade. */
+.wheel-planner h4 { color:#d4af37; text-shadow:0 1px 1px #000; font-size:11px;
+  letter-spacing:.6px; margin:12px 0 4px; text-align:left; }
+.wheel-planner .wheel-section { background:rgba(16,12,8,.6); border:1px solid #2a2016;
+  border-radius:4px; padding:4px 6px; }
+.wheel-planner .wheel-row { border-bottom:none; background:rgba(22,18,12,.9);
+  border:1px solid #3a2e22; border-radius:4px; padding:5px 8px; margin-bottom:3px; }
+.wheel-planner .wheel-row:hover { background:rgba(35,28,18,.95); border-color:#5a4a32; }
+.wheel-planner .wheel-row strong { color:#e8dfd0; }
+.wheel-planner .wheel-row .tiny { color:#a8a090; }
+.wheel-planner [data-wv] { background:rgba(20,16,10,.85); color:#a8a090;
+  border:1px solid #3a3020; border-radius:4px; }
+.wheel-planner [data-wv]:hover { background:rgba(35,28,18,.95); color:#e8dfd0; }
+.wheel-planner [data-wv].active { background:rgba(74,58,26,.9); color:#ffe9a8;
+  border-color:#d4af37; text-shadow:0 1px 1px #000; }
+.wheel-planner #wheel-visual-wrap { display:flex; justify-content:center; }
+.wheel-planner #wheel-visual-wrap .wheel-svg {
+  border:2px solid #755b29; border-radius:50%;
+  background:#14100c;
+  box-shadow:0 0 25px rgba(0,0,0,.85), 0 0 10px rgba(212,175,55,.15); }
+
 /* ---- Quest system ---- */
 .quests-btn-icon { vertical-align: middle; margin-right: 4px; image-rendering: pixelated; }
 .modal-bg .modal.quests-modal-shell,

@@ -51,7 +51,7 @@ function openWheelPlannerModal(startVocation) {
     "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell",
     "ranking-modal-shell", "chard-modal-shell", "imb-modal-shell"
   );
-  body.classList.add("hunts-modal-shell");
+  body.classList.add("cidade-modal-shell");
 
   const p = G.p;
   const voc = startVocation || (p && p.voc) || "knight";
@@ -117,7 +117,7 @@ function openWheelPlannerModal(startVocation) {
       <span class="tiny" style="margin-left:auto">Pontos: <b style="color:#ffe680">${spent}/${total}</b> (disp. <b style="color:#9ce84a">${avail}</b>)</span>
       <button class="sm" id="wheel-modal-close">Fechar</button>
     </div>
-    <div class="panel-body" style="max-height:70vh;overflow:auto;text-align:center;">
+    <div class="panel-body wheel-planner" style="max-height:70vh;overflow:auto;text-align:center;">
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">
         ${window.WHEEL_VOCATIONS.map(vocBtn).join("")}
       </div>
@@ -137,7 +137,7 @@ function openWheelPlannerModal(startVocation) {
   modal.classList.add("show");
   $("#wheel-modal-close").addEventListener("click", () => {
     modal.classList.remove("show");
-    body.classList.remove("hunts-modal-shell");
+    body.classList.remove("cidade-modal-shell");
   });
 
   $$('[data-wv]').forEach((btn) =>
