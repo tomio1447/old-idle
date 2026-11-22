@@ -3,6 +3,21 @@
 Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
+
+## 2026-11-22 — Maxxenius: loots Raros que faltavam
+
+- Tabela do Maxxenius completada com os drops "Raro" oficiais da wiki que
+  o dump Canary não traz: Brain in a Jar (3.57%) e Purple Tendril
+  Lantern (2.5%, mesma taxa da lanterna no Alptramun). Maxxenius Head já
+  estava (7.14%).
+- Novo item brain-in-a-jar (cid 29426): escudo oficial — def 19, ML+3,
+  proteção earth 7%, sorc/druid 180+, 1 slot de imbuement, 27 oz, sem
+  comprador NPC. Ícone já existia.
+- DREAM_COURTS_PATCH.registerLoot aplicado em GAMEDATA.monsters/
+  MONSTERDATA (cliente) e MONSTERS (engine) — mesma correção nos dois.
+- Cache-buster: maxxenius-loot-v1.
+
+---
 ## 2026-11-22 — Boss/hunt entry: confirmação de instância em loop (fix crítico)
 
 - Bug crítico: ao iniciar boss fight, o PUT de create podia morrer

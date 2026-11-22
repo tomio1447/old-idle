@@ -43,6 +43,10 @@ require("../game/js/stonerefiner.js").registerLoot(MONSTERS);
 // Roshamuul: o miniboss Mawhawk sempre dropa 1x Dream Matter — mesma
 // correção de loot aplicada no catálogo do cliente.
 require("../game/js/roshamuul.js").registerLoot(MONSTERS);
+// Dream Courts: o dump Canary não traz Brain in a Jar nem Purple Tendril
+// Lantern no loot do Maxxenius (drops "Raro" oficiais) — mesma correção
+// de loot aplicada no catálogo do cliente.
+require("../game/js/dream-courts-bosses.js").registerLoot(MONSTERS);
 // True Asuras - Thalassara (400+): a True Feverbloom Asura é do update
 // Forbidden Gardens (15.30) e não existe no dump Canary — a ficha vem do
 // patch da hunt (stats oficiais tibia.com/TibiaWiki balanceados sobre as

@@ -1,5 +1,26 @@
 "use strict";
 
+/* Maxxenius: a tabela do dump Canary não traz os dois drops "Raro" do
+ * loot oficial (TibiaWiki): Brain in a Jar e Purple Tendril Lantern.
+ * Chances alinhadas à banda rara da própria tabela (energized limb
+ * 3.57%) e à mesma lanterna do Alptramun (2.5%).
+ * `registerLoot` segue o padrão do roshamuul.js: o cliente aplica em
+ * GAMEDATA.monsters/MONSTERDATA, o engine aplica no MONSTERS. */
+const DREAM_COURTS_PATCH = {
+  registerLoot(monsters) {
+    const m = monsters && monsters["maxxenius"];
+    if (!m) return;
+    if (!Array.isArray(m.loot)) m.loot = [];
+    const add = (item, chance) => {
+      if (!m.loot.some((l) => l && l.item === item)) m.loot.push({ chance, max: 1, item });
+    };
+    add("brain-in-a-jar", 3.57);
+    add("purple-tendril-lantern", 2.5);
+  },
+};
+
+if (typeof module !== "undefined" && module.exports) module.exports = DREAM_COURTS_PATCH;
+
 const PLAGUEROOT_ID = "plagueroot";
 const PLAGUEROOT_ROOM = {
   otbm: "plagueroot",
@@ -26,6 +47,9 @@ const PLAGUEROOT_ROOM = {
     "abyss-hammer": { sell: 20000, npcSell: 20000 },
     "arcane-staff": { sell: 42000, npcSell: 42000 },
     "alptramun-s-toothbrush": { n: "Alptramun's toothbrush", s: null, t: "loot", cid: 29943, sell: 270000, npcSell: 270000 },
+    // Escudo oficial do Maxxenius (items.xml cid 29426): def 19, ML+3,
+    // earth 7%, sorc/druid 180+, 1 slot de imbuement, sem comprador NPC.
+    "brain-in-a-jar": { n: "brain in a jar", s: "shield", t: "armor", w: 27, cid: 29426, sell: 0, npcSell: 0, def: 19, ml: 3, mag: 3, res: { earth: 7 }, imbSlots: 1, lvl: 180, vocs: ["sorcerer", "master sorcerer", "druid", "elder druid"] },
     "izcandar-s-snow-globe": { n: "Izcandar's snow globe", s: null, t: "loot", cid: 29944, sell: 180000, npcSell: 180000 },
     "izcandar-s-sundial": { n: "Izcandar's sundial", s: null, t: "loot", cid: 29945, sell: 225000, npcSell: 225000 },
     "maxxenius-head": { n: "Maxxenius head", s: null, t: "loot", cid: 29942, sell: 500000, npcSell: 500000 },
@@ -103,4 +127,6 @@ const PLAGUEROOT_ROOM = {
       cooldown: 16 * 60 * 60 * 1000,
     };
   }
+  DREAM_COURTS_PATCH.registerLoot(GAMEDATA.monsters);
+  if (typeof MONSTERDATA !== "undefined") DREAM_COURTS_PATCH.registerLoot(MONSTERDATA);
 })();
