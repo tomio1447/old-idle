@@ -7756,7 +7756,7 @@ function tickEchoRaid(auth,now){
     if(now<pd.at)continue;st.pending.splice(i,1);
     st.portals.push({id:"echo-"+Math.floor(now)+"-"+i,slug:String(pd.slug),cx:pd.cx,cy:pd.cy,
       x:(pd.cx+.5)/w,y:(pd.cy+.5)/h,bornAt:now,expiresAt:now+ECHO_PORTAL_TTL_MS});
-    auth.events.push({t:"echo-portal",x:(pd.cx+.5)/w,y:(pd.cy+.5)/h,screen:true,ts:now});
+    auth.events.push({t:"echo-portal",x:(pd.cx+.5)/w,y:(pd.cy+.5)/h,slug:String(pd.slug),screen:true,ts:now});
   }
   // 2) Jogador pisando no portal arma a raid (portal some).
   for(let i=st.portals.length-1;i>=0;i--){const po=st.portals[i];
@@ -7767,7 +7767,7 @@ function tickEchoRaid(auth,now){
     if(!stepper)continue;
     st.portals.splice(i,1);
     st.armed.push({slug:po.slug,cx:po.cx,cy:po.cy,x:po.x,y:po.y,armedAt:now,spawnAt:now+ECHO_ARM_DELAY_MS});
-    auth.events.push({t:"echo-armed",x:po.x,y:po.y,at:now+ECHO_ARM_DELAY_MS,screen:true,ts:now});
+    auth.events.push({t:"echo-armed",x:po.x,y:po.y,at:now+ECHO_ARM_DELAY_MS,slug:String(po.slug),armedAt:now,screen:true,ts:now});
   }
   // 3) Raids armadas: warden + minions após o delay de 60s.
   for(let i=st.armed.length-1;i>=0;i--){const ar=st.armed[i];

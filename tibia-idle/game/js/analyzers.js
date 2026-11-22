@@ -481,6 +481,12 @@ function otcAnalyserIngestEvents(events, combat) {
   const hitEvents = [];
   for (const e of events) {
     if (!e) continue;
+    // Echo Raid: portais/ativações/wardens — métricas da sessão, sem dmg.
+    if (e.t === "echo-portal" || e.t === "echo-armed"
+        || e.t === "echo-spawn" || e.t === "echo-reward") {
+      otcAnalyserEchoEvent(c, e);
+      continue;
+    }
     // Forge: procs dedicados + buffs de ativação + ruse (miss sem dmg).
     if (e.t === "forge" || e.t === "buff" || (e.t === "miss" && e.ruse)) {
       otcAnalyserForgeEvent(c, e, activeId);
@@ -664,6 +670,63 @@ function otcAnalyserResetDeathTrack(c) {
   c.stats.deathTrack = { startedAt: Date.now(), byPlayer: {} };
 }
 
+/* ---- Echo Raid tracker: portais aparecidos + quando o jogador pisou ---- */
+function otcAnalyserEchoTrack(c) {
+  const stats = c.stats;
+  if (!stats.echoRaid || typeof stats.echoRaid !== "object")
+    stats.echoRaid = { portals: 0, armed: [], spawned: 0, wardens: 0, charmPoints: 0 };
+  if (!Array.isArray(stats.echoRaid.armed)) stats.echoRaid.armed = [];
+  return stats.echoRaid;
+}
+function otcAnalyserEchoEvent(c, e) {
+  const track = otcAnalyserEchoTrack(c);
+  if (e.t === "echo-portal") {
+    track.portals++;
+  } else if (e.t === "echo-armed") {
+    // ts remapeado pro clock do cliente (online) > armedAt local > at-60s.
+    const at = Number(e.ts) || Number(e.armedAt)
+      || (Number(e.at) ? Number(e.at) - 60000 : 0) || Date.now();
+    track.armed.push({ at: at, slug: e.slug || "", spawnAt: Number(e.at) || 0 });
+    if (track.armed.length > 60) track.armed.shift();
+  } else if (e.t === "echo-spawn") {
+    track.spawned++;
+  } else if (e.t === "echo-reward") {
+    track.wardens++;
+    track.charmPoints += Math.max(0, Number(e.points) || 0);
+  }
+}
+function otcAnalyserEchoMobName(slug) {
+  const d = (typeof MONSTERDATA !== "undefined" && MONSTERDATA[slug]) ||
+    (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters && GAMEDATA.monsters[slug]);
+  const n = (d && d.name) || slug || "?";
+  return typeof displayMonsterName === "function" ? displayMonsterName(n) : n;
+}
+function otcAnalyserEchoSection(c, stats) {
+  const track = (stats && stats.echoRaid) || null;
+  if (!track || (!(Number(track.portals) || 0) && !(track.armed || []).length)) return "";
+  const portals = Math.max(0, Number(track.portals) || 0);
+  const armed = Array.isArray(track.armed) ? track.armed : [];
+  const wardens = Math.max(0, Number(track.wardens) || 0);
+  const charmPts = Math.max(0, Number(track.charmPoints) || 0);
+  const sessionStart = Number(stats && stats.startedAt) || 0;
+  const lines = armed.map((a) => {
+    const at = Number(a.at) || 0;
+    const rel = sessionStart && at >= sessionStart
+      ? otcAnalyserClock(at - sessionStart)
+      : new Date(at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const mob = a.slug ? ` <small>${otcAnalyserEscape(otcAnalyserEchoMobName(a.slug))}</small>` : "";
+    return `<div class="otc-analyser-line"><span><b>${rel}</b>${mob}</span><strong><em>ativada</em></strong></div>`;
+  }).join("");
+  return `<div class="otc-analyser-section-title">Echo Raids</div>
+    <div class="otc-loot-econ">
+      <div class="otc-loot-econ-row"><span>Portais aparecidos</span><b>${otcAnalyserNumber(portals)}</b></div>
+      <div class="otc-loot-econ-row"><span>Ativadas (pisou)</span><b>${otcAnalyserNumber(armed.length)}</b></div>
+      ${wardens ? `<div class="otc-loot-econ-row"><span>Wardens mortos</span><b>${otcAnalyserNumber(wardens)}</b></div>` : ""}
+      ${charmPts ? `<div class="otc-loot-econ-row"><span>Charm points</span><b>+${otcAnalyserNumber(charmPts)}</b></div>` : ""}
+    </div>
+    ${lines}`;
+}
+
 /** Reset da sessão no header do painel (entre LIVE e minimizar): zera TODOS os analisadores. */
 function otcAnalyserResetSession() {
   const c = (typeof G !== "undefined" && G) ? G.combat : null;
@@ -689,6 +752,7 @@ function otcAnalyserResetSession() {
   c.stats.monsters = {};
   c.stats.supplyUsed = {};
   c.stats.supplyCost = 0;
+  c.stats.echoRaid = { portals: 0, armed: [], spawned: 0, wardens: 0, charmPoints: 0 };
   if (typeof document !== "undefined") renderOtcAnalyser();
 }
 
@@ -870,6 +934,7 @@ function otcAnalyserBody(kind, c) {
       </div>
       ${otcAnalyserLootEconBlock(stats)}
       ${otcAnalyserDeathSection(c, stats)}
+      ${otcAnalyserEchoSection(c, stats)}
       <div class="otc-raw-note"><b>Raw XP/h</b> usa somente a EXP original dos monstros. Não soma stage, PvP, Prey, VIP, Soul War ou bônus de party.</div>
       <div class="otc-analyser-section-title">Monstros abatidos</div>
       ${monsterRows || '<div class="tiny dim">Aguardando o primeiro abate.</div>'}`;
@@ -947,6 +1012,7 @@ if (typeof module !== "undefined" && module.exports) {
     otcAnalyserLootEconBlock, otcAnalyserDeathSection, otcAnalyserResetDeathTrack,
     otcAnalyserResetTrack, otcAnalyserResetSession, otcAnalyserRowForMeta,
     otcAnalyserPlayerMeta, otcAnalyserSyncSessionScalars,
+    otcAnalyserEchoTrack, otcAnalyserEchoEvent, otcAnalyserEchoSection,
   };
 }
 

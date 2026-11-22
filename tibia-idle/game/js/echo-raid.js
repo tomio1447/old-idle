@@ -178,7 +178,7 @@ function echoRaidTick(c, p, dt, now) {
       x: (pd.cx + 0.5) / gw, y: (pd.cy + 0.5) / gh,
       bornAt: now, expiresAt: now + ECHO_PORTAL_TTL_MS,
     });
-    c.events.push({ t: "echo-portal", x: (pd.cx + 0.5) / gw, y: (pd.cy + 0.5) / gh });
+    c.events.push({ t: "echo-portal", x: (pd.cx + 0.5) / gw, y: (pd.cy + 0.5) / gh, slug: pd.slug });
   }
 
   // 2) Qualquer jogador pisando no portal arma a raid (portal some).
@@ -194,7 +194,7 @@ function echoRaidTick(c, p, dt, now) {
       slug: po.slug, cx: po.cx, cy: po.cy, x: po.x, y: po.y,
       armedAt: now, spawnAt: now + ECHO_ARM_DELAY_MS,
     });
-    c.events.push({ t: "echo-armed", x: po.x, y: po.y, at: now + ECHO_ARM_DELAY_MS });
+    c.events.push({ t: "echo-armed", x: po.x, y: po.y, at: now + ECHO_ARM_DELAY_MS, slug: po.slug, armedAt: now });
   }
 
   // 3) Raids armadas: warden + minions após o delay.

@@ -1924,3 +1924,10 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   canary .lua; true-feverbloom-asura (1068: 62,61,114,15 — fora do dump
   15.30, derivada pixel-a-pixel do sprite oficial da wiki: pele verde,
   cabelo preto, flores rosa).
+
+- **Hunt Session Analyser: Echo Raids**: nova seção na aba Hunt Session
+  mostra quantos portais de Echo Raid apareceram na sessão, quantas o
+  jogador ativou (pisou), lista de ativações com horário da sessão e o
+  monstro, wardens mortos e charm points ganhos. Funciona nos modos
+  local e online (eventos echo-* do engine autoritativo também chegam
+  com slug+armedAt). Reset de sessão zera o contador.
