@@ -99,6 +99,10 @@ must(/accountEndInstance[\s\S]*?attempt<4/.test(clientSource),
   "accountEndInstance sem retry de INSTANCE_VERSION_CONFLICT");
 must(clientSource.includes('"replaced-stale"'),
   "create não encerra a row stale ativa que bloqueia novas instâncias");
+// 409 rotineiro (mesma row ativa, version bumpada pelo tick — ex.: spawn do
+// boss) não pode tostar "outra sessão": só row trocada/morta é conflito real.
+must(clientSource.includes("routineRace")&&/routineRace[\s\S]{0,200}prevInstanceId/.test(clientSource),
+  "toast de INSTANCE_VERSION_CONFLICT sem gate de corrida rotineira");
 
 // ------------------------------------------------------------- funcionais
 async function main() {

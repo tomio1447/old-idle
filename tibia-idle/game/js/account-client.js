@@ -496,6 +496,7 @@ function accountSaveInstance(token,state){
     if(r.data.ok){ACCOUNT_INSTANCE_CREATE_REJECT="";accountInstanceApply(r.data.instance);return true;}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409){
+      const prevInstanceId=String(ACCOUNT_INSTANCE.id||"");
       accountInstanceApply(r.data.instance||null);
       try{window.dispatchEvent(new CustomEvent("tibia-idle-instance-conflict"));}catch(e){}
       /* Create recusado porque a row ANTIGA segue 'active' (o end anterior
@@ -506,7 +507,17 @@ function accountSaveInstance(token,state){
       if(isCreate&&r.data.instance&&String(r.data.instance.status||"")==="active"&&
          typeof accountEndInstance==="function")
         accountEndInstance(token,"replaced-stale").catch(()=>{});
-      else if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
+      else if(typeof toast==="function"){
+        /* Conflito de VERSION na MESMA row ainda ativa é corrida rotineira:
+         * o tick autoritativo bumpou a version entre o último apply e este
+         * checkpoint (ex.: o boss materializou no spawn) — o apply acima já
+         * trouxe a version fresca e o próximo PUT passa. "Outra sessão" só
+         * se a row trocou de id ou morreu — aí sim é conflito real. */
+        const routineRace=r.data.instance&&prevInstanceId&&
+          String(r.data.instance.id||"")===prevInstanceId&&
+          String(r.data.instance.status||"")==="active";
+        if(!routineRace)toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
+      }
     }else if(isCreate&&r.code&&r.code!==0){
       // Erro definitivo no create (party estrangeira, requisito, estado
       // inválido): retry não resolve — o loop de confirmação aborta com a
