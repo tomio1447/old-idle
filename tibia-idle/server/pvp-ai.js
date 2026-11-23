@@ -331,6 +331,39 @@ function _vocBase(item) {
     v.indexOf("druid") >= 0 ? "druid" : v.indexOf("sorcerer") >= 0 ? "sorcerer" :
     v.indexOf("monk") >= 0 ? "monk" : v;
 }
+/* ==================== FASE 4 — VOCATIONAL PROFILES ====================
+ * Papel, alcance de combate e thresholds por vocação. Spells/runas não são
+ * codificadas aqui — a escolha de cast usa o vocabulário _pvpCtrl.mode
+ * (validado por tryUseRune/nextComboSpell com os dados reais do servidor).
+ * ========================================================================== */
+const AI_PROFILES = {
+  /* Knight/monk: FRONTLINE — tank, iniciação, controle de espaço. Melee
+   * (1sqm), protege a backline (intercepta quem encosta no healer), não
+   * persegue além do follow do líder sem target call. */
+  knight: { reach: 1, role: "frontline", fleeHp: 0.30, protectHp: 0.40,
+    defendsBackline: true },
+  monk:   { reach: 1, role: "frontline", fleeHp: 0.32, protectHp: 0.40,
+    defendsBackline: true },
+  /* Paladin: RANGED — dano à distância, execução. Mantém 4sqm, kite sob
+   * pressão, prioriza vulnerável/isolado. */
+  paladin: { reach: 4, role: "ranged", fleeHp: 0.35, protectHp: 0.55,
+    kites: true },
+  /* Druid: SUPPORT — cura emergencial primeiro, dano depois. Recua mais
+   * cedo: o time perde o healer se ele cair. */
+  druid:  { reach: 4, role: "support", fleeHp: 0.42, protectHp: 0.50,
+    kites: true },
+  /* Sorcerer: BURST — dano explosivo/área. Mantém 4sqm, kite sob pressão,
+   * aproveita packs. */
+  sorcerer: { reach: 4, role: "burst", fleeHp: 0.35, protectHp: 0.60,
+    kites: true },
+};
+function _profile(item) {
+  return AI_PROFILES[_vocBase(item)] || AI_PROFILES.knight;
+}
+/* Vocações de "backline" — alvo preferido da proteção do frontline. */
+function _isBackline(sight) {
+  return sight && /druid|sorcerer/.test(sight.voc || "");
+}
 /* Score de um hostil como alvo individual: hp% baixo, alcance, isolamento,
  * foco do time e proximidade — quanto maior melhor. */
 function pvpAiScoreTarget(v, foe, myReach) {
@@ -342,16 +375,21 @@ function pvpAiScoreTarget(v, foe, myReach) {
   const sup = /druid|sorcerer/.test(foe.s.voc) ? 8 : 0; // backline vale mais
   return s + sup;
 }
-/* Modo de cast (_pvpCtrl.mode) por vocação + situação — FASE 4 refina. */
-function pvpAiCombatMode(v) {
+/* Modo de cast (_pvpCtrl.mode) por vocação + situação — FASE 4.
+ * Cluster/contagem medidos em torno do ALVO (não do caster): pack no alvo
+ * → área; alvo solto → single-target; aliado crítico → cura (druid). */
+function pvpAiCombatMode(v, tgtSight) {
   const voc = _vocBase(v.self.item);
+  const packNear = (t, r) => t ? v.foes.filter((f) =>
+    Math.abs(f.s.cx - t.cx) + Math.abs(f.s.cy - t.cy) <= r).length : 0;
   switch (voc) {
-    case "sorcerer": return v.self.foesNear >= 3 ? "ue" : "sd";
-    case "druid": return v.critAllies.some((a) => a.id !== v.self.id) ? "heal" : "sd";
-    case "paladin": {
-      const clumped = v.foes.filter((f) => f.d <= 4).length >= 3;
-      return clumped ? "bow" : "xbow";
-    }
+    case "sorcerer": return packNear(tgtSight, 3) >= 3 ? "ue" : "sd";
+    case "druid":
+      // Healer com mana real pra curar — sem mana não adianta travar em sio.
+      if (v.self.mpPct > 0.15 && v.critAllies.some((a) => a.id !== v.self.id))
+        return "heal";
+      return "sd";
+    case "paladin": return packNear(tgtSight, 3) >= 3 ? "bow" : "xbow";
     default: return "sd"; // knight/monk: melee — mode não governa
   }
 }
@@ -361,29 +399,61 @@ function pvpAiDecide(auth, item, now) {
   const pc = pvpAiPerception(auth, now), v = pvpAiPerceive(auth, item, pc);
   if (!v || v.self.dead) return null;
   const mem = v.mem, s = v.self, pb = auth.pvpBattle || {};
-  const reach = _vocBase(item) === "knight" || _vocBase(item) === "monk" ? 1 : 3;
+  const prof = _profile(item), reach = prof.reach;
   mem.decisionAt = now;
 
   const cand = [];
   const myTeam = s.team, szHome = _szCenter(auth, myTeam);
 
-  /* SURVIVE — hp crítico sob pressão real: perseguidor colado OU burst
-   * recente maior que metade do HP atual. */
+  /* SURVIVE — hp abaixo do threshold da vocação sob pressão real:
+   * perseguidor colado OU burst recente maior que metade do HP atual.
+   * Druid recua mais cedo (0.42) — perder o healer derruba o time. */
   const threat = v.pursuers.length >= 1 ||
     v.dmgTaken > Math.max(1, Number(item.p.hp) || 1) * 0.5;
-  if ((s.hpPct < AI_FLEE_HP || s.critical) && threat && szHome) {
+  if (s.hpPct < prof.fleeHp && threat && szHome) {
     cand.push({ action: "RETREAT", prio: AI_PRIO.SURVIVE - s.hpPct * 40,
       goal: { cx: szHome.cx, cy: szHome.cy, td: 0, retreat: true } });
   }
 
-  /* SAVE_ALLY / DEFEND — aliado crítico (que não eu) precisa de escudo:
-   * intercepta na célula do aliado. Só se eu aguento (hp>45%). */
+  /* SAVE_ALLY — aliado crítico (não eu): frontline intercepta colado (1sqm
+   * = corpo na frente), ranged posiciona no alcance de suporte. */
   const critOther = v.critAllies.find((a) => a.id !== s.id);
-  if (critOther && s.hpPct > 0.45) {
+  if (critOther && s.hpPct > prof.protectHp) {
     const d = Math.abs(critOther.cx - s.cx) + Math.abs(critOther.cy - s.cy);
     cand.push({ action: "PROTECT", prio: AI_PRIO.SAVE_ALLY - d * 2,
-      goal: { cx: critOther.cx, cy: critOther.cy, td: 1, protect: true },
+      goal: { cx: critOther.cx, cy: critOther.cy,
+        td: prof.defendsBackline ? 1 : reach, protect: true },
       allyId: critOther.id });
+  }
+
+  /* DEFEND (frontline) — hostil encostado na backline (druid/sorcerer):
+   * o tank empurra o agressor, não o aliado. Knight/monk apenas. */
+  if (prof.defendsBackline && s.hpPct > prof.protectHp) {
+    for (const a of v.allies) {
+      if (a.id === s.id || !_isBackline(a)) continue;
+      const bully = v.foes.find((f) =>
+        Math.abs(f.s.cx - a.cx) + Math.abs(f.s.cy - a.cy) <= 2);
+      if (bully) {
+        cand.push({ action: "DEFEND", prio: AI_PRIO.DEFEND + 3,
+          targetId: bully.s.id, allyId: a.id,
+          goal: { cx: bully.s.cx, cy: bully.s.cy, td: 1, push: true, defend: true } });
+        break;
+      }
+    }
+  }
+
+  /* KITE (ranged) — sob pressão real: hostil colado (≤2sqm) E ferido, ou
+   * 2+ colados. Recua 3sqm na direção oposta — mantém alcance de cast. */
+  const glued = v.pursuers.filter((f) => f.d <= 2);
+  if (prof.kites && glued.length && s.hpPct > prof.fleeHp &&
+      (s.hpPct < 0.75 || glued.length >= 2)) {
+    const pur = glued[0].s;
+    if (Math.abs(pur.cx - s.cx) + Math.abs(pur.cy - s.cy) <= 2) {
+      const dx = Math.sign(s.cx - pur.cx) || (s.team === 1 ? -1 : 1);
+      const dy = Math.sign(s.cy - pur.cy);
+      cand.push({ action: "KITE", prio: AI_PRIO.REPOSITION + 10,
+        goal: { cx: s.cx + dx * 3, cy: s.cy + dy * 3, td: 0, kite: true } });
+    }
   }
 
   /* FINISH — inimigo vulnerável dentro de 8sqm. */
@@ -438,7 +508,8 @@ function pvpAiDecide(auth, item, now) {
   else if (win.action !== "ATTACK") item._aiTargetId = null;
   // Modo de cast: humano pode ter travado pelo painel (override respeitado).
   if (!item._pvpCtrl || !item._pvpCtrl.mode || item._pvpCtrl._aiOwned) {
-    const mode = pvpAiCombatMode(v);
+    const tgtSight = win.targetId ? pc.byId[String(win.targetId)] : null;
+    const mode = pvpAiCombatMode(v, tgtSight);
     item._pvpCtrl = Object.assign({}, item._pvpCtrl || {}, { mode, _aiOwned: true });
   }
   item._aiGoal = { goal: win.goal === undefined ? null : win.goal,
@@ -468,6 +539,6 @@ module.exports = {
   AI_HIT_MEM_MS, AI_CRIT_HP, AI_SUPPORT_HP, AI_FOE_SIGHT,
   aiTeamOf, aiHpPct, aiMpPct, aiMem, pvpAiNoteDamage, aiRecentDamage,
   pvpAiPerception, pvpAiPerceive,
-  AI_PRIO, AI_DECIDE_MS, pvpAiScoreTarget, pvpAiCombatMode,
+  AI_PRIO, AI_DECIDE_MS, AI_PROFILES, pvpAiScoreTarget, pvpAiCombatMode,
   pvpAiDecide, pvpAiGateGoal,
 };

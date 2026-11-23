@@ -330,12 +330,12 @@ console.log("== FASE 3: stickiness — ação não oscila ==");
 console.log("== FASE 3: modo de cast por vocação ==");
 {
   const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "sorcerer" }),
-    mkChar(2, 200, 2, 6, 1), mkChar(3, 200, 2, 7, 1), mkChar(4, 200, 2, 8, 1)]);
+    mkChar(2, 200, 2, 8, 1), mkChar(3, 200, 2, 8, 2), mkChar(4, 200, 2, 9, 1)]);
   const now = Date.now(); auth.clock = now;
   const it = auth.players[0];
   it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
   PVP_AI.pvpAiDecide(auth, it, now);
-  ok(it._pvpCtrl.mode === "ue", "sorcerer com 3+ hostis → ue");
+  ok(it._pvpCtrl.mode === "ue", "sorcerer com pack de 3 perto do alvo → ue");
   ok(it._pvpCtrl._aiOwned === true, "modo marcado como AI-owned");
 }
 
@@ -368,6 +368,96 @@ console.log("== FASE 3: retorno limpa o modo AI-owned ==");
   ok(it._aiCtl.mode === "HUMAN_RETURNING" && it._pvpCtrl === null &&
     it._aiGoal === null && it._aiTargetId === null,
     "handoff limpa goal/alvo/modo da IA");
+}
+
+console.log("== FASE 4: perfis por vocação ==");
+{
+  ok(PVP_AI.AI_PROFILES.knight.reach === 1 && PVP_AI.AI_PROFILES.paladin.reach === 4,
+    "melee 1sqm / ranged 4sqm");
+  ok(PVP_AI.AI_PROFILES.monk && PVP_AI.AI_PROFILES.monk.role === "frontline",
+    "monk existe como frontline condicional");
+  ok(PVP_AI.AI_PROFILES.druid.fleeHp > PVP_AI.AI_PROFILES.knight.fleeHp,
+    "druid recua mais cedo que knight");
+}
+
+console.log("== FASE 4: DEFEND — knight intercepta quem encosta no healer ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "elite knight" }),
+    mkChar(3, 100, 1, 7, 1, { voc: "druid" }), // backline aliada
+    mkChar(2, 200, 2, 8, 1)]);                // hostil colado no druid
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "DEFEND" && w.allyId === "3",
+    "knight defende a backline empurrando o agressor");
+  ok(it._aiGoal.goal.defend === true && it._aiGoal.goal.td === 1,
+    "intercepta colado (1sqm)");
+}
+
+console.log("== FASE 4: KITE — paladino recua do perseguidor colado ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "royal paladin" }),
+    mkChar(2, 200, 2, 6, 1)]); // hostil colado
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  it.p.hp = 700; // ferido mas não crítico (flee 0.35)
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && (w.action === "KITE" || w.action === "ATTACK"),
+    "paladino sob pressão responde (kite ou ataca)");
+  if (w.action === "KITE")
+    ok(it._aiGoal.goal.kite === true, "kite recua mantendo o fight");
+}
+
+console.log("== FASE 4: paladin BOW em pack / XBOW single ==");
+{
+  // Pack de 3 hostis perto do alvo → bow (área).
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "royal paladin" }),
+    mkChar(2, 200, 2, 8, 1), mkChar(3, 200, 2, 8, 2), mkChar(4, 200, 2, 9, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  PVP_AI.pvpAiDecide(auth, it, now);
+  ok(it._pvpCtrl.mode === "bow", "pack de 3 perto do alvo → bow");
+  // Alvo isolado → xbow.
+  const a2 = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "royal paladin" }),
+    mkChar(2, 200, 2, 9, 1)]);
+  a2.clock = now + 1;
+  const it2 = a2.players[0];
+  it2._aiCtl = { mode: "AI_HARD", since: now, prev: "HUMAN" };
+  PVP_AI.pvpAiDecide(a2, it2, now + 1);
+  ok(it2._pvpCtrl.mode === "xbow", "alvo isolado → xbow");
+}
+
+console.log("== FASE 4: druid HEAL com aliado crítico ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "elder druid" }),
+    mkChar(3, 100, 1, 6, 1), mkChar(2, 200, 2, 9, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  auth.players[1].p.hp = 300; // aliado crítico
+  PVP_AI.pvpAiDecide(auth, it, now);
+  ok(it._pvpCtrl.mode === "heal", "aliado crítico → heal");
+  // Sem mana → não trava em heal (clock novo recalcula a percepção).
+  it.p.mp = 100; it.p.maxMp = 5000; it._pvpCtrl = null;
+  auth.clock = now + 400;
+  PVP_AI.pvpAiDecide(auth, it, now + 400);
+  ok(it._pvpCtrl.mode !== "heal", "mana baixa → não força heal");
+}
+
+console.log("== FASE 4: PROTECT ranged posiciona no alcance ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "elder druid" }),
+    mkChar(3, 100, 1, 6, 1), mkChar(2, 200, 2, 7, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  auth.players[1].p.hp = 250; // aliado crítico
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "PROTECT" && it._aiGoal.goal.td === 4,
+    "druid posiciona a 4sqm do aliado (alcance de sio)");
 }
 
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
