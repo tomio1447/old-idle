@@ -1359,25 +1359,23 @@ function eldritchBossInit(c, player) {
     addLog("info", "Os vulcões evoluem — mantenha menos de <b>3 Flame Totems</b> ou o Eldritch é imortal!");
   return c;
 }
-function eldWanderCellFree(c, x, y, self) {
+function eldWanderCellFree(c, x, y, occ) {
   if (x < 0 || y < 0 || x >= (c.gridW || 30) || y >= (c.gridH || 30)) return false;
-  const occ = typeof buildOccupancy === "function" ? buildOccupancy(c, self) : null;
   if (occ && occ.has && occ.has(x + ":" + y)) return false;
-  if ((c.mobs || []).some((m) => m && m !== self && m.hp > 0 &&
-      m.cx === x && m.cy === y)) return false;
   if (c.huntMap && typeof huntMapBlocked === "function" &&
       huntMapBlocked(c.huntMap, x, y)) return false;
   return true;
 }
 /* Só o estágio "pulsating-lava" vaga — eruption explode parado e o
  * Flame Totem é estático por design (espelho de tickEldritch). */
-function eldWanderStep(c, m, dt, now) {
+function eldWanderStep(c, m, dt, now, occ) {
   if (m.slug !== "pulsating-lava") { m._wanderTo = null; return; }
   const to = m._wanderTo;
   if (to) {
     const d = typeof movePoint === "function" ?
       movePoint(m, to, ELD_WANDER_SPEED, dt, 0.001) : 0;
     if (d <= 0.002 || !m.moving) {
+      if (occ && occ.delete) occ.delete(m.cx + ":" + m.cy);
       m.cx = to.cx; m.cy = to.cy; m.x = to.x; m.y = to.y;
       m._wanderTo = null;
     }
@@ -1392,13 +1390,14 @@ function eldWanderStep(c, m, dt, now) {
   }
   for (const dxy of dirs) {
     const nx = m.cx + dxy[0], ny = m.cy + dxy[1];
-    if (!eldWanderCellFree(c, nx, ny, m)) continue;
+    if (!eldWanderCellFree(c, nx, ny, occ)) continue;
     if (dxy[0] && dxy[1] &&
-        (!eldWanderCellFree(c, m.cx + dxy[0], m.cy, m) ||
-         !eldWanderCellFree(c, m.cx, m.cy + dxy[1], m))) continue;
+        (!eldWanderCellFree(c, m.cx + dxy[0], m.cy, occ) ||
+         !eldWanderCellFree(c, m.cx, m.cy + dxy[1], occ))) continue;
     const pos = typeof cellToScreen === "function" ? cellToScreen(nx, ny)
       : { x: (nx + .5) / (c.gridW || 30), y: (ny + .5) / (c.gridH || 30) };
     m._wanderTo = { x: pos.x, y: pos.y, cx: nx, cy: ny };
+    if (occ && occ.set) occ.set(nx + ":" + ny, m);
     return;
   }
 }
@@ -1419,8 +1418,10 @@ function eldritchBossTick(c, now) {
       c.events.push({ t: "effect", x: m.x, y: m.y, screen: true, fx: "fire-area" });
     }
   }
+  const wanderOcc = typeof buildOccupancy === "function" ?
+    buildOccupancy(c, null) : null;
   for (const m of mobs)
-    if (m.eldVent && m.hp > 0) eldWanderStep(c, m, dt, now);
+    if (m.eldVent && m.hp > 0) eldWanderStep(c, m, dt, now, wanderOcc);
   const alive = new Set(mobs.filter((m) => m.eldVent && m.hp > 0)
     .map((m) => m._ventId));
   st.vents.forEach((v, i) => {

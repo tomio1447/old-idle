@@ -1369,34 +1369,29 @@ function rrPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// Boss bar ornamentada: moldura dourada envelhecida + vidro escuro,
-// gradiente de vida verde→amarelo→laranja→vermelho por threshold,
-// ranhuras diagonais e ponta brilhante (mockup medieval aprovado).
-function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
-  if (!combat || !combat.mobs || !combat.mobs.length) return;
-  const boss = combat.mobs.find((m) => m.boss) || (combat.boss ? combat.mobs[0] : null);
-  if (!boss || boss.hp <= 0) return;
-  const s = Math.max(1, Number(hudScale) || 1);
-  offsetX = Number(offsetX) || 0;
-  offsetY = Number(offsetY) || 0;
-  const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
-
-  const bw = Math.min(560 * s, viewportW * 0.78);
-  const infoH = 15 * s, barH = 14 * s, padX = 12 * s;
-  const frameH = 6 * s + infoH + 4 * s + barH + 7 * s;
-  const center = offsetX + viewportW / 2;
-  const x = center - bw / 2, y = offsetY + 10 * s;
-  const barX = x + padX, barW = bw - padX * 2;
-  const barY = y + 6 * s + infoH + 4 * s;
-  const textY = barY - 5 * s;
-
-  ctx.save();
-  // moldura: vidro escuro com sombra projetada no mapa
-  ctx.shadowColor = "rgba(0,0,0,.8)";
-  ctx.shadowBlur = 10 * s; ctx.shadowOffsetY = 3 * s;
+/* Moldura estática da boss bar: sombra, vidro escuro, borda dourada,
+ * pinos e trilho são pintados UMA vez por tamanho num canvas offscreen —
+ * o frame de combate só faz drawImage + texto + fill (shadowBlur por
+ * frame derrubava o FPS). */
+function bossBarFrame(bw, frameH, s) {
+  const key = Math.round(bw) + "x" + Math.round(frameH) + "@" +
+    (Math.round(s * 100) / 100);
+  const cache = bossBarFrame._c || (bossBarFrame._c = {});
+  if (cache[key]) return cache[key];
+  const pad = 8 * s;
+  const cv = document.createElement("canvas");
+  cv.width = Math.ceil(bw + pad * 2);
+  cv.height = Math.ceil(frameH + pad * 2);
+  const ctx = cv.getContext("2d");
+  const x = pad, y = pad;
+  const barX = x + 12 * s, barW = bw - 24 * s;
+  const barY = y + 6 * s + 15 * s + 4 * s, barH = 14 * s;
+  // sombra projetada (rect translúcido — sem shadowBlur)
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  rrPath(ctx, x + s, y + 4 * s, bw, frameH, 4 * s); ctx.fill();
+  // vidro escuro
   ctx.fillStyle = "rgba(15,17,21,.92)";
   rrPath(ctx, x, y, bw, frameH, 4 * s); ctx.fill();
-  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   // filete externo + borda dourada envelhecida
   ctx.strokeStyle = "#111"; ctx.lineWidth = 3 * s;
   rrPath(ctx, x, y, bw, frameH, 4 * s); ctx.stroke();
@@ -1427,6 +1422,47 @@ function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
     ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = s;
     rrPath(ctx, ox, y - 2 * s, ornW, frameH + 4 * s, 2.5 * s); ctx.stroke();
   }
+  // trilho da barra: fundo quase preto com sombra interna no topo
+  ctx.fillStyle = "#090a0d";
+  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.fill();
+  const inset = ctx.createLinearGradient(0, barY, 0, barY + barH);
+  inset.addColorStop(0, "rgba(0,0,0,.85)");
+  inset.addColorStop(0.45, "rgba(0,0,0,0)");
+  ctx.fillStyle = inset;
+  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.fill();
+  ctx.strokeStyle = "#232731"; ctx.lineWidth = s;
+  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.stroke();
+  const out = { cv, pad };
+  const keys = Object.keys(cache);
+  if (keys.length >= 8) delete cache[keys[0]];
+  cache[key] = out;
+  return out;
+}
+
+// Boss bar ornamentada: moldura dourada envelhecida + vidro escuro,
+// gradiente de vida verde→amarelo→laranja→vermelho por threshold,
+// ranhuras diagonais e ponta brilhante (mockup medieval aprovado).
+function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
+  if (!combat || !combat.mobs || !combat.mobs.length) return;
+  const boss = combat.mobs.find((m) => m.boss) || (combat.boss ? combat.mobs[0] : null);
+  if (!boss || boss.hp <= 0) return;
+  const s = Math.max(1, Number(hudScale) || 1);
+  offsetX = Number(offsetX) || 0;
+  offsetY = Number(offsetY) || 0;
+  const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+
+  const bw = Math.min(560 * s, viewportW * 0.78);
+  const infoH = 15 * s, barH = 14 * s, padX = 12 * s;
+  const frameH = 6 * s + infoH + 4 * s + barH + 7 * s;
+  const center = offsetX + viewportW / 2;
+  const x = center - bw / 2, y = offsetY + 10 * s;
+  const barX = x + padX, barW = bw - padX * 2;
+  const barY = y + 6 * s + infoH + 4 * s;
+  const textY = barY - 5 * s;
+
+  ctx.save();
+  const frame = bossBarFrame(bw, frameH, s);
+  ctx.drawImage(frame.cv, x - frame.pad, y - frame.pad);
 
   // linha de info: nome do boss (esq, tom de ameaça) + hp (dir)
   const label = (txt, tx, fill) => {
@@ -1455,17 +1491,6 @@ function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
   label(hpMax, txR, "#e2e8f0");
   label(" / ", txR - wMax, "#64748b");
   label(hpCur, txR - wMax - wDiv, "#e2e8f0");
-
-  // trilho da barra: fundo quase preto com sombra interna no topo
-  ctx.fillStyle = "#090a0d";
-  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.fill();
-  const inset = ctx.createLinearGradient(0, barY, 0, barY + barH);
-  inset.addColorStop(0, "rgba(0,0,0,.85)");
-  inset.addColorStop(0.45, "rgba(0,0,0,0)");
-  ctx.fillStyle = inset;
-  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.fill();
-  ctx.strokeStyle = "#232731"; ctx.lineWidth = s;
-  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.stroke();
 
   // preenchimento: gradiente por faixa de vida (verde→vermelho escuro)
   const fw = barW * pct;
@@ -1496,11 +1521,14 @@ function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
     low.addColorStop(0, "rgba(0,0,0,0)"); low.addColorStop(1, "rgba(0,0,0,.42)");
     ctx.fillStyle = low;
     ctx.fillRect(barX, barY, fw, barH);
-    // ponta brilhante na extremidade da vida
-    ctx.shadowColor = "#fff"; ctx.shadowBlur = 6 * s;
-    ctx.fillStyle = "rgba(255,255,255,.65)";
-    ctx.fillRect(Math.max(barX, barX + fw - 2.5 * s), barY + 1.5 * s,
-      2.5 * s, barH - 3 * s);
+    // ponta brilhante: retângulos em camadas (glow sem shadowBlur)
+    const tipX = Math.max(barX, barX + fw - 2.5 * s);
+    ctx.fillStyle = "rgba(255,255,255,.18)";
+    ctx.fillRect(tipX - 3 * s, barY + 0.5 * s, 8.5 * s, barH - s);
+    ctx.fillStyle = "rgba(255,255,255,.4)";
+    ctx.fillRect(tipX - s, barY + s, 4.5 * s, barH - 2 * s);
+    ctx.fillStyle = "rgba(255,255,255,.7)";
+    ctx.fillRect(tipX, barY + 1.5 * s, 2.5 * s, barH - 3 * s);
     ctx.restore();
   }
   ctx.restore();
