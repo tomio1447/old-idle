@@ -489,6 +489,15 @@ must(engineSrc.includes("tickEldritch") && engineSrc.includes("eldVent") &&
   "engine sem mecânica dos vulcões");
 must(combatSrc.includes("eldritchBossInit") && combatSrc.includes("eldritchBossTick"),
   "cliente sem hooks dos vulcões");
+// Pulsating Lava vaga pela sala (bug: speed 0 deixava os vents estáticos).
+must(engineSrc.includes("ELD_WANDER_MS") && engineSrc.includes("eldWanderTick") &&
+  engineSrc.includes('m.slug!=="pulsating-lava"') && engineSrc.includes("_wanderAt") &&
+  engineSrc.includes("authorityStepFree"),
+  "engine sem wander da pulsating-lava");
+must(roostSrc.includes("ELD_WANDER_MS") && roostSrc.includes("eldWanderStep") &&
+  roostSrc.includes('m.slug !== "pulsating-lava"') && roostSrc.includes("_wanderTo") &&
+  roostSrc.includes("movePoint"),
+  "cliente sem wander da pulsating-lava");
 
 /* ---------------- OTBMs: bounds, spawns, caminhabilidade ---------------- */
 const tfCtx = { console }; tfCtx.window = tfCtx; vm.createContext(tfCtx);

@@ -497,6 +497,8 @@ const AG_CRYSTAL_OFFSET = { dx: -1, dy: 6 }; // {1029,1033} — ao lado do playe
 const ELD_STAGE_MS = 18000;      // ~"a cada turno" — 18s por estágio
 const ELD_RESPAWN_MS = 30000;    // vent destruído volta como lava
 const ELD_TOTEM_IMMUNE = 3;      // 3+ totens → boss imortal
+const ELD_WANDER_MS = 1500;      // pulsating lava vaga pela sala entre estágios
+const ELD_WANDER_SPEED = 0.00005;
 const ELD_VENT_BASE = {
   speed: 0, armor: 0, defense: 0, damage: 0, attackSpeed: 2000,
   targetDistance: 1, exp: 0, loot: [], grupo: "quests",
@@ -1335,7 +1337,8 @@ function eldSpawnAt(c, slug, cx, cy, ventId) {
     id: "eld-" + slug + "-" + Date.now().toString(36) + "-" +
       Math.random().toString(36).slice(2, 7),
     cx: cell.x, cy: cell.y, x: pos.x, y: pos.y, sx: pos.x, sy: pos.y,
-    dir: "w", moving: false, attackAnim: 0, speed: 0, spawnAt: Date.now() };
+    dir: "w", moving: false, attackAnim: 0, speed: 0, spawnAt: Date.now(),
+    _wanderAt: Date.now() + 500 + Math.random() * 1500 };
   c.mobs = c.mobs || []; c.mobs.unshift(mob);
   c.events = c.events || [];
   c.events.push({ t: "spawn", slug, x: mob.x, y: mob.y, targetId: mob.id, screen: true });
@@ -1356,10 +1359,55 @@ function eldritchBossInit(c, player) {
     addLog("info", "Os vulcões evoluem — mantenha menos de <b>3 Flame Totems</b> ou o Eldritch é imortal!");
   return c;
 }
+function eldWanderCellFree(c, x, y, self) {
+  if (x < 0 || y < 0 || x >= (c.gridW || 30) || y >= (c.gridH || 30)) return false;
+  const occ = typeof buildOccupancy === "function" ? buildOccupancy(c, self) : null;
+  if (occ && occ.has && occ.has(x + ":" + y)) return false;
+  if ((c.mobs || []).some((m) => m && m !== self && m.hp > 0 &&
+      m.cx === x && m.cy === y)) return false;
+  if (c.huntMap && typeof huntMapBlocked === "function" &&
+      huntMapBlocked(c.huntMap, x, y)) return false;
+  return true;
+}
+/* Só o estágio "pulsating-lava" vaga — eruption explode parado e o
+ * Flame Totem é estático por design (espelho de tickEldritch). */
+function eldWanderStep(c, m, dt, now) {
+  if (m.slug !== "pulsating-lava") { m._wanderTo = null; return; }
+  const to = m._wanderTo;
+  if (to) {
+    const d = typeof movePoint === "function" ?
+      movePoint(m, to, ELD_WANDER_SPEED, dt, 0.001) : 0;
+    if (d <= 0.002 || !m.moving) {
+      m.cx = to.cx; m.cy = to.cy; m.x = to.x; m.y = to.y;
+      m._wanderTo = null;
+    }
+    return;
+  }
+  if (now < (m._wanderAt || 0)) return;
+  m._wanderAt = now + ELD_WANDER_MS * (0.7 + Math.random() * 0.9);
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  for (let i = dirs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = dirs[i]; dirs[i] = dirs[j]; dirs[j] = t;
+  }
+  for (const dxy of dirs) {
+    const nx = m.cx + dxy[0], ny = m.cy + dxy[1];
+    if (!eldWanderCellFree(c, nx, ny, m)) continue;
+    if (dxy[0] && dxy[1] &&
+        (!eldWanderCellFree(c, m.cx + dxy[0], m.cy, m) ||
+         !eldWanderCellFree(c, m.cx, m.cy + dxy[1], m))) continue;
+    const pos = typeof cellToScreen === "function" ? cellToScreen(nx, ny)
+      : { x: (nx + .5) / (c.gridW || 30), y: (ny + .5) / (c.gridH || 30) };
+    m._wanderTo = { x: pos.x, y: pos.y, cx: nx, cy: ny };
+    return;
+  }
+}
 function eldritchBossTick(c, now) {
   const st = c && c.eld; if (!st || c.ended) return true;
   const boss = (c.mobs || []).find((m) => m && m.boss);
   const mobs = c.mobs || [];
+  const dt = Math.min(500, Math.max(0, now - (c._eldTickAt || now)));
+  c._eldTickAt = now;
   for (const m of mobs) {
     if (!m.eldVent || !(m.hp > 0)) continue;
     const nx = m.def && m.def.eldStage && m.def.eldStage.next;
@@ -1371,6 +1419,8 @@ function eldritchBossTick(c, now) {
       c.events.push({ t: "effect", x: m.x, y: m.y, screen: true, fx: "fire-area" });
     }
   }
+  for (const m of mobs)
+    if (m.eldVent && m.hp > 0) eldWanderStep(c, m, dt, now);
   const alive = new Set(mobs.filter((m) => m.eldVent && m.hp > 0)
     .map((m) => m._ventId));
   st.vents.forEach((v, i) => {

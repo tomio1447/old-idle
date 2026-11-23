@@ -6807,6 +6807,7 @@ function arenaBossBindMechanics(auth,now){
     offs.forEach(([dx,dy],i)=>{
       const m=makeMob(auth,"pulsating-lava",false);if(!m)return;
       m.eldVent=true;m._ventId=i;m.eldStageAt=now;
+      m._wanderAt=now+500+Math.floor(random(auth)*1500);
       const cell=claimSpawnCell(auth,bx+dx,by+dy);
       m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;
       m.sx=m.x;m.sy=m.y;m.speed=0;
@@ -6956,6 +6957,30 @@ function tickAdventurerGroup(auth,now){
  * Flame Totems vivos o boss fica imortal (eldritchImmune → dano 0 no
  * funnel applyOutgoingDamage). Espelho do cliente (roost-graveborn.js). */
 const ELD_STAGE_MS=18000,ELD_RESPAWN_MS=30000,ELD_TOTEM_IMMUNE=3;
+/* pulsating-lava vaga pela sala (1 cell a cada ~1.5s); eruption/totem
+ * ficam parados. speed do mob segue 0 — o passo é o wander abaixo. */
+const ELD_WANDER_MS=1500;
+function eldWanderTick(auth,mobs,now){
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  const occ=authorityOccupancy(auth,null);
+  for(const m of mobs){
+    if(!m.eldVent||!(m.hp>0))continue;
+    if(m.slug!=="pulsating-lava"){m._wanderTo=null;continue;}
+    if(now<(Number(m._wanderAt)||0))continue;
+    m._wanderAt=now+ELD_WANDER_MS*(0.7+random(auth)*0.9);
+    const dirs=AUTH_STEP_DIRS.slice();
+    for(let i=dirs.length-1;i>0;i--){
+      const j=Math.floor(random(auth)*(i+1)),t=dirs[i];dirs[i]=dirs[j];dirs[j]=t;}
+    for(const dir of dirs){
+      if(!authorityStepFree(auth,occ,m.cx,m.cy,dir,m))continue;
+      occ.delete(m.cx+":"+m.cy);
+      m.cx+=dir.dx;m.cy+=dir.dy;m.sx=m.x;m.sy=m.y;
+      m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;
+      occ.add(m.cx+":"+m.cy);
+      break;
+    }
+  }
+}
 function tickEldritch(auth,now){
   const st=auth&&auth.eld;if(!st||auth.ended)return;
   const mobs=auth.mobs||[];
@@ -6972,6 +6997,7 @@ function tickEldritch(auth,now){
         fx:"fire-area",screen:true,ts:now});
     }
   }
+  eldWanderTick(auth,mobs,now);
   const alive=new Set(mobs.filter((m)=>m.eldVent&&m.hp>0).map((m)=>m._ventId));
   const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
   st.vents.forEach((v,i)=>{
@@ -6981,6 +7007,7 @@ function tickEldritch(auth,now){
       const m=makeMob(auth,"pulsating-lava",false);
       if(!m)return;
       m.eldVent=true;m._ventId=i;m.eldStageAt=now;m.speed=0;
+      m._wanderAt=now+500+Math.floor(random(auth)*1500);
       const cell=claimSpawnCell(auth,v.cx,v.cy);
       m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;m.sx=m.x;m.sy=m.y;
       mobs.unshift(m);
