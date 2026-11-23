@@ -126,6 +126,7 @@ function pvpAiControlTick(auth, now) {
         Number(c.returnedAt) > 0 && now - c.returnedAt < AI_HYSTERESIS_MS)
       aiSet(item, AI_MODES.HUMAN, now);
     pb.aiControl[id] = c.mode;
+    item.p._aiCtlMode = c.mode; // acessível onde só p chega (usePotion etc)
   }
 }
 
@@ -502,6 +503,11 @@ function pvpAiDecide(auth, item, now) {
   cand.sort((a, b) => b.prio - a.prio);
   const win = cand[0];
 
+  /* FASE 5: em fuga/reposicionamento sob perseguição, pede Magic Wall na
+   * célula entre eu e o perseguidor (mesma wallCalls do cliente). */
+  if ((win.action === "RETREAT" || win.action === "KITE") && v.pursuers.length)
+    pvpAiDefensiveWall(auth, item, v, now);
+
   /* Aplica efeitos colaterais da decisão. */
   mem.lastAction = win.action; mem.lastActionAt = now;
   if (win.targetId) { mem.lastTargetId = String(win.targetId); item._aiTargetId = String(win.targetId); }
@@ -510,11 +516,60 @@ function pvpAiDecide(auth, item, now) {
   if (!item._pvpCtrl || !item._pvpCtrl.mode || item._pvpCtrl._aiOwned) {
     const tgtSight = win.targetId ? pc.byId[String(win.targetId)] : null;
     const mode = pvpAiCombatMode(v, tgtSight);
-    item._pvpCtrl = Object.assign({}, item._pvpCtrl || {}, { mode, _aiOwned: true });
+    if (!item._pvpCtrl || item._pvpCtrl.mode !== mode) {
+      item._pvpCtrl = Object.assign({}, item._pvpCtrl || {},
+        { mode, _aiOwned: true, _aiDirty: true }); // engine: pvpEquipPreset
+    }
   }
   item._aiGoal = { goal: win.goal === undefined ? null : win.goal,
     follow: win.goal === undefined, action: win.action, until: now + AI_GOAL_TTL };
   return win;
+}
+
+/* ==================== FASE 5 — RESOURCE INTELLIGENCE ==================== */
+
+/* Config de consumíveis para chars sob AI_HARD — TRANSIENT (não salva no
+ * p.config): thresholds de combate + melhor potion presente na supply.
+ * orders.health/mana vêm do engine (HEALTH_POTION_ORDER/MANA_POTION_ORDER)
+ * — a validação lvl/voc continua em potionAllowed/consumeSupply. */
+function pvpAiPotionCfg(p, orders) {
+  const sup = p && p.supplies || {};
+  const pick = (list) => Array.isArray(list)
+    ? list.find((s) => Object.prototype.hasOwnProperty.call(sup, s) && (Number(sup[s]) || 0) > 0)
+    : null;
+  return { healItemAt: 75, manaAt: 60,
+    healSupply: pick(orders && orders.health), manaSupply: pick(orders && orders.mana) };
+}
+
+/* Pedido de Magic Wall DEFENSIVO em 2 fases — a tática real do jogador:
+ * célula ocupada NÃO aceita muro (regra do próprio wallCalls), então a IA
+ * marca a célula que está deixando e emite o pedido depois de pisar fora.
+ * pvpProcessWallCalls escolhe o caster (runa + cooldown + alcance reais,
+ * máx/conta, TTL de 6s). Anti-spam: ~4s por conta. */
+const AI_WALL_CALL_MS = 4000;
+function pvpAiDefensiveWall(auth, item, v, now) {
+  const pb = auth && auth.pvpBattle; if (!pb || !v) return false;
+  const accId = Number(item.accountId || (item.p && item.p.accountId)) || 0;
+  if (!accId) return false;
+  const mem = aiMem(item);
+  if (mem.wallPending) {
+    const w = mem.wallPending;
+    if (now - w.at > AI_WALL_CALL_MS) { mem.wallPending = null; return false; }
+    if (Number(item.cx) !== w.cx || Number(item.cy) !== w.cy) {
+      pb.wallCalls = pb.wallCalls || {};
+      pb.wallCalls[accId] = { cx: w.cx, cy: w.cy, at: now, ai: true };
+      mem.wallPending = null; mem.wallCallAt = now;
+      return true;
+    }
+    return false; // ainda em cima da célula — espera o passo
+  }
+  // Em retirada/kite com perseguidor colado: marca a célula atual.
+  if (v.pursuers.length && v.pursuers[0].d <= 2 &&
+      now - (Number(mem.wallCallAt) || 0) >= AI_WALL_CALL_MS) {
+    mem.wallPending = { cx: Number(item.cx), cy: Number(item.cy), at: now };
+    return true;
+  }
+  return false;
 }
 
 /* Gate no topo de pvpBattleGoal: AI_HARD decide e serve o goal cacheado;
@@ -540,5 +595,6 @@ module.exports = {
   aiTeamOf, aiHpPct, aiMpPct, aiMem, pvpAiNoteDamage, aiRecentDamage,
   pvpAiPerception, pvpAiPerceive,
   AI_PRIO, AI_DECIDE_MS, AI_PROFILES, pvpAiScoreTarget, pvpAiCombatMode,
-  pvpAiDecide, pvpAiGateGoal,
+  pvpAiDecide, pvpAiGateGoal, pvpAiPotionCfg, pvpAiDefensiveWall,
+  AI_WALL_CALL_MS,
 };

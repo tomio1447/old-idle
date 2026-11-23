@@ -460,5 +460,76 @@ console.log("== FASE 4: PROTECT ranged posiciona no alcance ==");
     "druid posiciona a 3sqm do aliado (alcance de sio)");
 }
 
+console.log("== FASE 5: potion cfg da IA ==");
+{
+  const p = { hp: 700, maxHp: 1000, mp: 2000, maxMp: 5000,
+    supplies: { "ultimate-health-potion": 5, "great-mana-potion": 3,
+      "ultimate-mana-potion": 2 } };
+  const cfg = PVP_AI.pvpAiPotionCfg(p, { health: ["supreme-health-potion",
+    "ultimate-health-potion"], mana: ["distilled-ultimate-mana-potion",
+    "ultimate-mana-potion", "great-mana-potion"] });
+  ok(cfg.healItemAt === 75 && cfg.manaAt === 60, "thresholds de combate");
+  ok(cfg.healSupply === "ultimate-health-potion", "melhor hp potion da supply");
+  ok(cfg.manaSupply === "ultimate-mana-potion", "melhor mana potion da supply");
+}
+
+console.log("== FASE 5: AI_HARD bebe potion pelo overlay (config intacto) ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "elite knight" }),
+    mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it.p.hp = 700; // 70% — abaixo do AI 75, ACIMA do default 60
+  it.p.supplies = { "ultimate-health-potion": 5 };
+  it.p._aiCtlMode = "AI_HARD";
+  eng.usePotion(auth, it.p);
+  ok(it.p.hp > 700, "AI bebe a 70% (threshold 75) — default 60 não beberia");
+  ok(it.p.supplies["ultimate-health-potion"] === 4, "supply consumida");
+  ok(!(it.p.config && it.p.config.healItemAt === 75), "p.config não foi tocado");
+  // Mana: sem manaSupply selecionado o jogador não bebe — a IA escolhe.
+  const it2 = auth.players[1];
+  it2.p.mp = 1000; it2.p.supplies = { "great-mana-potion": 3 };
+  it2.p._aiCtlMode = "AI_HARD"; delete it2.p._potionCd;
+  const mp0 = it2.p.mp;
+  eng.usePotion(auth, it2.p);
+  ok(it2.p.mp > mp0, "mana potion auto-selecionada da supply");
+}
+
+console.log("== FASE 5: Magic Wall defensivo ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  it.p.hp = 200; // crítico → RETREAT + wall entre eu e o perseguidor
+  const pur = auth.players[1]; pur.cx = 6; pur.cy = 1; // colado
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "RETREAT", "setup: retirada sob perseguição");
+  ok(it._aiMem.wallPending && it._aiMem.wallPending.cx === 5,
+    "marca a célula que está deixando (ocupada ainda)");
+  // Pisei fora → pedido real na célula deixada.
+  it.cx = 4; it.x = 4.5 / 11; auth.clock = now + 400;
+  PVP_AI.pvpAiDecide(auth, it, now + 400);
+  const call = auth.pvpBattle.wallCalls && auth.pvpBattle.wallCalls[100];
+  ok(call && call.ai === true && call.cx === 5 && call.cy === 1,
+    "muro na célula deixada atrás de mim");
+  const n = Object.keys(auth.pvpBattle.wallCalls).length;
+  auth.clock = now + 500;
+  PVP_AI.pvpAiDecide(auth, it, now + 500);
+  ok(Object.keys(auth.pvpBattle.wallCalls).length <= n, "anti-spam (~4s)");
+}
+
+console.log("== FASE 5: _aiDirty dispara preset de equipamento ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "royal paladin" }),
+    mkChar(2, 200, 2, 8, 1), mkChar(3, 200, 2, 8, 2), mkChar(4, 200, 2, 9, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  PVP_AI.pvpAiDecide(auth, it, now);
+  ok(it._pvpCtrl.mode === "bow" && it._pvpCtrl._aiDirty === true,
+    "mudança de modo marca _aiDirty → engine aplica o preset");
+}
+
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
 console.log("\nALL PVP AI CONTROL TESTS PASSED");

@@ -6537,8 +6537,13 @@ function usePotion(auth,p){
   const max=maxStats(p),cfg=p.config||{};
   p.supplies=p.supplies||{};
   const hpPct=max.hp?(p.hp/max.hp)*100:100,mpPct=max.mp?(p.mp/max.mp)*100:100;
-  const itemAt=Math.max(1,Math.min(99,Number(cfg.healItemAt!==undefined?cfg.healItemAt:cfg.healAt)||60));
-  const manaAt=Math.max(1,Math.min(99,Number(cfg.manaAt)||50));
+  /* PvP AI FASE 5: chars sob AI_HARD ganham defaults de combate TRANSIENTES
+   * — threshold mais cedo + melhor potion presente na supply (o config
+   * salvo do jogador nunca é modificado e sempre tem prioridade). */
+  const _aiCfg=p._aiCtlMode==="AI_HARD"?PVP_AI.pvpAiPotionCfg(p,
+    {health:HEALTH_POTION_ORDER,mana:MANA_POTION_ORDER}):null;
+  const itemAt=Math.max(1,Math.min(99,Number(cfg.healItemAt!==undefined?cfg.healItemAt:cfg.healAt)||(_aiCfg?_aiCfg.healItemAt:0)||60));
+  const manaAt=Math.max(1,Math.min(99,Number(cfg.manaAt)||(_aiCfg?_aiCfg.manaAt:0)||50));
   const orderOf=(selected,fallback)=>{
     if(selected){
       if(!Object.prototype.hasOwnProperty.call(p.supplies,selected))p.supplies[selected]=0;
@@ -6567,14 +6572,14 @@ function usePotion(auth,p){
     return false;
   };
   if(!cfg.noHealthPotions&&!cfg.noPotions&&hpPct<=itemAt){
-    for(const slug of orderOf(cfg.healSupply,HEALTH_POTION_ORDER))if(drink(slug))return true;
+    for(const slug of orderOf(cfg.healSupply||(_aiCfg&&_aiCfg.healSupply),HEALTH_POTION_ORDER))if(drink(slug))return true;
   }
   // Magic Shield NÃO bloqueia mana potion: a pool do utamo vita não sobe
   // com potion, mas p.mp sim. Sem isso o mage online fica HP cheio + 0 mana.
   // Só 1 potion de mana: a selecionada no Helper. Sem seleção = não bebe
   // (não cair em mana-potion / cascade automático).
   if(!cfg.noManaPotions&&!cfg.noPotions&&mpPct<=manaAt){
-    const selected=cfg.manaSupply;
+    const selected=cfg.manaSupply||(_aiCfg&&_aiCfg.manaSupply);
     if(selected){
       if(!Object.prototype.hasOwnProperty.call(p.supplies,selected))p.supplies[selected]=0;
       if(potionAllowed(p,selected,POTIONS[selected]||{}))drink(selected);
@@ -8949,6 +8954,12 @@ function advanceAuthorityMovement(auth,now,opts){
     // AI_HARD (Control Manager) é IA — anda sozinho mesmo que o preset
     // salvo seja manual (autoWalk:false).
     const pvpAi=!!auth.pvpBattle&&PVP_AI.pvpAiDriven(item,Number(auth.clock)||now);
+    // FASE 5: a IA mudou o modo server-side — aplica o preset de arma/munição
+    // uma única vez (_aiDirty), igual ao disparo do visual.
+    if(pvpAi&&item._pvpCtrl&&item._pvpCtrl._aiDirty){
+      item._pvpCtrl._aiDirty=false;
+      pvpEquipPreset(auth,item,item.p,Number(auth.clock)||now);
+    }
     const auto=pvpAi||!(item.p&&item.p.config)||item.p.config.autoWalk!==false;
     if(!auto){
       const intent=item.walkIntent,dir=intent&&AUTH_STEP_DIRS.find((d)=>d.dx===intent.dx&&d.dy===intent.dy);
@@ -10393,7 +10404,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
   pvpBattleLeaderChar,pvpWallAt,pvpCastMagicWall,pvpProcessWallCalls,pvpWallRuneReady,authorityCellBlocked,
   sanitizePvpCtrl,pvpTryParalyze,pvpTryUeRunes,pvpEquipPreset,pvpSpellReady,pvpPrioritySpell,
-  PVP_BATTLE_PARALYZE_MS,PVP_PRIO_XBOW,PVP_PRIO_BOW,healPlayers,pvpBattleGoal,
+  PVP_BATTLE_PARALYZE_MS,PVP_PRIO_XBOW,PVP_PRIO_BOW,healPlayers,usePotion,pvpBattleGoal,
   pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,
   canPlayerDamagePlayer,livingHostilePlayers,playersAreAllies,applyPlayerPvpDamage,
   CURRENCY_GOLD,
