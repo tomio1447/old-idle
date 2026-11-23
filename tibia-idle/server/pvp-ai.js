@@ -407,6 +407,7 @@ function pvpAiDecide(auth, item, now) {
   const cand = [];
   const myTeam = s.team, szHome = _szCenter(auth, myTeam);
   const coord = _aiCoord(pb, myTeam);
+  const mapW = AI_MAP_WEIGHTS[pb.mode] || AI_MAP_WEIGHTS.frags;
 
   /* TEAM_RETREAT — o comandante decretou retirada: quem está ferido e
    * exposto recua junto (a retirada coletiva não deixa stragglers). */
@@ -469,7 +470,7 @@ function pvpAiDecide(auth, item, now) {
   /* FINISH — inimigo vulnerável dentro de 8sqm. */
   const finishable = v.foes.find((f) => f.s.hpPct < AI_FINISH_HP && f.d <= 8);
   if (finishable) {
-    cand.push({ action: "ATTACK", prio: AI_PRIO.FINISH,
+    cand.push({ action: "ATTACK", prio: AI_PRIO.FINISH + mapW.finish,
       targetId: finishable.s.id,
       goal: { cx: finishable.s.cx, cy: finishable.s.cy, td: reach, push: true } });
   }
@@ -483,6 +484,9 @@ function pvpAiDecide(auth, item, now) {
     let best = -1e9;
     for (const f of v.foes) {
       let sc = pvpAiScoreTarget(v, f, reach);
+      // FASE 7: alvo "protegido" (≥2 escoltas coladas) é des-priorizado —
+      // pressiona outro setor em vez de bater cabeça na guarda do healer.
+      if (coord && coord.protectedFoes && coord.protectedFoes[f.s.id]) sc -= 15;
       if (mem.lastTargetId && f.s.id === mem.lastTargetId) sc += AI_STICK_TARGET;
       if (sc > best) { best = sc; tgt = f; }
     }
@@ -490,15 +494,26 @@ function pvpAiDecide(auth, item, now) {
   /* Em strategy "retreat" a ordem do time é recuar — ataque individual só
    * sai via FINISH (finalização segura não é suicídio). */
   if (tgt && !(coord && coord.strategy === "retreat")) {
-    cand.push({ action: "ATTACK", prio: callId ? AI_PRIO.ATTACK + 10 : AI_PRIO.ATTACK,
+    // FASE 7: no mapa de controle, perseguir longe da zona vale menos
+    // (caçar kill solto entrega o território).
+    const pursueAdj = !callId ? mapW.pursue : 0;
+    cand.push({ action: "ATTACK", prio: (callId ? AI_PRIO.ATTACK + 10 : AI_PRIO.ATTACK) + pursueAdj,
       targetId: tgt.s.id,
       goal: { cx: tgt.s.cx, cy: tgt.s.cy, td: reach, push: true } });
+  }
+
+  /* REGROUP — time espalhado e zona disputada: reagrupa no centro da
+   * massa aliada (Venore se ganha com massa na zona, não caçando solo). */
+  if (coord && coord.regroup && coord.regroupCell) {
+    cand.push({ action: "REGROUP", prio: AI_PRIO.CONTEST + 5,
+      goal: { cx: coord.regroupCell.cx, cy: coord.regroupCell.cy, td: 0,
+        regroup: true } });
   }
 
   /* CONTEST — modo control: disputar a zona vale mais que kill solto. */
   if (v.battle.mode === "control" && !v.battle.inControl && pb.controlZone) {
     const z = pb.controlZone;
-    cand.push({ action: "CONTEST", prio: AI_PRIO.CONTEST,
+    cand.push({ action: "CONTEST", prio: AI_PRIO.CONTEST + mapW.contest,
       goal: { cx: Number(z.cx) || 0, cy: Number(z.cy) || 0, td: 0, zone: true } });
   }
 
@@ -596,6 +611,18 @@ function pvpAiDefensiveWall(auth, item, v, now) {
 const AI_COORD_MS = 1000;         // cadência do comandante
 const AI_FRAG_LEAD_DEF = 5;       // déficit de frags → offensive
 const AI_FRAG_LEAD_SAFE = 8;      // vantagem larga → defensive
+/* ==================== FASE 7 — ADAPTIVE INTELLIGENCE ====================
+ * Peso das ações por MODO de mapa (o objetivo real do mapa dita a tática):
+ * - frags (Ankrahmun): finalizar vale mais; disputa de zona não existe.
+ * - control (Venore): o território vale mais que perseguições soltas —
+ *   CONTEST/REGROUP sobem, perseguir longe da zona cai.
+ * ========================================================================== */
+const AI_MAP_WEIGHTS = {
+  frags:   { finish: +10, contest: 0, pursue: 0 },
+  control: { finish: 0, contest: +15, pursue: -15 },
+};
+/* Tempo que um alvo "protegido" permanece marcado na memória do time. */
+const AI_PROTECTED_MEM_MS = 8000;
 
 function _teamHp(g) { return g.alive.reduce((s, m) => s + m.hpPct, 0); }
 function _leaderOnline(auth, t, now) {
@@ -609,7 +636,7 @@ function _leaderOnline(auth, t, now) {
 }
 /* Consenso ofensivo: soma os alvos recentes dos bots vivos do time —
  * o foco emergente (quem mais bots já estavam batendo) + score do hostil. */
-function _consensusTarget(auth, pc, t, foeG) {
+function _consensusTarget(auth, pc, t, foeG, protectedFoes) {
   const g = pc.teams[t], agg = {};
   for (const m of g.alive) {
     const mm = m.item && m.item._aiMem;
@@ -622,7 +649,8 @@ function _consensusTarget(auth, pc, t, foeG) {
   let best = null, bestSc = -1e9;
   for (const f of foeG.alive) {
     let sc = (agg[f.id] || 0) + 60 - f.hpPct * 40 + (f.isolated ? 15 : 0) +
-      (/druid|sorcerer/.test(f.voc) ? 8 : 0) - f.nearestFoe;
+      (/druid|sorcerer/.test(f.voc) ? 8 : 0) - f.nearestFoe -
+      (protectedFoes && protectedFoes[f.id] ? 15 : 0);
     if (sc > bestSc) { bestSc = sc; best = f.id; }
   }
   return best;
@@ -642,6 +670,19 @@ function pvpAiCoordinatorTick(auth, now) {
     const coord = pb.aiCoord[t] = pb.aiCoord[t] || { lastStrategy: null };
     coord.leaderOnline = _leaderOnline(auth, t, now);
     coord.events = [];
+
+    /* FASE 7 (antes da estratégia — o consenso consome o mapa):
+     * hostil com ≥2 aliados colados = escoltado; marcado na memória do
+     * time pros bots des-priorizarem e pressionarem outro setor. */
+    coord.protectedFoes = coord.protectedFoes || {};
+    for (const id of Object.keys(coord.protectedFoes))
+      if (now - coord.protectedFoes[id] > AI_PROTECTED_MEM_MS)
+        delete coord.protectedFoes[id];
+    for (const f of foeG.alive) {
+      const guards = foeG.alive.filter((o) => o !== f &&
+        Math.abs(o.cx - f.cx) + Math.abs(o.cy - f.cy) <= 2).length;
+      if (guards >= 2) coord.protectedFoes[f.id] = now;
+    }
 
     /* Estratégia macro: modo control → dominar/defender a zona;
      * frags → placar + HP agregado + superioridade numérica. */
@@ -671,7 +712,7 @@ function pvpAiCoordinatorTick(auth, now) {
       /* Consenso escreve aiTargetId — targetId fica EXCLUSIVO do líder
        * humano (regra "só o líder designa" preservada; a resolução do
        * foco usa targetId || aiTargetId). */
-      const tgt = _consensusTarget(auth, pc, t, foeG);
+      const tgt = _consensusTarget(auth, pc, t, foeG, coord.protectedFoes);
       coord.consensusTargetId = tgt;
       if (tgt) team.aiTargetId = tgt; else delete team.aiTargetId;
     } else {
@@ -689,6 +730,18 @@ function pvpAiCoordinatorTick(auth, now) {
       coord.events.push({ t: "TEAM_CONTROL_CONTESTED" });
     if (strategy === "retreat")
       coord.events.push({ t: "TEAM_RETREAT" });
+
+    /* Dispersão do time: distância média ao centro da massa. */
+    if (g.alive.length >= 3) {
+      const mx = g.alive.reduce((a, m) => a + m.cx, 0) / g.alive.length,
+        my = g.alive.reduce((a, m) => a + m.cy, 0) / g.alive.length;
+      const spread = g.alive.reduce((a, m) =>
+        a + Math.abs(m.cx - mx) + Math.abs(m.cy - my), 0) / g.alive.length;
+      coord.regroup = pb.mode === "control" &&
+        (Number(pb.holder) || 0) !== t && spread > 6;
+      if (coord.regroup) coord.regroupCell = { cx: Math.round(mx), cy: Math.round(my) };
+      coord.spread = Math.round(spread * 10) / 10;
+    } else { coord.regroup = false; coord.spread = 0; }
   }
 }
 /* O decide lê a coordenação do time (targetId efetivo + estratégia). */
@@ -720,5 +773,6 @@ module.exports = {
   pvpAiPerception, pvpAiPerceive,
   AI_PRIO, AI_DECIDE_MS, AI_PROFILES, pvpAiScoreTarget, pvpAiCombatMode,
   pvpAiDecide, pvpAiGateGoal, pvpAiPotionCfg, pvpAiDefensiveWall,
-  AI_WALL_CALL_MS, AI_COORD_MS, pvpAiCoordinatorTick,
+  AI_WALL_CALL_MS, AI_COORD_MS, pvpAiCoordinatorTick, AI_MAP_WEIGHTS,
+  AI_PROTECTED_MEM_MS,
 };

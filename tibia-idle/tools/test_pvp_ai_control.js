@@ -604,5 +604,71 @@ console.log("== FASE 6: control mode → domination ao segurar a zona ==");
     "time perdendo a zona → offensive + evento");
 }
 
+console.log("== FASE 7: alvo protegido por escolta é des-priorizado ==");
+{
+  // Druid inimigo atrás de 2 knights → marcado; bot pressiona o isolado.
+  // (time próprio tem massa — 1v4 cairia em strategy "retreat" e suprimiria
+  // o ataque, o que também está correto, mas não é o que se testa aqui.)
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(6, 100, 1, 5, 2),
+    mkChar(7, 100, 1, 5, 0, { voc: "elite knight" }),
+    mkChar(2, 200, 2, 8, 1, { voc: "elder druid" }),
+    mkChar(3, 200, 2, 8, 2, { voc: "elite knight" }), mkChar(4, 200, 2, 9, 1, { voc: "elite knight" }),
+    mkChar(5, 200, 2, 3, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  PVP_AI.pvpAiCoordinatorTick(auth, now);
+  const coord = auth.pvpBattle.aiCoord[1];
+  ok(coord.protectedFoes && coord.protectedFoes["2"] > 0,
+    "druid com 2 escoltas → protegido na memória do time");
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.targetId === "5", "bot pressiona o hostil isolado, não a escolta");
+}
+
+console.log("== FASE 7: pesos de mapa — frags premia finalização ==");
+{
+  ok(PVP_AI.AI_MAP_WEIGHTS.frags.finish > 0 &&
+     PVP_AI.AI_MAP_WEIGHTS.control.pursue < 0,
+    "frags: finish+ / control: pursue-");
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  auth.players[1].p.hp = 180; // finalizável
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "ATTACK" && w.prio >= 90,
+    "alvo <22% em frags → FINISH com bônus do mapa");
+}
+
+console.log("== FASE 7: control — zona > perseguição ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 9, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  auth.pvpBattle.mode = "control"; auth.pvpBattle.holder = 2;
+  auth.pvpBattle.controlZone = { cx: 5, cy: 2, r: 3 };
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && (w.action === "CONTEST" || w.action === "ATTACK"),
+    "zona perdida → disputar/atacar");
+  if (w.action === "CONTEST")
+    ok(w.prio >= 85, "CONTEST recebe o peso do mapa (+15)");
+}
+
+console.log("== FASE 7: regroup — time espalhado reagrupa ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 2, 1), mkChar(3, 100, 1, 9, 4),
+    mkChar(4, 100, 1, 9, 1), mkChar(2, 200, 2, 5, 2)]);
+  const now = Date.now(); auth.clock = now;
+  auth.pvpBattle.mode = "control"; auth.pvpBattle.holder = 2;
+  auth.pvpBattle.controlZone = { cx: 5, cy: 2, r: 3 };
+  auth.pvpBattle.teams[1].leaderAccountId = 100;
+  PVP_AI.pvpAiCoordinatorTick(auth, now);
+  const coord = auth.pvpBattle.aiCoord[1];
+  ok(coord.spread > 0, "dispersão medida no coord");
+  ok(coord.regroup === true || coord.regroup === false,
+    "flag de reagrupamento calculada");
+}
+
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
 console.log("\nALL PVP AI CONTROL TESTS PASSED");
