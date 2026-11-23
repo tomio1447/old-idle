@@ -1358,6 +1358,33 @@ function drawTargetSquare(ctx, x, y, w, h) {
   ctx.restore();
 }
 
+/* PvP: quadrados de target call. Vermelho = inimigo focado pelo MEU time;
+ * amarelo = aliado MEU focado pelo time inimigo. `combat._pvpTeamTarget`
+ * dá o eco local imediato do clique do líder (antes do sync autoritativo). */
+function pvpTargetMarks(combat) {
+  const pb = combat && combat.pvpBattle;
+  if (!pb || !pb.teams) return null;
+  const players = combat.players || [];
+  const myAcc = typeof pvpMyAccountId === "function" ? pvpMyAccountId() : 0;
+  const ownOf = (e) => typeof pvpIsOwnEnt === "function" ? pvpIsOwnEnt(e, myAcc)
+    : (e && e.p && myAcc && Number(e.accountId !== undefined ? e.accountId : e.p.accountId) === myAcc);
+  const myEnt = players.find((e) => e && e.p && ownOf(e));
+  const myTeam = myEnt ? Number(myEnt.pvpTeam || myEnt.team) || 0 : 0;
+  const marks = {};
+  const byTeam = (tid) => {
+    const ent = players.find((e) => String(e && e.id) === String(tid));
+    if (!ent) return;
+    const tTeam = Number(ent.pvpTeam || ent.team) || 0;
+    marks[String(tid)] = (myTeam && tTeam === myTeam) ? "yellow" : "red";
+  };
+  for (const t of [1, 2]) {
+    const tid = pb.teams[t] && pb.teams[t].targetId;
+    if (tid) byTeam(tid);
+  }
+  if (combat._pvpTeamTarget) byTeam(combat._pvpTeamTarget);
+  return marks;
+}
+
 function rrPath(ctx, x, y, w, h, r) {
   r = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.beginPath();
@@ -2700,6 +2727,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const entityInfo = [];
   const kindOrder = { monster: 0, ally: 1, player: 2 };
   const depthDrawables = [];
+  const targetMarks = pvpTargetMarks(combat);
 
   const paintEntity = (e) => {
     const ent = e.ent;
@@ -2764,6 +2792,22 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.restore();
     }
     else ctx.drawImage(img, origin.x, origin.y, w, h);
+    // PvP: quadrado no SQM do alvo chamado — vermelho inimigo / amarelo aliado.
+    const tMark = targetMarks && e.kind !== "monster" ?
+      targetMarks[String(ent.id)] : null;
+    if (tMark) {
+      const mcx = Number.isFinite(ent.cx) ? (ent.cx | 0)
+        : Math.floor((ent.x || 0) * gridW);
+      const mcy = Number.isFinite(ent.cy) ? (ent.cy | 0)
+        : Math.floor((ent.y || 0) * gridH);
+      const mx = mcx * tile, my = mcy * tile;
+      ctx.strokeStyle = "rgba(0,0,0,.85)";
+      ctx.lineWidth = Math.max(2, tile * 0.09);
+      ctx.strokeRect(mx + 1, my + 1, tile - 2, tile - 2);
+      ctx.strokeStyle = tMark === "yellow" ? "#ffd65a" : "#ff4a3d";
+      ctx.lineWidth = Math.max(1.5, tile * 0.06);
+      ctx.strokeRect(mx + 2.5, my + 2.5, tile - 5, tile - 5);
+    }
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   };
 

@@ -4,6 +4,20 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-23 — PvP: quadrados de target call no SQM
+
+- Quadrado **vermelho** no SQM do inimigo designado como alvo do time
+  (`teams[t].targetId` já viaja serializado no `combat.pvpBattle`) e
+  **amarelo** no aliado focado pelo time inimigo — leitura tática
+  imediata do call dos dois lados.
+- Eco local instantâneo: `combat._pvpTeamTarget` pinta o quadrado no
+  clique do líder antes do round-trip autoritativo — o target call
+  deixou de parecer "travado".
+- `PVP_SYSTEM.md`: documento de referência do sistema PvP completo
+  (regras, mapas, IA de batalha, resiliência e backlog de polimento).
+
+---
+
 ## 2026-11-22 — Boss/World Boss morto: fluxo restaurado + anti-travamento
 
 - Servidor não "trava" mais no last hit: a simulação autoritativa por
