@@ -397,9 +397,11 @@ const BONELORDS_PHYLACTERY = {
  * mesmo patamar (estimado). exp 0 oficial: o XP do encontro (750.000)
  * vem todo do Fatal Bug. looktypes dos avatares = outfits oficiais das
  * vocações (Steel 1593, Light 1594, Storm 1595, Nature 1596, Balance 1823).
- * looktypes dos membros: OFICIAIS do staticdata do client 15.20
- * (yorik 268, percy 137, grendel 144, fiona 1681, nigel 1837 — outfits
- * clássicos reutilizados: os aventureiros são humanos). */
+ * looktypes dos membros: staticdata do client 15.20
+ * (yorik 268, percy 137, grendel 144, fiona 1681, nigel 1837). ATENÇÃO:
+ * os atlases de sprite desses outfits NÃO estão no cache de refs — o
+ * DAT convertido renderiza placeholders (cavaleiro cinza) para eles.
+ * Os PNGs em assets/mob/ foram montados dos GIFs oficiais da wiki. */
 const AG_TRANSFORM_PCT = 0.30;
 const AG_MEMBER_BASE = {
   hp: 155000, exp: 0, speed: 210, armor: 90, defense: 80,
@@ -1056,11 +1058,16 @@ function roostBindExchange() {
     "ice-horror":           { cw: 64, ch: 64, cols: 9, rows: 4 },
     "the-gravedigger":      { cw: 64, ch: 64, cols: 9, rows: 4 },
     "bonelords-phylactery": { cw: 64, ch: 64, cols: 9, rows: 4 },
-    "yorik-youngbook":      { cw: 37, ch: 37, cols: 3, rows: 4 },
-    "percy-peacetinker":    { cw: 36, ch: 36, cols: 3, rows: 4 },
-    "grendel-greenlunch":   { cw: 37, ch: 37, cols: 3, rows: 4 },
-    "fiona-firstdream":     { cw: 39, ch: 39, cols: 9, rows: 4 },
-    "nigel-neverguess":     { cw: 37, ch: 37, cols: 9, rows: 4 },
+    /* Os 5 membros NÃO têm sprite nos refs do client (os looktypes do
+     * staticdata renderizam placeholders — os atlases lzma desses outfits
+     * não estavam no cache). Sheets 9x4 de 64x64 montadas dos GIFs
+     * oficiais da TibiaWiki — padrão sir-leonard/moonstone-miner: a
+     * direção do GIF é replicada nas 4 linhas, col 0 = idle. */
+    "yorik-youngbook":      { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "percy-peacetinker":    { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "grendel-greenlunch":   { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "fiona-firstdream":     { cw: 64, ch: 64, cols: 9, rows: 4 },
+    "nigel-neverguess":     { cw: 64, ch: 64, cols: 9, rows: 4 },
     "avatar-of-steel":      { cw: 64, ch: 64, cols: 9, rows: 4 },
     "avatar-of-light":      { cw: 64, ch: 64, cols: 9, rows: 4 },
     "avatar-of-nature":     { cw: 64, ch: 64, cols: 9, rows: 4 },

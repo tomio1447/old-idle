@@ -296,12 +296,17 @@ const AV_MAP = { "yorik-youngbook": "avatar-of-steel", "percy-peacetinker": "ava
   "nigel-neverguess": "avatar-of-balance" };
 for (const s of [...AG_MEMBERS, ...Object.values(AV_MAP), "bright-crystal"]) {
   must(M[s], s + " ausente do ROOST_MONSTERS");
-  /* Humanoides clássicos (looktypes 137/144/268) têm só 2 frames de
-   * walk no DAT → sheet 3×4; avatares/15.20 têm 9×4. */
+  /* Membros: sheets 9×4 de 64×64 montadas dos GIFs oficiais (sprites
+   * ausentes do cache de refs — padrão sir-leonard, full-cell sem
+   * âncora). Avatares/crystal: sheets DAT com âncora de recorte. */
+  const gifBuilt = AG_MEMBERS.includes(s);
   must(ctx.MOBSHEETS[s] && ctx.MOBSHEETS[s].cols >= 3 && ctx.MOBSHEETS[s].rows === 4 &&
     fs.existsSync(path.join(game, "assets", "mob", s + ".png")), s + " sheet ausente");
+  if (gifBuilt)
+    must(ctx.MOBSHEETS[s].cols === 9 && ctx.MOBSHEETS[s].cw === 64 &&
+      ctx.MOBSHEETS[s].ch === 64, s + ": MOBSHEETS GIF-build divergente");
   must(E.MONSTERS[s], "engine: " + s + " ausente do MONSTERS");
-  must(caCtx.CREATURE_ANCHORS[s], s + " âncora ausente");
+  if (!gifBuilt) must(caCtx.CREATURE_ANCHORS[s], s + " âncora ausente");
 }
 must(M["adventurer-group"].name === "Fatal Bug" && M["adventurer-group"].raceId === 2773,
   "entidade final deve ser o Fatal Bug (race 2773)");

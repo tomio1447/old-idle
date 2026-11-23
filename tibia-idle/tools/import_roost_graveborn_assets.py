@@ -80,14 +80,12 @@ MOBS_LOOKTYPE = {
     "eldritch-dragon-lord": 1879,
     "the-gravedigger": 1880,
     "ice-horror": 1881,
-    # Adventurer Group — 5 membros: looktypes OFICIAIS do staticdata
-    # do client 15.20 (race→outfit: yorik 2712→268, percy 2713→137,
-    # grendel 2714→144, fiona 2715→1681, nigel 2716→1837).
-    "nigel-neverguess": 1837,
-    "fiona-firstdream": 1681,
-    "percy-peacetinker": 137,
-    "grendel-greenlunch": 144,
-    "yorik-youngbook": 268,
+    # Adventurer Group — 5 membros: NÃO renderizar via looktype.
+    # Os atlases lzma das outfits oficiais (staticdata: yorik 2712→268,
+    # percy 2713→137, grendel 2714→144, fiona 2715→1681, nigel 2716→1837)
+    # não estão no cache de refs — o DAT convertido gera placeholders
+    # (cavaleiro cinza). Os PNGs atuais foram montados dos GIFs oficiais
+    # da TibiaWiki (tools/build_adventurer_group_sheets.py) — preservar.
     # Avatares das vocações (outfits oficiais como looktype de criatura).
     "avatar-of-steel": 1593,
     "avatar-of-light": 1594,
