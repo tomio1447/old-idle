@@ -346,15 +346,15 @@ const AI_PROFILES = {
     defendsBackline: true },
   /* Paladin: RANGED — dano à distância, execução. Mantém 4sqm, kite sob
    * pressão, prioriza vulnerável/isolado. */
-  paladin: { reach: 4, role: "ranged", fleeHp: 0.35, protectHp: 0.55,
+  paladin: { reach: 3, role: "ranged", fleeHp: 0.35, protectHp: 0.55,
     kites: true },
   /* Druid: SUPPORT — cura emergencial primeiro, dano depois. Recua mais
    * cedo: o time perde o healer se ele cair. */
-  druid:  { reach: 4, role: "support", fleeHp: 0.42, protectHp: 0.50,
+  druid:  { reach: 3, role: "support", fleeHp: 0.42, protectHp: 0.50,
     kites: true },
   /* Sorcerer: BURST — dano explosivo/área. Mantém 4sqm, kite sob pressão,
    * aproveita packs. */
-  sorcerer: { reach: 4, role: "burst", fleeHp: 0.35, protectHp: 0.60,
+  sorcerer: { reach: 3, role: "burst", fleeHp: 0.35, protectHp: 0.60,
     kites: true },
 };
 function _profile(item) {

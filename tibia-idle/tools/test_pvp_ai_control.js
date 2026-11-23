@@ -372,8 +372,8 @@ console.log("== FASE 3: retorno limpa o modo AI-owned ==");
 
 console.log("== FASE 4: perfis por vocação ==");
 {
-  ok(PVP_AI.AI_PROFILES.knight.reach === 1 && PVP_AI.AI_PROFILES.paladin.reach === 4,
-    "melee 1sqm / ranged 4sqm");
+  ok(PVP_AI.AI_PROFILES.knight.reach === 1 && PVP_AI.AI_PROFILES.paladin.reach === 3,
+    "melee 1sqm / ranged 3sqm");
   ok(PVP_AI.AI_PROFILES.monk && PVP_AI.AI_PROFILES.monk.role === "frontline",
     "monk existe como frontline condicional");
   ok(PVP_AI.AI_PROFILES.druid.fleeHp > PVP_AI.AI_PROFILES.knight.fleeHp,
@@ -456,8 +456,8 @@ console.log("== FASE 4: PROTECT ranged posiciona no alcance ==");
   it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
   auth.players[1].p.hp = 250; // aliado crítico
   const w = PVP_AI.pvpAiDecide(auth, it, now);
-  ok(w && w.action === "PROTECT" && it._aiGoal.goal.td === 4,
-    "druid posiciona a 4sqm do aliado (alcance de sio)");
+  ok(w && w.action === "PROTECT" && it._aiGoal.goal.td === 3,
+    "druid posiciona a 3sqm do aliado (alcance de sio)");
 }
 
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
