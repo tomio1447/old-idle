@@ -190,5 +190,67 @@ console.log("== integração: pose do HUMAN segue autoritativa ==");
   ok(a.pvpBattle.aiControl["1"] === "HUMAN", "pilotado recente → HUMAN no mapa");
 }
 
+console.log("== FASE 2: percepção por time 1×/tick ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(3, 100, 1, 6, 1),
+    mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now();
+  auth.clock = now;
+  auth.players[1].p.hp = 300; // crítico (30%)
+  const statFn = (p) => eng.maxStats(p);
+  const pc = PVP_AI.pvpAiPerception(auth, now, statFn);
+  ok(pc.teams[1].members.length === 2 && pc.teams[2].members.length === 1,
+    "membros separados por time");
+  ok(pc.teams[1].critical.length === 1 && pc.teams[1].critical[0].id === "3",
+    "aliado crítico identificado");
+  const pc2 = PVP_AI.pvpAiPerception(auth, now, statFn);
+  ok(pc2 === pc, "cache por clock reutiliza o objeto");
+  auth.clock = now + 200;
+  const pc3 = PVP_AI.pvpAiPerception(auth, now + 200, statFn);
+  ok(pc3 !== pc, "clock novo recalcula");
+  ok(JSON.stringify(auth).indexOf("_aiPercept") < 0,
+    "percepção não serializa (não enumerável)");
+}
+
+console.log("== FASE 2: visão tática por char ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(3, 100, 1, 6, 1),
+    mkChar(2, 200, 2, 8, 1)]);
+  auth.clock = Date.now();
+  auth.pvpBattle.teams[1].targetId = "2";
+  const it = auth.players[0];
+  const v = PVP_AI.pvpAiPerceive(auth, it);
+  ok(v && v.team === 1 && v.battle.targetId === "2", "battle + target call no contexto");
+  ok(v.foes.length === 1 && v.foes[0].s.id === "2" && v.foes[0].d === 3,
+    "hostil ordenado por distância");
+  ok(v.nearestFoe && v.nearestFoe.s.id === "2", "nearestFoe aponta");
+  ok(v.pursuers.length === 1, "hostil a 3sqm conta como perseguidor");
+  // Hostil fora do campo de visão não é percebido.
+  const far = auth.players.find((p) => String(p.id) === "2");
+  far.cx = 30; far.cy = 30;
+  auth.clock = Date.now() + 1;
+  const v2 = PVP_AI.pvpAiPerceive(auth, it);
+  ok(v2.foes.length === 0, "hostil a 25sqm fora do campo de visão");
+}
+
+console.log("== FASE 2: memória de dano recente ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now(), att = auth.players[1], vic = auth.players[0];
+  // Integração: dano real via applyPlayerPvpDamage alimenta a memória.
+  eng.applyPlayerPvpDamage(auth, att, vic, 200, "physical", now);
+  const m = PVP_AI.aiRecentDamage(vic, now, 6000);
+  ok(m.hits === 1 && m.total > 0, "dano PvP registra na memória da vítima");
+  ok(m.topSrc === "2", "top attacker identificado");
+  const old = PVP_AI.aiRecentDamage(vic, now + 10000, 6000);
+  ok(old.total === 0 && old.hits === 0, "memória expira fora da janela");
+  // Perseguidor por dano mesmo fora dos 4sqm.
+  auth.players[1].cx = 30; auth.players[1].cy = 30;
+  auth.clock = now;
+  eng.applyPlayerPvpDamage(auth, att, vic, 50, "physical", now + 1);
+  const v = PVP_AI.pvpAiPerceive(auth, vic);
+  ok(v.pursuers.some((f) => f.s.id === "2"), "atacante recente entra como perseguidor");
+}
+
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
 console.log("\nALL PVP AI CONTROL TESTS PASSED");

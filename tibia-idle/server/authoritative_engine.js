@@ -4918,6 +4918,8 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
   if(auth.pvpBattle)dmg=Math.max(0,Math.floor(dmg*PVP_BATTLE_DMG_MUL));
   if(dmg>0)victim.p._lastHitBy=(attacker&&attacker.p&&attacker.p.name)||"Player";
   victim.p.hp=Math.max(0,(Number(victim.p.hp)||0)-dmg);
+  // PvP AI FASE 2: memória de dano recente (janela 6s) pra percepção.
+  if(auth.pvpBattle&&dmg>0)PVP_AI.pvpAiNoteDamage(victim,dmg,attacker&&attacker.id,now);
   if(auth.pvpBattle)pvpBattleCredit(auth,attacker,victim,dmg);
   auth.lastDamageSource="player-raid";
   auth.events=auth.events||[];
@@ -5372,6 +5374,9 @@ function pvpBattleTick(auth,now,dt){
   // PvP Tactical AI FASE 1: máquina de estados de controle (HUMAN→AI_HARD)
   // roda por tick — O(players), comparações de carimbo apenas.
   PVP_AI.pvpAiControlTick(auth,now);
+  // FASE 2: percepção compartilhada por time, 1× por tick (cache por clock).
+  // maxStats resolve hp/mp máximos reais (não persistidos no p).
+  PVP_AI.pvpAiPerception(auth,now,(p)=>maxStats(p));
   dt=Math.max(1,Number(dt)||AUTH_STEP_MS);
   // Magic walls: expiração + chamadas pendentes (qualquer membro da conta
   // pode chamar — o caster é quem da PT tem runa e cooldown livre).
