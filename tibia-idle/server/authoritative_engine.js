@@ -782,7 +782,17 @@ function authorityVisualDistance(a,b,auth){
 }
 /* Paredes estáticas da instância (otbm/testes). Occupancy de criaturas é
  * montada em authorityOccupancy; isto só marca tiles inatravessáveis. */
+/* Magic Wall viva na célula (batalha PvP)? Bloqueia os DOIS times —
+ * verificada antes do mapa para cobrir pathfinding, follow e walkIntent. */
+function pvpWallAt(auth,cx,cy){
+  const pb=auth&&auth.pvpBattle,ws=pb&&pb.walls;
+  if(!ws||!ws.length)return false;
+  const now=Number(auth.clock)||Date.now();
+  for(const w of ws)if(w&&w.cx===cx&&w.cy===cy&&(Number(w.until)||0)>now)return true;
+  return false;
+}
 function authorityCellBlocked(auth,cx,cy){
+  if(auth&&auth.pvpBattle&&pvpWallAt(auth,cx,cy))return true;
   const blocked=auth&&auth.blockedCells;
   if(!blocked)return false;
   const key=cx+":"+cy;
@@ -1205,6 +1215,8 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
           }
         }
       }
+      // TARGET OFF vale por char — chega em todos os visuais da conta.
+      if(pos.pvpAtk!==undefined)item._pvpAttackOff=!pos.pvpAtk;
       continue;
     }
     if(auth.pvpBattle)item._pvpDrivenAt=Number(auth.clock)||Date.now();
@@ -1237,6 +1249,21 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
           if(ent&&chebyshevCells(entityGridCell(item,auth),entityGridCell(ent,auth))<=PVP_BATTLE_TARGET_RANGE)
             auth.pvpBattle.teams[team].targetId=tgt;
         }
+      }
+    }
+    // TARGET OFF: desliga magias E runas de ataque só deste char (transiente,
+    // não toca config.spellAttack salva) — a sequência de cooldowns fica
+    // livre pra Magic Wall entrar na hora certa.
+    if(pos.pvpAtk!==undefined&&auth.pvpBattle)item._pvpAttackOff=!pos.pvpAtk;
+    // WALL: a conta marca a célula; qualquer char da PT com runa+cooldown
+    // livre conjura (pvpProcessWallCalls). Não exige líder — cada conta
+    // controla os próprios muros.
+    if(pos.wallTarget&&auth.pvpBattle){
+      const acc=Number(item.accountId!==undefined?item.accountId:(item.p&&item.p.accountId))||0;
+      const wcx=Math.floor(Number(pos.wallTarget.cx)),wcy=Math.floor(Number(pos.wallTarget.cy));
+      if(acc&&Number.isFinite(wcx)&&Number.isFinite(wcy)){
+        auth.pvpBattle.wallCalls=auth.pvpBattle.wallCalls||{};
+        auth.pvpBattle.wallCalls[String(acc)]={cx:wcx,cy:wcy,at:Number(auth.clock)||Date.now()};
       }
     }
     if(challenge){item.p=item.p||{};item.p.config=item.p.config||{};
@@ -4865,6 +4892,9 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
  * Dano jogador→jogador reduzido em 35%, sem perda de XP/loot — a aposta
  * da guild é a penalidade. Morto renasce na própria sz em ~10s. */
 const PVP_BATTLE_DMG_MUL=0.65;
+const PVP_WALL_MS=14000;            // muro dura 14–20s (roll 0–6s em cima)
+const PVP_WALL_CALL_TTL=6000;       // chamada de muro expira se ninguém castar
+const PVP_WALL_MAX_PER_ACC=10;      // muros vivos simultâneos por conta
 /* Alcance máximo de runa na guerra (runes.json não tem campo range). */
 const PVP_BATTLE_RUNE_RANGE=7;
 /* O líder só designa alvo a até 11 sqm do próprio char (meia FOV). */
@@ -5098,12 +5128,89 @@ function pvpBattleControlCounts(auth){
   }
   return out;
 }
+/* Magic Wall pronta pra conjurar? Mesma sequência de cooldowns de runa
+ * (runeUsable exige tipo "attack"; magic-wall-rune é "suporte" — por isso
+ * a checagem própria de _runeCd/_offensiveCd/_groupCd). */
+function pvpWallRuneReady(p,now){
+  const rd=RUNEDATA["magic-wall-rune"];if(!rd)return false;
+  if(Number(rd.lvl||0)>Number(p.level||1))return false;
+  if(rd.ml&&Number(p.ml||0)<Number(rd.ml))return false;
+  if((Number(p._runeCd)||0)>now)return false;
+  if((Number(p._offensiveCd)||0)>now)return false;
+  p._groupCd=p._groupCd||{};
+  const group=String(rd.grupo||rd.group||"1");
+  if((p._groupCd[group]||p._groupCd["1"]||0)>now)return false;
+  p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};
+  if((Number(p.supplies["magic-wall-rune"])||0)>0||
+     (Number(p.lootPouch["magic-wall-rune"])||0)>0)return true;
+  return supplySelected(p,"magic-wall-rune")&&(Number(p.gold)||0)>=supplyPriceOf("magic-wall-rune");
+}
+function pvpCastMagicWall(auth,item,cx,cy,now){
+  const p=item.p,rd=RUNEDATA["magic-wall-rune"];
+  if(!rd||!consumeSupply(auth,p,"magic-wall-rune"))return false;
+  const cd=Number(rd.cd||rd.gcd||2000);
+  p._runeCd=now+cd;p._offensiveCd=now+2000;p._lastRuneId="magic-wall-rune";
+  p._groupCd=p._groupCd||{};
+  p._groupCd[String(rd.grupo||"1")]=now+Number(rd.gcd||2000);
+  p._groupCd["1"]=Math.max(p._groupCd["1"]||0,now+2000);
+  const pb=auth.pvpBattle;
+  pb.walls=pb.walls||[];
+  pb.walls.push({cx,cy,accId:Number(item.accountId||(p&&p.accountId))||0,
+    by:String(item.id),until:now+PVP_WALL_MS+roll(auth,0,6000)});
+  auth.events=auth.events||[];
+  auth.events.push({t:"wall",cx,cy,whoId:String(item.id),
+    whoName:(p&&p.name)||"",ts:now,screen:true});
+  return true;
+}
+/* Chamadas de muro (botão WALL do cliente): o primeiro char VIVO da conta
+ * com runa + cooldown livre + alcance da célula conjura. Se ninguém está
+ * livre ainda, a chamada espera até PVP_WALL_CALL_TTL — é isso que faz a
+ * wall "respeitar a sequência de cooldowns" da PT inteira. */
+function pvpProcessWallCalls(auth,now){
+  const pb=auth&&auth.pvpBattle,calls=pb&&pb.wallCalls;
+  if(!calls)return;
+  for(const acc of Object.keys(calls)){
+    const call=calls[acc];
+    if(!call){delete calls[acc];continue;}
+    if((now-call.at)>PVP_WALL_CALL_TTL){
+      // Ninguém da PT tinha runa/cooldown/alcance na janela — avisa a conta.
+      delete calls[acc];
+      auth.events=auth.events||[];
+      auth.events.push({t:"wall-fail",cx:call.cx,cy:call.cy,accId:Number(acc)||0,
+        ts:now,screen:true});
+      continue;
+    }
+    const cx=call.cx|0,cy=call.cy|0;
+    // Célula inválida (fora/mapa bloqueado/já murada) ou ocupada: descarta.
+    if(cx<0||cy<0||cx>=(Number(auth.gridW)||30)||cy>=(Number(auth.gridH)||30)||
+       authorityCellBlocked(auth,cx,cy)){delete calls[acc];continue;}
+    const occupied=(auth.players||[]).some((o)=>o&&o.p&&o.p.hp>0&&!o.downUntil&&
+      entityGridCell(o,auth).cx===cx&&entityGridCell(o,auth).cy===cy);
+    if(occupied){delete calls[acc];continue;}
+    const accN=Number(acc)||0;
+    const mine=(pb.walls||[]).filter((w)=>Number(w.accId)===accN).length;
+    if(mine>=PVP_WALL_MAX_PER_ACC){delete calls[acc];continue;}
+    const here=entityGridCell;
+    const caster=(auth.players||[]).filter((o)=>o&&o.p&&o.p.hp>0&&!o.downUntil&&
+      Number(o.accountId!==undefined?o.accountId:(o.p&&o.p.accountId))===accN&&
+      chebyshevCells(here(o,auth),{cx,cy})<=PVP_BATTLE_RUNE_RANGE)
+      .sort((a,b)=>chebyshevCells(here(a,auth),{cx,cy})-chebyshevCells(here(b,auth),{cx,cy}))
+      .find((o)=>pvpWallRuneReady(o.p,now));
+    if(!caster)continue;
+    pvpCastMagicWall(auth,caster,cx,cy,now);
+    delete calls[acc];
+  }
+}
 /* Tick por step (200ms): domínio da área de controle e timer principal. */
 function pvpBattleTick(auth,now,dt){
   const pb=auth&&auth.pvpBattle;if(!pb||auth.ended)return;
   // Resultado decidido (por frag ou timer) → encerra a instância.
   if(pb.finished){auth.ended=true;auth.terminalReason="pvp-battle-end";return;}
   dt=Math.max(1,Number(dt)||AUTH_STEP_MS);
+  // Magic walls: expiração + chamadas pendentes (qualquer membro da conta
+  // pode chamar — o caster é quem da PT tem runa e cooldown livre).
+  if(pb.walls&&pb.walls.length)pb.walls=pb.walls.filter((w)=>(Number(w.until)||0)>now);
+  pvpProcessWallCalls(auth,now);
   // Controle (Venore): domina quem tem mais chars vivos na zona; o placar
   // é o total de segundos de domínio (zona disputada/vazia não conta).
   if(String(pb.mode)==="control"&&pb.controlZone){
@@ -9025,12 +9132,12 @@ function step(auth,now,opts){if(auth.ended)return;
       // Guerra de guild: mago sempre prioriza Sudden Death no alvo — burst
       // antes das magias do combo/fallback. tryUseRune já valida carga,
       // vocação indireta (nível/ml), CDs e o alcance PvP (<=7 sqm).
-      if(auth.pvpBattle){
+      if(auth.pvpBattle&&!item._pvpAttackOff){
         const bv=CanaryVocation.baseVocName(p.voc);
         if(bv==="sorcerer"||bv==="druid")
           acted=tryUseRune(auth,item,p,now,"sudden-death-rune",primaryTarget,living,visualTs);
       }
-      const s=acted?null:nextComboSpell(auth,item,p,now,primaryTarget,living);
+      const s=(acted||item._pvpAttackOff)?null:nextComboSpell(auth,item,p,now,primaryTarget,living);
       if(s&&s.rune){
         acted=tryUseRune(auth,item,p,now,s.id,primaryTarget,living,visualTs);
       }else if(s){
@@ -9832,6 +9939,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     controlZone:auth.pvpBattle.controlZone?Object.assign({},auth.pvpBattle.controlZone):null,
     holder:Number(auth.pvpBattle.holder)||0,
     teams:auth.pvpBattle.teams?JSON.parse(JSON.stringify(auth.pvpBattle.teams)):null,
+    walls:auth.pvpBattle.walls?JSON.parse(JSON.stringify(auth.pvpBattle.walls)):[],
     finished:auth.pvpBattle.finished||null}:null;
   descriptor.state.hatred=auth.hatred?{active:!!auth.hatred.active,counters:Object.assign({},auth.hatred.counters||{}),
     nextActivationAt:Number(auth.hatred.nextActivationAt)||0,
@@ -10075,7 +10183,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
-  pvpBattleLeaderChar,
+  pvpBattleLeaderChar,pvpWallAt,pvpCastMagicWall,pvpProcessWallCalls,pvpWallRuneReady,authorityCellBlocked,
   pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,
   canPlayerDamagePlayer,livingHostilePlayers,playersAreAllies,applyPlayerPvpDamage,
   CURRENCY_GOLD,

@@ -639,6 +639,20 @@ function accountAuthorityVisualState(){
     const selfV=out.players.find((v)=>v.self)||out.players[0];
     selfV.teamTarget=combat._pvpTeamTarget?String(combat._pvpTeamTarget):"";
   }
+  if(pvpAccId){
+    // TARGET OFF: desliga magias/runes de ataque de TODOS os chars da
+    // conta — a sequência de cooldowns fica livre pra Magic Wall.
+    for(const v of out.players)v.pvpAtk=combat._pvpAttackOff?0:1;
+    // WALL: mira resolvida em célula — a autoridade escolhe o caster.
+    if(combat._pvpWallTarget&&out.players.length){
+      const w=combat._pvpWallTarget;
+      const selfV=out.players.find((v)=>v.self)||out.players[0];
+      selfV.wallTarget={cx:w.cx,cy:w.cy};
+      const done=((combat.pvpBattle&&combat.pvpBattle.walls)||[])
+        .some((x)=>x&&x.cx===w.cx&&x.cy===w.cy);
+      if(done||Date.now()-(Number(w.at)||0)>6000)combat._pvpWallTarget=null;
+    }
+  }
   if(combat._scarlettPendingDir){
     const intent={dir:String(combat._scarlettPendingDir)};
     const pressAuth=Number(combat._scarlettPendingPressAuth);

@@ -7261,6 +7261,35 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .pvp-sb-t1 { color: #7fc4ff; }
 .pvp-sb-t2 { color: #ff9d9d; }
 .pvp-sb-sub { font-size: 10px; color: #a89f88; margin-top: 2px; }
+
+/* Botões de batalha (WALL / TARGET) — estilo hotkey box, abaixo do scoreboard. */
+#pvp-actions {
+  position: fixed; top: 92px; left: 50%; transform: translateX(-50%);
+  z-index: 55; display: none; gap: 8px;
+}
+.pvp-act {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; min-width: 56px; padding: 4px 6px 3px;
+  background: rgba(16,12,10,.92); border: 1px solid #5a4a33; border-radius: 3px;
+  color: #d8d0bc; font: 700 8px "Trebuchet MS",sans-serif; letter-spacing: .5px;
+  cursor: pointer; user-select: none; opacity: .75; transition: opacity .15s;
+}
+.pvp-act:hover { opacity: 1; }
+.pvp-act img { width: 30px; height: 30px; image-rendering: pixelated; }
+.pvp-act.on {
+  opacity: 1; border-color: #ffd75e;
+  box-shadow: 0 0 8px rgba(255,215,94,.45), inset 0 0 6px rgba(255,215,94,.15);
+}
+.pvp-act.off { opacity: .5; border-color: #7a3b3b; }
+.pvp-act-reticle { width: 30px; height: 30px; display: block; position: relative; }
+.pvp-act-reticle::before {
+  content: ""; position: absolute; inset: 3px;
+  border: 2px solid #ff4a3d; border-radius: 50%;
+}
+.pvp-act-reticle::after {
+  content: ""; position: absolute; inset: 12px;
+  background: #ff4a3d; border-radius: 50%;
+}
 .pvp-sb-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
 .pvp-sb-head b { color: #fff; font-size: 14px; letter-spacing: 1px; }
 .pvp-sb-live { color: #ff6b6b; font-size: 9px; font-weight: 700; letter-spacing: 1px; border: 1px solid #a33535; padding: 0 5px; }

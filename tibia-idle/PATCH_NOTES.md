@@ -4,6 +4,31 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-23 — PvP: botões de batalha — WALL (Magic Wall) e TARGET ON/OFF
+
+- **WALL**: botão estilo hotkey (ícone da magic wall rune) abaixo do
+  scoreboard, só durante batalha live. Clique → cursor vira crosshair →
+  clique no SQM → a chamada vai pra autoridade e **qualquer char da PT
+  com a runa + cooldown livre + alcance (7 sqm) conjura**. Consome a
+  carga da runa e entra na sequência de cooldowns do caster
+  (_runeCd/_offensiveCd/_groupCd — tipo "suporte", checagem própria).
+  Muro = tile oficial 2129, dura 14–20s, bloqueia os DOIS times
+  (`authorityCellBlocked` → pathfinding/follow/walkIntent; cliente:
+  `buildOccupancy` como parede estática, inclusive corte de quina).
+  Regras: célula ocupada/murada/bloqueada descarta a chamada; chamada
+  espera até 6s por caster livre (cooldown "respeita a sequência") e
+  expira com toast `wall-fail`; máx 10 muros vivos por conta.
+- **TARGET ON/OFF**: desliga magias E runas de ataque da PT inteira
+  (`pos.pvpAtk` → `_pvpAttackOff` transiente — não toca a config salva)
+  pra sequência de cooldowns ficar livre pra Magic Wall. Ataque de arma,
+  cura e buffs continuam.
+- Serialização: `pvpBattle.walls` vai no descriptor — render com pulso
+  nos últimos 3s antes de expirar.
+- Teste novo: `tools/test_pvp_wall.js` (cast, escolha do caster, TTL,
+  alvos inválidos, gates, serialização) — 20 asserts verdes.
+
+---
+
 ## 2026-11-23 — PvP: quadrados de target call no SQM
 
 - Quadrado **vermelho** no SQM do inimigo designado como alvo do time

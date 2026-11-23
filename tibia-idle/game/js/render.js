@@ -2957,6 +2957,22 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
+  // Magic walls da batalha PvP: tile oficial 2129 no SQM, sobre chão e
+  // sprites. Pulsa nos últimos 3s antes de expirar.
+  const pvpWalls = combat && combat.pvpBattle && combat.pvpBattle.walls;
+  if (pvpWalls && pvpWalls.length && typeof TileSprites !== "undefined") {
+    const tile = tilePx(W), nowMs = Date.now();
+    for (const wl of pvpWalls) {
+      if (!wl || !Number.isFinite(wl.cx) || !Number.isFinite(wl.cy)) continue;
+      const left = (Number(wl.until) || 0) - nowMs;
+      const alpha = left > 0 && left < 3000
+        ? 0.45 + 0.4 * Math.abs(Math.sin(nowMs / 160)) : 1;
+      ctx.globalAlpha = alpha;
+      TileSprites.draw(ctx, 2129, wl.cx * tile, wl.cy * tile, tile, wl.cx, wl.cy);
+      ctx.globalAlpha = 1;
+    }
+  }
+
   // Ordem visual solicitada: arena/grounds < corpses < bossbar < healthbars dos players.
   // A bossbar vem depois de chão, paredes, sprites e corpses, mas antes dos labels.
   drawBossBar(ctx, canvasW, combat, -view.x, -view.y, canvasHudScale(this.c));

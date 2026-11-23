@@ -238,6 +238,17 @@ function mapBlockMap(c) {
 }
 function buildOccupancy(c, ignorar) {
   const occ = new Map(mapBlockMap(c));
+  /* Magic walls da batalha PvP bloqueiam o SQM (mesma regra da autoridade):
+   * entram no Map como sentinelas para a IA/caminhada não atravessar. */
+  const pvpWalls = c.pvpBattle && c.pvpBattle.walls;
+  if (pvpWalls && pvpWalls.length) {
+    const nowMs = Date.now();
+    for (const w of pvpWalls) {
+      if (!w || (Number(w.until) || 0) <= nowMs) continue;
+      // `true` = bloqueio estático: também barra o corte de quina diagonal.
+      occ.set((w.cx | 0) + ":" + (w.cy | 0), true);
+    }
+  }
   if (c.player && c.player !== ignorar && (!c.player.p || c.player.p.hp > 0)) {
     const key = c.player.cx + ":" + c.player.cy;
     if (!occ.has(key)) occ.set(key, c.player); // nunca apaga uma parede

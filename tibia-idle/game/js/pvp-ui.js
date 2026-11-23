@@ -743,6 +743,15 @@ async function pvpEnterBattle() {
 function pvpHandleCombatClick(cell) {
   const c = typeof G !== "undefined" && G && G.combat;
   if (!c || !c.pvpBattle || !cell) return false;
+  // Botão WALL armado: o clique escolhe o SQM — a autoridade escolhe qual
+  // char da PT conjura (runa + cooldown livre). Qualquer membro pode chamar.
+  if (c._pvpWallAim) {
+    c._pvpWallAim = false;
+    c._pvpWallTarget = { cx: Math.floor(Number(cell.cx)), cy: Math.floor(Number(cell.cy)), at: Date.now() };
+    if (typeof toast === "function")
+      toast(`Magic Wall em <b>${c._pvpWallTarget.cx},${c._pvpWallTarget.cy}</b> — a PT conjura quando o cooldown liberar.`);
+    return true;
+  }
   const accId = pvpMyAccountId();
   const own = (c.players || []).find((e) => pvpIsOwnEnt(e, accId));
   const myTeam = own ? Number(own.pvpTeam || own.team) || 0 : 0;
@@ -818,8 +827,62 @@ function pvpTakeoverTick() {
   document.body.appendChild(el);
   _pvpTakeoverEl = el;
 }
+/* ============ BOTÕES DE BATALHA — WALL (magic wall) e TARGET on/off =====
+ * Overlay estilo hotkey, só durante batalha live. WALL arma a mira para o
+ * clique no SQM; TARGET OFF desliga magias/runes de ataque da PT inteira
+ * para a sequência de cooldowns ficar livre pra Magic Wall. */
+let _pvpActionsEl = null;
+function pvpActionsTick() {
+  const c = typeof G !== "undefined" && G && G.combat;
+  const st = c && c.pvpBattle;
+  const inBattle = !!st && !st.finished;
+  if (!inBattle) {
+    if (_pvpActionsEl) _pvpActionsEl.style.display = "none";
+    return;
+  }
+  if (!_pvpActionsEl) {
+    const el = document.createElement("div");
+    el.id = "pvp-actions";
+    el.innerHTML =
+      `<button class="pvp-act" id="pvp-act-wall" title="Magic Wall: clique e escolha o SQM — um char da PT com cooldown livre conjura (consome a runa)">
+         <img src="assets/item/magic-wall-rune.png" alt="" draggable="false"><span>WALL</span>
+       </button>
+       <button class="pvp-act on" id="pvp-act-target" title="Magias de ataque da PT. OFF = sequência de cooldowns livre pra Magic Wall">
+         <span class="pvp-act-reticle"></span><span>TARGET</span>
+       </button>`;
+    document.body.appendChild(el);
+    el.querySelector("#pvp-act-wall").addEventListener("click", () => {
+      const cc = G && G.combat; if (!cc) return;
+      cc._pvpWallAim = !cc._pvpWallAim;
+      if (typeof toast === "function")
+        toast(cc._pvpWallAim ? "Clique no SQM onde soltar a <b>Magic Wall</b>."
+                             : "Magic Wall cancelada.", cc._pvpWallAim ? undefined : "bad");
+      pvpActionsTick();
+    });
+    el.querySelector("#pvp-act-target").addEventListener("click", () => {
+      const cc = G && G.combat; if (!cc) return;
+      cc._pvpAttackOff = !cc._pvpAttackOff;
+      if (typeof toast === "function")
+        toast(cc._pvpAttackOff ? "Magias de ataque <b>OFF</b> — cooldown livre pra wall."
+                               : "Magias de ataque <b>ON</b>.");
+      pvpActionsTick();
+    });
+    _pvpActionsEl = el;
+  }
+  _pvpActionsEl.style.display = "flex";
+  _pvpActionsEl.querySelector("#pvp-act-wall").classList.toggle("on", !!c._pvpWallAim);
+  const tgt = _pvpActionsEl.querySelector("#pvp-act-target");
+  tgt.classList.toggle("on", !c._pvpAttackOff);
+  tgt.classList.toggle("off", !!c._pvpAttackOff);
+  tgt.lastElementChild.textContent = c._pvpAttackOff ? "TARGET OFF" : "TARGET ON";
+  // Cursor de mira enquanto WALL está armado.
+  const cv = document.getElementById("scene");
+  if (cv) cv.style.cursor = c._pvpWallAim ? "crosshair" : "";
+}
+
 function pvpScoreboardTick() {
   pvpTakeoverTick();
+  pvpActionsTick();
   let el = document.getElementById("pvp-scoreboard");
   const st = (typeof G !== "undefined" && G && G.combat && G.combat.pvpBattle) || null;
   if (!st || st.finished) { if (el) el.style.display = "none"; return; }

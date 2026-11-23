@@ -5591,6 +5591,10 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     for(const ev of incoming.events){
       if(ev&&ev.t==="taken"&&ev.targetId!==undefined&&ev.targetId!==null)
         takenTargets.add(String(ev.targetId));
+      // Chamada de Magic Wall expirou sem caster livre (runa/cooldown/alcance).
+      if(ev&&ev.t==="wall-fail"&&typeof pvpMyAccountId==="function"&&
+         Number(ev.accId)===Number(pvpMyAccountId())&&typeof toast==="function")
+        toast("<b>Magic Wall</b> falhou — nenhum char da PT tinha runa/cooldown/alcance.","bad");
     }
     for(const ent of reconciledPlayers){
       if(!ent||!ent.p)continue;
