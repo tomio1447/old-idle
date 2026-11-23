@@ -45,7 +45,8 @@ vm.runInContext("GAMEDATA=window.GAMEDATA;", ctx);
 /* Stubs das coleções que vivem em game.js/city.js/city-ui.js (DOM) — o
  * módulo escreve nelas via referência. */
 vm.runInContext(
-  "var MISSION_DEFS={},QUEST_DEFS={},BOSS_DEFS={},NPCS={},BOSS_MODAL_SECTIONS=[];" +
+  "var MISSION_DEFS={},QUEST_DEFS={},BOSS_DEFS={},NPCS={}," +
+  "BOSS_MODAL_SECTIONS=[{title:'SOULWAR 400+',ids:[]},{title:'BLOODROTTEN 600+',ids:[]},{title:'BOSSES 800+',ids:[]}];" +
   "var NPC_MODAL_CATALOG=[],MONSTERDATA=window.MONSTERDATA||{};", ctx);
 vm.runInContext(fs.readFileSync(path.join(js, "roost-graveborn.js"), "utf8"),
   ctx, { filename: "roost-graveborn.js" });
@@ -100,6 +101,11 @@ const sect = ctx.BOSS_MODAL_SECTIONS.find((s) => /GRAVEBORN/.test(s.title));
 must(sect && sect.minLevel === 450 &&
   JSON.stringify(sect.ids) === JSON.stringify(BOSSES),
   "seção GRAVEBORN 450+ ausente/ordenada errada");
+/* Ordem por nível: GRAVEBORN 450+ logo abaixo de SOULWAR 400+,
+ * antes de BLOODROTTEN 600+ e BOSSES 800+. */
+must(ctx.BOSS_MODAL_SECTIONS.findIndex((s) => /GRAVEBORN/.test(s.title)) ===
+  ctx.BOSS_MODAL_SECTIONS.findIndex((s) => /SOULWAR/.test(s.title)) + 1,
+  "GRAVEBORN 450+ não ficou abaixo de SOULWAR");
 
 /* ---------------- NPC Dragon Ancestor Spirit ---------------- */
 must(ctx.NPCS["dragon-ancestor-spirit"] &&

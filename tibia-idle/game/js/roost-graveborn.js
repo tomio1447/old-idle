@@ -1161,12 +1161,18 @@ function roostBindExchange() {
         cooldown: ROOST_COOLDOWN_MS,
       };
     }
-    if (typeof BOSS_MODAL_SECTIONS !== "undefined")
-      BOSS_MODAL_SECTIONS.push({
+    if (typeof BOSS_MODAL_SECTIONS !== "undefined") {
+      const sect = {
         title: "ROOST OF THE GRAVEBORN 450+",
         minLevel: 450,
         ids: ROOST_BOSS_META.map((m) => m.id),
-      });
+      };
+      /* Ordem por nível no modal: 450+ fica logo abaixo de SOULWAR 400+
+       * (antes de BLOODROTTEN 600+ / BOSSES 800+). */
+      const after = BOSS_MODAL_SECTIONS.findIndex((s) => /SOULWAR/.test(s.title));
+      if (after >= 0) BOSS_MODAL_SECTIONS.splice(after + 1, 0, sect);
+      else BOSS_MODAL_SECTIONS.push(sect);
+    }
   }
 
   /* NPC Dragon Ancestor Spirit — troca runas por arma Crypt. */
