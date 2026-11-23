@@ -944,11 +944,16 @@ function showAwayModal(diff, awayMs) {
   }, 0);
   const monsterRows = Object.entries(diff.monsters || {})
     .sort((a, b) => b[1].kills - a[1].kills).slice(0, 8)
-    .map(([slug, m]) => `<div class="stat-row"><span class="k">${m.name || slug}</span><span class="v">×${fmtFull(m.kills)}</span></div>`).join("");
+    .map(([slug, m]) => `<div class="away-row"><span class="away-ico">${
+      typeof mobImg === "function" ? mobImg(slug, 26) : ""}</span><span class="away-name">${
+      m.name || slug}</span><span class="away-val">×${fmtFull(m.kills)}</span></div>`).join("");
   const memberRows = (diff.members || [])
     .map((m) => `<div class="stat-row"><span class="k">${m.name}</span><span class="v" style="color:#9ce84a">${m.levelUp > 0 ? `+${m.levelUp} níve${m.levelUp > 1 ? "is" : "l"}` : `+${fmtFull(m.exp)} XP`}</span></div>`).join("");
   const supRows = Object.keys(diff.supplies || {})
-    .map((s) => `<div class="stat-row"><span class="k">${typeof SUPPLIES !== "undefined" && SUPPLIES[s] ? SUPPLIES[s].name : itemName(s)}</span><span class="v">-${diff.supplies[s]}</span></div>`).join("");
+    .map((s) => `<div class="away-row"><span class="away-ico">${
+      typeof itemImg === "function" ? itemImg(s, 24) : ""}</span><span class="away-name">${
+      typeof SUPPLIES !== "undefined" && SUPPLIES[s] ? SUPPLIES[s].name : itemName(s)
+      }</span><span class="away-val">−${fmtFull(diff.supplies[s])}</span></div>`).join("");
   const lootRows = Object.keys(diff.loot || {})
     .sort((a, b) => (GAMEDATA.items[b] ? GAMEDATA.items[b].sell || 0 : 0) -
                     (GAMEDATA.items[a] ? GAMEDATA.items[a].sell || 0 : 0))
@@ -970,15 +975,17 @@ function showAwayModal(diff, awayMs) {
         ${diff.supplyCost > 0 ? `<div class="stat-row"><span class="k">Gasto em supplies</span><span class="v" style="color:#e08080">-${fmtFull(diff.supplyCost)}</span></div>` : ""}
         ${diff.deaths > 0 ? `<div class="stat-row"><span class="k">Mortes</span><span class="v" style="color:#e08080">${diff.deaths}${diff.blessCost > 0 ? ` (−${fmtFull(diff.blessCost)} bless)` : ""}</span></div>` : ""}
       </div>
-      ${monsterRows ? `<div class="small dim mt8 mb4">Monstros</div><div class="panel-inset" style="padding:6px 8px">${monsterRows}</div>` : ""}
-      ${supRows ? `<div class="small dim mt8 mb4">Supplies consumidos</div><div class="panel-inset" style="padding:6px 8px">${supRows}</div>` : ""}
-      ${lootRows ? `<div class="small dim mt8 mb4">Loot recolhido</div>
+      ${monsterRows ? `<div class="away-sec">Monstros</div><div class="panel-inset" style="padding:2px 4px">${monsterRows}</div>` : ""}
+      ${supRows ? `<div class="away-sec">Supplies consumidos</div><div class="panel-inset" style="padding:2px 4px">${supRows}</div>` : ""}
+      ${lootRows ? `<div class="away-sec">Loot recolhido</div>
         <div class="inv-grid">${lootRows}</div>` : ""}
       <button class="primary full mt12" id="modal-ok">Continuar caçando</button>
     </div>`;
+  $("#modal-body").classList.add("away-modal-shell");
   $("#modal").classList.add("show");
   $("#modal-ok").addEventListener("click", () => {
     $("#modal").classList.remove("show");
+    $("#modal-body").classList.remove("away-modal-shell");
   });
 }
 

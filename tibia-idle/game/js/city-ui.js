@@ -124,7 +124,7 @@ const CITY_MODAL_SHELLS = [
   "hunts-modal-shell", "bosses-modal-shell", "boss-modal-shell", "reward-modal-shell",
   "social-modal-shell", "calendar-modal-shell", "chard-modal-shell",
   "lootcfg-modal-shell", "depot-modal-shell", "imb-modal-shell",
-  "pvp-modal-shell", "gi-crypt-shell",
+  "pvp-modal-shell", "gi-crypt-shell", "away-modal-shell",
 ];
 
 const RANKING_TABS = [
