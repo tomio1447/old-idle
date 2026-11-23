@@ -5120,7 +5120,7 @@ function pvpBattleTarget(auth,item,living){
   const list=(living||[]).filter((t)=>t&&t.hp>0&&t._playerEnt);
   if(!list.length)return null;
   const t=pvpBattleTeamOf(item);
-  const wanted=t?String((pb.teams&&pb.teams[t]&&pb.teams[t].targetId)||""):"";
+  const wanted=t?String((pb.teams&&pb.teams[t]&&(pb.teams[t].targetId||pb.teams[t].aiTargetId))||""):"";
   if(wanted){const forced=list.find((x)=>String(x.id)===wanted);if(forced)return forced;}
   // FASE 3: alvo individual escolhido pela IA (só sem target call ativo).
   if(item._aiTargetId){const aiT=list.find((x)=>String(x.id)===String(item._aiTargetId));if(aiT)return aiT;}
@@ -5383,6 +5383,9 @@ function pvpBattleTick(auth,now,dt){
   // FASE 2: percepção compartilhada por time, 1× por tick (cache por clock).
   // maxStats resolve hp/mp máximos reais (não persistidos no p).
   PVP_AI.pvpAiPerception(auth,now,(p)=>maxStats(p));
+  // FASE 6: comandante estratégico por time — 1×/s (estratégia, consenso
+  // de alvo sem líder, eventos TEAM_*).
+  PVP_AI.pvpAiCoordinatorTick(auth,now);
   dt=Math.max(1,Number(dt)||AUTH_STEP_MS);
   // Magic walls: expiração + chamadas pendentes (qualquer membro da conta
   // pode chamar — o caster é quem da PT tem runa e cooldown livre).

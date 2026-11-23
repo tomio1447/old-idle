@@ -284,7 +284,8 @@ function pvpAiPerceive(auth, item, pc) {
     now: pc.clock, self: s, team: s.team,
     ctl: (item._aiCtl && item._aiCtl.mode) || "HUMAN",
     battle: { mode: pb.mode || null, scores: pb.scores || {},
-      targetId: pb.teams && pb.teams[s.team] ? pb.teams[s.team].targetId : null,
+      targetId: pb.teams && pb.teams[s.team]
+        ? (pb.teams[s.team].targetId || pb.teams[s.team].aiTargetId || null) : null,
       holder: Number(pb.holder) || 0,
       inControl: s.team === (Number(pb.holder) || 0) },
     allies: myTeam.alive, critAllies: myTeam.critical,
@@ -405,6 +406,14 @@ function pvpAiDecide(auth, item, now) {
 
   const cand = [];
   const myTeam = s.team, szHome = _szCenter(auth, myTeam);
+  const coord = _aiCoord(pb, myTeam);
+
+  /* TEAM_RETREAT — o comandante decretou retirada: quem está ferido e
+   * exposto recua junto (a retirada coletiva não deixa stragglers). */
+  if (coord && coord.strategy === "retreat" && s.hpPct < 0.55 && szHome) {
+    cand.push({ action: "RETREAT", prio: AI_PRIO.ATTACK + 5,
+      goal: { cx: szHome.cx, cy: szHome.cy, td: 0, retreat: true, team: true } });
+  }
 
   /* SURVIVE — hp abaixo do threshold da vocação sob pressão real:
    * perseguidor colado OU burst recente maior que metade do HP atual.
@@ -478,7 +487,9 @@ function pvpAiDecide(auth, item, now) {
       if (sc > best) { best = sc; tgt = f; }
     }
   }
-  if (tgt) {
+  /* Em strategy "retreat" a ordem do time é recuar — ataque individual só
+   * sai via FINISH (finalização segura não é suicídio). */
+  if (tgt && !(coord && coord.strategy === "retreat")) {
     cand.push({ action: "ATTACK", prio: callId ? AI_PRIO.ATTACK + 10 : AI_PRIO.ATTACK,
       targetId: tgt.s.id,
       goal: { cx: tgt.s.cx, cy: tgt.s.cy, td: reach, push: true } });
@@ -572,6 +583,119 @@ function pvpAiDefensiveWall(auth, item, v, now) {
   return false;
 }
 
+/* ==================== FASE 6 — HYBRID COORDINATION ==================== */
+/* Camada estratégica 1×/s por TIME, dentro do pvpBattleTick:
+ * - strategy por mapa (offensive/defensive/balanced/domination/retreat);
+ * - consenso de alvo quando o LÍDER está offline — os bots agregam seus
+ *   alvos recentes e o melhor foco vira o target call do time (os demais
+ *   seguem pelo pvpBattleTarget normal — foco coordenado de verdade);
+ * - eventos internos TEAM_* consumidos pelo decide;
+ * - comandante humano online sempre manda — consenso só preenche o vácuo.
+ * ========================================================================== */
+
+const AI_COORD_MS = 1000;         // cadência do comandante
+const AI_FRAG_LEAD_DEF = 5;       // déficit de frags → offensive
+const AI_FRAG_LEAD_SAFE = 8;      // vantagem larga → defensive
+
+function _teamHp(g) { return g.alive.reduce((s, m) => s + m.hpPct, 0); }
+function _leaderOnline(auth, t, now) {
+  const pb = auth.pvpBattle, acc = pb.teams && pb.teams[t] &&
+    Number(pb.teams[t].leaderAccountId) || 0;
+  if (!acc) return false;
+  return !!(auth.players || []).some((o) => o && o.p && o.p.hp > 0 && !o.downUntil &&
+    aiTeamOf(o) === t &&
+    Number(o.accountId !== undefined ? o.accountId : (o.p && o.p.accountId)) === acc &&
+    (Number(o._pvpDrivenAt) || 0) > now - AI_DRIVEN_MS);
+}
+/* Consenso ofensivo: soma os alvos recentes dos bots vivos do time —
+ * o foco emergente (quem mais bots já estavam batendo) + score do hostil. */
+function _consensusTarget(auth, pc, t, foeG) {
+  const g = pc.teams[t], agg = {};
+  for (const m of g.alive) {
+    const mm = m.item && m.item._aiMem;
+    if (mm && mm.lastTargetId) {
+      const f = pc.byId[mm.lastTargetId];
+      if (f && !f.dead && f.team !== t)
+        agg[f.id] = (agg[f.id] || 0) + 25; // foco existente pesa
+    }
+  }
+  let best = null, bestSc = -1e9;
+  for (const f of foeG.alive) {
+    let sc = (agg[f.id] || 0) + 60 - f.hpPct * 40 + (f.isolated ? 15 : 0) +
+      (/druid|sorcerer/.test(f.voc) ? 8 : 0) - f.nearestFoe;
+    if (sc > bestSc) { bestSc = sc; best = f.id; }
+  }
+  return best;
+}
+
+function pvpAiCoordinatorTick(auth, now) {
+  const pb = auth && auth.pvpBattle; if (!pb || pb.finished) return;
+  now = Number(now) || Number(auth.clock) || Date.now();
+  if (now - (Number(pb._aiCoordAt) || 0) < AI_COORD_MS) return;
+  pb._aiCoordAt = now;
+  const pc = pvpAiPerception(auth, now);
+  pb.aiCoord = pb.aiCoord || {};
+  for (const t of [1, 2]) {
+    const team = pb.teams && pb.teams[t] || {};
+    const g = pc.teams[t] || { alive: [], critical: [] },
+      foeG = pc.teams[t === 1 ? 2 : 1] || { alive: [] };
+    const coord = pb.aiCoord[t] = pb.aiCoord[t] || { lastStrategy: null };
+    coord.leaderOnline = _leaderOnline(auth, t, now);
+    coord.events = [];
+
+    /* Estratégia macro: modo control → dominar/defender a zona;
+     * frags → placar + HP agregado + superioridade numérica. */
+    let strategy;
+    if (pb.mode === "control") {
+      const holder = Number(pb.holder) || 0;
+      strategy = holder === t ? "domination" : "offensive";
+    } else {
+      const myScore = Number((pb.scores || {})[t]) || 0,
+        foScore = Number((pb.scores || {})[t === 1 ? 2 : 1]) || 0;
+      const myHp = _teamHp(g), foHp = _teamHp(foeG),
+        numAdv = g.alive.length - foeG.alive.length;
+      strategy = g.alive.length === 0 ? "defensive" :
+        myHp < foHp * 0.6 ? "retreat" :
+        foScore - myScore >= AI_FRAG_LEAD_DEF || numAdv > 0 ? "offensive" :
+        myScore - foScore >= AI_FRAG_LEAD_SAFE ? "defensive" : "balanced";
+    }
+    if (strategy !== coord.lastStrategy) {
+      coord.events.push({ t: "TEAM_STRATEGY_" + strategy.toUpperCase() });
+      coord.lastStrategy = strategy;
+    }
+    coord.strategy = strategy;
+
+    /* Consenso de alvo: só quando o líder está offline. Com líder online,
+     * o call dele é soberano — os bots apenas seguem. */
+    if (!coord.leaderOnline) {
+      /* Consenso escreve aiTargetId — targetId fica EXCLUSIVO do líder
+       * humano (regra "só o líder designa" preservada; a resolução do
+       * foco usa targetId || aiTargetId). */
+      const tgt = _consensusTarget(auth, pc, t, foeG);
+      coord.consensusTargetId = tgt;
+      if (tgt) team.aiTargetId = tgt; else delete team.aiTargetId;
+    } else {
+      coord.consensusTargetId = null;
+      delete team.aiTargetId; // líder de volta: call dos bots sai
+      // Líder online: alvo chamado morto é limpo (bots não mantêm fogo em cadáver).
+      if (team.targetId && pc.byId[String(team.targetId)] &&
+          pc.byId[String(team.targetId)].dead)
+        delete team.targetId;
+    }
+
+    if (g.critical.length)
+      coord.events.push({ t: "TEAM_MEMBER_CRITICAL", id: g.critical[0].id });
+    if (pb.mode === "control" && (Number(pb.holder) || 0) !== t)
+      coord.events.push({ t: "TEAM_CONTROL_CONTESTED" });
+    if (strategy === "retreat")
+      coord.events.push({ t: "TEAM_RETREAT" });
+  }
+}
+/* O decide lê a coordenação do time (targetId efetivo + estratégia). */
+function _aiCoord(pb, t) {
+  return pb && pb.aiCoord && pb.aiCoord[t] || null;
+}
+
 /* Gate no topo de pvpBattleGoal: AI_HARD decide e serve o goal cacheado;
  * undefined = fluxo normal (humano/auxiliar sem takeover). */
 function pvpAiGateGoal(auth, item, now) {
@@ -596,5 +720,5 @@ module.exports = {
   pvpAiPerception, pvpAiPerceive,
   AI_PRIO, AI_DECIDE_MS, AI_PROFILES, pvpAiScoreTarget, pvpAiCombatMode,
   pvpAiDecide, pvpAiGateGoal, pvpAiPotionCfg, pvpAiDefensiveWall,
-  AI_WALL_CALL_MS,
+  AI_WALL_CALL_MS, AI_COORD_MS, pvpAiCoordinatorTick,
 };

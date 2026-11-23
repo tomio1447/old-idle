@@ -531,5 +531,78 @@ console.log("== FASE 5: _aiDirty dispara preset de equipamento ==");
     "mudança de modo marca _aiDirty → engine aplica o preset");
 }
 
+console.log("== FASE 6: coordinator — cadência + estratégia ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(3, 100, 1, 6, 1),
+    mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now(); auth.clock = now;
+  auth.pvpBattle.teams[1].leaderAccountId = 100;
+  auth.pvpBattle.teams[2].leaderAccountId = 200;
+  PVP_AI.pvpAiCoordinatorTick(auth, now);
+  const coord = auth.pvpBattle.aiCoord[1];
+  ok(coord && coord.strategy === "offensive", "2v1 → offensive (sup. numérica)");
+  ok(coord.events.some((e) => e.t === "TEAM_STRATEGY_OFFENSIVE"), "evento de estratégia");
+  const at = auth.pvpBattle._aiCoordAt;
+  PVP_AI.pvpAiCoordinatorTick(auth, now + 100);
+  ok(auth.pvpBattle._aiCoordAt === at, "cadência 1s — não recalcula antes");
+}
+
+console.log("== FASE 6: consenso de alvo quando líder offline ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(3, 100, 1, 6, 1),
+    mkChar(2, 200, 2, 7, 1)]);
+  const now = Date.now(); auth.clock = now;
+  auth.pvpBattle.teams[1].leaderAccountId = 100; // conta 100 sem self driven
+  PVP_AI.pvpAiCoordinatorTick(auth, now);
+  const coord = auth.pvpBattle.aiCoord[1];
+  ok(coord.leaderOnline === false, "líder sem pilotagem → offline");
+  ok(coord.consensusTargetId === "2" && auth.pvpBattle.teams[1].aiTargetId === "2" &&
+    auth.pvpBattle.teams[1].targetId === undefined,
+    "consenso escreve aiTargetId — targetId fica do líder");
+  // Os bots seguem o call pelo pvpBattleTarget normal.
+  const prox = (id) => ({ id: String(id), hp: 100, maxHp: 1000, _playerEnt: true });
+  const t = eng.pvpBattleTarget(auth, auth.players[0], [prox(2)]);
+  ok(t && String(t.id) === "2", "foco coordenado via aiTargetId");
+  // Líder volta → call dos bots é devolvido.
+  auth.players[0]._pvpDrivenAt = now + 1; // conta 100 pilotando
+  auth.players[0]._pvpHumanActAt = now + 1;
+  PVP_AI.pvpAiCoordinatorTick(auth, now + 1100);
+  ok(auth.pvpBattle.aiCoord[1].leaderOnline === true &&
+    auth.pvpBattle.teams[1].aiTargetId === undefined,
+    "líder de volta devolve o call");
+}
+
+console.log("== FASE 6: TEAM_RETREAT — retirada coletiva ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "elite knight" }),
+    mkChar(2, 200, 2, 8, 1),
+    mkChar(3, 200, 2, 9, 1), mkChar(4, 200, 2, 7, 1)]);
+  const now = Date.now(); auth.clock = now;
+  auth.pvpBattle.teams[1].leaderAccountId = 100;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  it.p.hp = 400; // ferido, time em desvantagem de HP
+  for (const f of auth.players.slice(1)) f.p.hp = 1000;
+  PVP_AI.pvpAiCoordinatorTick(auth, now);
+  ok(auth.pvpBattle.aiCoord[1].strategy === "retreat",
+    "hp agregado baixo → strategy retreat");
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "RETREAT" && it._aiGoal.goal.team === true,
+    "ferido acompanha a retirada do time");
+}
+
+console.log("== FASE 6: control mode → domination ao segurar a zona ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now(); auth.clock = now;
+  auth.pvpBattle.mode = "control"; auth.pvpBattle.holder = 1;
+  auth.pvpBattle.controlZone = { cx: 5, cy: 2, r: 3 };
+  PVP_AI.pvpAiCoordinatorTick(auth, now);
+  ok(auth.pvpBattle.aiCoord[1].strategy === "domination", "segurando → domination");
+  ok(auth.pvpBattle.aiCoord[2].strategy === "offensive" &&
+    auth.pvpBattle.aiCoord[2].events.some((e) => e.t === "TEAM_CONTROL_CONTESTED"),
+    "time perdendo a zona → offensive + evento");
+}
+
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
 console.log("\nALL PVP AI CONTROL TESTS PASSED");
