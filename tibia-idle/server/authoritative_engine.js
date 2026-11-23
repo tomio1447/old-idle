@@ -5122,6 +5122,8 @@ function pvpBattleTarget(auth,item,living){
   const t=pvpBattleTeamOf(item);
   const wanted=t?String((pb.teams&&pb.teams[t]&&pb.teams[t].targetId)||""):"";
   if(wanted){const forced=list.find((x)=>String(x.id)===wanted);if(forced)return forced;}
+  // FASE 3: alvo individual escolhido pela IA (só sem target call ativo).
+  if(item._aiTargetId){const aiT=list.find((x)=>String(x.id)===String(item._aiTargetId));if(aiT)return aiT;}
   return list.slice().sort((a,b)=>(Number(a.maxHp)||1)-(Number(b.maxHp)||1))[0];
 }
 /* Distância de aproximação na guerra por vocação: knight/monk SEMPRE melee
@@ -5196,6 +5198,10 @@ function pvpFollowCell(auth,item,lc,pref){
  * 3) Sem alvo ao alcance: o seguidor ocupa o anel da própria vocação em
  *    volta do líder — knight/monk a 1 sqm, ranged a 3 (`pvpFollowCell`). */
 function pvpBattleGoal(auth,item){
+  // PvP Tactical AI FASE 3: AI_HARD serve o goal decidido pela utility AI;
+  // undefined = fluxo normal (humano, auxiliar sem takeover ou FOLLOW).
+  const _aiGate=PVP_AI.pvpAiGateGoal(auth,item,Number(auth.clock)||Date.now());
+  if(_aiGate!==undefined)return _aiGate;
   const pb=auth&&auth.pvpBattle;if(!pb||pb.finished)return null;
   // PARALYZE de guerra: o passo trava — cast/arma continuam valendo.
   if(Number(item._pvpParalyzeUntil||0)>(Number(auth.clock)||Date.now()))return null;

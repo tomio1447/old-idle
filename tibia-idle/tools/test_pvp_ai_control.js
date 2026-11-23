@@ -21,7 +21,7 @@ const PVP = require(path.join(ROOT, "server/pvp.js"));
 
 function mkChar(id, acc, team, cx, cy, extra) {
   const p = Object.assign({ id: String(id), name: "C" + id, voc: "druid",
-    level: 300, ml: 20, hp: 1000, mp: 5000, gold: 0,
+    level: 300, ml: 20, hp: 1000, maxHp: 1000, mp: 5000, maxMp: 5000, gold: 0,
     skills: { fist: 100, sword: 100, axe: 100, club: 100, dist: 100, shield: 100 },
     supplies: {}, lootPouch: {}, equip: {}, bag: {}, itemInstances: [],
     config: { autoWalk: false, attackMode: "box" } }, extra || {});
@@ -250,6 +250,124 @@ console.log("== FASE 2: memória de dano recente ==");
   eng.applyPlayerPvpDamage(auth, att, vic, 50, "physical", now + 1);
   const v = PVP_AI.pvpAiPerceive(auth, vic);
   ok(v.pursuers.some((f) => f.s.id === "2"), "atacante recente entra como perseguidor");
+}
+
+console.log("== FASE 3: decisão utility — ataque/prioridades ==");
+{
+  const statFn = (p) => eng.maxStats(p);
+  const mk = (id, acc, team, cx, cy, x) => mkChar(id, acc, team, cx, cy, x);
+  // Cenário: sorcerer AI_HARD com 2 hostis — escolhe atacar e mirar o alvo.
+  const auth = makeAuth([mk(1, 100, 1, 5, 1, { voc: "sorcerer" }),
+    mk(2, 200, 2, 7, 1), mk(3, 200, 2, 9, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "ATTACK", "hostis no campo → ATTACK");
+  ok(it._aiGoal && it._aiGoal.goal && it._aiGoal.goal.push === true,
+    "goal push no shape do engine");
+  ok(it._aiTargetId, "alvo individual registrado");
+  ok(it._pvpCtrl && it._pvpCtrl.mode === "sd", "sorcerer com <3 hostis → modo sd");
+  // Gate: AI_HARD serve o goal; humano → undefined (fluxo normal).
+  ok(PVP_AI.pvpAiGateGoal(auth, it, now) === it._aiGoal.goal,
+    "gate entrega o goal cacheado");
+  const h = auth.players[1]; h._aiCtl = { mode: "HUMAN", since: 0 };
+  ok(PVP_AI.pvpAiGateGoal(auth, h, now) === undefined,
+    "humano não entra no gate");
+}
+
+console.log("== FASE 3: prioridades — RETREAT > ATTACK ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 6, 1),
+    mkChar(3, 200, 2, 7, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  it.p.hp = 200; // crítico, 2 perseguidores colados
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "RETREAT", "hp crítico + perseguidores → RETREAT");
+  ok(it._aiGoal.goal.retreat === true, "goal de retirada pra própria sz");
+}
+
+console.log("== FASE 3: PROTECT — aliado crítico sob ameaça ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "elite knight" }),
+    mkChar(3, 100, 1, 6, 1), mkChar(2, 200, 2, 7, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  auth.players[1].p.hp = 250; // aliado crítico
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.action === "PROTECT" && w.allyId === "3",
+    "aliado crítico → PROTECT intercepta");
+}
+
+console.log("== FASE 3: target call > alvo individual ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 6, 1),
+    mkChar(3, 200, 2, 9, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  auth.pvpBattle.teams[1].targetId = "3"; // comandante chamou o mais longe
+  const w = PVP_AI.pvpAiDecide(auth, it, now);
+  ok(w && w.targetId === "3", "target call do comandante vence o score");
+}
+
+console.log("== FASE 3: stickiness — ação não oscila ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 6, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  const w1 = PVP_AI.pvpAiDecide(auth, it, now);
+  const t1 = it._aiTargetId;
+  const w2 = PVP_AI.pvpAiDecide(auth, it, now + 400);
+  ok(w1.action === w2.action && it._aiTargetId === t1,
+    "decisão estável entre ciclos");
+}
+
+console.log("== FASE 3: modo de cast por vocação ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1, { voc: "sorcerer" }),
+    mkChar(2, 200, 2, 6, 1), mkChar(3, 200, 2, 7, 1), mkChar(4, 200, 2, 8, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  PVP_AI.pvpAiDecide(auth, it, now);
+  ok(it._pvpCtrl.mode === "ue", "sorcerer com 3+ hostis → ue");
+  ok(it._pvpCtrl._aiOwned === true, "modo marcado como AI-owned");
+}
+
+console.log("== FASE 3: _aiTargetId vale só sem target call ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 6, 1),
+    mkChar(3, 200, 2, 9, 1)]);
+  const it = auth.players[0];
+  it._aiTargetId = "3";
+  const prox = (id) => ({ id: String(id), hp: 100, maxHp: 1000, _playerEnt: true });
+  const living = [prox(2), prox(3)];
+  const t1 = eng.pvpBattleTarget(auth, it, living);
+  ok(t1 && String(t1.id) === "3", "sem call → alvo da IA");
+  auth.pvpBattle.teams[1].targetId = "2";
+  const t2 = eng.pvpBattleTarget(auth, it, living);
+  ok(t2 && String(t2.id) === "2", "com call → chamado vence o _aiTargetId");
+}
+
+console.log("== FASE 3: retorno limpa o modo AI-owned ==");
+{
+  const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]);
+  const now = Date.now(); auth.clock = now;
+  const it = auth.players[0];
+  it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
+  it._pvpCtrl = { mode: "ue", _aiOwned: true };
+  it._aiGoal = { goal: { cx: 1, cy: 1 }, action: "ATTACK", until: now + 999 };
+  it._aiTargetId = "2";
+  it._pvpHumanActAt = now; // jogador voltou
+  PVP_AI.pvpAiControlTick(auth, now);
+  ok(it._aiCtl.mode === "HUMAN_RETURNING" && it._pvpCtrl === null &&
+    it._aiGoal === null && it._aiTargetId === null,
+    "handoff limpa goal/alvo/modo da IA");
 }
 
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }

@@ -104,7 +104,12 @@ function pvpAiControlTick(auth, now) {
         break;
       case AI_MODES.AI_HARD: {
         // Retorno humano tem prioridade: atividade nova após o takeover.
-        if (actAt > c.since) aiSet(item, AI_MODES.HUMAN_RETURNING, now);
+        if (actAt > c.since) {
+          aiSet(item, AI_MODES.HUMAN_RETURNING, now);
+          // Comandos da IA não vazam pro humano: goal/alvo/modo limpos.
+          item._aiGoal = null; item._aiTargetId = null;
+          if (item._pvpCtrl && item._pvpCtrl._aiOwned) item._pvpCtrl = null;
+        }
         break;
       }
       case AI_MODES.HUMAN_RETURNING:
@@ -290,6 +295,171 @@ function pvpAiPerceive(auth, item, pc) {
   };
 }
 
+/* ==================== FASE 3 — DECISION ENGINE (UTILITY AI) ====================
+ * Utility scoring sobre a visão tática. A decisão produz:
+ *   - item._aiGoal  — goal de movimento no MESMO shape de pvpBattleGoal
+ *                     ({cx,cy,td,push|follow|retreat|protect|hold}) — a
+ *                     execução continua sendo pvpStepToward/walkToward;
+ *   - item._aiTargetId — alvo individual (só vale quando não há target call);
+ *   - item._pvpCtrl.mode — vocabulário de cast já existente (ue/sd/heal/
+ *                     paralyze/bow/xbow) — reusa tryUseRune/nextComboSpell.
+ * Estabilidade: stickiness da ação anterior + histerese de alvo, cadência
+ * AI_DECIDE_MS por char (stagger natural: cada char tem seu relógio).
+ * ========================================================================== */
+
+const AI_DECIDE_MS = 350;        // decisão individual a cada ≥350ms
+const AI_GOAL_TTL = 700;         // goal cacheado vale até a próxima decisão
+const AI_FLEE_HP = 0.35;         // hp% pra considerar fuga
+const AI_FINISH_HP = 0.22;       // inimigo finalizável
+const AI_STICK_ACTION = 8;       // bônus de continuidade da ação atual
+const AI_STICK_TARGET = 12;      // bônus de continuidade do alvo atual
+const AI_PRIO = {
+  SURVIVE: 100, SAVE_ALLY: 95, INTERRUPT: 90, FINISH: 85, DEFEND: 85,
+  ATTACK: 75, CONTEST: 70, REPOSITION: 65, PURSUE: 40,
+};
+
+function _szCenter(auth, team) {
+  const sz = auth.pvpBattle && auth.pvpBattle.safezones &&
+    auth.pvpBattle.safezones[team === 2 ? 2 : 1];
+  if (!sz) return null;
+  return { cx: Math.floor((Number(sz.x1) + Number(sz.x2)) / 2),
+           cy: Math.floor((Number(sz.y1) + Number(sz.y2)) / 2) };
+}
+function _vocBase(item) {
+  const v = String(item.p && item.p.voc || "").toLowerCase();
+  return v.indexOf("knight") >= 0 ? "knight" : v.indexOf("paladin") >= 0 ? "paladin" :
+    v.indexOf("druid") >= 0 ? "druid" : v.indexOf("sorcerer") >= 0 ? "sorcerer" :
+    v.indexOf("monk") >= 0 ? "monk" : v;
+}
+/* Score de um hostil como alvo individual: hp% baixo, alcance, isolamento,
+ * foco do time e proximidade — quanto maior melhor. */
+function pvpAiScoreTarget(v, foe, myReach) {
+  let s = 60 - foe.s.hpPct * 40;
+  if (foe.d <= myReach) s += 20;
+  if (foe.s.isolated) s += 15;
+  s -= foe.d * 2;
+  if (foe.s.critical || foe.s.hpPct < AI_FINISH_HP) s += 12;
+  const sup = /druid|sorcerer/.test(foe.s.voc) ? 8 : 0; // backline vale mais
+  return s + sup;
+}
+/* Modo de cast (_pvpCtrl.mode) por vocação + situação — FASE 4 refina. */
+function pvpAiCombatMode(v) {
+  const voc = _vocBase(v.self.item);
+  switch (voc) {
+    case "sorcerer": return v.self.foesNear >= 3 ? "ue" : "sd";
+    case "druid": return v.critAllies.some((a) => a.id !== v.self.id) ? "heal" : "sd";
+    case "paladin": {
+      const clumped = v.foes.filter((f) => f.d <= 4).length >= 3;
+      return clumped ? "bow" : "xbow";
+    }
+    default: return "sd"; // knight/monk: melee — mode não governa
+  }
+}
+
+/* Decide a próxima ação do char. Retorna a ação vencedora (ou null). */
+function pvpAiDecide(auth, item, now) {
+  const pc = pvpAiPerception(auth, now), v = pvpAiPerceive(auth, item, pc);
+  if (!v || v.self.dead) return null;
+  const mem = v.mem, s = v.self, pb = auth.pvpBattle || {};
+  const reach = _vocBase(item) === "knight" || _vocBase(item) === "monk" ? 1 : 3;
+  mem.decisionAt = now;
+
+  const cand = [];
+  const myTeam = s.team, szHome = _szCenter(auth, myTeam);
+
+  /* SURVIVE — hp crítico sob pressão real: perseguidor colado OU burst
+   * recente maior que metade do HP atual. */
+  const threat = v.pursuers.length >= 1 ||
+    v.dmgTaken > Math.max(1, Number(item.p.hp) || 1) * 0.5;
+  if ((s.hpPct < AI_FLEE_HP || s.critical) && threat && szHome) {
+    cand.push({ action: "RETREAT", prio: AI_PRIO.SURVIVE - s.hpPct * 40,
+      goal: { cx: szHome.cx, cy: szHome.cy, td: 0, retreat: true } });
+  }
+
+  /* SAVE_ALLY / DEFEND — aliado crítico (que não eu) precisa de escudo:
+   * intercepta na célula do aliado. Só se eu aguento (hp>45%). */
+  const critOther = v.critAllies.find((a) => a.id !== s.id);
+  if (critOther && s.hpPct > 0.45) {
+    const d = Math.abs(critOther.cx - s.cx) + Math.abs(critOther.cy - s.cy);
+    cand.push({ action: "PROTECT", prio: AI_PRIO.SAVE_ALLY - d * 2,
+      goal: { cx: critOther.cx, cy: critOther.cy, td: 1, protect: true },
+      allyId: critOther.id });
+  }
+
+  /* FINISH — inimigo vulnerável dentro de 8sqm. */
+  const finishable = v.foes.find((f) => f.s.hpPct < AI_FINISH_HP && f.d <= 8);
+  if (finishable) {
+    cand.push({ action: "ATTACK", prio: AI_PRIO.FINISH,
+      targetId: finishable.s.id,
+      goal: { cx: finishable.s.cx, cy: finishable.s.cy, td: reach, push: true } });
+  }
+
+  /* ATTACK — target call do comandante tem prioridade estratégica;
+   * sem call, melhor alvo por score. Ataque normal = push na célula do
+   * alvo com alcance da vocação (mesmo shape do goal existente). */
+  const callId = v.battle.targetId ? String(v.battle.targetId) : null;
+  let tgt = callId && v.foes.find((f) => f.s.id === callId);
+  if (!tgt) {
+    let best = -1e9;
+    for (const f of v.foes) {
+      let sc = pvpAiScoreTarget(v, f, reach);
+      if (mem.lastTargetId && f.s.id === mem.lastTargetId) sc += AI_STICK_TARGET;
+      if (sc > best) { best = sc; tgt = f; }
+    }
+  }
+  if (tgt) {
+    cand.push({ action: "ATTACK", prio: callId ? AI_PRIO.ATTACK + 10 : AI_PRIO.ATTACK,
+      targetId: tgt.s.id,
+      goal: { cx: tgt.s.cx, cy: tgt.s.cy, td: reach, push: true } });
+  }
+
+  /* CONTEST — modo control: disputar a zona vale mais que kill solto. */
+  if (v.battle.mode === "control" && !v.battle.inControl && pb.controlZone) {
+    const z = pb.controlZone;
+    cand.push({ action: "CONTEST", prio: AI_PRIO.CONTEST,
+      goal: { cx: Number(z.cx) || 0, cy: Number(z.cy) || 0, td: 0, zone: true } });
+  }
+
+  /* HOLD — ficar parado (segurar posição sob paralyze/cerco). */
+  if (v.paralyzed && v.pursuers.length === 0)
+    cand.push({ action: "HOLD", prio: AI_PRIO.REPOSITION, goal: null });
+
+  /* FOLLOW (fallback) — formação normal do engine. */
+  cand.push({ action: "FOLLOW", prio: AI_PRIO.PURSUE, goal: undefined });
+
+  /* Stickiness: ação atual ganha bônus — evita ping-pong a cada decisão. */
+  for (const c of cand) if (c.action === mem.lastAction) c.prio += AI_STICK_ACTION;
+  cand.sort((a, b) => b.prio - a.prio);
+  const win = cand[0];
+
+  /* Aplica efeitos colaterais da decisão. */
+  mem.lastAction = win.action; mem.lastActionAt = now;
+  if (win.targetId) { mem.lastTargetId = String(win.targetId); item._aiTargetId = String(win.targetId); }
+  else if (win.action !== "ATTACK") item._aiTargetId = null;
+  // Modo de cast: humano pode ter travado pelo painel (override respeitado).
+  if (!item._pvpCtrl || !item._pvpCtrl.mode || item._pvpCtrl._aiOwned) {
+    const mode = pvpAiCombatMode(v);
+    item._pvpCtrl = Object.assign({}, item._pvpCtrl || {}, { mode, _aiOwned: true });
+  }
+  item._aiGoal = { goal: win.goal === undefined ? null : win.goal,
+    follow: win.goal === undefined, action: win.action, until: now + AI_GOAL_TTL };
+  return win;
+}
+
+/* Gate no topo de pvpBattleGoal: AI_HARD decide e serve o goal cacheado;
+ * undefined = fluxo normal (humano/auxiliar sem takeover). */
+function pvpAiGateGoal(auth, item, now) {
+  const c = item && item._aiCtl;
+  if (!c || c.mode !== "AI_HARD") return undefined;
+  now = Number(now) || Number(auth.clock) || Date.now();
+  const mem = aiMem(item);
+  if (now - (Number(mem.decisionAt) || 0) >= AI_DECIDE_MS) pvpAiDecide(auth, item, now);
+  const g = item._aiGoal;
+  if (!g || (Number(g.until) || 0) <= now) return undefined;
+  // FOLLOW delega à formação normal (pvpBattleGoal segue o fluxo comum).
+  return g.follow ? undefined : g.goal;
+}
+
 module.exports = {
   AI_MODES, AI_DRIVEN_MS, AI_OFFLINE_MS, AI_SUSPECT_MS, AI_CONFIRM_MS,
   AI_RETURN_GRACE_MS, AI_HYSTERESIS_MS,
@@ -298,4 +468,6 @@ module.exports = {
   AI_HIT_MEM_MS, AI_CRIT_HP, AI_SUPPORT_HP, AI_FOE_SIGHT,
   aiTeamOf, aiHpPct, aiMpPct, aiMem, pvpAiNoteDamage, aiRecentDamage,
   pvpAiPerception, pvpAiPerceive,
+  AI_PRIO, AI_DECIDE_MS, pvpAiScoreTarget, pvpAiCombatMode,
+  pvpAiDecide, pvpAiGateGoal,
 };
