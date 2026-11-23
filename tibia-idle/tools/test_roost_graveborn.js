@@ -269,14 +269,22 @@ must(M["the-gravedigger"].raceId === 2721 && M["the-gravedigger"].exp === 750000
   "gravedigger sem Fire Ball 600-800");
 must(M["bonelords-phylactery"].exp === 1000000 && M["bonelords-phylactery"].resist.earth === -10,
   "phylactery ficha divergente");
-must(M["adventurer-group"].raceId === 2773 && M["adventurer-group"].lookItem === 52836 &&
-  M["bonelords-phylactery"].lookItem === 52831, "lookItems divergentes");
+must(M["adventurer-group"].raceId === 2773 && M["adventurer-group"].looktype === 79 &&
+  M["bonelords-phylactery"].lookItem === 52831,
+  "Fatal Bug não é looktype 79 (Ancient Scarab) / phylactery divergente");
 
 /* ---------------- sprites ---------------- */
 for (const slug of BOSSES) {
   const sheet = ctx.MOBSHEETS[slug];
-  must(sheet && sheet.rows === 4 && sheet.cols === 9,
-    slug + ": MOBSHEETS ausente/9x4 divergente");
+  /* Fatal Bug: mesma sprite do Ancient Scarab — meta 3x4 do DAT, não 9x4. */
+  const expCols = slug === "adventurer-group" ? 3 : 9;
+  must(sheet && sheet.rows === 4 && sheet.cols === expCols,
+    slug + ": MOBSHEETS ausente/" + expCols + "x4 divergente");
+  if (slug === "adventurer-group") {
+    const scarab = ctx.MOBSHEETS["ancient-scarab"];
+    must(scarab && sheet.cw === scarab.cw && sheet.ch === scarab.ch,
+      "Fatal Bug: sheet não bate com a do Ancient Scarab");
+  }
   const png = fs.readFileSync(path.join(game, "assets", "mob", slug + ".png"));
   must(png.readUInt32BE(16) === sheet.cw * sheet.cols &&
     png.readUInt32BE(20) === sheet.ch * sheet.rows,

@@ -130,7 +130,8 @@ MOBS_LOOKTYPE = {
 # Bosses "lookItem": a entidade oficial aparece como objeto (cid). O sheet
 # repete o frame do item nas 9 colunas x 4 linhas (estático).
 MOBS_LOOKITEM = {
-    "adventurer-group": 52836,   # relíquia/troféu do grupo
+    # adventurer-group (Fatal Bug): sprite = Ancient Scarab (lt 79),
+    # PNG copiado de ancient-scarab.png — não é lookItem.
     "bonelords-phylactery": 52831,  # face do Bone Overlord (pinata oficial)
     # Vulcões do Eldritch Dragon Lord — objectIDs oficiais do wikitext
     # (Eruption 51952, Flame Totem 51953); Pulsating Lava sem objectID

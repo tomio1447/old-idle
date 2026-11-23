@@ -152,7 +152,10 @@ const ADVENTURER_GROUP = {
     { el: "holy",     min: 500, max: 900, int: 5000, ch: 20, radius: 2,
       fx: "holy-area", miss: "holy" },
   ],
-  lookItem: 52836, raceId: 2773, targetDistance: 1,
+  /* Sprite oficial: o Fatal Bug usa a mesma sprite do Ancient Scarab
+   * (looktype 79 — confirmado ingame; a ficha de "relíquia" lookItem
+   * 52836 renderizava um troféu estático errado). */
+  looktype: 79, raceId: 2773, targetDistance: 1,
   staticAttack: 90, imune: ["paralyze", "invisible"],
   loot: [
     /* Loot oficial do Fatal Bug (a entidade que o carrega). */
@@ -1053,7 +1056,8 @@ function roostBindExchange() {
    * canvas. Humanoides clássicos têm 3 colunas (2 frames de walk no
    * DAT); avatares e criaturas 15.x têm 9. */
   const ROOST_MOB_SHEETS = {
-    "adventurer-group":     { cw: 64, ch: 64, cols: 9, rows: 4 },
+    /* Fatal Bug = mesma sprite do Ancient Scarab (58x58, 3x4 do DAT). */
+    "adventurer-group":     { cw: 58, ch: 58, cols: 3, rows: 4 },
     "eldritch-dragon-lord": { cw: 64, ch: 64, cols: 9, rows: 4 },
     "ice-horror":           { cw: 64, ch: 64, cols: 9, rows: 4 },
     "the-gravedigger":      { cw: 64, ch: 64, cols: 9, rows: 4 },
