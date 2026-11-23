@@ -74,7 +74,7 @@ function hudFont(px, s, bold) {
   return (bold ? "bold " : "") + hudFontPx(px, s) + "px Verdana";
 }
 function floaterFont(f, s) {
-  const spec = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px"))));
+  const spec = (f.kind === "damage" ? "16px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px"))));
   const scale = Math.max(1, Number(s) || 1);
   if (scale === 1) return spec + " Verdana";
   return spec.replace(/(\d+)px/, (_, n) => hudFontPx(n, scale) + "px") + " Verdana";
