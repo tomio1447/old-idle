@@ -3521,6 +3521,23 @@ function drainEvents() {
 
   if (!ready.length) return;
 
+  /* Batalha PvP: anti-poluição — número e log de dano só quando a PT da
+   * CONTA participa do golpe (causado OU recebido). Projéteis/impactos do
+   * mundo continuam — são a leitura da guerra. */
+  const pvpAcc = c.pvpBattle && typeof pvpMyAccountId === "function" ? pvpMyAccountId() : 0;
+  if (pvpAcc) {
+    const ownHit = (id) => id !== undefined && id !== null && (c.players || []).some(
+      (e) => e && String(e.id) === String(id) &&
+        (typeof pvpIsOwnEnt === "function" ? pvpIsOwnEnt(e, pvpAcc)
+          : Number(e.accountId !== undefined ? e.accountId : (e.p && e.p.accountId)) === Number(pvpAcc)));
+    for (const e of ready) {
+      if (e.t !== "hit" && e.t !== "taken") continue;
+      if (ownHit(e.whoId) || ownHit(e.sourceId) ||
+          ownHit(e.targetId !== undefined ? e.targetId : e.mobId)) continue;
+      e._pvpMuted = true;
+    }
+  }
+
   // Damage / Damage Taken: agrega hit+taken por personagem/elemento a partir
   // dos eventos já emitidos (offline e online), sem campos extras no servidor.
   if (typeof otcAnalyserIngestEvents === "function") {
@@ -3601,7 +3618,7 @@ function drainEvents() {
         // número físico; magia elemental comum não deve flutuar à direita.
         const floaterX=ex(e)+(e.dual?0.022:0);
         const comboKey=e.targetId?("damage|"+visualElement+"|"+String(e.targetId)):null;
-        if (isComboLead) {
+        if (isComboLead && !e._pvpMuted) {
           r.addFloater(floaterX, y, "-" + fmtDmg(shownDamage), col, shownDamage > 200, true, "damage", comboKey);
           const elName=(ELEMENTS[visualElement]||ELEMENTS.physical).name;
           const alvo=typeof displayMonsterName==="function"
@@ -3754,7 +3771,7 @@ function drainEvents() {
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
         const shownTaken=visualAmount(e,takenDmg);
-        if(shownTaken>0)r.addFloater(ex(e), ey(e), "-" + fmtDmg(shownTaken), col, false, true, "damage");
+        if(shownTaken>0&&!e._pvpMuted)r.addFloater(ex(e), ey(e), "-" + fmtDmg(shownTaken), col, false, true, "damage");
         // e.fx = COMBAT_PARAM_EFFECT da habilidade do monstro (fire-area do
         // demon, mort area do lich...) — sem, cai o generico do elemento
         r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6,

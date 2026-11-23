@@ -6,6 +6,10 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ## 2026-11-23 — PvP: botões de batalha — WALL (Magic Wall) e TARGET ON/OFF
 
+- **Anti-poluição de dano**: em batalha, número de dano + log só quando
+  a PT da CONTA participa (causado por `whoId`/`sourceId` próprio OU
+  recebido em `targetId`/`mobId` próprio). Projéteis e impactos do mundo
+  seguem — são a leitura da guerra.
 - **Fix**: `normalizeVisualState` não copiava `wallTarget`/`pvpAtk` —
   a chamada nunca chegava na autoridade (só `teamTarget` estava na
   whitelist). A wall agora conjura de verdade; e a runa passou a ser
