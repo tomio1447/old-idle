@@ -7304,6 +7304,7 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .pvp-char-col { display: none; flex-direction: column; gap: 4px; margin-top: 4px; }
 .pvp-char-slot { position: relative; display: flex; align-items: center; }
 .pvp-char-btn {
+  position: relative;
   width: 34px; height: 34px; border-radius: 3px;
   background: rgba(16,12,10,.92); border: 2px solid #5a4a33;
   color: #e8dfc8; font: 700 12px "Trebuchet MS",sans-serif; letter-spacing: .5px;
@@ -7311,6 +7312,14 @@ body.fullhd .party-panel.collapsed { width: auto; }
 }
 .pvp-char-btn:hover { opacity: 1; }
 .pvp-char-slot.open .pvp-char-btn { opacity: 1; box-shadow: 0 0 8px rgba(255,215,94,.35); }
+/* Chip do modo de controle (PvP Tactical AI): AI/HARD/DEAD no canto do char. */
+.pvp-char-ai {
+  position: absolute; top: -5px; right: -5px; padding: 0 3px; border-radius: 2px;
+  background: #1d4ed8; color: #fff; font: 700 8px "Trebuchet MS",sans-serif;
+  line-height: 11px; font-style: normal; pointer-events: none;
+}
+.pvp-char-ai[data-m="DEAD"] { background: #7f1d1d; }
+.pvp-char-ai[data-m="AI_PENDING"], .pvp-char-ai[data-m="DISABLED"] { background: #6b7280; }
 .pvp-char-opts {
   position: absolute; left: calc(100% + 6px); top: 0;
   display: flex; gap: 4px; padding: 3px;

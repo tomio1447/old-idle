@@ -23,6 +23,9 @@ const applyVocationRegenTo=CanaryVocation.applyVocationRegenTo;
 const friendHealSpellIds=CanaryVocation.friendHealSpellIds;
 const selfHealSpellIds=CanaryVocation.selfHealSpellIds;
 const sanitizePlayerSpells=(p,spells)=>CanaryVocation.sanitizePlayerSpells(p,spells||ALL_SPELLS);
+/* PvP Tactical AI — Control Manager (FASE 1). Módulo puro: não requer o
+ * engine (evita ciclo); o engine o chama nos pontos de integração. */
+const PVP_AI=require("./pvp-ai.js");
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
 const BLOODROTTEN_DATA=require("../game/js/bloodrotten.js");
@@ -1121,6 +1124,8 @@ function normalizeVisualState(raw,auth){
         item.pvpCtrl={chase:input.pvpCtrl.chase===undefined?1:(input.pvpCtrl.chase?1:0),
           mode:String(input.pvpCtrl.mode||"").slice(0,16)};
       }
+      // Atividade humana explícita (o cliente pode carimbar interações reais).
+      if(Number.isFinite(Number(input.actAt)))item.actAt=Number(input.actAt);
       if(input.challenge&&typeof input.challenge==="object"){
         const hunt=String(input.challenge.huntMode||"");
         item.challenge={
@@ -1233,10 +1238,31 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       continue;
     }
     if(auth.pvpBattle)item._pvpDrivenAt=Number(auth.clock)||Date.now();
-    // PARALYZE de guerra: o passo do char pilotado também trava (a pose do
-    // cliente não atravessa a paralisia — o inimigo para de fugir).
-    if(!(auth.pvpBattle&&Number(item._pvpParalyzeUntil||0)>(Number(auth.clock)||Date.now())))
-      applyPose(item,pos);
+    /* Atividade intencional (PvP AI FASE 1): pose que MUDOU vs o ECO anterior
+     * do cliente (andar/clicar conta — pose idêntica ecoando é a aba aberta
+     * = AFK). Comparado ao último visual recebido, não à posição autoritativa:
+     * sob AI_HARD a IA move o char e o eco parado do cliente NÃO pode parecer
+     * movimento (senão oscila HARD↔HUMAN pra sempre). */
+    const _actAt=Number(auth.clock)||Date.now();
+    const _lpCx=item._pvpLastPoseCx,_lpCy=item._pvpLastPoseCy,
+      _lpX=item._pvpLastPoseX,_lpY=item._pvpLastPoseY;
+    if(Number.isFinite(Number(pos.cx)))item._pvpLastPoseCx=Math.round(Number(pos.cx));
+    if(Number.isFinite(Number(pos.cy)))item._pvpLastPoseCy=Math.round(Number(pos.cy));
+    if(Number.isFinite(Number(pos.x)))item._pvpLastPoseX=Number(pos.x);
+    if(Number.isFinite(Number(pos.y)))item._pvpLastPoseY=Number(pos.y);
+    const _moved=_lpCx!==undefined&&(
+      (Number.isFinite(Number(pos.cx))&&Math.round(Number(pos.cx))!==_lpCx)||
+      (Number.isFinite(Number(pos.cy))&&Math.round(Number(pos.cy))!==_lpCy)||
+      (Number.isFinite(Number(pos.x))&&Math.abs(Number(pos.x)-_lpX)>1e-4)||
+      (Number.isFinite(Number(pos.y))&&Math.abs(Number(pos.y)-_lpY)>1e-4));
+    if(auth.pvpBattle&&(_moved||pos.walkIntent||Number.isFinite(Number(pos.actAt))))
+      PVP_AI.pvpAiNoteActivity(item,_actAt);
+    if(Number.isFinite(Number(pos.actAt))&&Number(pos.actAt)>Number(item._pvpHumanActAt||0))
+      item._pvpHumanActAt=Number(pos.actAt);
+    // IA no controle (AI_HARD) ou PARALYZE: a pose do cliente não atravessa.
+    const _poseGate=auth.pvpBattle&&(PVP_AI.pvpAiBlocksPose(item)||
+      Number(item._pvpParalyzeUntil||0)>_actAt);
+    if(!_poseGate)applyPose(item,pos);
     if(pos.pvpCtrl!==undefined&&auth.pvpBattle){item._pvpCtrl=sanitizePvpCtrl(pos.pvpCtrl);
       pvpEquipPreset(auth,item,item.p,Number(auth.clock)||Date.now());}
     if(combo){
@@ -1248,7 +1274,7 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       if(accountIsVip(item.p)||auth.pvpBattle)item.p.config.autoWalk=pos.autoWalk;
       else item.p.config.autoWalk=true;
     }
-    if(pos.walkIntent&&(accountIsVip(item.p)||auth.pvpBattle))item.walkIntent=pos.walkIntent;else delete item.walkIntent;
+    if(pos.walkIntent&&!_poseGate&&(accountIsVip(item.p)||auth.pvpBattle))item.walkIntent=pos.walkIntent;else delete item.walkIntent;
     // Clique em inimigo: target manual compartilhado pelo time inteiro.
     // Só o LÍDER da guild designa — IA e demais membros não escrevem targetId.
     if(pos.teamTarget!==undefined&&auth.pvpBattle){
@@ -5343,6 +5369,9 @@ function pvpBattleTick(auth,now,dt){
   const pb=auth&&auth.pvpBattle;if(!pb||auth.ended)return;
   // Resultado decidido (por frag ou timer) → encerra a instância.
   if(pb.finished){auth.ended=true;auth.terminalReason="pvp-battle-end";return;}
+  // PvP Tactical AI FASE 1: máquina de estados de controle (HUMAN→AI_HARD)
+  // roda por tick — O(players), comparações de carimbo apenas.
+  PVP_AI.pvpAiControlTick(auth,now);
   dt=Math.max(1,Number(dt)||AUTH_STEP_MS);
   // Magic walls: expiração + chamadas pendentes (qualquer membro da conta
   // pode chamar — o caster é quem da PT tem runa e cooldown livre).
@@ -8905,9 +8934,10 @@ function advanceAuthorityMovement(auth,now,opts){
     if(!auth.pvpBattle&&item.p&&!accountIsVip(item.p)){
       item.p.config=item.p.config||{};item.p.config.autoWalk=true;delete item.walkIntent;
     }
-    // Batalha PvP: char sem cliente pilotando há 5s (offline) é IA — anda
-    // sozinho mesmo que o preset salvo seja manual (autoWalk:false).
-    const pvpAi=!!auth.pvpBattle&&!((Number(item._pvpDrivenAt)||0)>(Number(auth.clock)||now)-5000);
+    // Batalha PvP: char sem cliente pilotando há 5s (offline) ou sob
+    // AI_HARD (Control Manager) é IA — anda sozinho mesmo que o preset
+    // salvo seja manual (autoWalk:false).
+    const pvpAi=!!auth.pvpBattle&&PVP_AI.pvpAiDriven(item,Number(auth.clock)||now);
     const auto=pvpAi||!(item.p&&item.p.config)||item.p.config.autoWalk!==false;
     if(!auto){
       const intent=item.walkIntent,dir=intent&&AUTH_STEP_DIRS.find((d)=>d.dx===intent.dx&&d.dy===intent.dy);
@@ -10102,6 +10132,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     holder:Number(auth.pvpBattle.holder)||0,
     teams:auth.pvpBattle.teams?JSON.parse(JSON.stringify(auth.pvpBattle.teams)):null,
     walls:auth.pvpBattle.walls?JSON.parse(JSON.stringify(auth.pvpBattle.walls)):[],
+    aiControl:auth.pvpBattle.aiControl?Object.assign({},auth.pvpBattle.aiControl):{},
     finished:auth.pvpBattle.finished||null}:null;
   descriptor.state.hatred=auth.hatred?{active:!!auth.hatred.active,counters:Object.assign({},auth.hatred.counters||{}),
     nextActivationAt:Number(auth.hatred.nextActivationAt)||0,
@@ -10284,6 +10315,10 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState,opts)
    * bots eternamente parados na safezone. */
   const pvpFrozenIds=auth.pvpBattle
     ?new Set((visual.players||[]).filter((v)=>v&&v.self).map((v)=>String(v.id))):null;
+  // Char sob AI_HARD continua enviando `self` (aba aberta + AFK) — a pose
+  // é ignorada e o goal autoritativo dirige: sai do conjunto congelado.
+  if(pvpFrozenIds)for(const it of auth.players||[])
+    if(it&&it.p&&PVP_AI.pvpAiBlocksPose(it))pvpFrozenIds.delete(String(it.id));
   const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);
   const requested=Math.floor(total/AUTH_STEP_MS),steps=Math.min(250000,requested);
   /* Orçamento de tempo real por chamada: um elapsed grande (aba em segundo
@@ -10362,6 +10397,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   forgeBootAmplificationPct,forgeTryRuse,forgeTryMomentum,forgeTryTranscendence,
   forgeTranscendenceDamagePct,forgeIncomingDamageMul,forgeAvatarActive,forgeNoteCombatAction,
   FORGE_PROC_CHANCES,FORGE_AMPLIFICATION,FORGE_ONSLAUGHT_BONUS_PCT,
+  PVP_AI,
   bestiaryKill,bosstiaryKill,bosstiaryDamageBonus,boostSpellDamage,boostHealAmount,scalePlayerDamage,
   tickDelayedHits,wheelApplySpellBoost,playerResistPct,augmentTotals,authoritySpeedPts,
   huntModeOf,boxTargetCell,safeTargetCell,playerAttackRangeSQM,

@@ -927,9 +927,14 @@ function pvpCharColTick(col) {
   for (const ent of aux) {
     const id = String(ent.id), ctrl = pvpCharCtrl(c, id), bv = pvpVocBase(ent.p && ent.p.voc);
     const opts = pvpCharOptsFor(ent), open = _pvpCharOpen === id;
+    // Controle (PvP Tactical AI): chip do modo atual do char na batalha.
+    const aiCtl = c.pvpBattle && c.pvpBattle.aiControl, aiMode = aiCtl && aiCtl[id];
+    const aiChip = aiMode && aiMode !== "HUMAN"
+      ? `<i class="pvp-char-ai" data-m="${String(aiMode).replace(/"/g, "")}">` +
+        `${aiMode === "AI_HARD" ? "AI" : aiMode === "DEAD" ? "✝" : aiMode === "DISABLED" ? "OFF" : "…"}</i>` : "";
     html += `<div class="pvp-char-slot${open ? " open" : ""}">` +
-      `<button class="pvp-char-btn" data-cid="${id}" title="${String(ent.p.name).replace(/"/g, "")} (${bv || "char"})"` +
-      ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">${pvpCharBtnLabel(ent)}</button>`;
+      `<button class="pvp-char-btn" data-cid="${id}" title="${String(ent.p.name).replace(/"/g, "")} (${bv || "char"})${aiMode ? " — " + aiMode : ""}"` +
+      ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">${aiChip}${pvpCharBtnLabel(ent)}</button>`;
     if (open) {
       html += `<div class="pvp-char-opts">`;
       for (const o of opts) {
