@@ -583,13 +583,22 @@ function partyIsMember() {
   return !!(st && !st.isLeader);
 }
 
-/* Jogadores em party NÃO podem entrar em hunt/boss — só cidade ou área de
- * treino (regra do dono). Líder pode (ele leva a party junto). Vale nos
- * dois modos: online (membros via servidor) e local (membros do roster). */
+/* Qualquer personagem da CONTA DONA da party pode entrar em hunt/boss — a
+ * instância compartilhada pertence à conta, o "líder" é só a ordem do
+ * roster. Membro de party de OUTRA conta segue bloqueado: a sala é da
+ * conta do líder e o follow só chega a membros. */
 function partyBlocksHunt() {
-  const p = (typeof G !== "undefined" && G) ? G.p : null;
-  if (partyOnlineMode()) return partyIsMember();
-  return partyIsMemberLocal(p);
+  if (partyOnlineMode()) {
+    const st = partyOnlineState();
+    if (!st || st.isLeader) return false;
+    const myAcc = typeof accountLeaseAccountId === "function"
+      ? String(accountLeaseAccountId() || "") : "";
+    const ownerAcc = st.leader && st.leader.account_id != null
+      ? String(st.leader.account_id) : "";
+    return !!(myAcc && ownerAcc && myAcc !== ownerAcc);
+  }
+  // Party local: todos os chars são do mesmo roster — qualquer um dirige.
+  return false;
 }
 
 /* O personagem atual é o LÍDER da party (local ou online)? */

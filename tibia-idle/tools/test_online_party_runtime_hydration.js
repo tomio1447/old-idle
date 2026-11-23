@@ -71,7 +71,7 @@ function segment(begin,end){const a=party.indexOf(begin),b=party.indexOf(end,a);
 
   must(client.includes("function accountCharacterCacheRead")&&client.includes("function accountMergeCharacterCache")&&
     client.includes("accountMergeCharacterCache([{id:character.id"),"cliente não mantém snapshots para a party online");
-  must(/js\/account-client\.js\?v=/.test(html)&&html.includes("js/party.js?v=party-zone-403-v1")&&
+  must(/js\/account-client\.js\?v=/.test(html)&&/js\/party\.js\?v=/.test(html)&&
     /js\/party-ui\.js\?v=/.test(html)&&/js\/game\.js\?v=/.test(html),
     "assets da hidratação sem cache-bust");
   console.log("OK: membro online é materializado e controlado na mesma instância, sem reload ou duplicação.");

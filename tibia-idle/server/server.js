@@ -3195,7 +3195,12 @@ async function saveInstance(db,body){
     const bossCreate=expected===0&&String(body.state&&body.state.kind||"")==="boss";
     if(party&&shared&&!bossCreate&&(activeId!==Number(party.leader_id)||expected===0||String(body.instance_id||"")!==String(shared.instance_id)))
       return {code:200,body:{ok:true,shared:true,instance:instanceSummary(shared,false)}};
-    if(party&&Number(party.leader_id)!==activeId&&!shared&&!bossCreate)
+    /* Qualquer char da CONTA DONA da party pode abrir a instância
+     * compartilhada (o líder é só a ordem do roster — o save da conta é
+     * único). Membro de party de OUTRA conta continua pending: a sala é
+     * da conta do líder e ele entra via follow/shared mirror. */
+    if(party&&Number(party.leader_id)!==activeId&&!shared&&!bossCreate&&
+       Number(party.owner_account_id)!==Number(acc.id))
       return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
     if(party&&Number(party.owner_account_id)!==Number(acc.id)){
       // Create de boss de convidado de party estrangeira: `pending` nunca se
@@ -4792,8 +4797,11 @@ async function endInstance(db,body){
     if(pvpShare)
       return {code:200,body:{ok:true,sharedDetached:true,pvp:true,instance:null}};
   }
+  /* "Sair" só desprende quando a sala é de OUTRA conta (convidado de party
+   * estrangeira). Membro da conta dona encerra de verdade — a instância
+   * compartilhada pertence à conta dele; o líder é só a ordem do roster. */
   if(resolved.row&&String(resolved.row.instance_id)===id&&resolved.party&&resolved.character&&
-     Number(resolved.character.id)!==Number(resolved.party.leader_id))
+     Number(resolved.character.id)!==Number(resolved.party.leader_id)&&resolved.shared)
     return {code:200,body:{ok:true,sharedDetached:true,instance:null}};
   // Convidado Megalomania (ou dono que morreu com outros lutando): não
   // encerra a sala compartilhada — só se desprende.

@@ -106,6 +106,22 @@ function persistActiveInstance() {
       id:String(ent.id||ent.p.id||""),p:ent.p,
       hp:ent.p.hp,mp:ent.p.mp,
     })),
+    // Baseline do modal "Enquanto você esteve fora": snapshot do stats do
+    // analyzer + nível/XP de cada membro neste checkpoint. Na retomada, o
+    // diff contra o estado avançado (worker/ticks locais) vira o resumo do
+    // que a sessão rendeu com a aba fechada. Serializado junto com o
+    // descriptor — cada save sobrescreve a baseline do último checkpoint.
+    awayBaseline:{
+      stats:c.stats?{
+        kills:c.stats.kills,exp:c.stats.exp,gold:c.stats.gold,
+        deaths:c.stats.deaths,blessCost:c.stats.blessCost,
+        supplyCost:c.stats.supplyCost,
+        loot:c.stats.loot,supplyUsed:c.stats.supplyUsed,monsters:c.stats.monsters,
+      }:null,
+      members:participants.map((ent)=>({
+        id:String(ent.id||ent.p.id||""),level:ent.p.level,exp:ent.p.exp,
+      })),
+    },
   };
   try {
     const state=JSON.parse(JSON.stringify(c,(key,value)=>{
@@ -303,7 +319,12 @@ function resumeIdleInstance(session){
           if(!(boss&&boss.worldBoss)&&!pvpArena)persistActiveInstance();
           G.inCity=false;
         }
-        resolve({resumed:!!G.combat,ended:result.ended,elapsed});
+        // Diff do período fora: baseline do último checkpoint × stats
+        // avançados (worker ou replay local). O startRuntime exibe o modal
+        // "Enquanto você esteve fora" quando houve rendimento.
+        const away=(G.combat&&typeof computeAwayDiff==="function")
+          ?computeAwayDiff(session.awayBaseline,G.combat):null;
+        resolve({resumed:!!G.combat,ended:result.ended,elapsed,away});
       }catch(error){
         console.error("[idle] falha ao retomar instância",error);clearInstanceSession();G.combat=null;G.inCity=true;
         resolve({resumed:false,ended:true,error});
@@ -851,6 +872,106 @@ function showOfflineModal(r) {
         <div class="stat-row"><span class="k">Rendimento offline</span><span class="v">${Math.round(r.rate * 100)}%</span></div>
       </div>
       ${supRows ? `<div class="small dim mt8 mb4">Supplies consumidos</div>${supRows}` : ""}
+      ${lootRows ? `<div class="small dim mt8 mb4">Loot recolhido</div>
+        <div class="inv-grid">${lootRows}</div>` : ""}
+      <button class="primary full mt12" id="modal-ok">Continuar caçando</button>
+    </div>`;
+  $("#modal").classList.add("show");
+  $("#modal-ok").addEventListener("click", () => {
+    $("#modal").classList.remove("show");
+  });
+}
+
+/* -------------------- "Enquanto você esteve fora" --------------------
+ * Diff entre a baseline do último checkpoint (persistActiveInstance) e o
+ * stats da sessão retomada — já avançada pelo worker online ou pelo replay
+ * local de ticks. Mostra o que a instância rendeu com a aba fechada. */
+function computeAwayDiff(baseline, combat) {
+  if (!baseline || !baseline.stats || !combat || !combat.stats) return null;
+  const s = combat.stats, b = baseline.stats;
+  const num = (v) => Number(v) || 0;
+  const diffMap = (cur, old) => {
+    const out = {}; cur = cur || {}; old = old || {};
+    for (const k of Object.keys(cur)) {
+      const d = num(cur[k]) - num(old[k]);
+      if (d > 0) out[k] = d;
+    }
+    return out;
+  };
+  const monsters = {};
+  for (const slug of Object.keys(s.monsters || {})) {
+    const cur = s.monsters[slug] || {};
+    const old = (b.monsters || {})[slug] || {};
+    const d = num(cur.kills) - num(old.kills);
+    if (d > 0) monsters[slug] = { name: cur.name || slug, kills: d };
+  }
+  const members = [];
+  for (const ent of (combat.players || [])) {
+    if (!ent || !ent.p) continue;
+    const bm = (baseline.members || []).find((m) =>
+      String(m.id) === String(ent.id || (ent.p && ent.p.id)));
+    if (!bm) continue;
+    const levelUp = num(ent.p.level) - num(bm.level);
+    const expGain = num(ent.p.exp) - num(bm.exp);
+    if (levelUp > 0 || expGain > 0)
+      members.push({ name: ent.p.name || "?", levelUp: Math.max(0, levelUp), exp: Math.max(0, expGain) });
+  }
+  return {
+    kills: Math.max(0, num(s.kills) - num(b.kills)),
+    exp: Math.max(0, num(s.exp) - num(b.exp)),
+    gold: Math.max(0, num(s.gold) - num(b.gold)),
+    deaths: Math.max(0, num(s.deaths) - num(b.deaths)),
+    blessCost: Math.max(0, num(s.blessCost) - num(b.blessCost)),
+    supplyCost: Math.max(0, num(s.supplyCost) - num(b.supplyCost)),
+    loot: diffMap(s.loot, b.loot),
+    supplies: diffMap(s.supplyUsed, b.supplyUsed),
+    monsters, members,
+  };
+}
+
+function showAwayModal(diff, awayMs) {
+  if (!diff || !Number.isFinite(awayMs) || awayMs < 60000) return;
+  const hasLoot = Object.keys(diff.loot || {}).length > 0;
+  const hasContent = diff.kills > 0 || diff.exp > 0 || diff.gold > 0 || hasLoot ||
+    diff.deaths > 0 || (diff.members || []).length > 0;
+  if (!hasContent) return;
+  const awayH = Math.max(1, awayMs / 3600000);
+  const xpH = diff.exp > 0 ? Math.floor(diff.exp / awayH) : 0;
+  const lootValue = Object.keys(diff.loot || {}).reduce((acc, slug) => {
+    const unit = typeof lootNpcUnitValue === "function" ? lootNpcUnitValue(slug)
+      : (GAMEDATA.items[slug] ? Number(GAMEDATA.items[slug].sell) || 0 : 0);
+    return acc + unit * diff.loot[slug];
+  }, 0);
+  const monsterRows = Object.entries(diff.monsters || {})
+    .sort((a, b) => b[1].kills - a[1].kills).slice(0, 8)
+    .map(([slug, m]) => `<div class="stat-row"><span class="k">${m.name || slug}</span><span class="v">×${fmtFull(m.kills)}</span></div>`).join("");
+  const memberRows = (diff.members || [])
+    .map((m) => `<div class="stat-row"><span class="k">${m.name}</span><span class="v" style="color:#9ce84a">${m.levelUp > 0 ? `+${m.levelUp} níve${m.levelUp > 1 ? "is" : "l"}` : `+${fmtFull(m.exp)} XP`}</span></div>`).join("");
+  const supRows = Object.keys(diff.supplies || {})
+    .map((s) => `<div class="stat-row"><span class="k">${typeof SUPPLIES !== "undefined" && SUPPLIES[s] ? SUPPLIES[s].name : itemName(s)}</span><span class="v">-${diff.supplies[s]}</span></div>`).join("");
+  const lootRows = Object.keys(diff.loot || {})
+    .sort((a, b) => (GAMEDATA.items[b] ? GAMEDATA.items[b].sell || 0 : 0) -
+                    (GAMEDATA.items[a] ? GAMEDATA.items[a].sell || 0 : 0))
+    .slice(0, 24)
+    .map((s) => `<div class="inv-item ${itemClsBorder(s)}" title="${itemName(s)}">
+        ${itemImg(s, 0, null, diff.loot[s])}<span class="cnt">${diff.loot[s]}</span></div>`).join("");
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">Enquanto você esteve fora</div>
+    <div class="panel-body">
+      <p class="small mb8">Seus personagens caçaram sozinhos por
+      <b>${fmtTime(Math.floor(awayMs / 1000))}</b>.</p>
+      <div class="panel-inset" style="padding:8px">
+        ${diff.kills > 0 ? `<div class="stat-row"><span class="k">Monstros mortos</span><span class="v">${fmtFull(diff.kills)}</span></div>` : ""}
+        ${diff.exp > 0 ? `<div class="stat-row"><span class="k">Experiência</span><span class="v" style="color:#9ce84a">+${fmtFull(diff.exp)}</span></div>` : ""}
+        ${xpH > 0 ? `<div class="stat-row"><span class="k">XP/hora</span><span class="v">${fmtFull(xpH)}</span></div>` : ""}
+        ${memberRows}
+        ${diff.gold > 0 ? `<div class="stat-row"><span class="k">Ouro coletado</span><span class="v gold-txt">+${fmtFull(diff.gold)}</span></div>` : ""}
+        ${lootValue > 0 ? `<div class="stat-row"><span class="k">Valor do loot (NPC)</span><span class="v gold-txt">${fmtFull(lootValue)}</span></div>` : ""}
+        ${diff.supplyCost > 0 ? `<div class="stat-row"><span class="k">Gasto em supplies</span><span class="v" style="color:#e08080">-${fmtFull(diff.supplyCost)}</span></div>` : ""}
+        ${diff.deaths > 0 ? `<div class="stat-row"><span class="k">Mortes</span><span class="v" style="color:#e08080">${diff.deaths}${diff.blessCost > 0 ? ` (−${fmtFull(diff.blessCost)} bless)` : ""}</span></div>` : ""}
+      </div>
+      ${monsterRows ? `<div class="small dim mt8 mb4">Monstros</div><div class="panel-inset" style="padding:6px 8px">${monsterRows}</div>` : ""}
+      ${supRows ? `<div class="small dim mt8 mb4">Supplies consumidos</div><div class="panel-inset" style="padding:6px 8px">${supRows}</div>` : ""}
       ${lootRows ? `<div class="small dim mt8 mb4">Loot recolhido</div>
         <div class="inv-grid">${lootRows}</div>` : ""}
       <button class="primary full mt12" id="modal-ok">Continuar caçando</button>
@@ -2791,11 +2912,11 @@ function startBoss(id, force, arenaReady) {
   if(!force&&G.foreignInstance){
     toast("Outro personagem da conta já possui uma instância ativa. Troque para ele antes de iniciar outro boss.","bad");return;
   }
-  // PARTY: membros (não líder) não podem entrar em boss por conta própria —
-  // só o líder escolhe e leva a party (requisitos validados no server).
-  // `force = true` é o FOLLOW (membro teleportado para a sala do líder).
+  // PARTY: membro de party de OUTRA conta não pode abrir sala de boss — a
+  // instância pertence à conta dona da PT. `force = true` é o FOLLOW
+  // (membro teleportado para a sala aberta pela conta da party).
   if (!force && typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
-    toast("Membros de party só podem estar na Cidade ou Área de Treino. O líder escolhe o boss.", "bad");
+    toast("Só personagens da conta dona da PT podem escolher o boss.", "bad");
     return;
   }
   const ready = bossReadyInfo(G.p, boss);
@@ -2952,12 +3073,12 @@ function startHunt(id, instanceMode, force) {
     toast("Outro personagem da conta já possui uma instância ativa. Troque para ele antes de iniciar outra hunt.","bad");return;
   }
   // Hunts sem requisito de nível (modo de testes/progressão livre).
-  // PARTY: membros (não líder) não podem entrar em hunt por conta própria —
-  // só cidade/treino. O líder escolhe a hunt e leva a party junto (follow).
-  // `force = true` é o FOLLOW (o membro é teleportado pelo servidor para a
-  // MESMA instância do líder — não é escolha dele).
+  // PARTY: qualquer char da conta dona escolhe/inicia a hunt e leva a PT
+  // junto. Membro de party de OUTRA conta segue bloqueado — a instância
+  // compartilhada pertence à conta do líder. `force = true` é o FOLLOW
+  // (o membro é teleportado pelo servidor para a MESMA instância).
   if (!force && typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
-    toast("Membros de party só podem estar na Cidade ou Área de Treino. O líder escolhe a hunt.", "bad");
+    toast("Só personagens da conta dona da PT podem escolher a hunt.", "bad");
     return;
   }
   if (!force && hu.requirement) {
@@ -6222,6 +6343,8 @@ async function startGameReady(p) {
     }
     if(resumeResult&&resumeResult.resumed){
       addLog("info",`Instância retomada após <b>${fmtTime(Math.floor(resumeResult.elapsed/1000))}</b> em segundo plano.`);
+      if(resumeResult.away&&typeof showAwayModal==="function")
+        showAwayModal(resumeResult.away,resumeResult.elapsed);
     }
     if(off)showOfflineModal(off);
     // Party toda nível 20+: popup único da promotion (King Tibianus).

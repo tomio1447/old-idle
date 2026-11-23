@@ -29,8 +29,9 @@ must(entities[1].p.config.combo[0]==="rp"&&entities[1].p.equip.weapon.item==="bo
   entities[2].p.config.combo[0]==="ed"&&entities[2].p.equip.weapon.item==="rod",
   "presets/equipamentos individuais não foram preservados");
 must(!combat.includes('if (typeof partyOnlineMode === "function" && partyOnlineMode()) return;')&&
-  combat.includes("if(online&&(!player._partyOnline||!player._partyOnline.isLeader))return;"),
-  "newCombat ainda bloqueia party online ou não exige líder");
+  combat.includes("player._partyOnline")&&
+  combat.includes("c.player = c.players[idx]"),
+  "newCombat ainda bloqueia party online ou não ancora o char ativo");
 must(party.includes("accountSaveParty(token,state,G.combat.players)")&&
   game.includes('typeof partyCombatSaveAll==="function")partyCombatSaveAll()'),
   "autosave não persiste a party online em transação única");

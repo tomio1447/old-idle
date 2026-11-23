@@ -551,8 +551,13 @@ async function partyReportZone(db, body) {
   await db.setCharacterZone(char.id, zone);
 
   const party = await partyOf(db, char.id);
-  if (!party || Number(party.leader_id) !== Number(char.id)) {
-    // não é líder: registra a própria zona e termina (não controla a party)
+  /* Qualquer personagem da CONTA DONA dirige a party — a instância
+   * compartilhada é da conta, o líder é só a ordem do roster. Convidado de
+   * outra conta segue sem controle: registra a própria zona e termina. */
+  const drivesParty = !!party &&
+    (Number(party.leader_id) === Number(char.id) ||
+     Number(party.owner_account_id) === Number(char.account_id));
+  if (!party || !drivesParty) {
     return { code: 200, body: { ok: true, ignored: true } };
   }
 
@@ -599,9 +604,27 @@ async function partyReportZone(db, body) {
   //  - líder SAI da hunt/boss (volta p/ cidade/treino) -> gera um follow de
   //    RETORNO (returnHome) para cada membro: a instância fica ativa só
   //    enquanto o líder estiver nela — ao sair, TODOS voltam para a cidade.
+  // Quando um MEMBRO da conta dona dirige a PT, espelha a zona no líder e
+  // nos demais chars da mesma conta — todos estão na mesma instância. Sem
+  // isso o healStaleZone veria o líder em "city" e reverteria leader_zone
+  // (e os follows) antes da instância subir.
+  if (Number(party.leader_id) !== Number(char.id)) {
+    await db.setCharacterZone(party.leader_id, zone);
+    const roster = await db.partyMembers(party.id);
+    for (const m of roster) {
+      if (Number(m.id) !== Number(char.id) &&
+          Number(m.account_id) === Number(char.account_id))
+        await db.setCharacterZone(m.id, zone);
+    }
+  }
+
   let follows = [];
+  // O char que dirige nunca recebe follow para o destino que ele mesmo
+  // escolheu (membros só aparecem aqui quando quem reportou é o líder —
+  // o líder não está em party_members e nunca se segue).
+  const membersForFollow = (await db.partyMembers(party.id))
+    .filter((m) => Number(m.id) !== Number(char.id));
   if (zone === "hunt" || zone === "boss") {
-    const members = await db.partyMembers(party.id);
     const f = {
       hunt: zone === "hunt" ? String(body.hunt) : null,
       instance: zone === "hunt"
@@ -610,14 +633,13 @@ async function partyReportZone(db, body) {
       otbm: zone === "hunt" ? (body.otbm || null) : null,
       boss: zone === "boss" ? String(body.boss) : null,
     };
-    follows = members.map((m) => Object.assign({ character_id: Number(m.id), nonce: newNonce() }, f));
+    follows = membersForFollow.map((m) => Object.assign({ character_id: Number(m.id), nonce: newNonce() }, f));
   } else if ((party.leader_zone === "hunt" || party.leader_zone === "boss") &&
              (zone === "city" || zone === "training")) {
-    // líder saiu da instância -> recall de todos os membros. Usa o campo
-    // boss como marcador '__RETURN_HOME__' (o partyStateFor converte para
-    // returnHome:true e boss:null antes de devolver ao cliente).
-    const members = await db.partyMembers(party.id);
-    follows = members.map((m) => ({
+    // quem dirige saiu da instância -> recall de todos os membros. Usa o
+    // campo boss como marcador '__RETURN_HOME__' (o partyStateFor converte
+    // para returnHome:true e boss:null antes de devolver ao cliente).
+    follows = membersForFollow.map((m) => ({
       character_id: Number(m.id),
       nonce: newNonce(),
       boss: "__RETURN_HOME__",

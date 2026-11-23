@@ -107,9 +107,10 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
   const view = centeredGridViewport(canvasWidth, canvasHeight, cols, rows,
     fovCols,
     map && map.fovHeight ? map.fovHeight : undefined);
-  const followPlayer = combat && (combat.worldBoss || (combat.boss && combat.boss.worldBoss) ||
-    combat.questId || combat.instanceMode === "quest" || !!combat.pvpBattle);
-  let focus = followPlayer ? combat.player : null;
+  /* Câmera fixa no personagem em TODAS as instâncias: hunts, bosses, quests,
+   * world boss e PvP acompanham o char controlado — a janela não fica mais
+   * travada no centro do mapa. */
+  let focus = combat ? combat.player : null;
   /* Guerra de guild: os mapas (69x43, 51x52) são maiores que a FOV — com a
    * câmera travada no centro, as safezones nas bordas e o próprio char ficam
    * fora da tela. Segue o char vivo da própria conta. */

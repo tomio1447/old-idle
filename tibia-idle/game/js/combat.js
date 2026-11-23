@@ -339,16 +339,25 @@ function newCombat(player, huntId, instanceMode, opts) {
 function maybeLoadPartyCombat(c, player, spx, spy) {
   try {
     const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
-    if(!online&&(typeof partyIsLeaderLocal!=="function"||!partyIsLeaderLocal(player)))return;
-    if(online&&(!player._partyOnline||!player._partyOnline.isLeader))return;
+    // Qualquer membro da PT pode iniciar a caçada — a instância é do roster
+    // inteiro, não do líder. Só aborta quando o char nem sequer está na PT.
+    if(!online&&(typeof partyIsLeaderLocal==="function"||!partyIsLeaderLocal(player))&&
+       (typeof partyIsMemberLocal!=="function"||!partyIsMemberLocal(player)))return;
+    if(online&&(!player._partyOnline||(!player._partyOnline.isLeader&&
+       !(player._partyOnline.members||[]).some((m)=>String(m.id)===String(player.id)))))return;
     if (typeof partyCombatLoad !== "function") return;
     const ents = partyCombatLoad(player);
     if (!ents || ents.length < 2) return;
     c.players = ents;
-    // o líder (ativo) é o save REAL em uso — mutações refletem na hora
-    c.players[0].p = player;
-    c.players[0].id = player.id || c.players[0].id;
-    c.player = c.players[0];
+    // o personagem ATIVO é o save REAL em uso — mutações refletem na hora.
+    // Nem sempre é o líder (qualquer char da PT pode dirigir); players[0]
+    // continua sendo a entidade do líder na ordem da party.
+    const me=String(player.id||characterId(player));
+    let idx=ents.findIndex((ent)=>String(ent.id||(ent.p&&(ent.p.id||characterId(ent.p))))===me);
+    if(idx<0)idx=0;
+    c.players[idx].p = player;
+    c.players[idx].id = player.id || c.players[idx].id;
+    c.player = c.players[idx];
     // Cap compartilhada: todos os membros usam a maior cap da party.
     if (typeof maxStats === "function") {
       let bestCap = 0;
