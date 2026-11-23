@@ -6,6 +6,13 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ## 2026-11-23 — PvP: botões de batalha — WALL (Magic Wall) e TARGET ON/OFF
 
+- **Fix**: `normalizeVisualState` não copiava `wallTarget`/`pvpAtk` —
+  a chamada nunca chegava na autoridade (só `teamTarget` estava na
+  whitelist). A wall agora conjura de verdade; e a runa passou a ser
+  OPCIONAL (guerra = mecânica de cooldown — consome a carga se houver).
+- **Botões flutuantes arrastáveis**: nascem na área livre da coluna
+  esquerda (~62% da altura do `.col-left`), grip `✥` arrasta pra
+  qualquer ponto da tela, posição salva em localStorage.
 - **WALL**: botão estilo hotkey (ícone da magic wall rune) abaixo do
   scoreboard, só durante batalha live. Clique → cursor vira crosshair →
   clique no SQM → a chamada vai pra autoridade e **qualquer char da PT

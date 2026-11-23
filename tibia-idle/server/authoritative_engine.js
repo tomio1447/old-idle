@@ -1111,6 +1111,12 @@ function normalizeVisualState(raw,auth){
       }
       if(input.teamTarget!==undefined)
         item.teamTarget=input.teamTarget===null||input.teamTarget===""?null:String(input.teamTarget).slice(0,64);
+      if(input.pvpAtk!==undefined)item.pvpAtk=input.pvpAtk?1:0;
+      if(input.wallTarget&&typeof input.wallTarget==="object"){
+        const wcx=Number(input.wallTarget.cx),wcy=Number(input.wallTarget.cy);
+        if(Number.isFinite(wcx)&&Number.isFinite(wcy))
+          item.wallTarget={cx:Math.round(wcx),cy:Math.round(wcy)};
+      }
       if(input.challenge&&typeof input.challenge==="object"){
         const hunt=String(input.challenge.huntMode||"");
         item.challenge={
@@ -5140,14 +5146,14 @@ function pvpWallRuneReady(p,now){
   p._groupCd=p._groupCd||{};
   const group=String(rd.grupo||rd.group||"1");
   if((p._groupCd[group]||p._groupCd["1"]||0)>now)return false;
-  p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};
-  if((Number(p.supplies["magic-wall-rune"])||0)>0||
-     (Number(p.lootPouch["magic-wall-rune"])||0)>0)return true;
-  return supplySelected(p,"magic-wall-rune")&&(Number(p.gold)||0)>=supplyPriceOf("magic-wall-rune");
+  // A runa NÃO é exigida: na guerra a wall é mecânica de cooldown da PT.
+  // Se o char tem a carga, ela é consumida no cast (tema de runa).
+  return true;
 }
 function pvpCastMagicWall(auth,item,cx,cy,now){
   const p=item.p,rd=RUNEDATA["magic-wall-rune"];
-  if(!rd||!consumeSupply(auth,p,"magic-wall-rune"))return false;
+  if(!rd)return false;
+  consumeSupply(auth,p,"magic-wall-rune"); // best-effort: consome se houver
   const cd=Number(rd.cd||rd.gcd||2000);
   p._runeCd=now+cd;p._offensiveCd=now+2000;p._lastRuneId="magic-wall-rune";
   p._groupCd=p._groupCd||{};

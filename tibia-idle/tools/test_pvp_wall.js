@@ -85,15 +85,27 @@ console.log("\n== Escolha do caster: quem tem runa/cooldown/alcance ==");
     "só o char livre/perto gastou a runa");
 }
 
-console.log("\n== Sem caster livre: chamada espera; TTL expira com wall-fail ==");
+console.log("\n== Sem runa em supplies: conjura igual (mecânica de guerra) ==");
 {
   const now = Date.now();
   const c1 = mkChar(1, 100, 1, 10, 10);   // sem runa nenhuma
   const auth = makeAuth([c1]);
   auth.pvpBattle.wallCalls = { "100": { cx: 14, cy: 10, at: now } };
   eng.pvpProcessWallCalls(auth, now);
+  ok((auth.pvpBattle.walls || []).length === 1,
+    "sem runa em supplies a wall conjura (war = mecânica de cooldown)");
+}
+
+console.log("\n== Em cooldown: chamada espera; TTL expira com wall-fail ==");
+{
+  const now = Date.now();
+  const c1 = mkChar(1, 100, 1, 10, 10);
+  c1.p._runeCd = now + 10000;             // sequência de cooldowns ocupada
+  const auth = makeAuth([c1]);
+  auth.pvpBattle.wallCalls = { "100": { cx: 14, cy: 10, at: now } };
+  eng.pvpProcessWallCalls(auth, now);
   ok(!(auth.pvpBattle.walls || []).length && auth.pvpBattle.wallCalls["100"],
-    "sem caster a chamada permanece pendente");
+    "cooldown ocupado: a chamada permanece pendente");
   eng.pvpProcessWallCalls(auth, now + 6001); // TTL = 6000ms
   ok(!auth.pvpBattle.wallCalls["100"], "chamada expirada pelo TTL");
   ok((auth.events || []).some((e) => e.t === "wall-fail"),

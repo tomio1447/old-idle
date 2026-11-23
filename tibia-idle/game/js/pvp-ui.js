@@ -832,6 +832,46 @@ function pvpTakeoverTick() {
  * clique no SQM; TARGET OFF desliga magias/runes de ataque da PT inteira
  * para a sequência de cooldowns ficar livre pra Magic Wall. */
 let _pvpActionsEl = null;
+const PVP_ACT_POS_KEY = "tibia-idle-pvp-actions-pos";
+function pvpActDefaultPos(el) {
+  // Área livre da coluna esquerda (abaixo da lista): centrado no painel,
+  // ~62% da altura — onde fica o espaço vazio do sidebar.
+  const col = document.querySelector(".col-left");
+  if (col) {
+    const r = col.getBoundingClientRect();
+    return { left: Math.round(r.left + Math.max(8, (r.width - el.offsetWidth) / 2)),
+             top: Math.round(r.top + r.height * 0.62) };
+  }
+  return { left: 12, top: Math.round(window.innerHeight / 2) };
+}
+function pvpActPlace(el) {
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem(PVP_ACT_POS_KEY) || "null"); } catch (e) {}
+  if (!pos || !Number.isFinite(Number(pos.left))) pos = pvpActDefaultPos(el);
+  el.style.left = Math.max(0, Math.min(window.innerWidth - 40, Number(pos.left))) + "px";
+  el.style.top = Math.max(40, Math.min(window.innerHeight - 30, Number(pos.top))) + "px";
+}
+function pvpActMakeDraggable(el, grip) {
+  grip.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    const r = el.getBoundingClientRect();
+    const offX = ev.clientX - r.left, offY = ev.clientY - r.top;
+    const move = (e) => {
+      el.style.left = Math.max(0, Math.min(window.innerWidth - r.width, e.clientX - offX)) + "px";
+      el.style.top = Math.max(0, Math.min(window.innerHeight - r.height, e.clientY - offY)) + "px";
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      try {
+        localStorage.setItem(PVP_ACT_POS_KEY,
+          JSON.stringify({ left: parseInt(el.style.left, 10), top: parseInt(el.style.top, 10) }));
+      } catch (e) {}
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  });
+}
 function pvpActionsTick() {
   const c = typeof G !== "undefined" && G && G.combat;
   const st = c && c.pvpBattle;
@@ -844,13 +884,17 @@ function pvpActionsTick() {
     const el = document.createElement("div");
     el.id = "pvp-actions";
     el.innerHTML =
-      `<button class="pvp-act" id="pvp-act-wall" title="Magic Wall: clique e escolha o SQM — um char da PT com cooldown livre conjura (consome a runa)">
+      `<div class="pvp-act-grip" title="Arrastar">✥</div>
+       <div class="pvp-act-row">
+       <button class="pvp-act" id="pvp-act-wall" title="Magic Wall: clique e escolha o SQM — um char da PT com cooldown livre conjura (consome a runa)">
          <img src="assets/item/magic-wall-rune.png" alt="" draggable="false"><span>WALL</span>
        </button>
        <button class="pvp-act on" id="pvp-act-target" title="Magias de ataque da PT. OFF = sequência de cooldowns livre pra Magic Wall">
          <span class="pvp-act-reticle"></span><span>TARGET</span>
-       </button>`;
+       </button>
+       </div>`;
     document.body.appendChild(el);
+    pvpActMakeDraggable(el, el.querySelector(".pvp-act-grip"));
     el.querySelector("#pvp-act-wall").addEventListener("click", () => {
       const cc = G && G.combat; if (!cc) return;
       cc._pvpWallAim = !cc._pvpWallAim;
@@ -868,6 +912,7 @@ function pvpActionsTick() {
       pvpActionsTick();
     });
     _pvpActionsEl = el;
+    pvpActPlace(el);
   }
   _pvpActionsEl.style.display = "flex";
   _pvpActionsEl.querySelector("#pvp-act-wall").classList.toggle("on", !!c._pvpWallAim);
