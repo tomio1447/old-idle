@@ -28,7 +28,6 @@ MAGIC_WEAPONS = {
     "blue-spell-wand": {"mag": 5, "dmg": 40, "lvl": 33, "vocs": ["sorcerer"]},
     "red-spell-wand": {"mag": 6, "dmg": 50, "lvl": 40, "vocs": ["sorcerer"]},
     "yellow-spell-wand": {"mag": 5, "dmg": 40, "lvl": 33, "vocs": ["druid"]},
-    "arcane-staff": {"mag": 9, "dmg": 78, "lvl": 75, "vocs": ["sorcerer", "druid"]},
     "skull-staff": {"mag": 3, "dmg": 0, "lvl": 30, "vocs": []},
 }
 
@@ -138,6 +137,8 @@ SELL_VALUE = {
     "carrot": 2, "pumpkin": 8, "egg": 2, "golden-mug": 200,
     "silver-brooch": 100, "elven-brooch": 200, "golden-trash": 30,
     "piece-of-iron": 30, "some-wood": 5, "stone": 1,
+    # oficial: Gnomission compra por 42.000 (club 2h, Atk 50 / Def 30)
+    "arcane-staff": 42000,
 }
 
 # preco de compra na loja (NPC) — para supplies e equips basicos

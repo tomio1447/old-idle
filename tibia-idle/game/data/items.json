@@ -1966,16 +1966,13 @@
   "name": "arcane staff",
   "sprite": "arcane-staff",
   "slot": "weapon",
-  "type": "magic",
-  "magicDamage": 78,
-  "mag": 9,
+  "type": "club",
+  "attack": 50,
+  "defense": 30,
+  "twoHanded": true,
   "level": 75,
-  "vocs": [
-   "sorcerer",
-   "druid"
-  ],
   "weight": 40.0,
-  "sell": 4598
+  "sell": 42000
  },
  "magic-sword": {
   "id": 2400,

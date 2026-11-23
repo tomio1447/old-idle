@@ -84,7 +84,7 @@ var GEAR = {
   top: ["magic-longsword","magic-plate-armor","demon-helmet","demon-shield","golden-legs","golden-boots","demonbone-amulet","ring-of-healing"],
   magestart: ["wooden-wand","leather-armor","leather-helmet","leather-legs","leather-boots"],
   magemid: ["ritual-wand","blue-robe","mystic-turban","spellbook","plate-legs","leather-boots","elven-amulet","crystal-ring"],
-  magetop: ["arcane-staff","magic-plate-armor","hat-of-the-mad","spellbook","golden-legs","boots-of-haste","starlight-amulet","ring-of-the-sky"],
+  magetop: ["golden-wand","magic-plate-armor","hat-of-the-mad","spellbook","golden-legs","boots-of-haste","starlight-amulet","ring-of-the-sky"],
   paladin: ["bow","arrow","plate-armor","steel-helmet","plate-legs","boots-of-haste","dragon-necklace","power-ring"]
 };
 
