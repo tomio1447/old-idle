@@ -1358,6 +1358,20 @@ function drawTargetSquare(ctx, x, y, w, h) {
   ctx.restore();
 }
 
+function rrPath(ctx, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Boss bar ornamentada: moldura dourada envelhecida + vidro escuro,
+// gradiente de vida verde→amarelo→laranja→vermelho por threshold,
+// ranhuras diagonais e ponta brilhante (mockup medieval aprovado).
 function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
   if (!combat || !combat.mobs || !combat.mobs.length) return;
   const boss = combat.mobs.find((m) => m.boss) || (combat.boss ? combat.mobs[0] : null);
@@ -1366,32 +1380,129 @@ function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
   offsetX = Number(offsetX) || 0;
   offsetY = Number(offsetY) || 0;
   const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
-  const bw = Math.min(520 * s, viewportW * 0.72), bh = 18 * s;
+
+  const bw = Math.min(560 * s, viewportW * 0.78);
+  const infoH = 15 * s, barH = 14 * s, padX = 12 * s;
+  const frameH = 6 * s + infoH + 4 * s + barH + 7 * s;
   const center = offsetX + viewportW / 2;
   const x = center - bw / 2, y = offsetY + 10 * s;
+  const barX = x + padX, barW = bw - padX * 2;
+  const barY = y + 6 * s + infoH + 4 * s;
+  const textY = barY - 5 * s;
+
   ctx.save();
-  ctx.fillStyle = "rgba(0,0,0,.78)";
-  ctx.fillRect(x - 3 * s, y - 3 * s, bw + 6 * s, bh + 24 * s);
-  ctx.strokeStyle = "#8b6b2a";
-  ctx.lineWidth = 2 * s;
-  ctx.strokeRect(x - 3 * s, y - 3 * s, bw + 6 * s, bh + 24 * s);
-  ctx.fillStyle = "#050505";
-  ctx.fillRect(x, y + 17 * s, bw, bh);
-  const g = ctx.createLinearGradient(0, y + 17 * s, 0, y + 17 * s + bh);
-  g.addColorStop(0, "#ff5656");
-  g.addColorStop(1, "#7c0808");
-  ctx.fillStyle = g;
-  ctx.fillRect(x, y + 17 * s, bw * pct, bh);
-  ctx.strokeStyle = "#000";
-  ctx.strokeRect(x, y + 17 * s, bw, bh);
-  ctx.font = hudFont(13, s, true);
-  ctx.textAlign = "center";
-  // nome do boss na cor da vida tambem — mesma regra dos monstros da arena
-  ctx.fillStyle = tibiaHpColor(pct);
-  ctx.fillText(boss.def.name, center, y + 11 * s);
-  ctx.font = hudFont(10, s, true);
-  ctx.fillStyle = "#fff";
-  ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, center, y + 31 * s);
+  // moldura: vidro escuro com sombra projetada no mapa
+  ctx.shadowColor = "rgba(0,0,0,.8)";
+  ctx.shadowBlur = 10 * s; ctx.shadowOffsetY = 3 * s;
+  ctx.fillStyle = "rgba(15,17,21,.92)";
+  rrPath(ctx, x, y, bw, frameH, 4 * s); ctx.fill();
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  // filete externo + borda dourada envelhecida
+  ctx.strokeStyle = "#111"; ctx.lineWidth = 3 * s;
+  rrPath(ctx, x, y, bw, frameH, 4 * s); ctx.stroke();
+  const bord = ctx.createLinearGradient(0, y, 0, y + frameH);
+  bord.addColorStop(0, "#8a6427"); bord.addColorStop(0.5, "#6e4c19");
+  bord.addColorStop(1, "#4a3110");
+  ctx.strokeStyle = bord; ctx.lineWidth = 1.6 * s;
+  rrPath(ctx, x, y, bw, frameH, 4 * s); ctx.stroke();
+  // reflexo dourado interno no topo
+  const sheen = ctx.createLinearGradient(0, y, 0, y + frameH);
+  sheen.addColorStop(0, "rgba(200,150,62,.16)");
+  sheen.addColorStop(0.6, "rgba(200,150,62,0)");
+  ctx.fillStyle = sheen;
+  rrPath(ctx, x + 1.5 * s, y + 1.5 * s, bw - 3 * s, frameH - 3 * s, 3 * s);
+  ctx.fill();
+  // pinos dourados ornamentais nas laterais
+  const ornW = 6 * s;
+  for (const ox of [x - 1.5 * s, x + bw + 1.5 * s - ornW]) {
+    const og = ctx.createLinearGradient(ox, 0, ox + ornW, 0);
+    og.addColorStop(0, "#6e4c19"); og.addColorStop(0.45, "#e8c877");
+    og.addColorStop(1, "#8a6427");
+    ctx.fillStyle = og;
+    rrPath(ctx, ox, y - 2 * s, ornW, frameH + 4 * s, 2.5 * s); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.45)";
+    ctx.fillRect(ox + s, y - s, ornW - 2 * s, s);
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    ctx.fillRect(ox + s, y + frameH + s, ornW - 2 * s, s);
+    ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = s;
+    rrPath(ctx, ox, y - 2 * s, ornW, frameH + 4 * s, 2.5 * s); ctx.stroke();
+  }
+
+  // linha de info: nome do boss (esq, tom de ameaça) + hp (dir)
+  const label = (txt, tx, fill) => {
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2.5 * s; ctx.strokeStyle = "#000";
+    ctx.strokeText(txt, tx, textY);
+    ctx.fillStyle = fill; ctx.fillText(txt, tx, textY);
+  };
+  const fullName = (boss.def && boss.def.name) || "Boss";
+  ctx.font = hudFont(11, s, true);
+  const hpCur = Math.ceil(boss.hp).toLocaleString("pt-BR");
+  const hpMax = Math.ceil(boss.maxHp).toLocaleString("pt-BR");
+  const wMax = ctx.measureText(hpMax).width;
+  const wDiv = ctx.measureText(" / ").width;
+  const wCur = ctx.measureText(hpCur).width;
+  const nameCap = Math.max(40 * s, barW - wMax - wDiv - wCur - 10 * s);
+  ctx.font = hudFont(12, s, true);
+  let name = fullName;
+  while (name.length > 3 && ctx.measureText("☠ " + name + "…").width > nameCap)
+    name = name.slice(0, -1);
+  if (name !== fullName) name += "…";
+  ctx.textAlign = "left"; label("☠ " + name, barX, "#fca5a5");
+  ctx.font = hudFont(11, s, true);
+  const txR = barX + barW;
+  ctx.textAlign = "right";
+  label(hpMax, txR, "#e2e8f0");
+  label(" / ", txR - wMax, "#64748b");
+  label(hpCur, txR - wMax - wDiv, "#e2e8f0");
+
+  // trilho da barra: fundo quase preto com sombra interna no topo
+  ctx.fillStyle = "#090a0d";
+  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.fill();
+  const inset = ctx.createLinearGradient(0, barY, 0, barY + barH);
+  inset.addColorStop(0, "rgba(0,0,0,.85)");
+  inset.addColorStop(0.45, "rgba(0,0,0,0)");
+  ctx.fillStyle = inset;
+  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.fill();
+  ctx.strokeStyle = "#232731"; ctx.lineWidth = s;
+  rrPath(ctx, barX, barY, barW, barH, 2 * s); ctx.stroke();
+
+  // preenchimento: gradiente por faixa de vida (verde→vermelho escuro)
+  const fw = barW * pct;
+  if (fw > 2) {
+    ctx.save();
+    rrPath(ctx, barX + 0.5, barY + 0.5, Math.max(1, fw - 1), barH - 1,
+      Math.min(1.5 * s, fw / 2)); ctx.clip();
+    const fg = ctx.createLinearGradient(barX, 0, barX + fw, 0);
+    if (pct > 0.75) { fg.addColorStop(0, "#15803d"); fg.addColorStop(1, "#22c55e"); }
+    else if (pct > 0.50) { fg.addColorStop(0, "#ca8a04"); fg.addColorStop(1, "#eab308"); }
+    else if (pct > 0.20) { fg.addColorStop(0, "#b45309"); fg.addColorStop(1, "#f97316"); }
+    else { fg.addColorStop(0, "#7f1d1d"); fg.addColorStop(1, "#ef4444"); }
+    ctx.fillStyle = fg;
+    ctx.fillRect(barX, barY, fw, barH);
+    // ranhuras diagonais sutis (glint do mockup)
+    ctx.strokeStyle = "rgba(255,255,255,.07)";
+    ctx.lineWidth = 6 * s;
+    ctx.beginPath();
+    for (let sx = barX - barH; sx <= barX + fw + barH; sx += 14 * s) {
+      ctx.moveTo(sx, barY + barH + 1);
+      ctx.lineTo(sx + barH + 1, barY - 1);
+    }
+    ctx.stroke();
+    // inset: topo claro + base escurecida
+    ctx.fillStyle = "rgba(255,255,255,.22)";
+    ctx.fillRect(barX, barY, fw, Math.max(1, s));
+    const low = ctx.createLinearGradient(0, barY + barH - 5 * s, 0, barY + barH);
+    low.addColorStop(0, "rgba(0,0,0,0)"); low.addColorStop(1, "rgba(0,0,0,.42)");
+    ctx.fillStyle = low;
+    ctx.fillRect(barX, barY, fw, barH);
+    // ponta brilhante na extremidade da vida
+    ctx.shadowColor = "#fff"; ctx.shadowBlur = 6 * s;
+    ctx.fillStyle = "rgba(255,255,255,.65)";
+    ctx.fillRect(Math.max(barX, barX + fw - 2.5 * s), barY + 1.5 * s,
+      2.5 * s, barH - 3 * s);
+    ctx.restore();
+  }
   ctx.restore();
 }
 
