@@ -7262,10 +7262,11 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .pvp-sb-t2 { color: #ff9d9d; }
 .pvp-sb-sub { font-size: 10px; color: #a89f88; margin-top: 2px; }
 
-/* Botões de batalha (WALL / TARGET) — estilo hotkey box, abaixo do scoreboard. */
+/* Botões de batalha (WALL / TARGET) — estilo hotkey box, centro da lateral
+ * esquerda da tela de combate (empilhados na vertical). */
 #pvp-actions {
-  position: fixed; top: 92px; left: 50%; transform: translateX(-50%);
-  z-index: 55; display: none; gap: 8px;
+  position: fixed; top: 50%; left: 10px; transform: translateY(-50%);
+  z-index: 55; display: none; flex-direction: column; gap: 8px;
 }
 .pvp-act {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
