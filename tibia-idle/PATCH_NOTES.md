@@ -4,6 +4,32 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-23 — PvP: painel de controle por personagem (4 botões verticais)
+
+- **Coluna de auxiliares**: dentro do box arrastável, 1 botão por char
+  auxiliar da conta (até 4, sem o pilotado) — borda na cor da vocação.
+  Clique abre as opções pra lateral; `combat._pvpCharCtrl[id]` viaja
+  na própria entrada visual (`pvpCtrl`) e vira `item._pvpCtrl` na autoridade.
+- **Knight/Monk — CHASE ON/OFF** (ícone boots): OFF = o char não avança
+  no alvo chamado nem engaja fora da formação — segura o anel da vocação
+  (`pvpBattleGoal` sem push; sem âncora, fica parado).
+- **Sorcerer — UE | SD**: UE gasta thunderstorm/avalanche/GFB na ordem
+  antes da SD; SD = prioridade atual.
+- **Druid — SD | PARALYZE | HEAL**: PARALYZE trava o alvo chamado do time
+  (consome paralyze rune real, `_pvpParalyzeUntil` 4s — bloqueia o goal da
+  IA e a pose do char pilotado inimigo); HEAL habilita todas as sio
+  aplicáveis (92% HP) sem tocar a config salva.
+- **Paladin — BOW | XBOW** (ícones elvish-bow/arbalest): troca pra melhor
+  arma compatível da mochila (`pvpEquipPreset`, memoizado por modo) +
+  munição do preset (diamond-arrow / spectral-bolt); XBOW força
+  exori-gran-con/exori-con, BOW força exevo-mas-san quando há 2+ hostis.
+- **Bug corrigido**: friend-heal em guerra curava chars do time INIMIGO
+  (o filtro de feridos ignorava time) — agora só aliados.
+
+Teste: `node tools/test_pvp_ctrl.js`. Ctrl+F5 (`pvp-ctrl-v1`).
+
+---
+
 ## 2026-11-23 — PvP: botões de batalha — WALL (Magic Wall) e TARGET ON/OFF
 
 - **Anti-poluição de dano**: em batalha, número de dano + log só quando

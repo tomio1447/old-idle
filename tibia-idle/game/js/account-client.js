@@ -643,6 +643,11 @@ function accountAuthorityVisualState(){
     // TARGET OFF: desliga magias/runes de ataque de TODOS os chars da
     // conta — a sequência de cooldowns fica livre pra Magic Wall.
     for(const v of out.players)v.pvpAtk=combat._pvpAttackOff?0:1;
+    // Controle por personagem (painel PvP): chase/prioridade/equip de cada
+    // auxiliar viaja na própria entrada visual — a autoridade aplica por id.
+    const ctrls=combat._pvpCharCtrl||{};
+    for(const v of out.players){const cc=ctrls[String(v.id)];
+      if(cc)v.pvpCtrl={chase:cc.chase===false?0:1,mode:String(cc.mode||"sd")};}
     // WALL: mira resolvida em célula — a autoridade escolhe o caster.
     if(combat._pvpWallTarget&&out.players.length){
       const w=combat._pvpWallTarget;

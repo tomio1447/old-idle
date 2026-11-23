@@ -872,6 +872,103 @@ function pvpActMakeDraggable(el, grip) {
     document.addEventListener("pointerup", up);
   });
 }
+/* ---- Controle por personagem: 4 botões verticais (auxiliares da PT) com
+ * opções por vocação abrindo pra lateral. Estado local por char —
+ * combat._pvpCharCtrl[id] viaja no visual da própria entrada. ---- */
+let _pvpCharOpen = null;
+const PVP_VOC_COLORS = { knight: "#d96a5a", monk: "#e0a34a", sorcerer: "#5f9fd8", druid: "#63b06b", paladin: "#c9a35a" };
+function pvpVocBase(voc) {
+  const v = String(voc || "").toLowerCase();
+  if (/monk/.test(v)) return "monk";
+  if (/knight/.test(v)) return "knight";
+  if (/sorcer/.test(v)) return "sorcerer";
+  if (/druid/.test(v)) return "druid";
+  if (/paladin/.test(v)) return "paladin";
+  return "";
+}
+const PVP_CHAR_OPTS = {
+  knight:   [{ id: "chase", label: "CHASE", img: "assets/item/boots-of-haste.png", toggle: 1 }],
+  monk:     [{ id: "chase", label: "CHASE", img: "assets/item/boots-of-haste.png", toggle: 1 }],
+  sorcerer: [{ id: "ue", label: "UE", img: "assets/item/thunderstorm-rune.png", title: "Prioriza runas de área (thunder/avalanche/GFB) antes da SD" },
+             { id: "sd", label: "SD", img: "assets/item/sudden-death-rune.png", title: "Prioriza Sudden Death no alvo" }],
+  druid:    [{ id: "sd", label: "SD", img: "assets/item/sudden-death-rune.png", title: "Prioriza Sudden Death no alvo" },
+             { id: "paralyze", label: "PAR", img: "assets/item/paralyze-rune.png", title: "Paralisa o alvo chamado do time (consome paralyze rune)" },
+             { id: "heal", label: "HEAL", img: "assets/spell/otc/106.png", title: "Prioriza curar aliados (sio automático no mais ferido)" }],
+  paladin:  [{ id: "bow", label: "BOW", img: "assets/item/elvish-bow.png", title: "Melhor bow da mochila + diamond arrow + magias em área" },
+             { id: "xbow", label: "XBOW", img: "assets/item/arbalest.png", title: "Melhor crossbow + spectral bolt + exori con/gran con" }],
+};
+/* Auxiliares da conta: todos menos o char pilotado (máx 4 botões). */
+function pvpAuxChars(c) {
+  const me = typeof pvpMyAccountId === "function" ? pvpMyAccountId() : 0;
+  const selfId = String((c.player && c.player.id) || "");
+  return (c.players || []).filter((e) => e && typeof pvpIsOwnEnt === "function" &&
+    pvpIsOwnEnt(e, me) && String(e.id) !== selfId).slice(0, 4);
+}
+function pvpCharCtrl(c, id) {
+  c._pvpCharCtrl = c._pvpCharCtrl || {};
+  if (!c._pvpCharCtrl[id]) c._pvpCharCtrl[id] = { chase: true, mode: "sd" };
+  return c._pvpCharCtrl[id];
+}
+function pvpCharOptsFor(ent) {
+  return PVP_CHAR_OPTS[pvpVocBase(ent && ent.p && ent.p.voc)] || [];
+}
+function pvpCharBtnLabel(ent) {
+  const n = String((ent && ent.p && ent.p.name) || "?").replace(/[^A-Za-z]/g, "");
+  return (n.slice(0, 2) || "??").toUpperCase();
+}
+/* Re-render da coluna de chars + painel de opções lateral. */
+function pvpCharColTick(col) {
+  const c = typeof G !== "undefined" && G && G.combat;
+  if (!col || !c) return;
+  const aux = pvpAuxChars(c);
+  if (!aux.length) { col.style.display = "none"; _pvpCharOpen = null; return; }
+  col.style.display = "flex";
+  let html = "";
+  for (const ent of aux) {
+    const id = String(ent.id), ctrl = pvpCharCtrl(c, id), bv = pvpVocBase(ent.p && ent.p.voc);
+    const opts = pvpCharOptsFor(ent), open = _pvpCharOpen === id;
+    html += `<div class="pvp-char-slot${open ? " open" : ""}">` +
+      `<button class="pvp-char-btn" data-cid="${id}" title="${String(ent.p.name).replace(/"/g, "")} (${bv || "char"})"` +
+      ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">${pvpCharBtnLabel(ent)}</button>`;
+    if (open) {
+      html += `<div class="pvp-char-opts">`;
+      for (const o of opts) {
+        const on = o.toggle ? !!ctrl.chase : ctrl.mode === o.id;
+        html += `<button class="pvp-act pvp-char-opt${on ? " on" : " off"}" data-cid="${id}" data-opt="${o.id}"` +
+          ` title="${o.title || o.label}"><img src="${o.img}" alt="" draggable="false"><span>${o.label}</span></button>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  col.innerHTML = html;
+  col.querySelectorAll(".pvp-char-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-cid");
+      _pvpCharOpen = _pvpCharOpen === id ? null : id;
+      pvpActionsTick();
+    });
+  });
+  col.querySelectorAll(".pvp-char-opt").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-cid"), opt = btn.getAttribute("data-opt");
+      const cc = G && G.combat; if (!cc) return;
+      const ctrl = pvpCharCtrl(cc, id), ent = aux.find((e) => String(e.id) === id);
+      const name = ent && ent.p ? ent.p.name : id;
+      if (opt === "chase") {
+        ctrl.chase = !ctrl.chase;
+        if (typeof toast === "function")
+          toast(`<b>${name}</b>: CHASE ${ctrl.chase ? "<b>ON</b> — segue o alvo" : "<b>OFF</b> — segura a formação"}.`);
+      } else {
+        ctrl.mode = ctrl.mode === opt ? "sd" : opt;
+        const lbl = { ue: "UE (área)", sd: "SD", paralyze: "PARALYZE", heal: "HEAL FRIEND", bow: "BOW + área", xbow: "CROSSBOW + exori" }[ctrl.mode] || ctrl.mode;
+        if (typeof toast === "function") toast(`<b>${name}</b>: prioridade <b>${lbl}</b>.`);
+      }
+      pvpActionsTick();
+    });
+  });
+}
+
 function pvpActionsTick() {
   const c = typeof G !== "undefined" && G && G.combat;
   const st = c && c.pvpBattle;
@@ -892,7 +989,8 @@ function pvpActionsTick() {
        <button class="pvp-act on" id="pvp-act-target" title="Magias de ataque da PT. OFF = sequência de cooldowns livre pra Magic Wall">
          <span class="pvp-act-reticle"></span><span>TARGET</span>
        </button>
-       </div>`;
+       </div>
+       <div class="pvp-char-col" id="pvp-char-col"></div>`;
     document.body.appendChild(el);
     pvpActMakeDraggable(el, el.querySelector(".pvp-act-grip"));
     el.querySelector("#pvp-act-wall").addEventListener("click", () => {
@@ -920,6 +1018,7 @@ function pvpActionsTick() {
   tgt.classList.toggle("on", !c._pvpAttackOff);
   tgt.classList.toggle("off", !!c._pvpAttackOff);
   tgt.lastElementChild.textContent = c._pvpAttackOff ? "TARGET OFF" : "TARGET ON";
+  pvpCharColTick(_pvpActionsEl.querySelector("#pvp-char-col"));
   // Cursor de mira enquanto WALL está armado.
   const cv = document.getElementById("scene");
   if (cv) cv.style.cursor = c._pvpWallAim ? "crosshair" : "";

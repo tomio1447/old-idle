@@ -1117,6 +1117,10 @@ function normalizeVisualState(raw,auth){
         if(Number.isFinite(wcx)&&Number.isFinite(wcy))
           item.wallTarget={cx:Math.round(wcx),cy:Math.round(wcy)};
       }
+      if(input.pvpCtrl&&typeof input.pvpCtrl==="object"){
+        item.pvpCtrl={chase:input.pvpCtrl.chase===undefined?1:(input.pvpCtrl.chase?1:0),
+          mode:String(input.pvpCtrl.mode||"").slice(0,16)};
+      }
       if(input.challenge&&typeof input.challenge==="object"){
         const hunt=String(input.challenge.huntMode||"");
         item.challenge={
@@ -1223,10 +1227,18 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       }
       // TARGET OFF vale por char — chega em todos os visuais da conta.
       if(pos.pvpAtk!==undefined)item._pvpAttackOff=!pos.pvpAtk;
+      // Painel PvP por char: chase/prioridade/equip do auxiliar (IA do servidor).
+      if(pos.pvpCtrl!==undefined){item._pvpCtrl=sanitizePvpCtrl(pos.pvpCtrl);
+        pvpEquipPreset(auth,item,item.p,Number(auth.clock)||Date.now());}
       continue;
     }
     if(auth.pvpBattle)item._pvpDrivenAt=Number(auth.clock)||Date.now();
-    applyPose(item,pos);
+    // PARALYZE de guerra: o passo do char pilotado também trava (a pose do
+    // cliente não atravessa a paralisia — o inimigo para de fugir).
+    if(!(auth.pvpBattle&&Number(item._pvpParalyzeUntil||0)>(Number(auth.clock)||Date.now())))
+      applyPose(item,pos);
+    if(pos.pvpCtrl!==undefined&&auth.pvpBattle){item._pvpCtrl=sanitizePvpCtrl(pos.pvpCtrl);
+      pvpEquipPreset(auth,item,item.p,Number(auth.clock)||Date.now());}
     if(combo){
       item.p=item.p||{};item.p.config=item.p.config||{};
       item.p.config.combo=sanitizeCombo(combo,item.p.voc);
@@ -4908,6 +4920,119 @@ const PVP_BATTLE_TARGET_RANGE=11;
 /* Formação: o time acompanha o líder a até 5 sqm. */
 const PVP_BATTLE_FOLLOW_RANGE=5;
 const PVP_BATTLE_RESPAWN_MS=10000;
+/* Paralyze de guerra: trava o passo do alvo (movimento — cast/arma seguem). */
+const PVP_BATTLE_PARALYZE_MS=4000;
+/* Prioridades forçadas por vocação (botões do painel PvP):
+ * sorcerer UE → runas de área antes da SD; paladin xbow → exori con/gran con;
+ * paladin bow → magia de área + hit de diamond arrow (a munição já respinga). */
+const PVP_UE_RUNES=["thunderstorm-rune","avalanche-rune","great-fireball-rune"];
+const PVP_PRIO_XBOW=["exori-gran-con","exori-con"];
+const PVP_PRIO_BOW=["exevo-mas-san"];
+const PVP_CTRL_MODES={ue:1,sd:1,paralyze:1,heal:1,bow:1,xbow:1};
+function sanitizePvpCtrl(raw){
+  if(!raw||typeof raw!=="object")return null;
+  const mode=PVP_CTRL_MODES[String(raw.mode||"")]?String(raw.mode):"sd";
+  return {chase:raw.chase===undefined?true:!!raw.chase,mode};
+}
+/* Mesma janela de prontidão do combo — spell liberada p/ prioridade de guerra. */
+function pvpSpellReady(p,s,now){
+  if(!s||(s.type!=="attack"&&!s.aggr))return false;
+  if(s.stance)return false;
+  if(!spellAllowedForVoc(s,p.voc))return false;
+  if(Number(s.lvl||0)>Number(p.level||1))return false;
+  if(s.ml&&Number(p.ml||0)<Number(s.ml))return false;
+  if(Number(s.mana||0)>Number(p.mp||0))return false;
+  if((Number(p._offensiveCd)||0)>(now||0))return false;
+  if((p._spellCd&&p._spellCd[s.id])>(now||0))return false;
+  if(s.grupos){p._groupCd=p._groupCd||{};
+    for(const g of Object.keys(s.grupos))if((p._groupCd[g]||0)>(now||0))return false;}
+  return true;
+}
+function pvpPrioritySpell(p,sids,now){
+  for(const id of sids||[]){const s=ALL_SPELLS[String(id)];
+    if(s&&pvpSpellReady(p,s,now))return s;}
+  return null;
+}
+/* UE: sorcerer em modo "ue" gasta as runas de área na ordem antes da SD. */
+function pvpTryUeRunes(auth,item,p,now,primary,living,visualTs){
+  for(const id of PVP_UE_RUNES){
+    if(!runeUsable(p,id,now))continue;
+    if(tryUseRune(auth,item,p,now,id,primary,living,visualTs))return true;
+  }
+  return false;
+}
+/* PARALYZE: druida em modo "paralyze" trava o alvo chamado do time
+ * (alcance de runa, sem desperdiçar em quem já está paralisado). */
+function pvpTryParalyze(auth,item,p,now,living,visualTs){
+  const pb=auth&&auth.pvpBattle;if(!pb)return false;
+  const t=pvpBattleTeamOf(item);
+  const tid=String((pb.teams&&pb.teams[t]&&pb.teams[t].targetId)||"");
+  if(!tid)return false;
+  const ent=(auth.players||[]).find((o)=>o&&String(o.id)===tid&&o.p&&o.p.hp>0&&!o.downUntil);
+  if(!ent)return false;
+  if(chebyshevCells(entityGridCell(item,auth),entityGridCell(ent,auth))>PVP_BATTLE_RUNE_RANGE)return false;
+  if(Number(ent._pvpParalyzeUntil||0)>now+1500)return false;
+  if(!runeUsable(p,"paralyze-rune",now))return false;
+  const rd=RUNEDATA["paralyze-rune"];if(!rd)return false;
+  if(!consumeSupply(auth,p,"paralyze-rune"))return false;
+  const cd=Number(rd.cd||6000);
+  p._runeCd=now+cd;p._offensiveCd=now+2000;p._lastRuneId="paralyze-rune";
+  p._groupCd=p._groupCd||{};
+  const group=String(rd.grupo||rd.group||"support");
+  p._groupCd[group]=now+Number(rd.gcd||2000);
+  p._groupCd["1"]=Math.max(p._groupCd["1"]||0,now+2000);
+  ent._pvpParalyzeUntil=now+PVP_BATTLE_PARALYZE_MS;
+  const src=playerPosition(auth,p),dst=playerPosition(auth,ent.p);
+  auth.events.push({t:"effect",fx:"magic-red",x:dst.x,y:dst.y,screen:true,ts:visualTs+20});
+  auth.events.push({t:"say",text:"paralyze rune",whoId:String(item.id),x:src.x,y:src.y,screen:true,ts:visualTs+40});
+  return true;
+}
+/* Equip de guerra (paladin, botões BOW/XBOW): troca pra melhor arma
+ * compatível da mochila + seta a munição do preset. Roda só na mudança
+ * de modo — _pvpEquipMode memoiza pra não varrer a bag a cada tick. */
+function pvpEquipPreset(auth,item,p,now){
+  const mode=String((item._pvpCtrl&&item._pvpCtrl.mode)||"");
+  if(item._pvpEquipMode===mode)return;
+  item._pvpEquipMode=mode;
+  if(mode!=="bow"&&mode!=="xbow")return;
+  if(CanaryVocation.baseVocName(p.voc)!=="paladin")return;
+  const kind=mode==="bow"?"arrow":"bolt";
+  const wantAmmo=mode==="bow"?"diamond-arrow":"spectral-bolt";
+  const cands=[];
+  const addCand=(slug,inst)=>{
+    const it=ITEMS[slug];if(!it)return;
+    if(it.type!=="distance"&&it.t!=="distance"&&it.s!=="distance")return;
+    if(weaponAmmoKind(it,slug)!==kind)return;
+    cands.push({slug,inst,atk:Number(it.atk)||0,lvl:Number(it.lvl||it.level)||0});};
+  const wp=p.equip&&p.equip.weapon;if(wp&&wp.item)addCand(wp.item,null);
+  for(const inst of p.itemInstances||[])if(inst&&inst.loc==="bag")addCand(inst.slug,inst);
+  for(const slug of Object.keys(p.bag||{}))if(Number(p.bag[slug])>0)addCand(slug,null);
+  if(!cands.length)return;
+  cands.sort((a,b)=>b.atk-a.atk||b.lvl-a.lvl);
+  const best=cands[0];
+  if(String(wp&&wp.item)!==best.slug||(best.inst&&String(wp&&wp.instId)!==String(best.inst.id))){
+    p.equip=p.equip||{};
+    if(best.inst){const ix=p.itemInstances.indexOf(best.inst);if(ix>=0)p.itemInstances.splice(ix,1);}
+    else if(p.bag&&Number(p.bag[best.slug])>0){p.bag[best.slug]-=1;if(!p.bag[best.slug])delete p.bag[best.slug];}
+    if(wp&&wp.item&&String(wp.item)!==best.slug){
+      if(authItemNeedsBagInstance(wp.item)){
+        const inst=(p.itemInstances||[]).find((x)=>x&&String(x.id)===String(wp.instId));
+        if(inst)inst.loc="bag";
+        else{(p.itemInstances=p.itemInstances||[]).push({id:"srv-"+Date.now().toString(36)+"-"+
+          Math.floor(Math.random()*1e6).toString(36),slug:wp.item,loc:"bag",
+          tier:(p.forge&&p.forge[wp.item])||0});}
+      }else{p.bag=p.bag||{};p.bag[wp.item]=(Number(p.bag[wp.item])||0)+1;}
+    }
+    if(best.inst)best.inst.loc="equip:weapon";
+    p.equip.weapon=best.inst?{item:best.slug,count:1,instId:best.inst.id}:{item:best.slug,count:1};
+    const src=playerPosition(auth,p);
+    auth.events.push({t:"say",text:(String(ITEMS[best.slug].n||best.slug).toLowerCase()),
+      whoId:String(item.id),x:src.x,y:src.y,screen:true,ts:now});
+    authSyncBagCountsFromInstances(p);
+  }
+  const am=ITEMS[wantAmmo],amLvl=Number(am&&am.lvl!==undefined?am.lvl:0)||0;
+  if(am&&amLvl<=Number(p.level||1))p.equip.ammo={item:wantAmmo,count:null};
+}
 function pvpBattleCellInRect(cx,cy,rect){
   return !!(rect&&cx>=rect.x1&&cx<=rect.x2&&cy>=rect.y1&&cy<=rect.y2);
 }
@@ -5044,6 +5169,8 @@ function pvpFollowCell(auth,item,lc,pref){
  *    volta do líder — knight/monk a 1 sqm, ranged a 3 (`pvpFollowCell`). */
 function pvpBattleGoal(auth,item){
   const pb=auth&&auth.pvpBattle;if(!pb||pb.finished)return null;
+  // PARALYZE de guerra: o passo trava — cast/arma continuam valendo.
+  if(Number(item._pvpParalyzeUntil||0)>(Number(auth.clock)||Date.now()))return null;
   const leader=pvpBattleLeaderChar(auth,item);
   const alcance=pvpApproachRange(item.p);
   const myTeam=pvpBattleTeamOf(item);
@@ -5073,8 +5200,11 @@ function pvpBattleGoal(auth,item){
   const here=entityGridCell(item,auth),to=entityGridCell(ent,auth);
   const t=pvpBattleTeamOf(item);
   const wanted=String((pb.teams&&pb.teams[t]&&pb.teams[t].targetId)||"");
+  /* CHASE OFF (knight/monk, botão do painel): o char não sai atrás do alvo
+   * chamado nem engaja fora da formação — segura o anel da vocação. */
+  const chaseOff=!!(item._pvpCtrl&&item._pvpCtrl.chase===false);
   // 1) Alvo chamado pelo líder: todo o time avança junto naquele alvo.
-  if(wanted&&String(ent.id)===wanted)
+  if(wanted&&String(ent.id)===wanted&&!chaseOff)
     return chebyshevCells(here,to)===alcance?null:{cx:to.cx,cy:to.cy,td:alcance,push:true};
   if(leader){
     const lc=entityGridCell(leader,auth);
@@ -5082,7 +5212,7 @@ function pvpBattleGoal(auth,item){
     // 2) Engajamento limitado pela formação: seguidor só persegue alvo
     // dentro do raio do líder (melee: até 6, ranged: até 8). Dentro de
     // safezone nunca engaja — precisa sair p/ lutar.
-    if(!inSz&&chebyshevCells(to,lc)<=PVP_BATTLE_FOLLOW_RANGE+alcance)
+    if(!chaseOff&&!inSz&&chebyshevCells(to,lc)<=PVP_BATTLE_FOLLOW_RANGE+alcance)
       return chebyshevCells(here,to)===alcance?null:{cx:to.cx,cy:to.cy,td:alcance};
     // 3) Sem alvo ao alcance: ocupa o anel da vocação em volta do líder
     // (EK/monk a 1 sqm, ranged a 3). Quem está em sz sai marchando.
@@ -5094,8 +5224,9 @@ function pvpBattleGoal(auth,item){
     }
     return null; // em formação, ninguém ao alcance — segura a linha
   }
-  // Sem âncora viva: perseguição livre no alvo resolvido.
-  return chebyshevCells(here,to)===alcance?null:{cx:to.cx,cy:to.cy,td:alcance};
+  // Sem âncora viva: perseguição livre no alvo resolvido — menos com CHASE
+  // OFF: sem formação pra segurar, o char simplesmente fica onde está.
+  return chaseOff?null:(chebyshevCells(here,to)===alcance?null:{cx:to.cx,cy:to.cy,td:alcance});
 }
 /* Respawn da batalha: célula livre dentro da própria safezone. */
 function pvpBattleRespawn(auth,item,now){
@@ -6472,8 +6603,19 @@ function healPlayers(auth,now){
     const spells=Object.assign({},nested||{},(healer.p.config&&healer.p.config.healFriendSpells)||{});
     const order=friendHealSpellIds(healer.p.voc);
     if(!order.length)continue;
+    // Guerra: sem gate, o sio curaria char do time inimigo — restringe ao próprio time.
+    const healerTeam=auth.pvpBattle?pvpBattleTeamOf(healer):0;
+    // Painel PvP (druida HEAL): habilita TODAS as sio aplicáveis sem mexer
+    // na config salva — mass pega quando há 2+ feridos, single quando há 1.
+    if(auth.pvpBattle&&healer._pvpCtrl&&healer._pvpCtrl.mode==="heal"){
+      for(const sid of order){const s=ALL_SPELLS[sid];
+        if(!s||!spellAllowedForVoc(s,healer.p.voc)||Number(s.lvl||0)>Number(healer.p.level||1))continue;
+        if(!spells[sid]||spells[sid].enabled!==true)spells[sid]={enabled:true,hpBelow:92};
+      }
+    }
     healer.friendHealAcc=(Number(healer.friendHealAcc)||0)+Math.max(1,Number(auth._stepDt)||AUTH_STEP_MS);if(healer.friendHealAcc<1000)continue;
-    const living=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil);
+    const living=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil&&
+      (!healerTeam||pvpBattleTeamOf(x)===healerTeam));
     for(const sid of order){
       const rule=spells[sid];
       // Sem regra habilitada no Helper: não conjura sio “de emergência”.
@@ -9138,12 +9280,26 @@ function step(auth,now,opts){if(auth.ended)return;
       // Guerra de guild: mago sempre prioriza Sudden Death no alvo — burst
       // antes das magias do combo/fallback. tryUseRune já valida carga,
       // vocação indireta (nível/ml), CDs e o alcance PvP (<=7 sqm).
+      // Painel PvP por char muda a prioridade: sorcerer UE → runas de área
+      // primeiro; druida PARALYZE → trava o alvo chamado antes da SD; druida
+      // HEAL → SD normal (a cura em aliados corre no tick de friend-heal).
+      let _pvpForced=null;
       if(auth.pvpBattle&&!item._pvpAttackOff){
         const bv=CanaryVocation.baseVocName(p.voc);
-        if(bv==="sorcerer"||bv==="druid")
-          acted=tryUseRune(auth,item,p,now,"sudden-death-rune",primaryTarget,living,visualTs);
+        const ctrlMode=String((item._pvpCtrl&&item._pvpCtrl.mode)||"");
+        if(bv==="sorcerer"){
+          acted=(ctrlMode==="ue"&&pvpTryUeRunes(auth,item,p,now,primaryTarget,living,visualTs))||
+            tryUseRune(auth,item,p,now,"sudden-death-rune",primaryTarget,living,visualTs);
+        }else if(bv==="druid"){
+          if(ctrlMode==="paralyze"&&pvpTryParalyze(auth,item,p,now,living,visualTs))acted=true;
+          else acted=tryUseRune(auth,item,p,now,"sudden-death-rune",primaryTarget,living,visualTs);
+        }else if(bv==="paladin"){
+          if(ctrlMode==="xbow")_pvpForced=pvpPrioritySpell(p,PVP_PRIO_XBOW,now);
+          else if(ctrlMode==="bow"&&(living||[]).length>1)
+            _pvpForced=pvpPrioritySpell(p,PVP_PRIO_BOW,now);
+        }
       }
-      const s=(acted||item._pvpAttackOff)?null:nextComboSpell(auth,item,p,now,primaryTarget,living);
+      const s=_pvpForced||((acted||item._pvpAttackOff)?null:nextComboSpell(auth,item,p,now,primaryTarget,living));
       if(s&&s.rune){
         acted=tryUseRune(auth,item,p,now,s.id,primaryTarget,living,visualTs);
       }else if(s){
@@ -10190,6 +10346,8 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
   pvpBattleLeaderChar,pvpWallAt,pvpCastMagicWall,pvpProcessWallCalls,pvpWallRuneReady,authorityCellBlocked,
+  sanitizePvpCtrl,pvpTryParalyze,pvpTryUeRunes,pvpEquipPreset,pvpSpellReady,pvpPrioritySpell,
+  PVP_BATTLE_PARALYZE_MS,PVP_PRIO_XBOW,PVP_PRIO_BOW,healPlayers,pvpBattleGoal,
   pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,
   canPlayerDamagePlayer,livingHostilePlayers,playersAreAllies,applyPlayerPvpDamage,
   CURRENCY_GOLD,

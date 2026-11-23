@@ -7299,6 +7299,25 @@ body.fullhd .party-panel.collapsed { width: auto; }
   content: ""; position: absolute; inset: 12px;
   background: #ff4a3d; border-radius: 50%;
 }
+/* Controle por personagem — coluna vertical de auxiliares da PT;
+ * opções por vocação abrem pra lateral (dentro do mesmo box arrastável). */
+.pvp-char-col { display: none; flex-direction: column; gap: 4px; margin-top: 4px; }
+.pvp-char-slot { position: relative; display: flex; align-items: center; }
+.pvp-char-btn {
+  width: 34px; height: 34px; border-radius: 3px;
+  background: rgba(16,12,10,.92); border: 2px solid #5a4a33;
+  color: #e8dfc8; font: 700 12px "Trebuchet MS",sans-serif; letter-spacing: .5px;
+  cursor: pointer; user-select: none; opacity: .85; transition: opacity .15s;
+}
+.pvp-char-btn:hover { opacity: 1; }
+.pvp-char-slot.open .pvp-char-btn { opacity: 1; box-shadow: 0 0 8px rgba(255,215,94,.35); }
+.pvp-char-opts {
+  position: absolute; left: calc(100% + 6px); top: 0;
+  display: flex; gap: 4px; padding: 3px;
+  background: rgba(10,8,6,.92); border: 1px solid #5a4a33; border-radius: 3px;
+}
+.pvp-char-opt { min-width: 44px; }
+.pvp-char-opt img { width: 24px; height: 24px; }
 .pvp-sb-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
 .pvp-sb-head b { color: #fff; font-size: 14px; letter-spacing: 1px; }
 .pvp-sb-live { color: #ff6b6b; font-size: 9px; font-weight: 700; letter-spacing: 1px; border: 1px solid #a33535; padding: 0 5px; }

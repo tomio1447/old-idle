@@ -1,0 +1,508 @@
+<noinclude>
+{{Menu Sistemas}}
+{{TOC_left}}
+== Introdução ==
+</noinclude>
+{{#ifeq:{{FULLPAGENAME}}|{{#switch:{{FULLPAGENAME}}|Updates/13.10=Updates/13.10|Wheel of Destiny=Wheel of Destiny}}|
+[[Arquivo:Winter Update 2022 - Teaser 4 02.png|right|thumb|Roda de Habilidades dos Knights]]
+O processo de desenvolvimento da ''Roda do Destino'' foi impulsionado pelo objetivo de dar aos jogadores a oportunidade de especializar o personagem de acordo com as suas necessidades e estilo de jogo. Não há custos para gastar ou remover os pontos, permitindo experimentar diferentes configurações. {{#ifeq:{{FULLPAGENAME}}|Wheel of Destiny|A distribuição dos pontos pode ser alterada em qualquer [[Protection Zone]], assim como a utilização do Gem Atelier e do Fragment Workshop, desde o [[Update de Inverno 2026]].|Para alterar a distribuição dos pontos, é necessário estar em um templo.}}
+
+A partir do nível 51, os personagens promovidos recebem 1 ''Promotion Point'' por nível. A ''Roda do Destino'' está dividida em quatro domínios, cada um com nove fatias. Cada fatia possui uma Habilidade de Dedicação e uma Habilidade de Convicção.
+
+=== Notícias === 
+
+* PM Insights: Sneak Peek Roda de Habilidades - ({{OfficialNewsArchive|6864|Link do teaser no site oficial}}).
+* Roda do Destino - ({{OfficialNewsArchive|7013|Link do teaser no site oficial}}).
+* Habilidades de Convicção e Revelação - ({{OfficialNewsArchive|7020|Link do teaser no site oficial}}).
+* Mudanças na ''Roda do Destino'' durante o Servidor de Teste - ({{OfficialNewsArchive|7071|Link do teaser no site oficial}}).
+* Predefinições da Roda do Destino - ({{OfficialNewsArchive|7336|Link do teaser no site oficial}}).
+* Gem Atelier - ({{OfficialNewsArchive|7625|Link do teaser no site oficial}}).
+* Fragment Workshop - ({{OfficialNewsArchive|7913|Link do teaser no site oficial}}).
+{{clear}}
+=== Tipos de Habilidade ===
+'''Habilidades de Dedicação''' possuem efeitos pequenos. Cada ''Promotion Point'' utilizado dentro de uma fatia, aumenta uma das características pré-existentes, como:
+* HP (até +4.800 para Knights; até +3.200 para Paladins; até + 1.600 para Druids e Sorcerers);
+* Mana (até +1.600 para Knights; até +4.800 para Paladins; até +9.600 para Druids e Sorcerers);
+* Capacidade (até +4.000 para Knights; até +3.200 para Paladins; até +1.600 para Druids e Sorcerers);
+* % de Mitigation (até +24% para todas as vocações)<br>
+
+'''Habilidades de Convicção''' possuem efeitos médios a grandes. Uma habilidade de convicção só é ativada quando sua respectiva fatia é preenchida com o máximo de pontos exigidos, e fatias do mesmo tipo, quando preenchidas, têm efeitos acumulativos:
+* Aprimoram magias pré-existentes;
+* Concedem habilidades passivas específicas da vocação;
+* Aumentam sua resistência a danos elementais (com exceção a dano físico; o limite de aumento destas resistências é de 4% de cada elemento);
+* Adicionam até +3% de Life Leech e +1% de Mana Leech;
+* Aumentam o Magic Skill (no caso de Druids e Sorcerers) em até +4;
+* Aumentam o Distance Skill (para Paladins) em até +4;
+* Aumentam o Weapon Skill (para Knights) em até +4 de sword/club/axe fighting.<br>
+
+'''Habilidades de Revelação''' possuem efeitos poderosos: concedem novas magias e fortes efeitos passivos com impacto considerável. Há 4 destes tipos de habilidade - uma para cada domínio - porém, duas são padrões de todas as classes: Avatar e Gift of Life (habilidade passiva); e duas exclusivas de cada classe.
+* Usando 250 / 500 / 1000 ''Promotions points'' em um domínio, libera-se os Estágios I / II / III da Habilidade de Revelação daquele domínio. Além disso, você recebe um bonus de +4 / +9 / +20 de dano e de cura a cada estágio adicional liberado, e seus efeitos são cumulativos (por exemplo: se voce tiver o Estágio I do Avatar e o Estágio II do Gift of Life, seu bônus será de +13). O máximo acumulado pode ser +80.
+* Um domínio possui espaço para distribuir até 1000 ''Promotion Points''. O progresso adicional de Revelation Mastery contribui para alcançar os estágios da Habilidade de Revelação, sem preencher outras fatias da roda.
+* Em uma ''Roda do Destino'' sem pontos atribuídos haverá uma escolha inicial de fatias limitada (4 fatias no centro da roda, uma para cada domínio), ao liberar uma fatia destas completamente será possível investir pontos nas fatias adjacentes a esta.
+* Cada vocação tem sua própria ''Roda do Destino'' com suas próprias magias e efeitos, mas há algumas sobreposições como as habilidades de convicção de Life Leech e Mana Leech por exemplo.
+
+{{#ifeq:{{FULLPAGENAME}}|Wheel of Destiny|
+=== Gem Vessel e Revelation Mastery ===
+
+No [[Update de Inverno 2026]], os 12 perks de '''Vessel Resonance''' foram substituídos por '''8 Gem Vessel perks''' e '''4 Revelation Mastery perks'''.
+
+* '''Gem Vessel:''' existem dois por domínio, nas posições fatia 0 do quadrante superior esquerdo, fatia 5 do quadrante superior esquerdo, fatia 3 do quadrante superior direito, fatia 7 do quadrante superior direito, fatia 3 do quadrante inferior esquerdo, fatia 7 do quadrante inferior esquerdo, fatia 0 do quadrante inferior direito e fatia 5 do quadrante inferior direito. Cada perk completamente preenchido concede '''+1 de dano e cura''' e desbloqueia um slot no Gem Atelier. Com os oito perks preenchidos, o bônus total é de '''+8 de dano e cura''', independentemente de haver gemas equipadas.
+* '''Revelation Mastery:''' existe um por domínio. Cada perk completamente preenchido concede '''125 pontos de progresso''' para a Habilidade de Revelação daquele domínio. Esse progresso não corresponde a pontos livres para distribuir em outras fatias.
+
+No planejador consultado em 21/11/2026, os perks de '''Revelation Mastery''' ocupam fatias de 100 pontos. A CipSoft anunciou uma reorganização para posições anteriormente ocupadas por perks de leech; a disposição definitiva deve ser conferida após a implementação.
+
+Os '''125 pontos''' são adicionados apenas quando a fatia está completamente preenchida. Eles contribuem somente para a Habilidade de Revelação do respectivo domínio, antecipando seus estágios, mas não são pontos disponíveis para investir em outras fatias. Os estágios exigem '''250, 500 e 1.000 pontos de progresso''', respectivamente, e o progresso de cada domínio é limitado a '''1.000'''. No planejador analisado, ao completar Revelation Mastery antes de atingir o limite, é possível alcançar o Estágio III com '''875 Promotion Points investidos''' no domínio.
+}}
+
+=== Reorganização dos Augments em 2026 ===
+A posição de alguns augments foi modificada no planejador do Test Server. Entretanto, uma nova reorganização das fatias de Revelation Mastery e leech foi anunciada pela CipSoft em 17/11/2026, ainda sem confirmação no planejador consultado em 21/11/2026. Por isso, as posições específicas dos augments devem ser verificadas após a implementação dessas mudanças.
+
+=== Habilidades Por Vocação ===
+{{Menu Quest
+| qtdBtn            = 5
+| altura            = 32
+| boss              = não
+<!------------------------------------------------------------------------------------------------------------------------------->
+| imgBtn01          = Druid
+| imgBtnSize01      = 64
+| txtBtn01          = Druids
+| tituloTxtBtn01    = Druids
+| spoilerTxtBtn01   = 
+<!------------------------------- INÍCIO DO TEXTO DO SPOILER P/ O BOTÂO Nº 01 --------------------------------------------------->
+'''Habilidades de Convicção'''
+{{#dpl:
+| mode            = userformat
+| category        = Habilidades de Druids
+| category        = Habilidades de Convicção
+| notcategory     = Magias Instantâneas
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Habilidade.include}}
+| table           = {{DPLPARM Habilidade.table}}
+| tablerow        = {{DPLPARM Habilidade.tablerow}}
+}}
+'''Habilidades de Revelação'''
+{{#dpl:
+| mode            = userformat
+| category        = Magias de Druids
+| category        = Habilidades de Revelação
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Spell.include}}
+| table           = {{DPLPARM Spell.table}}
+| tablerow        = {{DPLPARM Spell.tablerow}}
+}}
+<!--------------------------------- FIM DO TEXTO DO SPOILER P/ O BOTÂO Nº 01 ---------------------------------------------------->
+| imgBtn02          = Knight
+| imgBtnSize02      = 64
+| txtBtn02          = Knights
+| tituloTxtBtn02    = Knights
+| spoilerTxtBtn02   = 
+<!------------------------------- INÍCIO DO TEXTO DO SPOILER P/ O BOTÂO Nº 02 --------------------------------------------------->
+'''Habilidades de Convicção'''
+{{#dpl:
+| mode            = userformat
+| category        = Habilidades de Knights
+| category        = Habilidades de Convicção
+| notcategory     = Magias Instantâneas
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Habilidade.include}}
+| table           = {{DPLPARM Habilidade.table}}
+| tablerow        = {{DPLPARM Habilidade.tablerow}}
+}}
+'''Habilidades de Revelação'''
+{{#dpl:
+| mode            = userformat
+| category        = Magias de Knights
+| category        = Habilidades de Revelação
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Spell.include}}
+| table           = {{DPLPARM Spell.table}}
+| tablerow        = {{DPLPARM Spell.tablerow}}
+}}
+<!--------------------------------- FIM DO TEXTO DO SPOILER P/ O BOTÂO Nº 02 ---------------------------------------------------->
+| imgBtn03          = Monk
+| imgBtnSize03      = 64
+| txtBtn03          = Monks
+| tituloTxtBtn03    = Monks
+| spoilerTxtBtn03   = 
+<!------------------------------- INÍCIO DO TEXTO DO SPOILER P/ O BOTÂO Nº 03 --------------------------------------------------->
+'''Habilidades de Convicção'''
+{{#dpl:
+| mode            = userformat
+| category        = Habilidades de Monks
+| category        = Habilidades de Convicção
+| notcategory     = Magias Instantâneas
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Habilidade.include}}
+| table           = {{DPLPARM Habilidade.table}}
+| tablerow        = {{DPLPARM Habilidade.tablerow}}
+}}
+'''Habilidades de Revelação'''
+{{#dpl:
+| mode            = userformat
+| category        = Magias de Monks
+| category        = Habilidades de Revelação
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Spell.include}}
+| table           = {{DPLPARM Spell.table}}
+| tablerow        = {{DPLPARM Spell.tablerow}}
+}}
+<!--------------------------------- FIM DO TEXTO DO SPOILER P/ O BOTÂO Nº 03 ---------------------------------------------------->
+| imgBtn04          = Paladin
+| imgBtnSize04      = 64
+| txtBtn04          = Paladins
+| tituloTxtBtn04    = Paladins
+| spoilerTxtBtn04   = 
+<!------------------------------- INÍCIO DO TEXTO DO SPOILER P/ O BOTÂO Nº 04 --------------------------------------------------->
+'''Habilidades de Convicção'''
+{{#dpl:
+| mode            = userformat
+| category        = Habilidades de Paladins
+| category        = Habilidades de Convicção
+| notcategory     = Magias Instantâneas
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Habilidade.include}}
+| table           = {{DPLPARM Habilidade.table}}
+| tablerow        = {{DPLPARM Habilidade.tablerow}}
+}}
+'''Habilidades de Revelação'''
+{{#dpl:
+| mode            = userformat
+| category        = Magias de Paladins
+| category        = Habilidades de Revelação
+| notcategory     = Magias de Treinamento
+| notcategory     = Página Contestada
+| noresultsheader = ''Nada encontrado.''
+| include         = {{DPLPARM Spell.include}}
+| table           = {{DPLPARM Spell.table}}
+| tablerow        = {{DPLPARM Spell.tablerow}}
+}}
+<!--------------------------------- FIM DO TEXTO DO SPOILER P/ O BOTÂO Nº 04 ---------------------------------------------------->
+| imgBtn05          = Sorcerer
+| imgBtnSize05      = 64
+| txtBtn05          = Sorcerers
+| tituloTxtBtn05    = Sorcerers
+| spoilerTxtBtn05   = 
+<!------------------------------- INÍCIO DO TEXTO DO SPOILER P/ O BOTÂO Nº 05 --------------------------------------------------->
+'''Habilidades de Convicção'''
+{{#dpl:
+| mode            =userformat
+| category        =Habilidades de Sorcerers
+| category        =Habilidades de Convicção
+| notcategory     =Magias Instantâneas
+| notcategory     =Magias de Treinamento
+| notcategory     =Página Contestada
+| noresultsheader =''Nada encontrado.''
+| include         ={{DPLPARM Habilidade.include}}
+| table           ={{DPLPARM Habilidade.table}}
+| tablerow        ={{DPLPARM Habilidade.tablerow}}
+}}
+'''Habilidades de Revelação'''
+{{#dpl:
+| mode            =userformat
+| category        =Magias de Sorcerers
+| category        =Habilidades de Revelação
+| notcategory     =Magias de Treinamento
+| notcategory     =Página Contestada
+| noresultsheader =''Nada encontrado.''
+| include         ={{DPLPARM Spell.include}}
+| table           ={{DPLPARM Spell.table}}
+| tablerow        ={{DPLPARM Spell.tablerow}}
+}}
+<!--------------------------------- FIM DO TEXTO DO SPOILER P/ O BOTÂO Nº 05 ---------------------------------------------------->
+}}
+=== Mitigação em Escudos === 
+Com objetivo de dar uma nova vida ao atributo de defesa dos escudos foi criado uma forma adicional de mitigação de danos que beneficiou mais os Knights. A mitigação reduz todos os tipos de danos comuns (Físico, Terra, Gelo, Fogo, Energia, Sagrado e Morte) em uma porcentagem, e seu cálculo será baseado em alguns fatores como: Shielding Skill, Tipo de equipamento (escudo versus arma de duas mãos e seus stats), tipo de combate (Full Attack, Balanced, Full Def).
+
+Este sistema de mitigação beneficia jogadores e monstros, até mesmo bosses. Para fins de ajustes ao novo sistema, a magia Protector foi ajustada com menor incremento do Skill de Shielding (de 220% de incremento para 135%).
+
+Adicionalmente, a partir desta atualização diversas criaturas tiveram seu dano aumentado, sendo as '''criaturas médias em 1%''', de '''criaturas difíceis em 3%''' e '''criaturas desafiadoras em 5%''', sem impacto em bosses.|}}
+{{#ifeq:{{FULLPAGENAME}}|{{#switch:{{FULLPAGENAME}}|Updates/13.30.14423=Updates/13.30.14423|Wheel of Destiny=Wheel of Destiny}}|
+<noinclude>
+== Gem Atelier ==
+</noinclude>
+Gemas da roda do destino são itens especiais que permitem ao jogador adquirir modificadores específicos que oferecem vantagens especiais ao seu personagem, cada vocação possui três variantes de gemas: '''Lesser (Menores), Regular (Médias) e Greater (Maiores)'''.
+
+Se você obter tal joia, poderá trocá-la com outros jogadores ou, se corresponder à sua vocação, revelar seu potencial através do '''Gem Atelier'''. Navegue até a interface da Roda do Destino e selecione a guia chamada 'Gem Atelier'. Lá você poderá revelar joias não identificadas de sua vocação e descobrir mais sobre suas características. Revelar uma joia revelará seus atributos precisos. No entanto, também vinculará a gema ao seu personagem; ela não existirá mais como um item que pode ser adquirido e não poderá mais ser negociado. As joias reveladas têm diferentes quantidades de Mods:
+
+* Uma joia menor tem 01 Mod Básico
+* Uma joia média tem 02 Mods Básicos
+* Uma joia maior tem 02 Mods Básicos e 01 Mod Supremo
+
+{{#dpl:
+| mode          = userformat
+| category      = Gemas Menores
+| notcategory   = Página Contestada
+| resultsheader = <h3>Gemas Menores</h3>\n
+| include       = {{DPLPARM Item.include}}
+| table         = {{DPLPARM Item.table}}
+| tablerow      = {{DPLPARM Item.tablerow}}
+}}
+{{#dpl:
+| mode          = userformat
+| category      = Gemas Médias
+| notcategory   = Página Contestada
+| resultsheader = <h3>Gemas Médias</h3>\n
+| include       = {{DPLPARM Item.include}}
+| table         = {{DPLPARM Item.table}}
+| tablerow      = {{DPLPARM Item.tablerow}}
+}}
+{{#dpl:
+| mode          = userformat
+| category      = Gemas Maiores
+| notcategory   = Página Contestada
+| resultsheader = <h3>Gemas Maiores</h3>\n
+| include       = {{DPLPARM Item.include}}
+| table         = {{DPLPARM Item.table}}
+| tablerow      = {{DPLPARM Item.tablerow}}
+}}
+
+== Utilização do Gem Atelier ==
+
+{{#ifeq:{{FULLPAGENAME}}|Wheel of Destiny|
+A partir do [[Update de Inverno 2026]], as gemas não possuem '''Domain Affinity'''. Uma gema revelada pode ser colocada em qualquer slot compatível com sua qualidade, mantendo a cor correspondente à sua vocação.
+
+O Gem Atelier pode ser utilizado em qualquer [[Protection Zone]].
+
+=== Slots de Gemas ===
+
+O Gem Atelier exibe '''oito slots''', desbloqueados ao preencher os perks de '''Gem Vessel''' na roda. Os slots ainda bloqueados aparecem acinzentados. Os slots possuem níveis fixos: '''dois de nível 0''' (Lesser), '''dois de nível 1''' (Regular) e '''quatro de nível 2''' (Greater).
+
+A ordem de desbloqueio é fixa, independentemente do domínio em que o perk foi preenchido:
+
+<table class="wikitable" style="width:100%; text-align:center;">
+<tr>
+<th>Ordem de desbloqueio</th>
+<th>Qualidade aceita</th>
+<th>Modificadores</th>
+</tr>
+<tr><td>1º</td><td>Lesser</td><td>1 Basic Mod</td></tr>
+<tr><td>2º</td><td>Regular</td><td>2 Basic Mods</td></tr>
+<tr><td>3º</td><td>Greater</td><td>2 Basic Mods e 1 Supreme Mod</td></tr>
+<tr><td>4º</td><td>Lesser</td><td>1 Basic Mod</td></tr>
+<tr><td>5º</td><td>Greater</td><td>2 Basic Mods e 1 Supreme Mod</td></tr>
+<tr><td>6º</td><td>Regular</td><td>2 Basic Mods</td></tr>
+<tr><td>7º</td><td>Greater</td><td>2 Basic Mods e 1 Supreme Mod</td></tr>
+<tr><td>8º</td><td>Greater</td><td>2 Basic Mods e 1 Supreme Mod</td></tr>
+</table>
+
+Com todos os slots desbloqueados, é possível utilizar simultaneamente '''2 Lesser Gems, 2 Regular Gems e 4 Greater Gems'''.
+
+Os marcadores ovais identificam a qualidade aceita por cada slot. Um ícone na aba do Gem Atelier avisa quando há um slot desbloqueado vazio, mas não é obrigatório preenchê-lo.
+
+=== Colocando e Removendo Gemas ===
+
+Para colocar uma gema:
+
+# Selecione um slot desbloqueado e vazio.
+# A lista de gemas será filtrada automaticamente pela qualidade compatível.
+# Selecione a gema desejada.
+# Clique em '''Place in Vessel''', na seção '''Modify Gem'''.
+
+A seção '''Modify Gem''' também permite remover, substituir e desmantelar gemas. A revelação de novas gemas é realizada na seção '''Gem Revelation'''.
+
+Os modificadores de uma gema equipada não dependem de Vessel Resonance para serem ativados. Cada modificador aplica o maior Grade desbloqueado para ele no '''Fragment Workshop''', independentemente dos Grades dos outros modificadores da mesma gema.
+
+Por exemplo, um Supreme Mod aprimorado até '''Grade IV''' aplica seus benefícios completos mesmo que os dois Basic Mods da gema estejam no '''Grade I'''.
+
+=== Reshape ===
+
+A função '''Reshape''', disponível em '''Modify Gem''', permite que jogadores [[Premium Account]] sorteiem novamente um modificador específico de uma gema, sem alterar os demais.
+
+Os custos abaixo foram anunciados inicialmente; em 17/11/2026 a CipSoft informou que estavam sendo reavaliados. Portanto, podem mudar antes do lançamento:
+
+<table class="wikitable" style="width:100%;">
+<tr>
+<th>Posição do modificador</th>
+<th>Custo em Gold</th>
+<th>Custo em fragmentos</th>
+</tr>
+<tr>
+<td>1º modificador — Basic Mod</td>
+<td>125.000</td>
+<td>1 Lesser Fragment</td>
+</tr>
+<tr>
+<td>2º modificador — Basic Mod</td>
+<td>1.000.000</td>
+<td>2 Lesser Fragments</td>
+</tr>
+<tr>
+<td>3º modificador — Supreme Mod</td>
+<td>5.000.000</td>
+<td>3 Greater Fragments</td>
+</tr>
+</table>
+
+Após o sorteio, o jogador pode escolher entre '''aceitar o novo modificador''' ou '''manter o anterior'''. Manter o modificador anterior não exige pagamento adicional ao custo da tentativa.
+
+=== Limite de Resistência ===
+
+A resistência concedida pelas gemas possui um limite de '''30% por elemento'''. Esse limite é aplicado separadamente a cada elemento: por exemplo, é possível obter '''30% de resistência a Fogo''' e '''30% de resistência a Terra''' na mesma configuração.
+
+A interface apresenta um aviso quando a configuração ultrapassa o limite.
+|
+[[Arquivo:Winter_Update_2023_-_Teaser_5_01.jpg|right|200px]]
+No sistema introduzido no [[Update de Inverno 2023]], cada domínio possuía um slot de gema e três '''Vessel Resonance perks'''. A gema precisava ter afinidade com o domínio em que seria colocada.
+
+Preencher o primeiro Vessel Resonance perk ativava o primeiro Basic Mod da gema, no estágio '''Dormant Vessel'''. Preencher o segundo ativava o segundo Basic Mod, quando disponível, no estágio '''Awakened Vessel'''.
+
+[[Arquivo:Winter_Update_2023_-_Teaser_5_02.jpg|right|200px]]
+Quando a quantidade de Vessel Resonance perks preenchidos correspondia à qualidade da gema — um para Lesser, dois para Regular ou três para Greater — o personagem recebia '''+2 de dano e cura'''.
+
+Era possível utilizar uma gema por domínio, totalizando '''quatro gemas simultaneamente'''.
+{{clear}}
+}}
+
+== Modificadores ==
+=== Modificadores Gerais ===
+Os '''Basic Mods''' são compartilhados pelas cinco vocações; os valores de vida, mana e capacidade variam conforme a vocação. Os valores abaixo correspondem aos Grades I, II, III e IV, nessa ordem.
+=== Basic Mods de Vida, Mana e Capacidade ===
+<table class="wikitable" style="width:100%; text-align:center;">
+<tr><th>Modificador</th><th>Vocação</th><th>Grade I</th><th>Grade II</th><th>Grade III</th><th>Grade IV</th></tr>
+<tr><td>Hit Points</td><td>Knight</td><td>300</td><td>330</td><td>360</td><td>450</td></tr>
+<tr><td>Hit Points</td><td>Paladin</td><td>200</td><td>220</td><td>240</td><td>300</td></tr>
+<tr><td>Hit Points</td><td>Monk</td><td>200</td><td>220</td><td>240</td><td>300</td></tr>
+<tr><td>Hit Points</td><td>Sorcerer e Druid</td><td>100</td><td>110</td><td>120</td><td>150</td></tr>
+<tr><td>Hit Points + resistência elemental</td><td>Knight</td><td>150</td><td>165</td><td>180</td><td>225</td></tr>
+<tr><td>Hit Points + resistência elemental</td><td>Paladin</td><td>100</td><td>110</td><td>120</td><td>150</td></tr>
+<tr><td>Hit Points + resistência elemental</td><td>Monk</td><td>100</td><td>110</td><td>120</td><td>150</td></tr>
+<tr><td>Hit Points + resistência elemental</td><td>Sorcerer e Druid</td><td>50</td><td>55</td><td>60</td><td>75</td></tr>
+<tr><td>Mana</td><td>Knight</td><td>100</td><td>110</td><td>120</td><td>150</td></tr>
+<tr><td>Mana</td><td>Paladin</td><td>300</td><td>330</td><td>360</td><td>450</td></tr>
+<tr><td>Mana</td><td>Monk</td><td>200</td><td>220</td><td>240</td><td>300</td></tr>
+<tr><td>Mana</td><td>Sorcerer e Druid</td><td>600</td><td>660</td><td>720</td><td>900</td></tr>
+<tr><td>Mana + resistência elemental</td><td>Knight</td><td>50</td><td>55</td><td>60</td><td>75</td></tr>
+<tr><td>Mana + resistência elemental</td><td>Paladin</td><td>150</td><td>165</td><td>180</td><td>225</td></tr>
+<tr><td>Mana + resistência elemental</td><td>Monk</td><td>100</td><td>110</td><td>120</td><td>150</td></tr>
+<tr><td>Mana + resistência elemental</td><td>Sorcerer e Druid</td><td>300</td><td>330</td><td>360</td><td>450</td></tr>
+<tr><td>Capacidade</td><td>Knight</td><td>500</td><td>550</td><td>600</td><td>750</td></tr>
+<tr><td>Capacidade</td><td>Paladin</td><td>400</td><td>440</td><td>480</td><td>600</td></tr>
+<tr><td>Capacidade</td><td>Monk</td><td>500</td><td>550</td><td>600</td><td>700</td></tr>
+<tr><td>Capacidade</td><td>Sorcerer e Druid</td><td>200</td><td>220</td><td>240</td><td>300</td></tr>
+<tr><td>Capacidade + resistência elemental</td><td>Knight</td><td>250</td><td>275</td><td>300</td><td>375</td></tr>
+<tr><td>Capacidade + resistência elemental</td><td>Paladin</td><td>200</td><td>220</td><td>240</td><td>300</td></tr>
+<tr><td>Capacidade + resistência elemental</td><td>Monk</td><td>250</td><td>275</td><td>300</td><td>375</td></tr>
+<tr><td>Capacidade + resistência elemental</td><td>Sorcerer e Druid</td><td>100</td><td>110</td><td>120</td><td>150</td></tr>
+</table>
+Nos modificadores combinados com resistência elemental, acrescenta-se '''+1% / +1,1% / +1,2% / +1,5%''' de resistência a Fogo, Energia, Terra ou Gelo, conforme o Grade. O valor '''700''' de capacidade para Monk no Grade IV foi reproduzido do planejador; sua progressão atípica merece conferência no jogo.
+=== Outros Basic Mods ===
+<table class="wikitable" style="width:100%; text-align:center;">
+<tr><th>Modificador</th><th>Grade I</th><th>Grade II</th><th>Grade III</th><th>Grade IV</th></tr>
+<tr><td>Resistência a Fogo, Terra, Gelo ou Energia</td><td>+2%</td><td>+2,2%</td><td>+2,4%</td><td>+3%</td></tr>
+<tr><td>Resistência a Físico, Sagrado ou Morte</td><td>+1%</td><td>+1,1%</td><td>+1,2%</td><td>+1,5%</td></tr>
+<tr><td>Resistência a dois elementos (cada)</td><td>+1%</td><td>+1,1%</td><td>+1,2%</td><td>+1,5%</td></tr>
+<tr><td>Resistência a um elemento / vulnerabilidade a outro</td><td>+3% / −2%</td><td>+3,3% / −2%</td><td>+3,6% / −2%</td><td>+4,5% / −2%</td></tr>
+<tr><td>Resistência a Sagrado / vulnerabilidade a Morte (ou inverso)</td><td>+1,5% / −1%</td><td>+1,65% / −1%</td><td>+1,8% / −1%</td><td>+2,25% / −1%</td></tr>
+<tr><td>Resistência a Mana Drain ou Life Drain</td><td>+3%</td><td>+3,3%</td><td>+3,6%</td><td>+4,5%</td></tr>
+<tr><td>Resistência a Mana Drain e Life Drain (cada)</td><td>+1,5%</td><td>+1,65%</td><td>+1,8%</td><td>+2,25%</td></tr>
+</table>
+O modificador '''Mitigation Multiplier''' também aparece no planejador, mas sua unidade precisa ser verificada antes da publicação dos valores.
+=== Supreme Mods do Update de Inverno 2026 ===
+Os 20 modificadores abaixo foram identificados individualmente no planejador do Test Server em 21/11/2026. '''Atenção:''' mudanças posteriores já foram anunciadas pela CipSoft e ainda não estavam refletidas no planejador. A tabela representa os valores observados, não necessariamente os valores finais do update.
+<table class="wikitable" style="width:100%; text-align:center;">
+<tr><th>Vocação</th><th>Modificador</th><th>Efeito</th><th>Grade I</th><th>Grade II</th><th>Grade III</th><th>Grade IV</th></tr>
+<tr><td>[[Knight]]</td><td>Augmented Shield Slam</td><td>Dano base</td><td>+8%</td><td>+8,8%</td><td>+9,6%</td><td>+12%</td></tr>
+<tr><td>[[Knight]]</td><td>Augmented Shield Slam</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+<tr><td>[[Knight]]</td><td>Augmented Intense Wound Cleansing</td><td>Cura base</td><td>+20%</td><td>+22%</td><td>+24%</td><td>+30%</td></tr>
+<tr><td>[[Knight]]</td><td>Augmented Intense Wound Cleansing</td><td>Cooldown / Momentum</td><td>−20 s</td><td>−20 s; +0,33% Momentum</td><td>−20 s; +0,66% Momentum</td><td>−20 s; +1% Momentum</td></tr>
+<tr><td>[[Paladin]]</td><td>Augmented Divine Barrage</td><td>Dano base</td><td>+5%</td><td>+5,5%</td><td>+6%</td><td>+7,5%</td></tr>
+<tr><td>[[Paladin]]</td><td>Augmented Divine Barrage</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+<tr><td>[[Paladin]]</td><td>Augmented Ethereal Barrage</td><td>Dano base</td><td>+5%</td><td>+5,5%</td><td>+6%</td><td>+7,5%</td></tr>
+<tr><td>[[Paladin]]</td><td>Augmented Ethereal Barrage</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+<tr><td>[[Sorcerer]]</td><td>Augmented Death Echo</td><td>Dano base</td><td>+5%</td><td>+5,5%</td><td>+6%</td><td>+7,5%</td></tr>
+<tr><td>[[Sorcerer]]</td><td>Augmented Death Echo</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+<tr><td>[[Sorcerer]]</td><td>Augmented Lightning</td><td>Dano base</td><td>+10%</td><td>+11%</td><td>+12%</td><td>+15%</td></tr>
+<tr><td>[[Sorcerer]]</td><td>Augmented Lightning</td><td>Dano crítico extra</td><td>+15%</td><td>+16,5%</td><td>+18%</td><td>+22,5%</td></tr>
+<tr><td>[[Druid]]</td><td>Augmented Forked Glacier</td><td>Dano base</td><td>+5%</td><td>+5,5%</td><td>+6%</td><td>+7,5%</td></tr>
+<tr><td>[[Druid]]</td><td>Augmented Forked Glacier</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+<tr><td>[[Druid]]</td><td>Augmented Forked Thorns</td><td>Dano base</td><td>+5%</td><td>+5,5%</td><td>+6%</td><td>+7,5%</td></tr>
+<tr><td>[[Druid]]</td><td>Augmented Forked Thorns</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+<tr><td>[[Monk]]</td><td>Augmented Chained Penance</td><td>Dano base</td><td>+5%</td><td>+5,5%</td><td>+6%</td><td>+7,5%</td></tr>
+<tr><td>[[Monk]]</td><td>Augmented Chained Penance</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+<tr><td>[[Monk]]</td><td>Augmented Thousand Fist Blows</td><td>Dano base</td><td>+5%</td><td>+5,5%</td><td>+6%</td><td>+7,5%</td></tr>
+<tr><td>[[Monk]]</td><td>Augmented Thousand Fist Blows</td><td>Dano crítico extra</td><td>+12%</td><td>+13,2%</td><td>+14,4%</td><td>+18%</td></tr>
+</table>
+'''Alterações anunciadas após os dados do planejador:''' Shield Slam passará a +10% / +11% / +12% / +15% de dano base e +15% / +16,5% / +18% / +22,5% de dano crítico extra. Foram anunciados novos modificadores Chain para Chivalrous Challenge, Lightning e Divine Dazzle, substituindo modificadores existentes. Também foram anunciadas mudanças em diversos valores do Grade IV, ainda não refletidas na tabela.
+'''Pendência:''' o anúncio de 17/11 prevê substituir o modificador de dano crítico de Lightning por Chain, enquanto o de 19/11 prevê aumentar seu Grade IV para 30%. É necessário confirmar qual regra prevalecerá antes de atualizar esse valor como definitivo.
+=== Informações Adicionais ===
+* O modificador de gema '''Revelation Mastery''' concede 125 ''Promotion Points'' de progresso para a Habilidade de Revelação correspondente, respeitando o limite de 1000 pontos de progresso por domínio.
+* Seu Gem Atelier pode acomodar no máximo 90 gemas. Gemas que não são mais necessárias podem ser desmanteladas.
+
+<noinclude>
+=== Lista de Modificadores ===
+A lista abaixo reúne os modificadores cadastrados na wiki e pode estar incompleta. Os valores e Grades podem ser consultados nas páginas de cada modificador.
+{{#dpl:
+| mode        = userformat
+| order       = ascending
+| ordermethod = title
+| category    = Modificadores
+| include     = {{DPLPARM Modificadores.include}}
+| table       = {{DPLPARM Modificadores.table}}
+| tablerow    = {{DPLPARM Modificadores.tablerow}}
+}}
+</noinclude>|}}
+{{#ifeq:{{FULLPAGENAME}}|{{#switch:{{FULLPAGENAME}}|Updates/13.40.54ea79=Updates/13.40.54ea79|Wheel of Destiny=Wheel of Destiny}}|
+|}}
+
+<noinclude>
+== Fragment Workshop ==
+
+O '''Fragment Workshop''' permite aprimorar os modificadores das gemas. O maior Grade desbloqueado para um modificador é aplicado às gemas que possuem esse modificador.
+
+Conforme anunciado para o [[Update de Inverno 2026]], cada aprimoramento de modificador concede os seguintes bônus ao personagem:
+
+* '''+5 pontos de vida'''.
+* '''+5 pontos de mana'''.
+* '''+5 de capacidade'''.
+
+Interpretando o benefício como aplicado a cada passagem de Grade, aprimorar um modificador do '''Grade I ao Grade IV''' concede, no total, '''+15 de vida, +15 de mana e +15 de capacidade'''. Ao alcançar o '''Grade IV''', o jogador também recebe '''1 Promotion Point'''.
+
+Uma caixa de informações no Fragment Workshop apresenta o total de bônus desbloqueados pelos aprimoramentos.
+
+O Fragment Workshop pode ser utilizado em qualquer [[Protection Zone]].
+
+== Augments de Chain ==
+
+Anunciados durante o Test Server do [[Update de Inverno 2026]] (ainda não refletidos no planejador consultado em 21/11/2026), os modificadores de '''Chain''' aumentam a quantidade de alvos e o alcance das magias '''[[Chivalrous Challenge]]''', '''[[Lightning]]''' e '''[[Divine Dazzle]]'''.
+
+<table class="wikitable" style="width:100%; text-align:center;">
+<tr>
+<th>Grade do Supreme Mod</th>
+<th>Alvos adicionais</th>
+<th>Aumento do alcance de lançamento e dos saltos</th>
+</tr>
+<tr><td>I</td><td>1</td><td>0 sqm</td></tr>
+<tr><td>II</td><td>1</td><td>1 sqm</td></tr>
+<tr><td>III</td><td>1</td><td>2 sqm</td></tr>
+<tr><td>IV</td><td>2</td><td>2 sqm</td></tr>
+</table>
+
+O alcance da corrente não pode ultrapassar '''o dobro do valor base''' da magia, e a quantidade total de alvos não pode ultrapassar '''12'''.
+
+== Predefinições ==
+
+O planejador da [[Wheel of Destiny]] no site oficial acompanha a configuração atual da roda.
+
+Predefinições criadas antes do [[Update de Inverno 2026]] ainda podem ser importadas, mas podem exigir ajustes manuais devido à reorganização dos perks.
+
+== Histórico ==
+
+* No [[Update de Inverno 2023]], o Gem Atelier introduziu gemas com afinidade por domínio e o sistema '''Vessel Resonance'''. Cada domínio comportava uma gema, permitindo utilizar até quatro simultaneamente.
+* Na introdução desse sistema, personagens a partir do level 51 receberam oito gemas com modificadores de resistência elemental: uma Lesser Gem e uma Regular Gem para cada domínio.
+* Antes do [[Update de Inverno 2026]], a ativação dos modificadores dependia do investimento em Vessel Resonance. Além disso, o Grade aplicado a um modificador podia ser limitado pelos Grades dos modificadores anteriores da mesma gema.
+* No [[Update de Inverno 2026]], foram removidos Domain Affinity e Vessel Resonance, adicionados oito slots de gemas, os perks Gem Vessel e Revelation Mastery, a função Reshape, novos Supreme Mods e bônus adicionais pelos aprimoramentos no Fragment Workshop. A utilização da roda, do Atelier e do Workshop também foi ampliada para qualquer Protection Zone.
+</noinclude>
