@@ -4943,6 +4943,9 @@ const PVP_WALL_CALL_TTL=6000;       // chamada de muro expira se ninguém castar
 const PVP_WALL_MAX_PER_ACC=10;      // muros vivos simultâneos por conta
 /* Alcance máximo de runa na guerra (runes.json não tem campo range). */
 const PVP_BATTLE_RUNE_RANGE=7;
+/* Guerra de guild: Royal Paladin (bolt/crossbow + spells de distância)
+ * tem alcance PvP de ATÉ 8 SQM — pedido de balance. */
+const PVP_BATTLE_RP_RANGE=8;
 /* O líder só designa alvo a até 11 sqm do próprio char (meia FOV). */
 const PVP_BATTLE_TARGET_RANGE=11;
 /* Formação: o time acompanha o líder a até 5 sqm. */
@@ -8737,6 +8740,16 @@ function playerAttackRangeSQM(p){
   if(profile.type==="magic")return 6;
   return 1;
 }
+/* Alcance de ataque DENTRO da guerra: RP com arma de distância ganha o
+ * cap PvP de 8 SQM (bolt/crossbow); demais perfis seguem o normal. */
+function pvpAttackRangeSQM(auth,item){
+  const base=playerAttackRangeSQM(item&&item.p);
+  if(!(auth&&auth.pvpBattle)||!item||!item.p)return base;
+  if(CanaryVocation.baseVocName(item.p.voc)==="paladin"&&
+    playerWeaponProfile(item.p).type==="distance")
+    return Math.max(base,PVP_BATTLE_RP_RANGE);
+  return base;
+}
 function huntModeOf(auth,item){
   const m=item&&item.p&&item.p.config?String(item.p.config.attackMode||""):"";
   if(m==="box"||m==="safe")return m;
@@ -9352,6 +9365,11 @@ function step(auth,now,opts){if(auth.ended)return;
           if(ctrlMode==="xbow")_pvpForced=pvpPrioritySpell(p,PVP_PRIO_XBOW,now);
           else if(ctrlMode==="bow"&&(living||[]).length>1)
             _pvpForced=pvpPrioritySpell(p,PVP_PRIO_BOW,now);
+          // Gate de alcance do RP: spells forçados respeitam o cap de 8sqm
+          // (antes o _pvpForced ignorava o spellInRange e cruzava o mapa).
+          if(_pvpForced&&primaryTarget&&
+            chebyshevCells(entityGridCell(item,auth),entityGridCell(primaryTarget,auth))>PVP_BATTLE_RP_RANGE)
+            _pvpForced=null;
         }
       }
       const s=_pvpForced||((acted||item._pvpAttackOff)?null:nextComboSpell(auth,item,p,now,primaryTarget,living));
@@ -9519,7 +9537,7 @@ function step(auth,now,opts){if(auth.ended)return;
         // Sem este gate o knight derrubava mobs do outro lado da sala.
         const fromGate=entityGridCell(item,auth),toGate=entityGridCell(primaryTarget,auth);
         const sqmGate=Math.max(Math.abs(fromGate.cx-toGate.cx),Math.abs(fromGate.cy-toGate.cy));
-        if(sqmGate>playerAttackRangeSQM(p)){hitIdx++;continue;}
+        if(sqmGate>pvpAttackRangeSQM(auth,item)){hitIdx++;continue;}
         if(primaryTarget.greedImmune||primaryTarget.qteImmune){
           if(!auth._immuneFx||now-auth._immuneFx>500){
             auth._immuneFx=now;const blocked=entityPosition(primaryTarget,.5,.5);
@@ -10425,7 +10443,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   PVP_AI,
   bestiaryKill,bosstiaryKill,bosstiaryDamageBonus,boostSpellDamage,boostHealAmount,scalePlayerDamage,
   tickDelayedHits,wheelApplySpellBoost,playerResistPct,augmentTotals,authoritySpeedPts,
-  huntModeOf,boxTargetCell,safeTargetCell,playerAttackRangeSQM,
+  huntModeOf,boxTargetCell,safeTargetCell,playerAttackRangeSQM,pvpAttackRangeSQM,
   wandMissileOf,physicalHitFx,basicHitFx,WAND_SHOOT,
   tickAccessoryCharges,tryAccessoryHelper,consumeAccessoryHitCharge,energyRingOn,
   isAutoSupplyStash,addSupplyStash,ensureSupplyStash,isSupplyStashableItem,moveItemToSupplyStash,

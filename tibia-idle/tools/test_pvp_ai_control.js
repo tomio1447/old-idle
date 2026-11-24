@@ -670,5 +670,20 @@ console.log("== FASE 7: regroup — time espalhado reagrupa ==");
     "flag de reagrupamento calculada");
 }
 
+console.log("== RP: alcance PvP de 8sqm (bolt/crossbow/spells) ==");
+{
+  const pala = mkChar(1, 100, 1, 5, 1, { voc: "royal paladin" });
+  pala.p.equip = { weapon: { item: "crossbow" }, ammo: { item: "bolt" } };
+  const auth = makeAuth([pala, mkChar(2, 200, 2, 9, 1)]);
+  ok(eng.pvpAttackRangeSQM(auth, auth.players[0]) === 8,
+    "RP com crossbow dentro da guerra: alcance 8");
+  const hunt = { players: auth.players }; // sem pvpBattle
+  ok(eng.pvpAttackRangeSQM(hunt, auth.players[0]) ===
+      eng.playerAttackRangeSQM(auth.players[0].p),
+    "mesmo RP fora da guerra: alcance normal do item");
+  const ek = mkChar(3, 100, 1, 5, 1, { voc: "elite knight" });
+  ok(eng.pvpAttackRangeSQM(auth, ek) === 1, "knight continua melee (1)");
+}
+
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
 console.log("\nALL PVP AI CONTROL TESTS PASSED");
