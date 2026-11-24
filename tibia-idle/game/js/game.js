@@ -5612,6 +5612,16 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
       if(ev&&ev.t==="wall-fail"&&typeof pvpMyAccountId==="function"&&
          Number(ev.accId)===Number(pvpMyAccountId())&&typeof toast==="function")
         toast("<b>Magic Wall</b> falhou — nenhum char da PT tinha runa/cooldown/alcance.","bad");
+      // BCP BOW/XBOW: o char (próprio ou AFK aliado) não tem arma do tipo
+      // na mochila/pouch/stash — o servidor nunca cria item.
+      if(ev&&ev.t==="pvp-equip-fail"&&typeof toast==="function"){
+        const me=typeof pvpMyAccountId==="function"?Number(pvpMyAccountId()):0;
+        const mine=(incoming.players||[]).find((e)=>e&&me&&Number(e.accountId||(e.p&&e.p.accountId))===me);
+        const who=(incoming.players||[]).find((e)=>e&&String(e.id)===String(ev.whoId));
+        const myTeam=mine?Number(mine.pvpTeam||mine.team)||0:0;
+        if(who&&myTeam&&Number(who.pvpTeam||who.team)===myTeam)
+          toast(`<b>${String(ev.name||"Paladin").replace(/[<>]/g,"")}</b> não tem ${ev.mode==="xbow"?"crossbow":"bow"} na mochila — mantém a arma atual.`,"bad");
+      }
     }
     for(const ent of reconciledPlayers){
       if(!ent||!ent.p)continue;

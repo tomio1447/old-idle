@@ -5104,50 +5104,114 @@ function pvpTryParalyze(auth,item,p,now,living,visualTs){
   return true;
 }
 /* Equip de guerra (paladin, botões BOW/XBOW): troca pra melhor arma
- * compatível da mochila + seta a munição do preset. Roda só na mudança
- * de modo — _pvpEquipMode memoiza pra não varrer a bag a cada tick. */
+ * compatível que o char TEM (bag, instâncias, loot pouch, supply stash,
+ * supplies — nunca cria item), garante quiver e seta a melhor munição
+ * do tipo: diamond arrow / spectral bolt (ou a melhor que o nível
+ * permite). Memoiza só no SUCESSO — falha re-tenta a cada 3s (ex.: item
+ * chegou na pouch depois). Sem arma do tipo: evento pvp-equip-fail. */
+const PVP_EQUIP_SOURCES=["bag","lootPouch","supplyStash","supplies"];
+const PVP_EQUIP_RETRY_MS=3000;
+function pvpEquipHas(p,slug){
+  for(const src of PVP_EQUIP_SOURCES){const m=p[src];if(m&&(Number(m[slug])||0)>0)return true;}
+  return (p.itemInstances||[]).some((i)=>i&&i.slug===slug&&i.loc==="bag");
+}
+function pvpEquipTake(p,slug){
+  const inst=(p.itemInstances||[]).filter((i)=>i&&i.slug===slug&&i.loc==="bag")
+    .sort((x,y)=>(Number(y.tier)||0)-(Number(x.tier)||0))[0];
+  if(inst)return inst;
+  for(const src of PVP_EQUIP_SOURCES){const m=p[src];
+    if(m&&(Number(m[slug])||0)>0){m[slug]--;if(!m[slug])delete m[slug];
+      if(authItemNeedsBagInstance(slug)){const ni={id:"srv-"+Date.now().toString(36)+"-"+
+        Math.floor(Math.random()*1e6).toString(36),slug,loc:"bag",tier:(p.forge&&p.forge[slug])||0};
+        (p.itemInstances=p.itemInstances||[]).push(ni);return ni;}
+      return true;}}
+  return null;
+}
+function pvpEquipStash(p,slot){
+  const e=p.equip&&p.equip[slot];if(!e||!e.item)return;
+  const inst=e.instId&&(p.itemInstances||[]).find((x)=>x&&String(x.id)===String(e.instId));
+  if(inst)inst.loc="bag";
+  else if(authItemNeedsBagInstance(e.item))(p.itemInstances=p.itemInstances||[]).push({id:"srv-"+
+    Date.now().toString(36)+"-"+Math.floor(Math.random()*1e6).toString(36),slug:e.item,loc:"bag",
+    tier:(p.forge&&p.forge[e.item])||0});
+  else{p.bag=p.bag||{};p.bag[e.item]=(Number(p.bag[e.item])||0)+1;}
+  delete p.equip[slot];
+}
+function pvpEquipPut(p,slot,slug,got){
+  p.equip=p.equip||{};
+  if(got&&typeof got==="object"){got.loc="equip:"+slot;p.equip[slot]={item:slug,count:1,instId:got.id};}
+  else p.equip[slot]={item:slug,count:1};
+}
+/* Melhor munição do tipo que o nível permite — prioridade explícita
+ * diamond arrow / spectral bolt (topo), depois maior ataque. */
+function pvpBestAmmo(p,kind){
+  const top=kind==="arrow"?"diamond-arrow":"spectral-bolt",lvl=Number(p.level)||1;
+  const okLvl=(slug)=>{const it=ITEMS[slug];return it&&(Number(it.lvl!==undefined?it.lvl:it.level)||0)<=lvl;};
+  if(okLvl(top))return top;
+  let best=null,bestAtk=-1;
+  for(const slug of Object.keys(ITEMS)){const it=ITEMS[slug];
+    if(!it||(it.s!=="ammo"&&it.type!=="ammo"&&it.t!=="ammo"))continue;
+    if(ammoKindOf(it)!==kind||!okLvl(slug))continue;
+    const atk=Number(it.atk)||0;if(atk>bestAtk){bestAtk=atk;best=slug;}}
+  return best||(kind==="arrow"?"arrow":"bolt");
+}
 function pvpEquipPreset(auth,item,p,now){
   const mode=String((item._pvpCtrl&&item._pvpCtrl.mode)||"");
+  now=Number(now)||Number(auth&&auth.clock)||Date.now();
   if(item._pvpEquipMode===mode)return;
-  item._pvpEquipMode=mode;
-  if(mode!=="bow"&&mode!=="xbow")return;
-  if(CanaryVocation.baseVocName(p.voc)!=="paladin")return;
-  const kind=mode==="bow"?"arrow":"bolt";
-  const wantAmmo=mode==="bow"?"diamond-arrow":"spectral-bolt";
-  const cands=[];
-  const addCand=(slug,inst)=>{
-    const it=ITEMS[slug];if(!it)return;
-    if(it.type!=="distance"&&it.t!=="distance"&&it.s!=="distance")return;
-    if(weaponAmmoKind(it,slug)!==kind)return;
-    cands.push({slug,inst,atk:Number(it.atk)||0,lvl:Number(it.lvl||it.level)||0});};
-  const wp=p.equip&&p.equip.weapon;if(wp&&wp.item)addCand(wp.item,null);
-  for(const inst of p.itemInstances||[])if(inst&&inst.loc==="bag")addCand(inst.slug,inst);
-  for(const slug of Object.keys(p.bag||{}))if(Number(p.bag[slug])>0)addCand(slug,null);
-  if(!cands.length)return;
-  cands.sort((a,b)=>b.atk-a.atk||b.lvl-a.lvl);
-  const best=cands[0];
-  if(String(wp&&wp.item)!==best.slug||(best.inst&&String(wp&&wp.instId)!==String(best.inst.id))){
-    p.equip=p.equip||{};
-    if(best.inst){const ix=p.itemInstances.indexOf(best.inst);if(ix>=0)p.itemInstances.splice(ix,1);}
-    else if(p.bag&&Number(p.bag[best.slug])>0){p.bag[best.slug]-=1;if(!p.bag[best.slug])delete p.bag[best.slug];}
-    if(wp&&wp.item&&String(wp.item)!==best.slug){
-      if(authItemNeedsBagInstance(wp.item)){
-        const inst=(p.itemInstances||[]).find((x)=>x&&String(x.id)===String(wp.instId));
-        if(inst)inst.loc="bag";
-        else{(p.itemInstances=p.itemInstances||[]).push({id:"srv-"+Date.now().toString(36)+"-"+
-          Math.floor(Math.random()*1e6).toString(36),slug:wp.item,loc:"bag",
-          tier:(p.forge&&p.forge[wp.item])||0});}
-      }else{p.bag=p.bag||{};p.bag[wp.item]=(Number(p.bag[wp.item])||0)+1;}
-    }
-    if(best.inst)best.inst.loc="equip:weapon";
-    p.equip.weapon=best.inst?{item:best.slug,count:1,instId:best.inst.id}:{item:best.slug,count:1};
-    const src=playerPosition(auth,p);
-    auth.events.push({t:"say",text:(String(ITEMS[best.slug].n||best.slug).toLowerCase()),
-      whoId:String(item.id),x:src.x,y:src.y,screen:true,ts:now});
-    authSyncBagCountsFromInstances(p);
+  if(item._pvpEquipFailMode===mode&&(Number(item._pvpEquipRetryAt)||0)>now)return;
+  if(mode!=="bow"&&mode!=="xbow"){item._pvpEquipMode=mode;return;}
+  if(CanaryVocation.baseVocName(p.voc)!=="paladin"){item._pvpEquipMode=mode;return;}
+  const kind=mode==="bow"?"arrow":"bolt",lvl=Number(p.level)||1;
+  const usable=(slug)=>{const it=ITEMS[slug];
+    if(!it||(it.type!=="distance"&&it.t!=="distance"))return false;
+    if(weaponAmmoKind(it,slug)!==kind)return false;
+    return (Number(it.lvl||it.level)||0)<=lvl;};
+  const score=(slug)=>{const it=ITEMS[slug]||{};return (Number(it.atk)||0)*1000+(Number(it.lvl||it.level)||0);};
+  const wp=p.equip&&p.equip.weapon;
+  const cands=new Set();
+  if(wp&&wp.item&&usable(wp.item))cands.add(wp.item);
+  for(const src of PVP_EQUIP_SOURCES)for(const slug of Object.keys(p[src]||{}))
+    if((Number(p[src][slug])||0)>0&&usable(slug))cands.add(slug);
+  for(const inst of p.itemInstances||[])if(inst&&inst.loc==="bag"&&usable(inst.slug))cands.add(inst.slug);
+  const src=playerPosition(auth,p);
+  if(!cands.size){
+    item._pvpEquipFailMode=mode;item._pvpEquipRetryAt=now+PVP_EQUIP_RETRY_MS;
+    if(item._pvpEquipFailNotified!==mode){item._pvpEquipFailNotified=mode;
+      auth.events.push({t:"pvp-equip-fail",whoId:String(item.id),mode,
+        name:String(p.name||""),accId:Number(item.accountId||p.accountId)||0,ts:now,screen:true});}
+    return;
   }
-  const am=ITEMS[wantAmmo],amLvl=Number(am&&am.lvl!==undefined?am.lvl:0)||0;
-  if(am&&amLvl<=Number(p.level||1))p.equip.ammo={item:wantAmmo,count:null};
+  const best=[...cands].sort((x,y)=>score(y)-score(x))[0];
+  if(String(wp&&wp.item)!==best){
+    const got=pvpEquipTake(p,best);
+    if(!got){item._pvpEquipFailMode=mode;item._pvpEquipRetryAt=now+PVP_EQUIP_RETRY_MS;return;}
+    pvpEquipStash(p,"weapon");
+    pvpEquipPut(p,"weapon",best,got);
+    auth.events.push({t:"say",text:String((ITEMS[best]&&ITEMS[best].n)||best).toLowerCase(),
+      whoId:String(item.id),x:src.x,y:src.y,screen:true,ts:now});
+  }
+  // Quiver: munição exige quiver no slot do escudo — equipa o melhor que
+  // o char tiver se o slot não estiver com um.
+  if(!equippedQuiver(p)){
+    let q=null,qs=-1;
+    const consider=(slug)=>{const it=ITEMS[slug];
+      if(!it||!(it.type==="quiver"||it.t==="quiver"||it.s==="quiver"||QUIVERS[slug]))return;
+      if((Number(it.lvl||it.level)||0)>lvl)return;
+      const sc=(Number(it.arm)||0)*100+(Number(it.lvl||it.level)||0);if(sc>qs){qs=sc;q=slug;}};
+    for(const s2 of PVP_EQUIP_SOURCES)for(const slug of Object.keys(p[s2]||{}))
+      if((Number(p[s2][slug])||0)>0)consider(slug);
+    for(const inst of p.itemInstances||[])if(inst&&inst.loc==="bag")consider(inst.slug);
+    if(q){const got=pvpEquipTake(p,q);if(got){pvpEquipStash(p,"shield");pvpEquipPut(p,"shield",q,got);}}
+  }
+  const ammo=pvpBestAmmo(p,kind);
+  if(ammo&&ammoCompatibleWithWeapon(ITEMS[ammo],best)){
+    p.equip.ammo={item:ammo,count:null};
+    const cfg=p.config=p.config||{};
+    if(kind==="arrow")cfg.refillArrow=ammo;else cfg.refillBolt=ammo;
+  }
+  authSyncBagCountsFromInstances(p);
+  item._pvpEquipMode=mode;item._pvpEquipFailMode=null;item._pvpEquipFailNotified=null;
 }
 function pvpBattleCellInRect(cx,cy,rect){
   return !!(rect&&cx>=rect.x1&&cx<=rect.x2&&cy>=rect.y1&&cy<=rect.y2);

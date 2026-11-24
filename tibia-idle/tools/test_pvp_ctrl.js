@@ -193,5 +193,54 @@ console.log("== Equip: paladin BOW/XBOW troca arma + munição ==");
 }
 
 console.log("");
+console.log("== BCP BOW/XBOW: auto-equip arma + quiver + melhor munição ==");
+{
+  const ITEMS = eng.ITEMS;
+  const mkP = (extra) => Object.assign({ name: "Pal", voc: "royal paladin", level: 300,
+    equip: {}, bag: {}, lootPouch: {}, supplyStash: {}, supplies: {}, itemInstances: [], config: {} }, extra || {});
+  const auth = { events: [], clock: 1000, gridW: 11, gridH: 5, players: [] };
+  // 1) bow na loot pouch, crossbow equipado, sem quiver equipado (quiver na stash).
+  {
+    const p = mkP({ equip: { weapon: { item: "royal-crossbow", count: 1 }, ammo: { item: "spectral-bolt", count: null } },
+      lootPouch: { "elvish-bow": 1 }, supplyStash: { "jungle-quiver": 1 } });
+    const it = { id: "9", accountId: 1, p, _pvpCtrl: { mode: "bow", chase: true }, cx: 1, cy: 1, x: .1, y: .3 };
+    eng.pvpEquipPreset(auth, it, p, 1000);
+    ok(p.equip.weapon && p.equip.weapon.item === "elvish-bow", "bow da loot pouch equipado");
+    ok(p.equip.ammo && p.equip.ammo.item === "diamond-arrow", "munição = diamond arrow");
+    ok(p.config.refillArrow === "diamond-arrow", "refill de arrow aponta diamond arrow");
+    ok(p.equip.shield && p.equip.shield.item === "jungle-quiver", "quiver auto-equipado da supply stash");
+    ok((Number(p.bag["royal-crossbow"]) || 0) + (p.itemInstances || []).filter((i) => i.slug === "royal-crossbow" && i.loc === "bag").length >= 1,
+      "crossbow anterior volta pra mochila (nada some)");
+    // 2) xbow de volta: spectral bolt.
+    it._pvpCtrl = { mode: "xbow", chase: true };
+    eng.pvpEquipPreset(auth, it, p, 1200);
+    ok(p.equip.weapon && p.equip.weapon.item === "royal-crossbow", "xbow re-equipa o crossbow");
+    ok(p.equip.ammo && p.equip.ammo.item === "spectral-bolt", "munição = spectral bolt");
+  }
+  // 3) Sem crossbow nenhum: não cria item, avisa 1x e re-tenta depois.
+  {
+    const p = mkP({ equip: { weapon: { item: "elvish-bow", count: 1 }, ammo: { item: "diamond-arrow", count: null } } });
+    const it = { id: "8", accountId: 2, p, _pvpCtrl: { mode: "xbow", chase: true }, cx: 1, cy: 1, x: .1, y: .3 };
+    auth.events.length = 0;
+    eng.pvpEquipPreset(auth, it, p, 1000);
+    ok(p.equip.weapon.item === "elvish-bow", "sem crossbow: arma atual mantida (nunca cria item)");
+    ok(auth.events.some((e) => e.t === "pvp-equip-fail" && e.mode === "xbow"), "evento pvp-equip-fail emitido");
+    eng.pvpEquipPreset(auth, it, p, 1500);
+    ok(auth.events.filter((e) => e.t === "pvp-equip-fail").length === 1, "aviso não spamma");
+    p.lootPouch["royal-crossbow"] = 1;              // item chegou depois
+    eng.pvpEquipPreset(auth, it, p, 1000 + 3001);
+    ok(p.equip.weapon.item === "royal-crossbow", "re-tenta após 3s e equipa quando o item aparece");
+  }
+  // 4) Nível baixo: diamond arrow (150) indisponível → melhor arrow do nível.
+  {
+    const p = mkP({ level: 50, equip: { weapon: { item: "crossbow", count: 1 } }, bag: { "bow": 1 } });
+    const it = { id: "7", accountId: 3, p, _pvpCtrl: { mode: "bow", chase: true }, cx: 1, cy: 1, x: .1, y: .3 };
+    eng.pvpEquipPreset(auth, it, p, 1000);
+    const am = p.equip.ammo && ITEMS[p.equip.ammo.item];
+    ok(p.equip.ammo && p.equip.ammo.item !== "diamond-arrow" && am && (Number(am.lvl) || 0) <= 50,
+      "nível baixo: melhor arrow permitida (" + (p.equip.ammo && p.equip.ammo.item) + ")");
+  }
+}
+
 if (failures) { console.error(`${failures} FALHA(S)`); process.exit(1); }
 console.log("ALL PVP CTRL TESTS PASSED");
