@@ -123,8 +123,13 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
      * vivo da conta como antes. */
     const selId = typeof _pvpSelChar !== "undefined" && _pvpSelChar != null
       ? String(_pvpSelChar) : "";
+    // O selecionado pode ser AFK do mesmo time (não só da própria conta).
+    const myTeam = ((combat.players.find(ownAcc) || {}).pvpTeam) ||
+      ((combat.players.find(ownAcc) || {}).team) || 0;
+    const mineOrAlly = (e) => ownAcc(e) ||
+      (myTeam && Number(e && (e.pvpTeam || e.team)) === myTeam);
     focus = (selId && combat.players.find((e) =>
-        String(e.id) === selId && ownAcc(e) && Number(e.p.hp) > 0)) ||
+        String(e.id) === selId && mineOrAlly(e) && Number(e.p.hp) > 0)) ||
       combat.players.find((e) => ownAcc(e) && Number(e.p.hp) > 0) ||
       combat.players.find(ownAcc) || combat.player;
   }

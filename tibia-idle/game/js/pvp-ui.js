@@ -760,10 +760,15 @@ function pvpHandleCombatClick(cell) {
   const dist = (e) => Math.max(Math.abs(Number(e.cx) - cell.cx), Math.abs(Number(e.cy) - cell.cy));
   const hit = foes.filter((e) => dist(e) <= 1).sort((a, b) => dist(a) - dist(b))[0];
   if (!hit) {
-    // Clique num char PRÓPRIO (vivo) na arena: seleciona — a câmera passa
-    // a seguir ele. Clicar de novo no selecionado volta pro fallback.
+    // Clique num char CONTROLÁVEL (vivo) na arena: seleciona — a câmera
+    // passa a seguir ele. Vale char próprio E AFK AI_HARD do mesmo time
+    // (os mesmos que o BCP comanda). Clicar de novo volta pro fallback.
+    const aiCtl = (c.pvpBattle && c.pvpBattle.aiControl) || {};
     const mineHit = (c.players || []).filter((e) => e && e.p &&
-      Number(e.p.hp) > 0 && pvpIsOwnEnt(e, accId) && dist(e) <= 1)
+      Number(e.p.hp) > 0 && dist(e) <= 1 &&
+      (pvpIsOwnEnt(e, accId) ||
+        (myTeam && Number(e.pvpTeam || e.team) === myTeam &&
+          aiCtl[String(e.id)] === "AI_HARD")))
       .sort((a, b) => dist(a) - dist(b))[0];
     if (mineHit) {
       const id = String(mineHit.id);
@@ -959,8 +964,9 @@ function pvpCharColTick(col) {
     const list = byVoc[bv], opts = PVP_CHAR_OPTS[bv] || [], open = _pvpCharOpen === bv;
     // Estado mostrado = do 1º char do grupo (todos convergem após 1 clique).
     const ctrl = pvpCharCtrl(c, String(list[0].id));
+    const hasSel = _pvpSelChar && list.some((e) => String(e.id) === _pvpSelChar);
     html += `<div class="pvp-char-slot${open ? " open" : ""}">` +
-      `<button class="pvp-char-btn" data-voc="${bv}" title="BCP ${PVP_VOC_SHORT[bv]} — ${list.length} controlado(s)"` +
+      `<button class="pvp-char-btn${hasSel ? " sel" : ""}" data-voc="${bv}" title="BCP ${PVP_VOC_SHORT[bv]} — ${list.length} controlado(s)"` +
       ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">` +
       `<i class="pvp-voc-n">${list.length}</i>${PVP_VOC_SHORT[bv]}</button>`;
     if (open) {
@@ -979,6 +985,10 @@ function pvpCharColTick(col) {
     btn.addEventListener("click", () => {
       const bv = btn.getAttribute("data-voc");
       _pvpCharOpen = _pvpCharOpen === bv ? null : bv;
+      // Clicar no BCP de uma vocação também seleciona o 1º controlado
+      // dela — a câmera acompanha o grupo que está recebendo ordens.
+      const list = byVoc[bv] || [];
+      if (list.length) _pvpSelChar = String(list[0].id);
       pvpActionsTick();
     });
   });
