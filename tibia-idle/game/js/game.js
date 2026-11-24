@@ -4048,15 +4048,18 @@ function drainEvents() {
         // TALKTYPE_SPELL: palavras no caster, visíveis para toda a party.
         // Potion/comida ("Aaaah...", Munch.) não são magia — não desenhar.
         // Cada evento = um bubble separado (nunca concatenar "exori gran" +
-        // "exevo mas san" no mesmo texto).
+        // "exevo mas san" no mesmo texto). Runas e potions carregam `icon`:
+        // o ícone do item sobe no lugar do nome/golo.
         const text = String(e.text || "").replace(/\s+/g, " ").trim();
-        if (!text || e.supply || /^(Aaaah|Aahhh|Munch)\b/i.test(text)) break;
+        const sayIcon = String(e.icon || "").trim() || null;
+        const supplyLike = !!e.supply || /^(Aaaah|Aahhh|Munch)\b/i.test(text);
+        if ((!text && !sayIcon) || (supplyLike && !sayIcon)) break;
         // Dedup só com authTs (replay online). Local não tem authTs e não
         // deve perder re-casts legítimos da mesma magia.
         const authTs = Number(e.authTs);
         if (Number.isFinite(authTs)) {
           const sayFinger = "say|" + String(e.whoId || "") + "|" + text + "|" +
-            String(Math.floor(authTs / 50));
+            String(sayIcon || "") + "|" + String(Math.floor(authTs / 50));
           const seenSay = (typeof G !== "undefined" && G)
             ? (G._saySeen || (G._saySeen = new Map())) : null;
           if (seenSay) {
@@ -4075,11 +4078,11 @@ function drainEvents() {
         const alvo = saidor || (!wanted && c && c.player) || null;
         const nome = (alvo && (alvo.name || (alvo.p && alvo.p.name))) || (G.p && G.p.name) || "";
         if (alvo && typeof creatureSay === "function") {
-          creatureSay(alvo, text, TALK.SPELL);
-          addLog("say", `<b>${nome}</b>: ${text}`);
+          creatureSay(alvo, sayIcon ? "" : text, TALK.SPELL, sayIcon);
+          if (text && !supplyLike) addLog("say", `<b>${nome}</b>: ${text}`);
         } else {
-          r.addSpeech(text, "#ffe680");
-          addLog("say", `<b>${nome}</b>: ${text}`);
+          r.addSpeech(sayIcon ? "" : text, "#ffe680", TALK.SPELL, sayIcon);
+          if (text && !supplyLike) addLog("say", `<b>${nome}</b>: ${text}`);
         }
         break;
       }

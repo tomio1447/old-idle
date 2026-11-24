@@ -1381,7 +1381,7 @@ function tryMagicShieldPotion(c, p, now, force) {
     c.stats.supplyUsed["magic-shield-potion"] = (c.stats.supplyUsed["magic-shield-potion"] || 0) + 1;
   }
   if (c && c.events) {
-    c.events.push({ t: "say", text: "Aaaah..." });
+    c.events.push({ t: "say", text: "Aaaah...", supply: true, icon: "magic-shield-potion" });
     emitMagicShieldOn(c, p, "Magic Shield Potion");
   }
   return true;

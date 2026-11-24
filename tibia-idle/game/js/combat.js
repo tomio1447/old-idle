@@ -3308,7 +3308,7 @@ function tryUseRune(c, p, target, now, forcada) {
   }
 
   if (c.player) c.player.attackAnim = 180;
-  c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
+  c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true, icon: best });
   return total > 0 || !!s.cond;
 }
 
@@ -3583,9 +3583,9 @@ function tryHeal(c, p, now) {
       // o famoso "Aahhh..." do Tibia: beber potion NAO fala o nome do item;
       // runa continua anunciando o nome (el e uma conjuracao, nao um gole)
       if (s.kind === "rune") {
-        c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
+        c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true, icon: best });
       } else {
-        c.events.push({ t: "say", text: "Aahhh...", supply: true, drunk: 1 });
+        c.events.push({ t: "say", text: "Aahhh...", supply: true, drunk: 1, icon: best });
       }
       return true;
     }
@@ -3860,7 +3860,7 @@ function tryMana(c, p, now) {
                   heal: healAmount, drunk: 1 });
   // o gole do Tibia: "Aahhh..." — nunca o nome da potion
   c.events.push({ t: "say", text: s.kind === "food" ? "Munch." : "Aahhh...",
-                  supply: true, drunk: 1 });
+                  supply: true, drunk: 1, icon: s.kind === "food" ? null : slug });
   return true;
 }
 

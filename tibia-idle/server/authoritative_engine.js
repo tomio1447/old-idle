@@ -4106,7 +4106,8 @@ function tryMagicShieldPotion(auth,item,p,now){
     auth.stats.supplyUsed["magic-shield-potion"]=(auth.stats.supplyUsed["magic-shield-potion"]||0)+1;
   }
   const pos=playerPosition(auth,p);
-  auth.events.push({t:"say",text:"Aaaah...",supply:true,whoId:String(item.id),x:pos.x,y:pos.y,screen:true,ts:now});
+  auth.events.push({t:"say",text:"Aaaah...",supply:true,icon:"magic-shield-potion",
+    whoId:String(item.id),x:pos.x,y:pos.y,screen:true,ts:now});
   auth.events.push({t:"magic-shield-on",cap:p.magicShieldCap,source:"Magic Shield Potion",
     targetId:String(item.id),x:pos.x,y:pos.y,screen:true,ts:now});
   return true;
@@ -5100,7 +5101,7 @@ function pvpTryParalyze(auth,item,p,now,living,visualTs){
   ent._pvpParalyzeUntil=now+PVP_BATTLE_PARALYZE_MS;
   const src=playerPosition(auth,p),dst=playerPosition(auth,ent.p);
   auth.events.push({t:"effect",fx:"magic-red",x:dst.x,y:dst.y,screen:true,ts:visualTs+20});
-  auth.events.push({t:"say",text:"paralyze rune",whoId:String(item.id),x:src.x,y:src.y,screen:true,ts:visualTs+40});
+  auth.events.push({t:"say",text:"paralyze rune",icon:"paralyze-rune",whoId:String(item.id),x:src.x,y:src.y,screen:true,ts:visualTs+40});
   return true;
 }
 /* Equip de guerra (paladin, botões BOW/XBOW): troca pra melhor arma
@@ -6723,6 +6724,13 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   auth.stats.exp+=totalShare;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
   return lootDrops;
 }
+/* Ícone do item usado sobe no caster (runa/potion) — o cliente troca o
+ * texto do "say" pelo sprite do item deslizante. */
+function authSayUseIcon(auth,p,slug,now){
+  const pos=playerPosition(auth,p);
+  auth.events.push({t:"say",text:"",icon:String(slug),supply:true,
+    whoId:String(p&&p.id),x:pos.x,y:pos.y,screen:true,ts:now});
+}
 function usePotion(auth,p){
   const now=Number(auth.clock)||Date.now();
   if(!p||p.hp<=0)return false;
@@ -6751,7 +6759,7 @@ function usePotion(auth,p){
       if(!potionAllowed(p,slug,pot)||!consumeSupply(auth,p,slug))return false;
       if(pot.hp)p.hp=Math.min(max.hp,p.hp+roll(auth,pot.hp[0],pot.hp[1]));
       if(pot.mp)p.mp=Math.min(max.mp,p.mp+roll(auth,pot.mp[0],pot.mp[1]));
-      p._potionCd=now+POTION_CD_MS;return true;
+      p._potionCd=now+POTION_CD_MS;authSayUseIcon(auth,p,slug,now);return true;
     }
     const rune=runeAsSpell(slug);
     if(rune&&rune.type==="heal"){
@@ -6760,7 +6768,7 @@ function usePotion(auth,p){
       if(!consumeSupply(auth,p,slug))return false;
       p.hp=Math.min(max.hp,p.hp+Math.max(1,rollSpell(auth,p,rune)));
       // UH/IH: no Tibia o exhaust de item (1s) e o mesmo das potions.
-      p._potionCd=now+POTION_CD_MS;return true;
+      p._potionCd=now+POTION_CD_MS;authSayUseIcon(auth,p,slug,now);return true;
     }
     return false;
   };
@@ -9571,7 +9579,7 @@ function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
   }
   if(areaCells.length>1)auth.events.push({t:"areafx",cells:areaCells,fx,spell:rd.nome||id,screen:true,ts:visualTs+20,
     whoId:String(item.id),base:entityGridCell(item,auth)});
-  auth.events.push({t:"say",text:String(rd.nome||id).toLowerCase(),whoId:String(item.id),x:source.x,y:source.y,screen:true,ts:visualTs+40});
+  auth.events.push({t:"say",text:String(rd.nome||id).toLowerCase(),icon:id,whoId:String(item.id),x:source.x,y:source.y,screen:true,ts:visualTs+40});
   return true;
 }
 function step(auth,now,opts){if(auth.ended)return;

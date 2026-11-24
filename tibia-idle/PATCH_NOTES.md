@@ -4,6 +4,25 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Cast say: ícone do item no lugar do nome
+
+- **Runas**: em vez do nome da runa ("sudden death", "paralyze rune"...),
+  o ÍCONE do item sobe deslizante acima do caster, na altura da fonte —
+  mesma animação/ fade das palavras de magia.
+- **Potions**: health/mana potions (e heal-runes bebidas como UH/IH)
+  agora mostram o ícone da potion — antes eram silenciosas online
+  ("Aahhh..." nunca foi desenhado).
+- **Magic Shield Potion**: mesmo tratamento (sprite .webp mapeado).
+- Cobertura nos dois caminhos: sim local (`combat.js`/`accessories.js`)
+  e autoridade (`authoritative_engine.js` — `say` ganha campo `icon`;
+  `usePotion` passa a emitir o evento). Log de chat continua mostrando
+  o nome da runa — só o flutuante vira ícone.
+- Comidas ("Munch.") e palavras de magia (exori, exura sio…) sem mudança.
+
+Teste: `node tools/test_say_icon.js`. Ctrl+F5 (`say-icon-v1`).
+
+---
+
 ## 2026-11-24 — The Unwelcome: mecânica oficial (Feast of Souls)
 
 - **Imune a todo dano** (resist 100% em todos os elementos) — a cura de

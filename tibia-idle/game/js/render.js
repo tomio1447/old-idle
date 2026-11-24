@@ -828,7 +828,7 @@ function ensureTalkDeadline(sp, now) {
 }
 
 function talkExpired(sp, now) {
-  if (!sp || typeof sp !== "object" || !sp.text) return true;
+  if (!sp || typeof sp !== "object" || (!sp.text && !sp.icon)) return true;
   now = Number(now) || Date.now();
   const exp = ensureTalkDeadline(sp, now);
   if (now >= exp) {
@@ -849,13 +849,24 @@ function ageTalkEntry(sp, dt, now) {
 /* Empilha uma fala num dono qualquer (jogador ou monstro).
  * `dono` e o objeto da criatura; guardamos a fila nele mesmo para a fala
  * acompanhar quem falou enquanto a criatura anda. */
-function creatureSay(dono, texto, tipo) {
-  if (!dono || !texto) return;
+/* Sprite do ícone de cast (runa/potion) — .png padrão; os poucos itens
+ * fora do png padrão ficam mapeados aqui. */
+const SAY_ICON_PATHS = {
+  "magic-shield-potion": "assets/item/magic-shield-potion.webp",
+};
+function sayIconSprite(slug) {
+  const path = SAY_ICON_PATHS[slug] || ("assets/item/" + slug + ".png");
+  const img = Sprites.get(path);
+  return img && img.complete && img.naturalWidth ? img : null;
+}
+
+function creatureSay(dono, texto, tipo, icon) {
+  if (!dono || (!texto && !icon)) return;
   tipo = tipo || TALK.SAY;
   // Uma conjuração = um bubble. Nunca concatena palavras de magias
   // diferentes no mesmo texto (ex.: "exori gran" + "exevo mas san").
-  let text = String(texto).replace(/\s+/g, " ").trim();
-  if (!text) return;
+  let text = String(texto || "").replace(/\s+/g, " ").trim();
+  if (!text && !icon) return;
   if (text.length > 64) text = text.slice(0, 64);
   if (!Array.isArray(dono.speech)) dono.speech = [];
   const now = Date.now();
@@ -871,6 +882,8 @@ function creatureSay(dono, texto, tipo) {
   dono.speech.push({
     // o client mostra o grito em caixa alta
     text: tipo === TALK.MONSTER_YELL ? text.toUpperCase() : text,
+    // runas/potions mostram o ÍCONE do item subindo no lugar do nome
+    icon: icon || null,
     tipo: tipo, color: TALK_COR[tipo] || "#ffe680",
     life: dur, max: dur, slot: 0, born: now, expiresAt: now + dur,
   });
@@ -900,10 +913,10 @@ function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
     const sp = dono.speech[i];
     if (ageHere && ageTalkEntry(sp, dt, now)) { dono.speech.splice(i, 1); continue; }
     if (talkExpired(sp, now)) { dono.speech.splice(i, 1); continue; }
-    if (!sp || !sp.text) continue;
+    if (!sp || (!sp.text && !sp.icon)) continue;
     // o grito e maior, como no client
     const fontSpec = hudFont(sp.tipo === TALK.MONSTER_YELL ? 12 : 10, s, true);
-    if (!sp._spr || sp._sprFont !== fontSpec) {
+    if (!sp.icon && (!sp._spr || sp._sprFont !== fontSpec)) {
       sp._spr = textSprite(fontSpec, sp.color, "rgba(0,0,0,.9)", 3 * s, sp.text);
       sp._sprFont = fontSpec;
     }
@@ -914,7 +927,14 @@ function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
     if (a <= 0.02) { dono.speech.splice(i, 1); continue; }
     const ty = y - 34 * s - (sp.slot || 0) * 13 * s - p * 10 * s;
     ctx.globalAlpha = a;
-    if (sp._spr) {
+    if (sp.icon) {
+      // Ícone do item (runa/potion) — sobe deslizante na altura da fonte.
+      const img = sayIconSprite(sp.icon);
+      if (img) {
+        const sz = Math.max(10, Math.round(13 * s));
+        ctx.drawImage(img, Math.round(x - sz / 2), Math.round(ty - sz), sz, sz);
+      }
+    } else if (sp._spr) {
       drawTextSprite(ctx, sp._spr, x, ty);
     } else {
       ctx.font = fontSpec;
@@ -930,9 +950,9 @@ function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
 
 /* Compatibilidade: a fala do jogador continua entrando pelo renderer, mas
  * agora e so um atalho para a fila do proprio jogador. */
-Renderer.prototype.addSpeech = function (text, color, tipo) {
+Renderer.prototype.addSpeech = function (text, color, tipo, icon) {
   this.playerTalk = this.playerTalk || {};
-  creatureSay(this.playerTalk, text, tipo || TALK.SPELL);
+  creatureSay(this.playerTalk, text, tipo || TALK.SPELL, icon);
   if (color) {
     const ls = this.playerTalk.speech;
     ls[ls.length - 1].color = color;
