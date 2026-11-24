@@ -131,6 +131,7 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
     focus = (selId && combat.players.find((e) =>
         String(e.id) === selId && mineOrAlly(e) && Number(e.p.hp) > 0)) ||
       combat.players.find((e) => ownAcc(e) && Number(e.p.hp) > 0) ||
+      combat.players.find((e) => myTeam && Number(e && (e.pvpTeam || e.team)) === myTeam && e.p && Number(e.p.hp) > 0) ||
       combat.players.find(ownAcc) || combat.player;
   }
   if (focus && Number.isFinite(focus.x) && Number.isFinite(focus.y)) {

@@ -765,7 +765,7 @@ function pvpHandleCombatClick(cell) {
     // (os mesmos que o BCP comanda). Clicar de novo volta pro fallback.
     const aiCtl = (c.pvpBattle && c.pvpBattle.aiControl) || {};
     const mineHit = (c.players || []).filter((e) => e && e.p &&
-      Number(e.p.hp) > 0 && dist(e) <= 1 &&
+      Number(e.p.hp) > 0 && dist(e) === 0 &&
       (pvpIsOwnEnt(e, accId) ||
         (myTeam && Number(e.pvpTeam || e.team) === myTeam &&
           aiCtl[String(e.id)] === "AI_HARD")))
