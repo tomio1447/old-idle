@@ -1134,6 +1134,7 @@ function normalizeVisualState(raw,auth){
       if(input.teamTarget!==undefined)
         item.teamTarget=input.teamTarget===null||input.teamTarget===""?null:String(input.teamTarget).slice(0,64);
       if(input.pvpAtk!==undefined)item.pvpAtk=input.pvpAtk?1:0;
+      if(input.pvpRegroup)item.pvpRegroup=1;
       if(input.wallTarget&&typeof input.wallTarget==="object"){
         const wcx=Number(input.wallTarget.cx),wcy=Number(input.wallTarget.cy);
         if(Number.isFinite(wcx)&&Number.isFinite(wcy))
