@@ -787,6 +787,25 @@ function authorityVisualDistance(a,b,auth){
  * montada em authorityOccupancy; isto só marca tiles inatravessáveis. */
 /* Magic Wall viva na célula (batalha PvP)? Bloqueia os DOIS times —
  * verificada antes do mapa para cobrir pathfinding, follow e walkIntent. */
+/* Linha de visão na grade (Bresenham): magic walls e paredes do mapa
+ * bloqueiam missiles/sio — sem corner-cutting na diagonal. */
+function pvpLosClear(auth,ax,ay,bx,by){
+  let x=ax|0,y=ay|0;const x1=bx|0,y1=by|0;
+  const dx=Math.abs(x1-x),dy=Math.abs(y1-y),sx=x<x1?1:-1,sy=y<y1?1:-1;
+  let err=dx-dy,guard=dx+dy+4;
+  while(guard-->0){
+    if(x===x1&&y===y1)return true;
+    const e2=2*err,ox=x,oy=y;
+    if(e2>-dy){err-=dy;x+=sx;}
+    if(e2<dx){err+=dx;y+=sy;}
+    // Canto diagonal: se ambos os vizinhos ortogonais do passo diagonal
+    // bloqueiam, o projétil não passa pelo canto — mesmo chegando ao alvo.
+    if(x!==ox&&y!==oy&&authorityCellBlocked(auth,x,oy)&&authorityCellBlocked(auth,ox,y))return false;
+    if(x===x1&&y===y1)return true;
+    if(authorityCellBlocked(auth,x,y))return false;
+  }
+  return true;
+}
 function pvpWallAt(auth,cx,cy){
   const pb=auth&&auth.pvpBattle,ws=pb&&pb.walls;
   if(!ws||!ws.length)return false;
@@ -3132,7 +3151,11 @@ function nextComboSpell(auth,item,p,now,primary,living){
       if(fromCaster)return true; // self-AoE: hitsForSpell decide
       if(!(s.needTarget||meta.needTarget||(Number(s.range)>1&&!areaName)))return true;
       const reach=Math.max(1,spellReach(s));
-      return chebyshevCells(entityGridCell(item,auth),entityGridCell(primary,auth))<=reach;
+      const _f=entityGridCell(item,auth),_t=entityGridCell(primary,auth);
+      if(chebyshevCells(_f,_t)>reach)return false;
+      // Na guerra, spell de alvo não atravessa muro/parede.
+      if(auth&&auth.pvpBattle&&!pvpLosClear(auth,_f.cx,_f.cy,_t.cx,_t.cy))return false;
+      return true;
     };
     const spellFits=(slot)=>{
       if(!slot||!slot.id||slot.kind==="rune")return false;
@@ -3186,7 +3209,10 @@ function nextComboSpell(auth,item,p,now,primary,living){
     const meta=SPELL_TARGET[String(s.id||"")]||{},areaName=spellAreaName(s);
     if(meta.self||(areaName&&spellAreaFromCaster(areaName,s)))return true;
     if(!(s.needTarget||meta.needTarget||(Number(s.range)>1&&!areaName)))return true;
-    return chebyshevCells(entityGridCell(item,auth),entityGridCell(primary,auth))<=Math.max(1,spellReach(s));
+    const _f=entityGridCell(item,auth),_t=entityGridCell(primary,auth);
+    if(chebyshevCells(_f,_t)>Math.max(1,spellReach(s)))return false;
+    if(!pvpLosClear(auth,_f.cx,_f.cy,_t.cx,_t.cy))return false;
+    return true;
   };
   const list=playerSpellList(p).filter((s)=>usable(s)&&pvpReach(s));
   if(!list.length)return null;
@@ -5032,7 +5058,9 @@ function pvpTryParalyze(auth,item,p,now,living,visualTs){
   if(!tid)return false;
   const ent=(auth.players||[]).find((o)=>o&&String(o.id)===tid&&o.p&&o.p.hp>0&&!o.downUntil);
   if(!ent)return false;
-  if(chebyshevCells(entityGridCell(item,auth),entityGridCell(ent,auth))>PVP_BATTLE_RUNE_RANGE)return false;
+  const _f=entityGridCell(item,auth),_t=entityGridCell(ent,auth);
+  if(chebyshevCells(_f,_t)>PVP_BATTLE_RUNE_RANGE||
+    !pvpLosClear(auth,_f.cx,_f.cy,_t.cx,_t.cy))return false;
   if(Number(ent._pvpParalyzeUntil||0)>now+1500)return false;
   if(!runeUsable(p,"paralyze-rune",now))return false;
   const rd=RUNEDATA["paralyze-rune"];if(!rd)return false;
@@ -6720,7 +6748,14 @@ function healPlayers(auth,now){
         if(x===healer)return false;
         const t=targetsCfg[String(x.id)];
         if(t&&t.enabled===false)return false;
-        return (x.p.hp/maxStats(x.p).hp)*100<below;
+        if((x.p.hp/maxStats(x.p).hp)*100>=below)return false;
+        // Guerra: sio precisa de linha de visão — magic wall e parede
+        // bloqueiam a cura em aliado.
+        if(auth.pvpBattle){
+          const _f=entityGridCell(healer,auth),_t=entityGridCell(x,auth);
+          if(!pvpLosClear(auth,_f.cx,_f.cy,_t.cx,_t.cy))return false;
+        }
+        return true;
       }).sort((a,b)=>{
         const pa=Number((targetsCfg[String(a.id)]||{}).priority)||99;
         const pb=Number((targetsCfg[String(b.id)]||{}).priority)||99;
@@ -9249,9 +9284,11 @@ function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
   if(!runeUsable(p,id,now)||!primary||primary.hp<=0)return false;
   // Guerra de guild: a runa respeita alcance — sem o gate ela acertava o
   // alvo do outro lado do mapa.
-  if(auth&&auth.pvpBattle&&
-    chebyshevCells(entityGridCell(item,auth),entityGridCell(primary,auth))>PVP_BATTLE_RUNE_RANGE)
-    return false;
+  if(auth&&auth.pvpBattle){
+    const _from=entityGridCell(item,auth),_to=entityGridCell(primary,auth);
+    if(chebyshevCells(_from,_to)>PVP_BATTLE_RUNE_RANGE||
+      !pvpLosClear(auth,_from.cx,_from.cy,_to.cx,_to.cy))return false;
+  }
   const rd=RUNEDATA[id];if(!rd||!consumeSupply(auth,p,id))return false;
   const cd=Number(rd.cd||rd.gcd||2000);
   p._runeCd=now+cd;p._offensiveCd=now+2000;p._lastRuneId=id;p._groupCd=p._groupCd||{};
@@ -9405,9 +9442,12 @@ function step(auth,now,opts){if(auth.ended)return;
             _pvpForced=pvpPrioritySpell(p,PVP_PRIO_BOW,now);
           // Gate de alcance do RP: spells forçados respeitam o cap de 8sqm
           // (antes o _pvpForced ignorava o spellInRange e cruzava o mapa).
-          if(_pvpForced&&primaryTarget&&
-            chebyshevCells(entityGridCell(item,auth),entityGridCell(primaryTarget,auth))>PVP_BATTLE_RP_RANGE)
-            _pvpForced=null;
+          // E muro/parede bloqueia o projétil do exori con/gran con.
+          if(_pvpForced&&primaryTarget){
+            const _f=entityGridCell(item,auth),_t=entityGridCell(primaryTarget,auth);
+            if(chebyshevCells(_f,_t)>PVP_BATTLE_RP_RANGE||
+              !pvpLosClear(auth,_f.cx,_f.cy,_t.cx,_t.cy))_pvpForced=null;
+          }
         }
       }
       const s=_pvpForced||((acted||pvpAttackOffEff(auth,item))?null:nextComboSpell(auth,item,p,now,primaryTarget,living));
@@ -9576,6 +9616,9 @@ function step(auth,now,opts){if(auth.ended)return;
         const fromGate=entityGridCell(item,auth),toGate=entityGridCell(primaryTarget,auth);
         const sqmGate=Math.max(Math.abs(fromGate.cx-toGate.cx),Math.abs(fromGate.cy-toGate.cy));
         if(sqmGate>pvpAttackRangeSQM(auth,item)){hitIdx++;continue;}
+        // Missiles (bolt/arrow/wand): magic wall e parede bloqueiam a linha de tiro.
+        if(auth.pvpBattle&&sqmGate>1&&
+          !pvpLosClear(auth,fromGate.cx,fromGate.cy,toGate.cx,toGate.cy)){hitIdx++;continue;}
         if(primaryTarget.greedImmune||primaryTarget.qteImmune){
           if(!auth._immuneFx||now-auth._immuneFx>500){
             auth._immuneFx=now;const blocked=entityPosition(primaryTarget,.5,.5);
@@ -10461,7 +10504,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
-  pvpBattleLeaderChar,pvpWallAt,pvpCastMagicWall,pvpProcessWallCalls,pvpWallRuneReady,authorityCellBlocked,
+  pvpBattleLeaderChar,pvpWallAt,pvpLosClear,pvpCastMagicWall,pvpProcessWallCalls,pvpWallRuneReady,authorityCellBlocked,
   sanitizePvpCtrl,pvpTryParalyze,pvpTryUeRunes,pvpEquipPreset,pvpSpellReady,pvpPrioritySpell,pvpAttackOffEff,
   PVP_BATTLE_PARALYZE_MS,PVP_PRIO_XBOW,PVP_PRIO_BOW,healPlayers,usePotion,pvpBattleGoal,
   pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,

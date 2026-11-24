@@ -201,5 +201,23 @@ console.log("\n== TARGET OFF de time atinge só AFK (pvpAttackOffEff) ==");
     "flag próprio do char continua valendo");
 }
 
+console.log("\n== Linha de visão: muros/paredes bloqueiam (pvpLosClear) ==");
+{
+  const now = Date.now();
+  const a = mkChar(1, 100, 1, 10, 10), b = mkChar(2, 200, 2, 14, 10);
+  const auth = makeAuth([a, b]);
+  ok(eng.pvpLosClear(auth, 10, 10, 14, 10) === true, "linha livre passa");
+  auth.pvpBattle.walls = [{ cx: 12, cy: 10, accId: 100, by: "1", until: now + 15000 }];
+  ok(eng.pvpLosClear(auth, 10, 10, 14, 10) === false, "magic wall na linha bloqueia");
+  auth.pvpBattle.walls = [];
+  auth.blockedCells = { "11:10": true };            // parede do mapa
+  ok(eng.pvpLosClear(auth, 10, 10, 14, 10) === false, "parede do mapa bloqueia");
+  auth.blockedCells = {};
+  ok(eng.pvpLosClear(auth, 10, 10, 10, 10) === true, "mesma célula = livre");
+  // Diagonal com canto fechado pelos dois lados: não passa.
+  auth.blockedCells = { "11:10": true, "10:11": true };
+  ok(eng.pvpLosClear(auth, 10, 10, 11, 11) === false, "canto diagonal fechado bloqueia");
+}
+
 if (failures) { console.error("\n" + failures + " FALHA(S)"); process.exit(1); }
 console.log("\nALL PVP WALL TESTS PASSED");
