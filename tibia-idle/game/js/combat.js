@@ -3907,11 +3907,10 @@ function monsterThinkYell(mob, dt) {
  * Habilidades do monstro, do .lua da criatura (MONSTERDATA.skills e
  * defSkills — o tools/import_monsters.py le os blocos attacks/defenses).
  *
- * A cada turno de ataque (attackSpeed do bicho) rolamos a lista NA ORDEM
- * do .lua, como o Monster::doAttacking do servidor: a primeira habilidade
- * pronta (intervalo proprio decorrido) que passar na chance entra em cena;
- * se nenhuma sair, cai o corpo-a-corpo. Cada habilidade tem relogio
- * proprio — o spell:interval — guardado em mob.skillCds.
+ * Cada habilidade rola UMA vez por intervalo proprio (spell:interval do
+ * .lua), como no Canary — o acumulador por skill fica em mob.skillAccs
+ * (paridade com runMobSkills do servidor). O corpo-a-corpo segue no tick
+ * do attackSpeed, desacoplado das skills.
  *
  * O que cada campo significa (espelha os parametros do spell:... do lua):
  *   el     elemento (CombatType)
@@ -4416,7 +4415,7 @@ function inferSkillElement(sk) {
  * Devolve true quando QUALQUER habilidade entrou em cena — o corpo-a-corpo
  * (mobAttack) só roda se nenhuma skill da lista passar (monstros sem basic
  * attack ch=100 na lista). */
-function mobCastSkill(c, p, mob, now) {
+function mobCastSkill(c, p, mob, now, dt) {
   // PARTY COMBAT: o monstro ataca a entidade mais próxima (m.target), não
   // só o personagem ativo — todos na mesma instância levam dano de verdade.
   const tgt = (mob.target && mob.target.p && mob.target.p.hp > 0)
@@ -4432,7 +4431,19 @@ function mobCastSkill(c, p, mob, now) {
   const dist = (pl.cx !== undefined && mob.cx !== undefined &&
                 typeof sqmDistance === "function")
     ? sqmDistance(mob, pl) : 1;
-  if (!mob.skillCds) mob.skillCds = {};
+  /* Canary: cada attackSpell tem o próprio timer e rola a chance UMA vez
+   * por intervalo — paridade com o servidor (runMobSkills). Antes as
+   * skills só rolavam no tick do melee e, ao falhar, re-rolavam todo
+   * swing até passar. */
+  if (!mob.skillAccs) mob.skillAccs = {};
+  const stepDt = Math.max(0, Number(dt) || 0);
+  const accRoll = (key, sk) => {
+    const iv = Math.max(200, Number(sk.int) || 2000);
+    mob.skillAccs[key] = (Number(mob.skillAccs[key]) || 0) + stepDt;
+    if (mob.skillAccs[key] < iv) return false;
+    mob.skillAccs[key] = 0;
+    return true;
+  };
   let usou = false;
 
   // ---- defensivas (o bloco defenses do .lua): cura propria.
@@ -4440,14 +4451,13 @@ function mobCastSkill(c, p, mob, now) {
   for (let i = 0; i < defS.length; i++) {
     const sk = defS[i];
     const key = "d" + i;
-    if ((mob.skillCds[key] || 0) > now) continue;
+    if (!accRoll(key, sk)) continue;
     if (Math.random() * 100 >= (sk.ch === undefined ? 15 : sk.ch)) continue;
     if (sk.n === "healing") {
       if (mob.maxHp && mob.hp >= mob.maxHp) continue;   // vida cheia
       const cura = Math.max(0, mobSkillRoll(sk));
       if (!cura) continue;
       mob.hp = Math.min(mob.maxHp || (mob.hp + cura), mob.hp + cura);
-      mob.skillCds[key] = now + (sk.int || 2000);
       c.events.push({ t: "mobheal", x: mob.x, y: mob.y, targetId:mob.id, heal: cura,
                       fx: sk.fx || "magic-green", screen: true });
       usou = true;
@@ -4461,7 +4471,7 @@ function mobCastSkill(c, p, mob, now) {
   for (let i = 0; i < skills.length; i++) {
     const sk = skills[i];
     const key = "s" + i;
-    if ((mob.skillCds[key] || 0) > now) continue;
+    if (!accRoll(key, sk)) continue;
     const nomeFx = sk.n || "";
     // removido a pedido: invisibilidade (warlock, stalker, ferumbras...)
     if (/invisib/i.test(nomeFx)) continue;
@@ -4486,7 +4496,6 @@ function mobCastSkill(c, p, mob, now) {
         const slug = slugs.length > 1 ? slugs[Math.floor(Math.random() * slugs.length)] : slugs[0];
         spawnMobAt(c, String(slug), bx + ((n % 3) - 1), by + Math.floor(n / 3), { bossHelper: true, now: now });
       }
-      mob.skillCds[key] = now + (sk.int || 2000);
       if (count > 0) usou = true;
       continue;
     }
@@ -4500,10 +4509,9 @@ function mobCastSkill(c, p, mob, now) {
       else if (/paralyz/i.test(nomeFx)) sk.cond = "freezing";
     }
     if (dist > mobSkillRangeSQM(sk, mob)) continue;
-    // chLock: rola UMA vez por intervalo — paridade com o motor do servidor.
-    if (sk.chLock) mob.skillCds[key] = now + (sk.int || 2000);
+    // Chance única por intervalo: accRoll já consumiu o período — falhar a
+    // chance adia para o próximo intervalo (comportamento oficial).
     if (Math.random() * 100 >= (sk.ch === undefined ? 15 : sk.ch)) continue;
-    mob.skillCds[key] = now + (sk.int || 2000);
     mob.attackAnim = 220;
     // magia sem dano direto (faixa zerada): entra a animacao oficial e,
     // quando a magia carrega um efeito no tempo (campo de fogo/veneno do
@@ -5521,18 +5529,17 @@ function combatTick(c, p, dt, now) {
 
   // monstros agem: no Canary (Monster::commitCombatIntention) o ataque
   // BÁSICO (melee, chance 100 no .lua) roda SEMPRE e as skills rolam a
-  // própria chance ADICIONAL no mesmo turno — cada attack da lista é
-  // independente. Antes o código fazia `skills || melee`, então quando
-  // qualquer skill passava o dano físico básico NUNCA saía (os monstros
-  // pareciam não causar dano físico, só as magias).
+  // própria chance ADICIONAL — cada attackSpell da lista tem o próprio
+  // timer de intervalo, independente do tick do melee.
   for (const m of c.mobs) {
+    // PARTY COMBAT: escolhe o alvo (mais próximo entre líder + membros)
+    if (typeof partyNearestTarget === "function") m.target = partyNearestTarget(c, m);
+    const pp = (m.target && m.target.p) ? m.target.p : p;
+    // 1) skills do .lua — cada uma rola chance no PRÓPRIO intervalo
+    //    (acumulador por skill, paridade com o servidor), não no tick do melee.
+    if (typeof mobCastSkill === "function") mobCastSkill(c, pp, m, now, dt);
     m.atkCd -= dt;
     if (m.atkCd <= 0) {
-      // PARTY COMBAT: escolhe o alvo (mais próximo entre líder + membros)
-      if (typeof partyNearestTarget === "function") m.target = partyNearestTarget(c, m);
-      const pp = (m.target && m.target.p) ? m.target.p : p;
-      // 1) skills do .lua (cada uma rola a própria chance + interval)
-      if (typeof mobCastSkill === "function") mobCastSkill(c, pp, m, now);
       // 2) melee extraído do name="melee". Sem melee real (naga combat
       // basic_attack) o damage é cópia do maior spell — não somar de novo.
       if ((m.def && (m.def.damage || 0) > 0) &&

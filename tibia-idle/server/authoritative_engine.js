@@ -4781,10 +4781,25 @@ function mobSkillHitsTarget(mob,sk,victim,auth){
   const cell=entityGridCell(victim,auth),key=cell.cx+":"+cell.cy;
   return cells.some((c)=>c.cx+":"+c.cy===key);
 }
-function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
+function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx,dt){
   const def=mob.def||{},skills=Array.isArray(def.skills)?def.skills:[],defS=Array.isArray(def.defSkills)?def.defSkills:[];
   if(!skills.length&&!defS.length)return;
-  mob.skillCds=mob.skillCds||{};
+  /* Canary: cada attackSpell do .lua tem o PROPRIO timer (spellBlock.speed)
+   * e rola a chance uma vez por intervalo — não no tick do melee. Antes a
+   * skill só rolava a cada golpe corpo-a-corpo: int<attackSpeed ficava
+   * pela metade da frequência oficial e, ao falhar a chance, re-rolava a
+   * cada swing até passar (int>attackSpeed ficava frequente demais).
+   * skillAccs acumula dt por skill e consome o intervalo a cada rolagem
+   * (pass ou fail) — mesma semântica do chLock, agora para todas. */
+  mob.skillAccs=mob.skillAccs||{};
+  const stepDt=Math.max(0,Number(dt)||0);
+  const accRoll=(key,sk)=>{
+    const iv=Math.max(200,Number(sk.int)||2000);
+    mob.skillAccs[key]=(Number(mob.skillAccs[key])||0)+stepDt;
+    if(mob.skillAccs[key]<iv)return false;
+    mob.skillAccs[key]=0;
+    return true;
+  };
   const dist=authorityVisualDistance(mob,victim,auth);
   const pushFx=(sk)=>{
     const cells=mobSkillCells(mob,sk,victim,auth),el=inferSkillElement(sk),fx=sk.fx||ELEMENT_FX[el]||ELEMENT_FX.physical;
@@ -4826,14 +4841,13 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
   };
   for(let i=0;i<defS.length;i++){
     const sk=defS[i],key="d"+i;
-    if((mob.skillCds[key]||0)>now)continue;
+    if(!accRoll(key,sk))continue;
     if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
     if(sk.n==="healing"){
       if(mob.maxHp&&mob.hp>=mob.maxHp)continue;
       const cura=sk.min<sk.max?roll(auth,Number(sk.min)||0,Number(sk.max)||0):Number(sk.min)||0;
       if(!cura)continue;
       mob.hp=Math.min(mob.maxHp||(mob.hp+cura),mob.hp+cura);
-      mob.skillCds[key]=now+(sk.int||2000);
       const pos=entityPosition(mob,.5,.5);
       auth.events.push({t:"mobheal",heal:cura,x:pos.x,y:pos.y,targetId:String(mob.id),
         fx:sk.fx||"magic-green",screen:true,ts:stepTs+mobHitIdx*200});
@@ -4841,7 +4855,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
   }
   for(let i=0;i<skills.length;i++){
     const sk=skills[i],key="s"+i,nomeFx=sk.n||"";
-    if((mob.skillCds[key]||0)>now)continue;
+    if(!accRoll(key,sk))continue;
     if(/invisib/i.test(nomeFx))continue;
     if(/summon/i.test(nomeFx)){
       // Summon genérico do Canary (ex.: Leiden invoca 1-2 Barkless Fanatic).
@@ -4849,7 +4863,6 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
       // <summon name="..."/> no XML do monstro.
       if(sk.summonSlug&&monsterDef(sk.summonSlug)){
         if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
-        mob.skillCds[key]=now+(sk.int||2000);
         const count=Math.max(1,Number(sk.summonCount)||1);
         for(let n=0;n<count;n++){
           const add=makeMob(auth,String(sk.summonSlug),false);
@@ -4873,12 +4886,9 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
       else if(/paralyz/i.test(nomeFx))sk.cond="freezing";
     }
     if(dist>mobSkillRangeSQM(sk,mob))continue;
-    /* chLock: rola UMA vez por intervalo (ex.: "20% a cada 8s") — sem o
-     * flag, uma chance baixa re-rola a cada ataque até acertar, ficando
-     * muito mais frequente que o intervalo pedido. */
-    if(sk.chLock)mob.skillCds[key]=now+(sk.int||2000);
+    /* Chance única por intervalo: accRoll já consumiu o período — falhar a
+     * chance adia para o próximo intervalo (comportamento oficial). */
     if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
-    mob.skillCds[key]=now+(sk.int||2000);
     const el=inferSkillElement(sk);
     pushFx(sk);
     if(!((sk.max||0)>0)){
@@ -10107,6 +10117,10 @@ function step(auth,now,opts){if(auth.ended)return;
   for(const mob of auth.mobs){
     if(mob.def?.noAttack)continue;
     mob.attackAcc+=dt;
+    // Skills rolam no intervalo próprio do .lua (acumulador por skill em
+    // runMobSkills), desacopladas do tick do melee — ver comentário lá.
+    const skillVictim=authorityMobTarget(auth,mob);
+    if(skillVictim)runMobSkills(auth,mob,skillVictim,now,stepTs,0,dt);
     let mobHitIdx=0;
     const mobInterval=Math.max(500,Number(mob.attackSpeed)||2000);
     while(mob.attackAcc>=mobInterval){
@@ -10114,7 +10128,6 @@ function step(auth,now,opts){if(auth.ended)return;
       mob.attackAcc-=mobInterval;
       const victim=authorityMobTarget(auth,mob);
       if(!victim)break;
-      runMobSkills(auth,mob,victim,now,mobVisualTs,0);
 
       // 2) Melee extraído do name="melee" do .lua. Sem melee real o import
       // copia max(skills) em damage — naga/makara NÃO devem bater isso extra.

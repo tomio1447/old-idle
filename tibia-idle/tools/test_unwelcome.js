@@ -107,6 +107,9 @@ must(bro.exp===0,"Brother Worm não deveria dar exp (oficial: 0)");
 const liveBro=brotherOf(cur.authority);
 must(liveBro,"Brother Worm fora de campo no ponto do teste de pool");
 liveBro.hp=50000; // desserializar → reconciliação pelo flag unwelcomeLinked
+// silencia a cura própria (defSkills) para o assert de espelho ser exato —
+// ela rola no intervalo próprio e pode regenerar dentro do advance.
+if(liveBro.def)liveBro.def=Object.assign({},liveBro.def,{skills:[],defSkills:[]});
 cur=advance(cur,1000);
 must(bossOf(cur.authority).hp===50000&&bossOf(cur.authority).maxHp===290000,
   "barra do boss não espelha a vida compartilhada da Brother Worm");

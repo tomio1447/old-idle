@@ -229,6 +229,14 @@ def parse_ataques(txt):
         mind = abs(num(ln, "minDamage", 0) or 0)
         maxd = abs(num(ln, "maxDamage", 0) or 0)
         if nome == "melee":
+            # Melee por fórmula (ex.: ink_blob.lua usa `skill = 45,
+            # attack = 40` sem min/maxDamage): o TFS calcula o máximo via
+            # Weapons::getMaxMeleeDamage = ceil(skill*attack*0.05 + attack*0.5).
+            if maxd <= 0:
+                atk_skill = num(ln, "skill")
+                atk_value = num(ln, "attack")
+                if atk_skill and atk_value:
+                    maxd = int(-(-(atk_skill * (atk_value * 0.05) + atk_value * 0.5) // 1))
             melee = max(melee, int(maxd))
             cond = _condicao(ln)
             if cond:

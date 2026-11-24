@@ -4,6 +4,28 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Dano dos monstros: skills no timer próprio + melee do Ink Blob
+
+- **Bug**: as magias dos monstros só rolavam a cada golpe corpo-a-corpo
+  (~2s). No Canary cada `attackSpell` tem o próprio timer — skills com
+  `interval < 2000` (ex.: Icecold Book, Biting Book) ficavam pela metade
+  da frequência oficial e, ao falhar a chance, re-rolavam todo swing até
+  passar (skills de `interval > 2000` ficavam frequentes demais). Agora
+  cada skill rola UMA chance por intervalo próprio (`mob.skillAccs`),
+  tanto no servidor (`runMobSkills`) quanto no sim local (`mobCastSkill`).
+- **Bug**: o melee do Ink Blob nunca saía — no .lua ele usa fórmula
+  (`skill=45, attack=40`, sem min/maxDamage) e o import antigo copiou
+  `max(skills)=580` no campo damage, que o motor interpretava como "sem
+  melee real" e suprimia. Corrigido para o máximo oficial (~110 via
+  `getMaxMeleeDamage`) — morde e ainda envenena (`meleeCond`, que já
+  estava certo).
+- Resultado medido na Library Ice: ~+20% de dano recebido por tempo na
+  box de 10–12 mobs; Ink Blob ~+70%.
+- `tools/import_monsters.py` agora calcula melee de fórmula — re-imports
+  não regridem.
+
+---
+
 ## 2026-11-24 — Fala/ícones de cast mais perto do personagem
 
 - **Ajuste**: textos de magia e os ícones de runa/potion subiam ~1 tile

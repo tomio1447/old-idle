@@ -26,7 +26,9 @@ const bands = {
   "marapur-nagas": { mobs: ["naga-archer", "naga-warrior", "makara"], dmg: [400, 550], level: 320 },
   "library-fire": { mobs: ["burning-book", "rage-squid", "biting-book"], dmg: [600, 900], level: 400 },
   "library-energy": { mobs: ["energetic-book", "biting-book"], dmg: [500, 800], level: 425 },
-  "library-ice": { mobs: ["icecold-book", "squid-warden", "ink-blob"], dmg: [250, 500], level: 450 },
+  // Ink Blob melee oficial é por fórmula (skill 45 / attack 40 → max ~110),
+  // não o maxSkill 580 que o import antigo sintetizava — a média do trio é 203.
+  "library-ice": { mobs: ["icecold-book", "squid-warden", "ink-blob"], dmg: [150, 450], level: 450 },
   "library-earth": { mobs: ["cursed-book", "biting-book"], dmg: [500, 800], level: 475 },
   "dark-thais": {
     mobs: ["many-faces", "knight-s-apparition", "paladin-s-apparition", "sorcerer-s-apparition",
