@@ -934,7 +934,7 @@ function pvpAuxChars(c) {
     if (pvpIsOwnEnt(e, me)) return true;
     return myTeam && Number(e.pvpTeam || e.team) === myTeam &&
       aiCtl[String(e.id)] === "AI_HARD";
-  }).slice(0, 8);
+  }).slice(0, 16);
 }
 function pvpCharCtrl(c, id) {
   c._pvpCharCtrl = c._pvpCharCtrl || {};

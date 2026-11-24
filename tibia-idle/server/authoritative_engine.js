@@ -1144,6 +1144,16 @@ function normalizeVisualState(raw,auth){
         item.pvpCtrl={chase:input.pvpCtrl.chase===undefined?1:(input.pvpCtrl.chase?1:0),
           mode:String(input.pvpCtrl.mode||"").slice(0,16)};
       }
+      // Mapa de controles pra AFKs aliados ({charId:{chase,mode}}) — o
+      // servidor aplica só em AI_HARD do mesmo time (validação no sync).
+      if(input.pvpCtrlMap&&typeof input.pvpCtrlMap==="object"){
+        const m={},keys=Object.keys(input.pvpCtrlMap).slice(0,32);
+        for(const k of keys){const cc=input.pvpCtrlMap[k];
+          if(cc&&typeof cc==="object"&&String(k).length<=64)
+            m[String(k)]={chase:cc.chase===undefined?1:(cc.chase?1:0),
+              mode:String(cc.mode||"").slice(0,16)};}
+        if(Object.keys(m).length)item.pvpCtrlMap=m;
+      }
       // Atividade humana explícita (o cliente pode carimbar interações reais).
       if(Number.isFinite(Number(input.actAt)))item.actAt=Number(input.actAt);
       if(input.challenge&&typeof input.challenge==="object"){

@@ -425,6 +425,12 @@ function pvpAiDecide(auth, item, now) {
       goal: { cx: Number(recall.cx) || s.cx, cy: Number(recall.cy) || s.cy,
         td: 2, recall: true } });
 
+  /* CHASE OFF travado pelo painel (humano — não _aiOwned): o bot não sai
+   * atrás de alvo nenhum — segura posição/formação (igual ao CHASE OFF
+   * do fluxo humano). RECALL/RETREAT defensivo continuam valendo. */
+  const chaseOff = !!(item._pvpCtrl && item._pvpCtrl.chase === false &&
+    !item._pvpCtrl._aiOwned);
+
   /* TEAM_RETREAT — o comandante decretou retirada: quem está ferido e
    * exposto recua junto (a retirada coletiva não deixa stragglers). */
   if (coord && coord.strategy === "retreat" && s.hpPct < 0.55 && szHome) {
@@ -460,7 +466,7 @@ function pvpAiDecide(auth, item, now) {
       if (a.id === s.id || !_isBackline(a)) continue;
       const bully = v.foes.find((f) =>
         Math.abs(f.s.cx - a.cx) + Math.abs(f.s.cy - a.cy) <= 2);
-      if (bully) {
+      if (bully && !chaseOff) {
         cand.push({ action: "DEFEND", prio: AI_PRIO.DEFEND + 3,
           targetId: bully.s.id, allyId: a.id,
           goal: { cx: bully.s.cx, cy: bully.s.cy, td: 1, push: true, defend: true } });
@@ -485,7 +491,7 @@ function pvpAiDecide(auth, item, now) {
 
   /* FINISH — inimigo vulnerável dentro de 8sqm. */
   const finishable = v.foes.find((f) => f.s.hpPct < AI_FINISH_HP && f.d <= 8);
-  if (finishable && !recallOn) {
+  if (finishable && !recallOn && !chaseOff) {
     cand.push({ action: "ATTACK", prio: AI_PRIO.FINISH + mapW.finish,
       targetId: finishable.s.id,
       goal: { cx: finishable.s.cx, cy: finishable.s.cy, td: reach, push: true } });
@@ -509,7 +515,7 @@ function pvpAiDecide(auth, item, now) {
   }
   /* Em strategy "retreat" a ordem do time é recuar — ataque individual só
    * sai via FINISH (finalização segura não é suicídio). */
-  if (tgt && !(coord && coord.strategy === "retreat") && !recallOn) {
+  if (tgt && !(coord && coord.strategy === "retreat") && !recallOn && !chaseOff) {
     // FASE 7: no mapa de controle, perseguir longe da zona vale menos
     // (caçar kill solto entrega o território).
     const pursueAdj = !callId ? mapW.pursue : 0;

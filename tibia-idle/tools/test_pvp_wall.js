@@ -271,5 +271,18 @@ console.log("\n== REGROUP: ordem de convergência + cooldown por conta ==");
     act.goal.cy === entLeader.cy, "goal converge pra célula do caller");
 }
 
+console.log("\n== Transporte do painel: campos sobrevivem ao normalize ==");
+{
+  const v = eng.normalizeVisualState({ players: [
+    { id: "1", self: 1, x: .2, y: .2, cx: 10, cy: 10, pvpRegroup: 1,
+      pvpAtk: 0, pvpCtrlMap: { "9": { chase: 0, mode: "xbow" } } },
+  ] }, { gridW: 51, gridH: 52 });
+  const p0 = v.players[0];
+  ok(p0 && p0.pvpRegroup === 1, "pvpRegroup chega à autoridade");
+  ok(p0 && p0.pvpCtrlMap && p0.pvpCtrlMap["9"] &&
+    p0.pvpCtrlMap["9"].mode === "xbow" && p0.pvpCtrlMap["9"].chase === 0,
+    "pvpCtrlMap (AFKs aliados) chega à autoridade");
+}
+
 if (failures) { console.error("\n" + failures + " FALHA(S)"); process.exit(1); }
 console.log("\nALL PVP WALL TESTS PASSED");
