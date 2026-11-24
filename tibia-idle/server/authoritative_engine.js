@@ -1231,7 +1231,12 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
         }
       }
       // TARGET OFF vale por char — chega em todos os visuais da conta.
-      if(pos.pvpAtk!==undefined)item._pvpAttackOff=!pos.pvpAtk;
+      // Também vira flag DE TIME: chars AFK (AI_HARD) de qualquer conta
+      // aliada obedecem (pvpAttackOffEff) — o painel não é mais só da PT.
+      if(pos.pvpAtk!==undefined){item._pvpAttackOff=!pos.pvpAtk;
+        if(auth.pvpBattle){const _t=pvpBattleTeamOf(item);
+          if(_t&&auth.pvpBattle.teams&&auth.pvpBattle.teams[_t])
+            auth.pvpBattle.teams[_t].attackOff=!pos.pvpAtk;}}
       // Painel PvP por char: chase/prioridade/equip do auxiliar (IA do servidor).
       if(pos.pvpCtrl!==undefined){item._pvpCtrl=sanitizePvpCtrl(pos.pvpCtrl);
         pvpEquipPreset(auth,item,item.p,Number(auth.clock)||Date.now());}
@@ -1265,6 +1270,20 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     if(!_poseGate)applyPose(item,pos);
     if(pos.pvpCtrl!==undefined&&auth.pvpBattle){item._pvpCtrl=sanitizePvpCtrl(pos.pvpCtrl);
       pvpEquipPreset(auth,item,item.p,Number(auth.clock)||Date.now());}
+    // Painel estendido pros AFK DO TIME: pvpCtrlMap {charId:{chase,mode}}
+    // controla chars AI_HARD de contas aliadas. Validações: mesmo time,
+    // AI_HARD (não sequestra char pilotado), inimigo impossível por team.
+    if(pos.pvpCtrlMap&&auth.pvpBattle){
+      const _t=pvpBattleTeamOf(item);
+      for(const rid of Object.keys(pos.pvpCtrlMap)){
+        const o=(auth.players||[]).find((x)=>x&&String(x.id)===rid&&pvpBattleTeamOf(x)===_t);
+        if(!o||o===item)continue;
+        if(!(o._aiCtl&&o._aiCtl.mode==="AI_HARD"))continue;
+        const cc=sanitizePvpCtrl(pos.pvpCtrlMap[rid]);if(!cc)continue;
+        o._pvpCtrl=cc;
+        pvpEquipPreset(auth,o,o.p,Number(auth.clock)||Date.now());
+      }
+    }
     if(combo){
       item.p=item.p||{};item.p.config=item.p.config||{};
       item.p.config.combo=sanitizeCombo(combo,item.p.voc);
@@ -1298,7 +1317,10 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     // TARGET OFF: desliga magias E runas de ataque só deste char (transiente,
     // não toca config.spellAttack salva) — a sequência de cooldowns fica
     // livre pra Magic Wall entrar na hora certa.
-    if(pos.pvpAtk!==undefined&&auth.pvpBattle)item._pvpAttackOff=!pos.pvpAtk;
+    if(pos.pvpAtk!==undefined&&auth.pvpBattle){item._pvpAttackOff=!pos.pvpAtk;
+      const _t=pvpBattleTeamOf(item);
+      if(_t&&auth.pvpBattle.teams&&auth.pvpBattle.teams[_t])
+        auth.pvpBattle.teams[_t].attackOff=!pos.pvpAtk;}
     // WALL: a conta marca a célula; qualquer char da PT com runa+cooldown
     // livre conjura (pvpProcessWallCalls). Não exige líder — cada conta
     // controla os próprios muros.
@@ -4946,6 +4968,15 @@ const PVP_BATTLE_RUNE_RANGE=7;
 /* Guerra de guild: Royal Paladin (bolt/crossbow + spells de distância)
  * tem alcance PvP de ATÉ 8 SQM — pedido de balance. */
 const PVP_BATTLE_RP_RANGE=8;
+/* TARGET OFF efetivo: o flag próprio do char OU a flag do time — esta
+ * alcança chars AFK (AI_HARD) de contas aliadas; o painel do líder não
+ * desarma chars HUMANOS de outras contas (autonomia preservada). */
+function pvpAttackOffEff(auth,item){
+  if(item&&item._pvpAttackOff)return true;
+  const pb=auth&&auth.pvpBattle,t=item?pvpBattleTeamOf(item):0;
+  return !!(t&&pb&&pb.teams&&pb.teams[t]&&pb.teams[t].attackOff&&
+    item&&item._aiCtl&&item._aiCtl.mode==="AI_HARD");
+}
 /* O líder só designa alvo a até 11 sqm do próprio char (meia FOV). */
 const PVP_BATTLE_TARGET_RANGE=11;
 /* Formação: o time acompanha o líder a até 5 sqm. */
@@ -5365,8 +5396,15 @@ function pvpProcessWallCalls(auth,now){
     const mine=(pb.walls||[]).filter((w)=>Number(w.accId)===accN).length;
     if(mine>=PVP_WALL_MAX_PER_ACC){delete calls[acc];continue;}
     const here=entityGridCell;
+    /* Caster: chars da conta que chamou (como antes) + AFKs do MESMO time
+     * — qualquer AI_HARD aliado com runa+cooldown+alcance conjura. Chars
+     * HUMANOS de outras contas não são forçados (autonomia). */
+    const accTeam=(auth.players||[]).reduce((t,o)=>t||(o&&
+      Number(o.accountId!==undefined?o.accountId:(o.p&&o.p.accountId))===accN
+      ?pvpBattleTeamOf(o):0),0);
     const caster=(auth.players||[]).filter((o)=>o&&o.p&&o.p.hp>0&&!o.downUntil&&
-      Number(o.accountId!==undefined?o.accountId:(o.p&&o.p.accountId))===accN&&
+      (Number(o.accountId!==undefined?o.accountId:(o.p&&o.p.accountId))===accN||
+        (accTeam&&pvpBattleTeamOf(o)===accTeam&&o._aiCtl&&o._aiCtl.mode==="AI_HARD"))&&
       chebyshevCells(here(o,auth),{cx,cy})<=PVP_BATTLE_RUNE_RANGE)
       .sort((a,b)=>chebyshevCells(here(a,auth),{cx,cy})-chebyshevCells(here(b,auth),{cx,cy}))
       .find((o)=>pvpWallRuneReady(o.p,now));
@@ -9352,7 +9390,7 @@ function step(auth,now,opts){if(auth.ended)return;
       // primeiro; druida PARALYZE → trava o alvo chamado antes da SD; druida
       // HEAL → SD normal (a cura em aliados corre no tick de friend-heal).
       let _pvpForced=null;
-      if(auth.pvpBattle&&!item._pvpAttackOff){
+      if(auth.pvpBattle&&!pvpAttackOffEff(auth,item)){
         const bv=CanaryVocation.baseVocName(p.voc);
         const ctrlMode=String((item._pvpCtrl&&item._pvpCtrl.mode)||"");
         if(bv==="sorcerer"){
@@ -9372,7 +9410,7 @@ function step(auth,now,opts){if(auth.ended)return;
             _pvpForced=null;
         }
       }
-      const s=_pvpForced||((acted||item._pvpAttackOff)?null:nextComboSpell(auth,item,p,now,primaryTarget,living));
+      const s=_pvpForced||((acted||pvpAttackOffEff(auth,item))?null:nextComboSpell(auth,item,p,now,primaryTarget,living));
       if(s&&s.rune){
         acted=tryUseRune(auth,item,p,now,s.id,primaryTarget,living,visualTs);
       }else if(s){
@@ -10424,7 +10462,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
   pvpBattleLeaderChar,pvpWallAt,pvpCastMagicWall,pvpProcessWallCalls,pvpWallRuneReady,authorityCellBlocked,
-  sanitizePvpCtrl,pvpTryParalyze,pvpTryUeRunes,pvpEquipPreset,pvpSpellReady,pvpPrioritySpell,
+  sanitizePvpCtrl,pvpTryParalyze,pvpTryUeRunes,pvpEquipPreset,pvpSpellReady,pvpPrioritySpell,pvpAttackOffEff,
   PVP_BATTLE_PARALYZE_MS,PVP_PRIO_XBOW,PVP_PRIO_BOW,healPlayers,usePotion,pvpBattleGoal,
   pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,
   canPlayerDamagePlayer,livingHostilePlayers,playersAreAllies,applyPlayerPvpDamage,

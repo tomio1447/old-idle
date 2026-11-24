@@ -915,12 +915,21 @@ const PVP_CHAR_OPTS = {
   paladin:  [{ id: "bow", label: "BOW", img: "assets/item/elvish-bow.png", title: "Melhor bow da mochila + diamond arrow + magias em área" },
              { id: "xbow", label: "XBOW", img: "assets/item/arbalest.png", title: "Melhor crossbow + spectral bolt + exori con/gran con" }],
 };
-/* Auxiliares da conta: todos menos o char pilotado (máx 4 botões). */
+/* Controláveis pelo painel: auxiliares da conta + AFKs DO TIME (chars
+ * AI_HARD de contas aliadas — o servidor só aplica em AI_HARD do mesmo
+ * time; humano aliado e inimigo são imunes ao controle). */
 function pvpAuxChars(c) {
   const me = typeof pvpMyAccountId === "function" ? pvpMyAccountId() : 0;
   const selfId = String((c.player && c.player.id) || "");
-  return (c.players || []).filter((e) => e && typeof pvpIsOwnEnt === "function" &&
-    pvpIsOwnEnt(e, me) && String(e.id) !== selfId).slice(0, 4);
+  const aiCtl = (c.pvpBattle && c.pvpBattle.aiControl) || {};
+  const own = (c.players || []).find((e) => typeof pvpIsOwnEnt === "function" && pvpIsOwnEnt(e, me));
+  const myTeam = own ? Number(own.pvpTeam || own.team) || 0 : 0;
+  return (c.players || []).filter((e) => {
+    if (!e || !e.p || String(e.id) === selfId) return false;
+    if (pvpIsOwnEnt(e, me)) return true;
+    return myTeam && Number(e.pvpTeam || e.team) === myTeam &&
+      aiCtl[String(e.id)] === "AI_HARD";
+  }).slice(0, 8);
 }
 function pvpCharCtrl(c, id) {
   c._pvpCharCtrl = c._pvpCharCtrl || {};

@@ -136,7 +136,7 @@ console.log("\n== TARGET OFF: flag _pvpAttackOff ==");
   // O gate fica no loop de ataque: _pvpAttackOff impede tryUseRune SD e
   // nextComboSpell — assertivo estrutural do diff aplicado.
   const src = fs.readFileSync(path.join(ROOT, "server/authoritative_engine.js"), "utf8");
-  ok(src.includes("!item._pvpAttackOff"), "SD-rune e combo gated por _pvpAttackOff");
+  ok(src.includes("pvpAttackOffEff(auth,item)"), "SD-rune e combo gated por pvpAttackOffEff");
   ok(src.includes("pos.pvpAtk!==undefined"), "pos.pvpAtk processado no visual");
   ok(src.includes("pos.wallTarget"), "pos.wallTarget processado no visual");
 }
@@ -145,6 +145,60 @@ console.log("\n== Serialização: walls no descriptor ==");
 {
   const src = fs.readFileSync(path.join(ROOT, "server/authoritative_engine.js"), "utf8");
   ok(src.includes("walls:auth.pvpBattle.walls"), "pvpBattle.walls serializado");
+}
+
+console.log("\n== Painel estendido: AFK do time como caster ==");
+{
+  const now = Date.now();
+  const caller = mkChar(1, 100, 1, 10, 10);          // quem chamou (sem runa)
+  const afk = mkChar(2, 200, 1, 14, 10);             // AFK aliado COM runa
+  afk.p.supplies["magic-wall-rune"] = 2;
+  const foe = mkChar(3, 300, 2, 20, 10);
+  const auth = makeAuth([caller, afk, foe]);
+  auth.players[1]._aiCtl = { mode: "AI_HARD" };      // _aiCtl vive na entidade runtime
+  auth.pvpBattle.wallCalls = { "100": { cx: 16, cy: 10, at: now } };
+  eng.pvpProcessWallCalls(auth, now);
+  const wall = (auth.pvpBattle.walls || [])[0];
+  ok(wall && wall.cx === 16, "AFK aliado com runa+alcance conjura o muro");
+  ok(wall && String(wall.by) === "2", "caster é o char AFK da conta aliada");
+}
+
+console.log("\n== Painel estendido: HUMANO aliado e INIMIGO imunes ==");
+{
+  const now = Date.now();
+  // Caller LONGE da célula (>7sqm): se o muro sair, foi o aliado/inimigo.
+  const caller = mkChar(1, 100, 1, 40, 40);
+  const human = mkChar(2, 200, 1, 14, 10);           // aliado PILOTADO
+  human.p.supplies["magic-wall-rune"] = 2;           // (sem _aiCtl = humano)
+  const foe = mkChar(3, 300, 2, 13, 10);
+  foe.p.supplies["magic-wall-rune"] = 5;             // inimigo c/ runa sobrando
+  const auth = makeAuth([caller, human, foe]);
+  auth.players[2]._aiCtl = { mode: "AI_HARD" };
+  auth.pvpBattle.wallCalls = { "100": { cx: 16, cy: 10, at: now } };
+  eng.pvpProcessWallCalls(auth, now);
+  ok(!(auth.pvpBattle.walls || []).length,
+    "nem humano aliado nem AFK inimigo conjuram (espera TTL)");
+}
+
+console.log("\n== TARGET OFF de time atinge só AFK (pvpAttackOffEff) ==");
+{
+  const own = mkChar(1, 100, 1, 10, 10);
+  const afk = mkChar(2, 200, 1, 11, 10);
+  const human = mkChar(3, 300, 1, 12, 10);           // aliado pilotado
+  const auth = makeAuth([own, afk, human]);
+  auth.players[1]._aiCtl = { mode: "AI_HARD" };
+  const it = auth.players;
+  auth.pvpBattle.teams[1].attackOff = true;
+  ok(eng.pvpAttackOffEff(auth, it[1]) === true,
+    "AFK do time: attackOff do painel desarma");
+  ok(eng.pvpAttackOffEff(auth, it[2]) === false,
+    "humano aliado: flag do time não desarma (autonomia)");
+  auth.pvpBattle.teams[1].attackOff = false;
+  ok(eng.pvpAttackOffEff(auth, it[1]) === false,
+    "flag desligada volta a permitir ataque");
+  it[1]._pvpAttackOff = true;
+  ok(eng.pvpAttackOffEff(auth, it[1]) === true,
+    "flag próprio do char continua valendo");
 }
 
 if (failures) { console.error("\n" + failures + " FALHA(S)"); process.exit(1); }
