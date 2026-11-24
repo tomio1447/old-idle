@@ -937,7 +937,7 @@ function pvpCharCtrl(c, id) {
   return c._pvpCharCtrl[id];
 }
 
-const PVP_VOC_SHORT = { knight: "KN", monk: "MK", paladin: "PA", sorcerer: "SO", druid: "DR" };
+const PVP_VOC_SHORT = { knight: "EK", monk: "EM", paladin: "RP", sorcerer: "MS", druid: "ED" };
 const PVP_VOC_ORDER = ["knight", "monk", "paladin", "sorcerer", "druid"];
 /* Re-render da coluna BCP (Botão de Comando PvP): UM botão por vocação —
  * a opção escolhida aplica em TODOS os controlados AFK daquela vocação
@@ -960,7 +960,7 @@ function pvpCharColTick(col) {
     // Estado mostrado = do 1º char do grupo (todos convergem após 1 clique).
     const ctrl = pvpCharCtrl(c, String(list[0].id));
     html += `<div class="pvp-char-slot${open ? " open" : ""}">` +
-      `<button class="pvp-char-btn" data-voc="${bv}" title="BCP ${bv} — ${list.length} controlado(s)"` +
+      `<button class="pvp-char-btn" data-voc="${bv}" title="BCP ${PVP_VOC_SHORT[bv]} — ${list.length} controlado(s)"` +
       ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">` +
       `<i class="pvp-voc-n">${list.length}</i>${PVP_VOC_SHORT[bv]}</button>`;
     if (open) {

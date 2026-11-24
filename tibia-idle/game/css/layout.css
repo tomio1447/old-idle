@@ -7376,11 +7376,19 @@ body.fullhd .party-panel.collapsed { width: auto; }
 }
 .pvp-char-ai[data-m="DEAD"] { background: #7f1d1d; }
 .pvp-char-ai[data-m="AI_PENDING"], .pvp-char-ai[data-m="DISABLED"] { background: #6b7280; }
+/* Flyout de opções = extensão do próprio botão BCP: colado na borda,
+ * centralizado na altura do botão e compartilhando fundo/borda — não
+ * flutua desalinhado. O -2px sobrepõe as bordas (uma linha só). */
 .pvp-char-opts {
-  position: absolute; left: calc(100% + 6px); top: 0;
+  position: absolute; left: calc(100% - 2px); top: 50%;
+  transform: translateY(-50%);
   display: flex; gap: 4px; padding: 3px;
-  background: rgba(10,8,6,.92); border: 1px solid #5a4a33; border-radius: 3px;
+  background: rgba(16,12,10,.92); border: 2px solid #5a4a33;
+  border-left: none; border-radius: 0 3px 3px 0;
+  z-index: 5;
 }
+/* Com o flyout aberto, o botão perde o raio direito — vira peça única. */
+.pvp-char-slot.open .pvp-char-btn { border-radius: 3px 0 0 3px; }
 .pvp-char-opt { min-width: 44px; }
 .pvp-char-opt img { width: 24px; height: 24px; }
 .pvp-sb-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 0; }
