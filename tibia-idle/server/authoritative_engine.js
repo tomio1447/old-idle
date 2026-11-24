@@ -4614,6 +4614,8 @@ function mobHasExtractedMelee(def){
   def=def||{};
   const dmg=Number(def.damage)||0;
   if(dmg<=0)return false;
+  if(def.noMelee)return false;
+  if(def.hasMelee)return true;
   const skills=Array.isArray(def.skills)?def.skills:[];
   if(!skills.length)return true;
   let skillMax=0;

@@ -480,6 +480,14 @@ def parse_arquivo(caminho):
     }
     if melee_cond:
         m["meleeCond"] = melee_cond
+    if melee > 0:
+        _smax = max([sk.get("max") or 0 for sk in skills] or [0])
+        if melee == _smax:
+            # a heuristica damage===maxSkill nao distingue melee real de
+            # damage sintetizado — a marca explicita impede a supressao
+            m["hasMelee"] = True
+    else:
+        m["noMelee"] = True
     if defesas.get("mitigation"):
         m["mitigation"] = defesas["mitigation"]
     if elements:

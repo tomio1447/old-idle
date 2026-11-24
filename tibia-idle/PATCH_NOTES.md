@@ -4,6 +4,35 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Melee oficial em TODO o bestiário (auditoria Canary)
+
+- **Bug**: a heurística `damage === max(skills)` que detectava "melee
+  sintetizado" (nagas: `basic_attack` como `name="combat"`) também
+  suprimia o melee **real** de qualquer monstro cujo golpe corpo-a-corpo
+  coincidisse com a magia mais forte — ou que usasse fórmula
+  `skill/attack` no .lua (o import copiava `max(skills)` no damage).
+- Auditoria dos 1656 .lua do Canary:
+  - **220 monstros** com `damage` divergente do melee oficial
+    (corrigidos; ex.: apparitions 630→900, thorn-steed 0→1375,
+    Infernatil 1500→2860, Morshabaal 30000→2625);
+  - **61 monstros** cujo melee oficial é IGUAL ao maxSkill — a
+    heurística jamais os distinguia: Jaul, gazer-spectre, sopping-corpus,
+    manta-ray, rahemos, drillworm… marcados `hasMelee:true`;
+  - **47 monstros** sem linha `name="melee"` no .lua marcados
+    `noMelee:true` (a supressão nesses é legítima — 2 nem a heurística
+    pegava e ganhavam melee de graça).
+- `mobHasExtractedMelee` agora honra os marcadores explícitos
+  (`hasMelee`/`noMelee`) antes da heurística — servidor e sim local.
+- Aplicado em `game/data/canarymonsters.json` E `game/js/monsterdata.js`
+  (o def do cliente alimenta o `bossSrc` dos bosses).
+- `tools/import_monsters.py` emite os marcadores — re-imports não
+  regridem.
+- Efeito: vários monstros e **bosses** passam a morder o valor oficial —
+  hunts ficam mais fiéis (e algumas mais perigosas). `test_hunt_damage_bands`
+  voltou a passar no dark-thais (apparitions estavam ~30% abaixo).
+
+---
+
 ## 2026-11-24 — Dano dos monstros: skills no timer próprio + melee do Ink Blob
 
 - **Bug**: as magias dos monstros só rolavam a cada golpe corpo-a-corpo
