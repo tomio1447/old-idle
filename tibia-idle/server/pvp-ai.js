@@ -415,6 +415,16 @@ function pvpAiDecide(auth, item, now) {
   const coord = _aiCoord(pb, myTeam);
   const mapW = AI_MAP_WEIGHTS[pb.mode] || AI_MAP_WEIGHTS.frags;
 
+  /* RECALL — o líder apertou REGROUP: todos os bots largam o alvo e
+   * vêm pra célula do caller (perto = 2sqm). Ordem explícita vence até
+   * o instinto de sobrevivência; alvos são ignorados enquanto ativa. */
+  const recall = pb.teams && pb.teams[myTeam] && pb.teams[myTeam].recall;
+  const recallOn = !!(recall && Number(recall.until) > now);
+  if (recallOn)
+    cand.push({ action: "RECALL", prio: AI_PRIO.SURVIVE + 20,
+      goal: { cx: Number(recall.cx) || s.cx, cy: Number(recall.cy) || s.cy,
+        td: 2, recall: true } });
+
   /* TEAM_RETREAT — o comandante decretou retirada: quem está ferido e
    * exposto recua junto (a retirada coletiva não deixa stragglers). */
   if (coord && coord.strategy === "retreat" && s.hpPct < 0.55 && szHome) {
@@ -475,7 +485,7 @@ function pvpAiDecide(auth, item, now) {
 
   /* FINISH — inimigo vulnerável dentro de 8sqm. */
   const finishable = v.foes.find((f) => f.s.hpPct < AI_FINISH_HP && f.d <= 8);
-  if (finishable) {
+  if (finishable && !recallOn) {
     cand.push({ action: "ATTACK", prio: AI_PRIO.FINISH + mapW.finish,
       targetId: finishable.s.id,
       goal: { cx: finishable.s.cx, cy: finishable.s.cy, td: reach, push: true } });
@@ -499,7 +509,7 @@ function pvpAiDecide(auth, item, now) {
   }
   /* Em strategy "retreat" a ordem do time é recuar — ataque individual só
    * sai via FINISH (finalização segura não é suicídio). */
-  if (tgt && !(coord && coord.strategy === "retreat")) {
+  if (tgt && !(coord && coord.strategy === "retreat") && !recallOn) {
     // FASE 7: no mapa de controle, perseguir longe da zona vale menos
     // (caçar kill solto entrega o território).
     const pursueAdj = !callId ? mapW.pursue : 0;

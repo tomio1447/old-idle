@@ -16,6 +16,7 @@ function ok(cond, msg) {
 }
 const eng = require(path.join(ROOT, "server/authoritative_engine.js"));
 const PVP = require(path.join(ROOT, "server/pvp.js"));
+const PVP_AI = require(path.join(ROOT, "server/pvp-ai.js"));
 
 function mkChar(id, acc, team, cx, cy, extra) {
   const p = Object.assign({ id: String(id), name: "C" + id, voc: "druid",
@@ -217,6 +218,57 @@ console.log("\n== Linha de visão: muros/paredes bloqueiam (pvpLosClear) ==");
   // Diagonal com canto fechado pelos dois lados: não passa.
   auth.blockedCells = { "11:10": true, "10:11": true };
   ok(eng.pvpLosClear(auth, 10, 10, 11, 11) === false, "canto diagonal fechado bloqueia");
+}
+
+console.log("\n== REGROUP: ordem de convergência + cooldown por conta ==");
+{
+  const now = Date.now();
+  const leader = mkChar(1, 100, 1, 10, 10);
+  const afk = mkChar(2, 200, 1, 16, 16, { voc: "knight" });
+  const foe = mkChar(3, 300, 2, 20, 20);
+  const auth = makeAuth([leader, afk, foe]);
+  const entLeader = auth.players.find((o) => o.id === "1");
+  const entAfk = auth.players.find((o) => o.id === "2");
+
+  auth.pvpBattle.regroupCalls = { "100": { charId: "1", at: now } };
+  eng.pvpProcessRegroupCalls(auth, now);
+  const rec = auth.pvpBattle.teams[1].recall;
+  ok(!!rec, "regroup call vira team.recall");
+  ok(rec && rec.cx === entLeader.cx && rec.cy === entLeader.cy,
+    "recall aponta a célula do caller");
+  ok(rec && Number(rec.until) > now, "recall tem janela ativa");
+  ok(Number(auth.pvpBattle.regroupCd["100"]) === now + 60000,
+    "free: cooldown 60s por conta");
+  ok(!auth.pvpBattle.regroupCalls["100"], "chamada consumida");
+
+  // Cooldown: segunda chamada dentro dos 60s é ignorada.
+  auth.pvpBattle.regroupCalls = { "100": { charId: "1", at: now + 5000 } };
+  const recBefore = rec;
+  eng.pvpProcessRegroupCalls(auth, now + 5000);
+  ok(auth.pvpBattle.teams[1].recall === recBefore,
+    "dentro do cooldown a chamada não dispara");
+
+  // VIP: cooldown de 10s.
+  entLeader.p.vipUntil = now + 99999999;
+  auth.pvpBattle.regroupCalls = { "100": { charId: "1", at: now + 60001 } };
+  eng.pvpProcessRegroupCalls(auth, now + 60001);
+  ok(Number(auth.pvpBattle.regroupCd["100"]) === now + 60001 + 10000,
+    "vip: cooldown 10s por conta");
+
+  // Outra conta do mesmo time não divide o cooldown.
+  entAfk.accountId = 200;
+  auth.pvpBattle.regroupCalls = { "200": { charId: "2", at: now + 60002 } };
+  eng.pvpProcessRegroupCalls(auth, now + 60002);
+  ok(!!auth.pvpBattle.regroupCd["200"], "cooldown é por conta, não por time");
+
+  // Enquanto o recall está ativo, o bot decide RECALL pra célula do caller.
+  PVP_AI.aiSet(entAfk, { mode: "AI_HARD", since: now });
+  auth.pvpBattle.teams[1].recall = { cx: entLeader.cx, cy: entLeader.cy,
+    by: "1", accId: 100, until: now + 8000 };
+  const act = PVP_AI.pvpAiDecide(auth, entAfk, now);
+  ok(act && act.action === "RECALL", "AI_HARD obedece o regroup (RECALL)");
+  ok(act && act.goal && act.goal.cx === entLeader.cx &&
+    act.goal.cy === entLeader.cy, "goal converge pra célula do caller");
 }
 
 if (failures) { console.error("\n" + failures + " FALHA(S)"); process.exit(1); }

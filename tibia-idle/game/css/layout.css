@@ -7302,6 +7302,20 @@ body.fullhd .party-panel.collapsed { width: auto; }
   content: ""; position: absolute; inset: 12px;
   background: #ff4a3d; border-radius: 50%;
 }
+/* REGROUP — bandeira de convergência + badge de cooldown. */
+.pvp-act-flag { width: 30px; height: 30px; display: block; position: relative; }
+.pvp-act-flag::before {
+  content: ""; position: absolute; left: 7px; top: 3px; bottom: 3px;
+  width: 3px; background: #d8c98a; border-radius: 1px;
+}
+.pvp-act-flag::after {
+  content: ""; position: absolute; left: 10px; top: 4px;
+  border-style: solid; border-width: 7px 0 7px 15px;
+  border-color: transparent transparent transparent #ff4a3d;
+}
+.pvp-act-cd { position: absolute; top: -4px; right: -4px; padding: 0 3px;
+  font: bold 9px/14px monospace; color: #ffe9a8; background: #4a3a12;
+  border: 1px solid #8a7a3a; border-radius: 4px; display: none; }
 /* Controle por personagem — coluna vertical de auxiliares da PT;
  * opções por vocação abrem pra lateral (dentro do mesmo box arrastável). */
 .pvp-char-col { display: none; flex-direction: column; gap: 4px; margin-top: 4px; }

@@ -1110,6 +1110,9 @@ function pvpActionsTick() {
        <button class="pvp-act on" id="pvp-act-target" title="Magias de ataque da PT. OFF = sequência de cooldowns livre pra Magic Wall">
          <span class="pvp-act-reticle"></span><span>TARGET</span>
        </button>
+       <button class="pvp-act" id="pvp-act-regroup" title="REGROUP: todos os AFKs do time largam o alvo e vêm pra perto de você (60s free / 10s VIP)">
+         <span class="pvp-act-flag"></span><span>REGROUP</span><i class="pvp-act-cd"></i>
+       </button>
        </div>
        <div class="pvp-char-col" id="pvp-char-col"></div>`;
     document.body.appendChild(el);
@@ -1129,6 +1132,22 @@ function pvpActionsTick() {
                                : "Magias de ataque <b>ON</b>.");
       pvpActionsTick();
     });
+    el.querySelector("#pvp-act-regroup").addEventListener("click", () => {
+      const cc = G && G.combat; if (!cc || !cc.pvpBattle) return;
+      const now = Date.now(), vip = !!(cc.p && Number(cc.p.vipUntil) > now) ||
+        (typeof G !== "undefined" && G.p && Number(G.p.vipUntil) > now);
+      const cd = vip ? 10000 : 60000;
+      if (now - (Number(cc._pvpRegroupAt) || 0) < cd) {
+        if (typeof toast === "function")
+          toast("REGROUP em cooldown: <b>" + Math.ceil((cd - (now - cc._pvpRegroupAt)) / 1000) + "s</b>.", "bad");
+        return;
+      }
+      cc._pvpRegroupAt = now; cc._pvpRegroupCd = cd;
+      cc._pvpRegroup = 1; // enviado no próximo tick visual → autoridade aplica
+      if (typeof toast === "function")
+        toast("<b>REGROUP!</b> O time converge pra você.");
+      pvpActionsTick();
+    });
     _pvpActionsEl = el;
     pvpActPlace(el);
   }
@@ -1143,6 +1162,17 @@ function pvpActionsTick() {
   tgt.classList.toggle("on", !c._pvpAttackOff);
   tgt.classList.toggle("off", !!c._pvpAttackOff);
   tgt.lastElementChild.textContent = c._pvpAttackOff ? "TARGET OFF" : "TARGET ON";
+  const rg = _pvpActionsEl.querySelector("#pvp-act-regroup");
+  if (rg) {
+    const cd = Number(c._pvpRegroupCd) || 0,
+      left = Math.max(0, cd - (Date.now() - (Number(c._pvpRegroupAt) || 0)));
+    rg.classList.toggle("off", left > 0);
+    const cdEl = rg.querySelector(".pvp-act-cd");
+    if (cdEl) {
+      cdEl.textContent = left > 0 ? Math.ceil(left / 1000) + "s" : "";
+      cdEl.style.display = left > 0 ? "block" : "none";
+    }
+  }
   pvpCharColTick(_pvpActionsEl.querySelector("#pvp-char-col"));
   // Cursor de mira enquanto WALL está armado.
   const cv = document.getElementById("scene");

@@ -669,6 +669,13 @@ function accountAuthorityVisualState(){
         .some((x)=>x&&x.cx===w.cx&&x.cy===w.cy);
       if(done||Date.now()-(Number(w.at)||0)>6000)combat._pvpWallTarget=null;
     }
+    // REGROUP: chamada one-shot — sai no próximo tick e limpa (o
+    // cooldown fica no servidor; aqui só disparamos a ordem).
+    if(combat._pvpRegroup&&out.players.length){
+      const selfV=out.players.find((v)=>v.self)||out.players[0];
+      selfV.pvpRegroup=1;
+      combat._pvpRegroup=0;
+    }
   }
   if(combat._scarlettPendingDir){
     const intent={dir:String(combat._scarlettPendingDir)};

@@ -1351,6 +1351,17 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
         auth.pvpBattle.wallCalls[String(acc)]={cx:wcx,cy:wcy,at:Number(auth.clock)||Date.now()};
       }
     }
+    // REGROUP: a conta chama — todo AI_HARD do time larga o alvo e vem
+    // pra célula do char que chamou (pvpProcessRegroupCalls; cooldown por
+    // conta: 60s free / 10s VIP).
+    if(pos.pvpRegroup&&auth.pvpBattle){
+      const acc=Number(item.accountId!==undefined?item.accountId:(item.p&&item.p.accountId))||0;
+      if(acc){
+        auth.pvpBattle.regroupCalls=auth.pvpBattle.regroupCalls||{};
+        auth.pvpBattle.regroupCalls[String(acc)]={charId:String(item.id),
+          at:Number(auth.clock)||Date.now()};
+      }
+    }
     if(challenge){item.p=item.p||{};item.p.config=item.p.config||{};
       item.p.config.exetaRes=!!challenge.res;item.p.config.exetaAmpRes=!!challenge.amp;
       const mode=challenge.huntMode||(challenge.box?"box":"");
@@ -4989,6 +5000,10 @@ const PVP_BATTLE_DMG_MUL=0.65;
 const PVP_WALL_MS=14000;            // muro dura 14–20s (roll 0–6s em cima)
 const PVP_WALL_CALL_TTL=6000;       // chamada de muro expira se ninguém castar
 const PVP_WALL_MAX_PER_ACC=10;      // muros vivos simultâneos por conta
+const PVP_REGROUP_CALL_TTL=2000;    // chamada de regroup expira rápido (clique único)
+const PVP_REGROUP_CD_FREE=60000;    // cooldown do botão REGROUP — conta free
+const PVP_REGROUP_CD_VIP=10000;     // cooldown do botão REGROUP — conta VIP
+const PVP_REGROUP_ACTIVE_MS=8000;   // janela em que a ordem de convergir vale
 /* Alcance máximo de runa na guerra (runes.json não tem campo range). */
 const PVP_BATTLE_RUNE_RANGE=7;
 /* Guerra de guild: Royal Paladin (bolt/crossbow + spells de distância)
@@ -5441,6 +5456,34 @@ function pvpProcessWallCalls(auth,now){
     delete calls[acc];
   }
 }
+/* REGROUP: a conta que chamou tem cooldown próprio (60s free / 10s VIP).
+ * Ao disparar, team.recall vira a ordem do painel — todos os AI_HARD do
+ * time largam alvo e convergem pra célula do caller. */
+function pvpProcessRegroupCalls(auth,now){
+  const pb=auth&&auth.pvpBattle,calls=pb&&pb.regroupCalls;
+  if(!calls)return;
+  pb.regroupCd=pb.regroupCd||{};
+  for(const acc of Object.keys(calls)){
+    const call=calls[acc];delete calls[acc];
+    if(!call)continue;
+    if((now-call.at)>PVP_REGROUP_CALL_TTL)continue;
+    const accN=Number(acc)||0;
+    const cdUntil=Number(pb.regroupCd[acc])||0;
+    if(now<cdUntil)continue;
+    const caller=(auth.players||[]).find((o)=>o&&String(o.id)===String(call.charId)&&
+      o.p&&o.p.hp>0&&!o.downUntil&&
+      (Number(o.accountId!==undefined?o.accountId:(o.p&&o.p.accountId))===accN));
+    if(!caller)continue;
+    const team=pvpBattleTeamOf(caller);
+    if(!team||!pb.teams||!pb.teams[team])continue;
+    const cell=entityGridCell(caller,auth);
+    pb.teams[team].recall={cx:cell.cx,cy:cell.cy,by:String(caller.id),accId:accN,
+      until:now+PVP_REGROUP_ACTIVE_MS};
+    pb.regroupCd[acc]=now+(accountIsVip(caller.p)?PVP_REGROUP_CD_VIP:PVP_REGROUP_CD_FREE);
+    auth.events=auth.events||[];
+    auth.events.push({t:"regroup",team,cx:cell.cx,cy:cell.cy,accId:accN,ts:now,screen:true});
+  }
+}
 /* Tick por step (200ms): domínio da área de controle e timer principal. */
 function pvpBattleTick(auth,now,dt){
   const pb=auth&&auth.pvpBattle;if(!pb||auth.ended)return;
@@ -5460,6 +5503,9 @@ function pvpBattleTick(auth,now,dt){
   // pode chamar — o caster é quem da PT tem runa e cooldown livre).
   if(pb.walls&&pb.walls.length)pb.walls=pb.walls.filter((w)=>(Number(w.until)||0)>now);
   pvpProcessWallCalls(auth,now);
+  // Regroup (botão do painel): ordem de convergência do time, com
+  // cooldown por conta.
+  pvpProcessRegroupCalls(auth,now);
   // Controle (Venore): domina quem tem mais chars vivos na zona; o placar
   // é o total de segundos de domínio (zona disputada/vazia não conta).
   if(String(pb.mode)==="control"&&pb.controlZone){
@@ -10504,7 +10550,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
-  pvpBattleLeaderChar,pvpWallAt,pvpLosClear,pvpCastMagicWall,pvpProcessWallCalls,pvpWallRuneReady,authorityCellBlocked,
+  pvpBattleLeaderChar,pvpWallAt,pvpLosClear,pvpCastMagicWall,pvpProcessWallCalls,pvpProcessRegroupCalls,pvpWallRuneReady,authorityCellBlocked,
   sanitizePvpCtrl,pvpTryParalyze,pvpTryUeRunes,pvpEquipPreset,pvpSpellReady,pvpPrioritySpell,pvpAttackOffEff,
   PVP_BATTLE_PARALYZE_MS,PVP_PRIO_XBOW,PVP_PRIO_BOW,healPlayers,usePotion,pvpBattleGoal,
   pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,
