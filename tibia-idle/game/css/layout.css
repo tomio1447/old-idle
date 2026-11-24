@@ -7248,19 +7248,22 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .pvp-tk-btn:disabled { opacity: .6; cursor: wait; }
 
 /* Placar dentro da instância */
+/* Placar compacto e transparente: flutua sobre a arena sem caixa —
+ * a sombra do texto garante leitura em qualquer fundo de mapa. */
 #pvp-scoreboard {
-  position: fixed; top: 46px; left: 50%; transform: translateX(-50%); z-index: 55;
-  display: none; min-width: 230px; text-align: center; padding: 6px 14px;
-  background: rgba(16,12,10,.92); border: 1px solid #a33535; color: #d8d0bc;
+  position: fixed; top: 38px; left: 50%; transform: translateX(-50%); z-index: 55;
+  display: none; min-width: 0; text-align: center; padding: 2px 4px;
+  background: transparent; border: none; color: #d8d0bc;
   font-family: "Trebuchet MS",sans-serif;
+  text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 7px rgba(0,0,0,.8);
 }
-.pvp-sb-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; }
-.pvp-sb-row b { font-size: 20px; color: #ffe680; }
-.pvp-sb-row em { font-style: normal; color: #a33535; font-weight: 700; }
-.pvp-sb-t1, .pvp-sb-t2 { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.pvp-sb-row { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 10px; }
+.pvp-sb-row b { font-size: 13px; color: #ffe680; }
+.pvp-sb-row em { font-style: normal; color: #c05a5a; font-weight: 700; }
+.pvp-sb-t1, .pvp-sb-t2 { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
 .pvp-sb-t1 { color: #7fc4ff; }
 .pvp-sb-t2 { color: #ff9d9d; }
-.pvp-sb-sub { font-size: 10px; color: #a89f88; margin-top: 2px; }
+.pvp-sb-sub { font-size: 8px; color: #b8ae92; margin-top: 1px; }
 
 /* Botões de batalha (WALL / TARGET) — estilo hotkey box, livre na tela:
  * nascem na área vazia da coluna esquerda e são arrastáveis pelo grip. */
@@ -7359,11 +7362,11 @@ body.fullhd .party-panel.collapsed { width: auto; }
 }
 .pvp-char-opt { min-width: 44px; }
 .pvp-char-opt img { width: 24px; height: 24px; }
-.pvp-sb-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
-.pvp-sb-head b { color: #fff; font-size: 14px; letter-spacing: 1px; }
-.pvp-sb-live { color: #ff6b6b; font-size: 9px; font-weight: 700; letter-spacing: 1px; border: 1px solid #a33535; padding: 0 5px; }
-.pvp-sb-bar { height: 4px; margin: 4px 0 2px; background: #8c2b2b; }
-.pvp-sb-bar i { display: block; height: 100%; background: #3d7fd6; }
+.pvp-sb-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 0; }
+.pvp-sb-head b { color: #fff; font-size: 11px; letter-spacing: 1px; }
+.pvp-sb-live { color: #ff6b6b; font-size: 7px; font-weight: 700; letter-spacing: 1px; border: 1px solid rgba(163,53,53,.7); padding: 0 3px; }
+.pvp-sb-bar { height: 2px; margin: 2px 0 1px; background: rgba(140,43,43,.55); }
+.pvp-sb-bar i { display: block; height: 100%; background: rgba(61,127,214,.8); }
 .pvp-cal-day { grid-column: 1 / -1; margin: 6px 0 2px; color: #e8d4a2; font-size: 11px; font-weight: 700; text-transform: capitalize; }
 .pvp-boost-head { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 8px; font-size: 12px; color: #d8d0bc; }
 .pvp-boost-head b { color: #ffe680; }
