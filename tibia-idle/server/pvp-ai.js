@@ -174,9 +174,14 @@ function aiVisibleConds(item, now) {
 /* Memória temporária por char — expira pela janela, sem serviço externo. */
 function aiMem(item) {
   let m = item._aiMem;
-  if (!m || typeof m !== "object")
-    m = item._aiMem = { hits: [], lastTargetId: null, lastAttackerId: null,
+  if (!m || typeof m !== "object") {
+    // Memória tática é TRANSIENTE — non-enumerable pra não serializar
+    // no checkpoint (hits, decisionAt, etc. não são estado persistente).
+    m = { hits: [], lastTargetId: null, lastAttackerId: null,
       lastAttackerAt: 0, decisionAt: 0, lastAction: null, lastActionAt: 0 };
+    Object.defineProperty(item, "_aiMem",
+      { value: m, writable: true, enumerable: false, configurable: true });
+  }
   return m;
 }
 /* Hook chamado pelo engine quando um player recebe dano PvP. */
@@ -263,6 +268,7 @@ function pvpAiPerception(auth, now, statFn) {
  * Nada de estado oculto: hpPct/voc/cond do inimigo = o que um jogador
  * real veria (barra de hp, outfit, efeitos). */
 function pvpAiPerceive(auth, item, pc) {
+  if (!item) return null;
   pc = pc || pvpAiPerception(auth);
   const s = pc.byId[String(item.id)]; if (!s) return null;
   const pb = auth.pvpBattle || {};
@@ -673,8 +679,11 @@ function pvpAiCoordinatorTick(auth, now) {
 
     /* FASE 7 (antes da estratégia — o consenso consome o mapa):
      * hostil com ≥2 aliados colados = escoltado; marcado na memória do
-     * time pros bots des-priorizarem e pressionarem outro setor. */
-    coord.protectedFoes = coord.protectedFoes || {};
+     * time pros bots des-priorizarem e pressionarem outro setor.
+     * Memória TRANSIENTE (non-enumerable) — não vai pro checkpoint. */
+    if (!coord.protectedFoes)
+      Object.defineProperty(coord, "protectedFoes",
+        { value: {}, writable: true, enumerable: false, configurable: true });
     for (const id of Object.keys(coord.protectedFoes))
       if (now - coord.protectedFoes[id] > AI_PROTECTED_MEM_MS)
         delete coord.protectedFoes[id];
