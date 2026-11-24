@@ -2715,9 +2715,13 @@ function bossStats(boss) {
   };
 }
 
-function openBossModal(id) {
+function openBossModal(id, backTo) {
   const boss = BOSS_DEFS[id];
   if (!boss) return;
+  // Voltar retorna à aba que abriu o detalhe (catálogo BOSSES hoje; o
+  // parâmetro cobre futuras origens — world bosses/hunts usam o mesmo
+  // padrão huntinfo-back / wb-detail-back).
+  const back = typeof backTo === "function" ? backTo : openBossesCatalogModal;
   if (boss.unavailable) {
     toast(boss.name + " chega em breve.", "bad");
     return;
@@ -2776,8 +2780,10 @@ function openBossModal(id) {
   const portrait = (typeof bossMobImg === "function" ? bossMobImg : mobImg);
   modalBox.innerHTML = `
     <div class="panel-title">
+      <button class="sm" id="boss-back">← Voltar</button>
+      <span style="margin-left:6px;display:inline-flex;align-items:center;gap:6px">
       ${portrait(boss.sprite, 24)}
-      ${boss.name} — <span class="dim" style="font-weight:normal">${boss.title}</span>
+      ${boss.name} — <span class="dim" style="font-weight:normal">${boss.title}</span></span>
       <span style="flex:1"></span><button class="sm" id="boss-close">✕</button>
     </div>
     <div class="panel-body boss-detail-body">
@@ -2821,13 +2827,17 @@ function openBossModal(id) {
   };
   $("#modal").classList.add("show");
   $("#boss-close").addEventListener("click", closeBossModal);
+  $("#boss-back").addEventListener("click", () => {
+    if (typeof hideTip === "function") hideTip();
+    back();
+  });
   // Hazard level do The Primal Menace: escolha vale para a luta (e para
   // as hunts gnomprona — mesma sel da conta).
   $$("#modal-body [data-hazard]").forEach((el) => {
     el.addEventListener("click", () => {
       if (typeof gnompronaSetHazard !== "function") return;
       gnompronaSetHazard(G.p, Number(el.dataset.hazard));
-      openBossModal(id);
+      openBossModal(id, backTo);
     });
   });
   $("#boss-fight").addEventListener("click", () => {
