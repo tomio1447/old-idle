@@ -985,10 +985,6 @@ function pvpCharColTick(col) {
     btn.addEventListener("click", () => {
       const bv = btn.getAttribute("data-voc");
       _pvpCharOpen = _pvpCharOpen === bv ? null : bv;
-      // Clicar no BCP de uma vocação também seleciona o 1º controlado
-      // dela — a câmera acompanha o grupo que está recebendo ordens.
-      const list = byVoc[bv] || [];
-      if (list.length) _pvpSelChar = String(list[0].id);
       pvpActionsTick();
     });
   });
