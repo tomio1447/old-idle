@@ -6568,6 +6568,9 @@ function bindControls() {
     if (!k) return;
     // Labirinto Malice QTE: WASD/setas são do minigame (handler em capture).
     if (G.combat && G.combat.malice && G.combat.malice.qtePhase === "active") return;
+    // Dança da Scarlett: durante o QTE as direções respondem à sequência —
+    // o char fica parado (o handler em capture cuida do input da dança).
+    if (G.combat && G.combat.scarlett && G.combat.scarlett.phase === "qte") return;
     if (G.combat) {
       if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p)) return;
       G.walkKeys[k] = true;

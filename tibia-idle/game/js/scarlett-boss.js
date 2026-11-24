@@ -390,10 +390,15 @@ function scarlettEstimatePressAuth(c) {
 function scarlettQueueOnlineIntent(dir) {
   const c = typeof G !== "undefined" ? G.combat : null;
   if (!c || !dir) return false;
-  c._scarlettPendingDir = dir;
-  c._scarlettPendingAt = Date.now();
+  // FILA de intents: antes era slot único — um segundo press no mesmo
+  // tick sobrescrevia o primeiro e o servidor julgava dir errada = morte.
   const pressAuth = scarlettEstimatePressAuth(c);
-  c._scarlettPendingPressAuth = Number.isFinite(pressAuth) ? pressAuth : null;
+  c._scarlettPendingDirs = c._scarlettPendingDirs || [];
+  if (c._scarlettPendingDirs.length < 8)
+    c._scarlettPendingDirs.push({ dir, pressAuth: Number.isFinite(pressAuth) ? pressAuth : null });
+  c._scarlettPendingDir = null;
+  c._scarlettPendingAt = 0;
+  c._scarlettPendingPressAuth = null;
   // Feedback local otimista; o servidor confirma no próximo tick.
   const st = c.scarlett;
   if (!st || st.phase !== "qte" || !st.notes || !st.notes.length) {
@@ -424,7 +429,11 @@ function scarlettHandleKey(c, key, now) {
   }
   const st = c.scarlett;
   const note = st.notes[st.index];
-  if (!note || dir !== note.dir || Math.abs(now - note.due) > SCARLETT_TIMING_WINDOW)
+  // Lead-in: toque antes da primeira janela abrir = tecla de movimento
+  // capturada pelo QTE — ignora (servidor faz o mesmo para o intent).
+  if (!note) return scarlettQteFail(c, "fora do timing");
+  if (st.index === 0 && now < note.due - SCARLETT_TIMING_WINDOW) return true;
+  if (dir !== note.dir || Math.abs(now - note.due) > SCARLETT_TIMING_WINDOW)
     return scarlettQteFail(c, "fora do timing");
   note.hit = true;
   st.index++;

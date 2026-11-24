@@ -4,6 +4,24 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Dança da Scarlett: movimento e QTE separados
+
+- **Bug**: durante a sequência, WASD/setas moviam o personagem E alimentavam
+  o input da dança ao mesmo tempo (a guarda de movimento só existia para a
+  Malice). E o intent era slot único — um segundo press no mesmo tick
+  sobrescrevia o primeiro → servidor julgava direção errada → morte injusta.
+- **Movimento travado**: durante `phase==="qte"` as teclas de direção são
+  exclusivas da dança — o char fica parado (mesmo padrão do QTE da Malice).
+- **Fila de intents**: `scarlettIntents` leva todos os pressos do tick em
+  ordem — nenhum é perdido por overwrite. `scarlettIntent` single fica por
+  compatibilidade.
+- **Lead-in perdoa**: toque antes da primeira janela abrir (o banner
+  "PREPARE A DANÇA") é ignorado — não mata mais quem estava se movendo.
+
+Teste: `node tools/test_scarlett_qte.js`. Ctrl+F5 (`scarlett-qte-v1`).
+
+---
+
 ## 2026-11-24 — Cooldown de boss: verificação de instância antes do carimbo
 
 - O cooldown só é carimbado depois que a instância é **confirmada**: um

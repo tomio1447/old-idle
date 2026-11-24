@@ -1206,9 +1206,19 @@ function normalizeVisualState(raw,auth){
     if(clean)megaIntentsOut.push(clean);
     if(megaIntentsOut.length>=24)break;
   }
+  const scarlettIntentsRaw=Array.isArray(raw.scarlettIntents)?raw.scarlettIntents:[];
+  const scarlettIntents=[];
+  for(const it of scarlettIntentsRaw){
+    const d=String(it&&it.dir||"");
+    if(d!=="up"&&d!=="down"&&d!=="left"&&d!=="right")continue;
+    const pa=it?it.pressAuth:null,pan=pa==null||pa===""?NaN:Number(pa);
+    scarlettIntents.push({dir:d,pressAuth:Number.isFinite(pan)&&pan>0?pan:undefined});
+    if(scarlettIntents.length>=8)break;
+  }
   return{players:normalize(raw.players,8),mobs:normalize(raw.mobs,64),
     scarlettIntent:intentDir==="up"||intentDir==="down"||intentDir==="left"||intentDir==="right"
       ?{dir:intentDir,pressAuth:Number.isFinite(pressAuth)&&pressAuth>0?pressAuth:undefined}:null,
+    scarlettIntents,
     spiteIntent:{
       stomp:!!(spiteIntent&&spiteIntent.stomp),
       bubble:Number.isFinite(bubbleIdx)&&bubbleIdx>=0&&bubbleIdx<32?Math.floor(bubbleIdx):undefined},
@@ -1433,11 +1443,24 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     if((Number(mob.challengedUntil)||0)>clock||(Number(mob.forceMeleeUntil)||0)>clock)
       applyPose(mob,pos);
   }
-  if(auth.scarlett&&visual.scarlettIntent&&visual.scarlettIntent.dir){
-    const pi={dir:visual.scarlettIntent.dir};
-    const pressAuth=Number(visual.scarlettIntent.pressAuth);
-    if(Number.isFinite(pressAuth))pi.pressAuth=pressAuth;
-    auth.scarlett.pendingIntent=pi;
+  // Dança da Scarlett: intents entram numa FILA — antes era slot único e
+  // um segundo press no mesmo tick sobrescrevia o primeiro (dir errada
+  // julgada → morte injusta). `scarlettIntent` single fica por legado.
+  if(auth.scarlett){
+    const inc=[];
+    if(visual.scarlettIntent&&visual.scarlettIntent.dir)inc.push(visual.scarlettIntent);
+    if(Array.isArray(visual.scarlettIntents))for(const it of visual.scarlettIntents)inc.push(it);
+    if(inc.length){
+      const q=auth.scarlett.pendingIntents=Array.isArray(auth.scarlett.pendingIntents)
+        ?auth.scarlett.pendingIntents:[];
+      for(const it of inc){
+        if(q.length>=16)break;
+        const pi={dir:String(it.dir)};
+        const pa=Number(it.pressAuth);
+        if(Number.isFinite(pa))pi.pressAuth=pa;
+        q.push(pi);
+      }
+    }
   }
   if(auth.spite&&visual.spiteIntent){
     if(visual.spiteIntent.stomp)auth.spite.pendingStomp=true;
@@ -8125,12 +8148,12 @@ function scarlettStartQte(auth,now){
   st.qteStartedAt=now;
   const last=st.notes[st.notes.length-1];
   st.qteUntil=(last?last.due:now)+SCARLETT_TIMING_WINDOW+SCARLETT_ONLINE_SLACK+200;
-  delete st.pendingIntent;
+  delete st.pendingIntent;delete st.pendingIntents;
 }
 function scarlettQteSuccess(auth,now){
   const st=auth.scarlett;if(!st)return;
   st.phase="vulnerable";st.immune=false;st.sequence=[];st.notes=[];st.noteDues=[];st.index=0;
-  delete st.pendingIntent;delete st.qteUntil;
+  delete st.pendingIntent;delete st.pendingIntents;delete st.qteUntil;
   auth.events=auth.events||[];
   auth.events.push({t:"scarlett-qte",result:"success",screen:true,ts:now||auth.clock});
 }
@@ -8138,7 +8161,7 @@ function scarlettQteFail(auth,now){
   const st=auth.scarlett;if(!st||st.phase!=="qte")return;
   st.phase="waiting";st.immune=true;st.nextAt=(Number(now)||auth.clock)+3500;
   st.sequence=[];st.notes=[];st.noteDues=[];st.index=0;
-  delete st.pendingIntent;delete st.qteUntil;
+  delete st.pendingIntent;delete st.pendingIntents;delete st.qteUntil;
   const victim=scarlettKillLowestMaxHp(auth,now);
   auth.events=auth.events||[];
   auth.events.push({t:"scarlett-qte",result:"fail",victimId:victim?String(victim.id):null,
@@ -8146,28 +8169,40 @@ function scarlettQteFail(auth,now){
   if(!scarlettAlivePlayers(auth).length)fullWipe(auth);
 }
 function scarlettAcceptIntent(auth,now){
-  const st=auth.scarlett;if(!st||st.phase!=="qte"||!st.pendingIntent)return;
-  const intent=st.pendingIntent;
-  const dir=String(intent.dir||"");
-  const note=st.notes&&st.notes[st.index];
-  if(!note||SCARLETT_KEYS.indexOf(dir)<0){delete st.pendingIntent;scarlettQteFail(auth,now);return;}
-  const window=SCARLETT_TIMING_WINDOW+SCARLETT_ONLINE_SLACK;
-  const serverNow=Number(now)||0;
-  const rawPress=intent.pressAuth;
-  const pressAuth=rawPress==null||rawPress===""?NaN:Number(rawPress);
-  // pressAuth do cliente: só confia se for número real e não estiver no futuro.
-  const usePress=Number.isFinite(pressAuth)&&pressAuth>0&&pressAuth<=serverNow+80;
-  const judgeAt=usePress?pressAuth:serverNow;
-  const delta=judgeAt-note.due;
-  // Intent chegou cedo demais (tick antes da nota): espera a janela abrir.
-  if(delta<-window){
-    if(!usePress)return;
-    delete st.pendingIntent;scarlettQteFail(auth,now);return;
+  const st=auth.scarlett;if(!st||st.phase!=="qte")return;
+  // Migração do slot legado + fila de intents (vários press por tick).
+  if(st.pendingIntent){
+    st.pendingIntents=Array.isArray(st.pendingIntents)?st.pendingIntents:[];
+    st.pendingIntents.unshift(st.pendingIntent);delete st.pendingIntent;
   }
-  delete st.pendingIntent;
-  if(dir!==note.dir||delta>window){scarlettQteFail(auth,now);return;}
-  note.hit=true;st.index=(Number(st.index)||0)+1;
-  if(st.index>=st.notes.length)scarlettQteSuccess(auth,now);
+  const q=st.pendingIntents;
+  if(!Array.isArray(q)||!q.length)return;
+  while(q.length&&st.phase==="qte"){
+    const intent=q.shift();
+    const dir=String(intent.dir||"");
+    const note=st.notes&&st.notes[st.index];
+    if(!note||SCARLETT_KEYS.indexOf(dir)<0){scarlettQteFail(auth,now);break;}
+    const window=SCARLETT_TIMING_WINDOW+SCARLETT_ONLINE_SLACK;
+    const serverNow=Number(now)||0;
+    const rawPress=intent.pressAuth;
+    const pressAuth=rawPress==null||rawPress===""?NaN:Number(rawPress);
+    // pressAuth do cliente: só confia se for número real e não estiver no futuro.
+    const usePress=Number.isFinite(pressAuth)&&pressAuth>0&&pressAuth<=serverNow+80;
+    const judgeAt=usePress?pressAuth:serverNow;
+    const delta=judgeAt-note.due;
+    // Intent chegou cedo demais (tick antes da nota): espera a janela abrir.
+    if(delta<-window){
+      if(!usePress){q.unshift(intent);break;}
+      // Press no LEAD-IN (antes da 1ª janela abrir) = toque de movimento,
+      // não resposta — ignora em vez de matar o personagem.
+      if(st.index===0&&judgeAt<st.notes[0].due-window)continue;
+      scarlettQteFail(auth,now);break;
+    }
+    if(dir!==note.dir||delta>window){scarlettQteFail(auth,now);break;}
+    note.hit=true;st.index=(Number(st.index)||0)+1;
+    if(st.index>=st.notes.length){scarlettQteSuccess(auth,now);break;}
+  }
+  if(!q.length)delete st.pendingIntents;
 }
 function tickScarlett(auth,now){
   if(!auth.scarlett)return;

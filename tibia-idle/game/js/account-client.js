@@ -677,7 +677,20 @@ function accountAuthorityVisualState(){
       combat._pvpRegroup=0;
     }
   }
-  if(combat._scarlettPendingDir){
+  // Dança da Scarlett: fila de intents (vários press entre ticks não se
+  // sobrescrevem mais — o servidor julga um a um na ordem).
+  if(Array.isArray(combat._scarlettPendingDirs)&&combat._scarlettPendingDirs.length){
+    out.scarlettIntents=combat._scarlettPendingDirs.splice(0,8).map((it)=>{
+      const o={dir:String(it&&it.dir||"")};
+      const pa=Number(it&&it.pressAuth);
+      if(Number.isFinite(pa))o.pressAuth=pa;
+      return o;
+    }).filter((o)=>o.dir);
+    if(!out.scarlettIntents.length)delete out.scarlettIntents;
+    combat._scarlettPendingDir=null;
+    combat._scarlettPendingAt=0;
+    combat._scarlettPendingPressAuth=null;
+  }else if(combat._scarlettPendingDir){
     const intent={dir:String(combat._scarlettPendingDir)};
     const pressAuth=Number(combat._scarlettPendingPressAuth);
     if(Number.isFinite(pressAuth))intent.pressAuth=pressAuth;
