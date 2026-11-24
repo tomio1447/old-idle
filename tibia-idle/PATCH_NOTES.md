@@ -4,6 +4,26 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Cooldown de boss: verificação de instância antes do carimbo
+
+- O cooldown só é carimbado depois que a instância é **confirmada**: um
+  cliente precisa enviar um tick com o char pilotado (`self`) — prova de
+  que o combate montou na tela. Instância quebrada (cliente preso no
+  loading, visual nulo) não queima a tentativa, mesmo que a autoridade
+  órfã simule dano/wipe em background.
+- Dano/wipe que acontece ANTES da confirmação fica pendente e é promovido
+  quando o visual chega — luta real continua carimbando normalmente.
+- **Vitória fura o gate**: `boss-defeated` carimba sempre — o boss morto
+  já prova que a luta aconteceu.
+- Cliente: o carimbo local (`stopHunt`) só conta HP perdido DENTRO da
+  luta — entrar já machucado (lobby, hunt anterior) não marca "engajou"
+  (snapshot `_entryVitals` no `newCombat`).
+
+Teste: `node tools/test_boss_lasthit_flow.js` (3 cenários novos).
+Ctrl+F5 (`boss-cd-gate-v1`).
+
+---
+
 ## 2026-11-24 — Cast say: ícone do item no lugar do nome
 
 - **Runas**: em vez do nome da runa ("sudden death", "paralyze rune"...),

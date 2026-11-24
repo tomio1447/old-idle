@@ -1229,6 +1229,16 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
   mobs=new Map(visual.mobs.map((v)=>[v.id,v]));
   // Cliente antigo sem flag `self`: o primeiro char da conta é o pilotado.
   if(auth&&auth.pvpBattle&&visual.players.length&&!visual.players.some((v)=>v.self))visual.players[0].self=1;
+  // Verificação de instância do boss: a entrada só é confirmada quando um
+  // cliente manda a pose do char pilotado (`self`) — o combate montou de
+  // verdade. Instância quebrada (loading eterno) envia visual nulo/vazio e
+  // nunca confirma → authMarkBossEngaged não carimba o cooldown. Dano/wipe
+  // que aconteceu ANTES da confirmação é promovido: foi luta de verdade.
+  if(auth&&String(auth.kind||"")==="boss"&&!auth._entryConfirmed&&
+     visual.players.some((v)=>v&&v.self)){
+    auth._entryConfirmed=auth.clock;
+    if(auth._engagePending){auth._engagePending=false;authMarkBossEngaged(auth);}
+  }
   const applyPose=(ent,pos)=>{
     if(!ent||!pos)return;
     if(Number.isFinite(Number(pos.cx)))ent.cx=pos.cx;
@@ -8843,13 +8853,18 @@ function unwelcomeTick(auth,now){
     }
   }
 }
-/* Cooldown do boss só conta quando a luta ENGAGE: o boss deu ou levou dano
- * (ou a luta já encerrou por combate). Instância quebrada/orphan — create
- * nunca confirmado, watchdog matando a row sem tick — não carimba nada.
+/* Cooldown do boss só conta quando a luta ENGAGE numa instância CONFIRMADA:
+ * a entrada só é válida depois que um cliente enviou visual_state com o
+ * char pilotado (`self`) — prova de que o combate montou na tela. Uma
+ * instância quebrada (cliente preso no loading, visual nulo) não queima
+ * a tentativa: o dano/wipe fica pendente (_engagePending) e só carimba se
+ * a confirmação chegar depois — dano real antes de confirmar ainda conta.
+ * `force` (boss-defeated) fura o gate: a própria vitória prova a luta.
  * Carimba TODOS os membros: a tentativa é por personagem (party.js gate). */
-function authMarkBossEngaged(auth){
+function authMarkBossEngaged(auth,force){
   if(!auth||auth._bossFightEngaged||String(auth.kind||"")!=="boss"||!auth.bossId||
      (typeof authIsWorldBoss==="function"&&authIsWorldBoss(auth)))return;
+  if(!force&&!auth._entryConfirmed){auth._engagePending=true;return;}
   auth._bossFightEngaged=true;
   for(const item of auth.players||[]){
     const p=item&&item.p;if(!p)continue;
@@ -10041,7 +10056,7 @@ function step(auth,now,opts){if(auth.ended)return;
       const isHuntMiniBoss=auth.kind==="hunt";
       // Boss de arena (kind=boss) encerra a luta; mini boss de HUNT não —
       // a caçada continua, só o loot vai para o Reward Chest.
-      if(!isHuntMiniBoss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;authMarkBossEngaged(auth);}
+      if(!isHuntMiniBoss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;authMarkBossEngaged(auth,true);}
       if(leader){
         const bossKey=auth.bossId||mob.slug;
         leader.p.bosses[bossKey]=leader.p.bosses[bossKey]||{};

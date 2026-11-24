@@ -329,6 +329,16 @@ function newCombat(player, huntId, instanceMode, opts) {
   }
   // PARTY COMBAT: o líder leva TODOS os membros para a mesma instância
   if (!opts.skipParty) maybeLoadPartyCombat(out, player, spx, spy);
+  // HP na entrada: o cooldown do boss (bossFightEngaged) só vale quando o
+  // char PERDEU hp dentro da luta — entrar já machucado (lobby, hunt
+  // anterior, instância quebrada) não é "engajou".
+  out._entryVitals = {};
+  const vitalsEnts = Array.isArray(out.players) && out.players.length
+    ? out.players : (out.player ? [out.player] : []);
+  for (const ent of vitalsEnts) {
+    const ep = ent && ent.p;
+    if (ep && ep.id != null) out._entryVitals[String(ep.id)] = Number(ep.hp) || 0;
+  }
   return out;
 }
 

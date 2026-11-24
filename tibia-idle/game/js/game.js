@@ -2144,11 +2144,17 @@ function bossFightEngaged(c) {
   if (bm && bmax > 0 && Number(bm.hp) < bmax) return true;
   const ps = (Array.isArray(c.players) && c.players.length ? c.players
     : (c.player ? [c.player] : [])).concat(G.p ? [{ p: G.p }] : []);
+  const entryVitals = c._entryVitals || {};
   for (const pl of ps) {
     const p = (pl && pl.p) || pl;
     if (p && typeof maxStats === "function") {
       const mx = Number(maxStats(p).hp) || 0;
-      if (mx > 0 && Number(p.hp) < mx) return true;
+      // Só conta HP perdido DENTRO da luta: entrar machucado (lobby, hunt
+      // anterior, instância quebrada) não carimba o cooldown. Sem snapshot
+      // (char que entrou depois) a régua continua sendo o HP máximo.
+      const e0 = Number(entryVitals[String(p.id)]);
+      const base = Number.isFinite(e0) && e0 > 0 ? Math.min(mx, e0) : mx;
+      if (mx > 0 && Number(p.hp) < base) return true;
     }
   }
   return false;

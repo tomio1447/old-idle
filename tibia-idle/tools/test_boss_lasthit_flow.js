@@ -122,4 +122,45 @@ function silence(auth){
   must(debt<200||reason,"dívida de carryMs nunca drena ("+debt+")");
 }
 
+// --- 4) Cooldown exige instância confirmada (visual_state com `self`) ------
+{
+  // Instância quebrada: o cliente nunca montou o combate → nenhum visual
+  // com `self` chega. O boss batendo na PT fica PENDENTE e não carimba.
+  const auth=waitArenaBoss(engine.initializeAuthority(bossDesc(player(),"malofur-mangrinder"),
+    "d".repeat(64),1000));
+  const boss=(auth.authority.mobs||[]).find((m)=>m.boss);
+  must(boss,"boss não materializou (gate de confirmação)");
+  boss.damage=100;boss.attackAcc=100000;boss.attackSpeed=200;
+  const out=engine.advanceAuthorityState(JSON.stringify(auth),8000,
+    auth.authority.clock+8000);
+  const a2=JSON.parse(out.state).authority,p2=a2.players[0].p;
+  must(p2.hp<500000,"boss não bateu no jogador no cenário sem confirmação");
+  must(!(p2.bosses&&p2.bosses["malofur-mangrinder"]&&
+    p2.bosses["malofur-mangrinder"].lastFight),
+    "instância não confirmada carimbou lastFight");
+  must(a2._engagePending,"dano pré-confirmação não ficou pendente");
+  // Confirmação tardia (cliente montou o combate) promove o carimbo.
+  const out2=engine.advanceAuthorityState(out.state,200,a2.clock+200,
+    {players:[{id:"1",x:10.5/30,y:10.5/30,cx:10,cy:10,self:1}]});
+  const a3=JSON.parse(out2.state).authority;
+  must(a3._entryConfirmed,"visual com self não confirmou a entrada");
+  must(a3.players[0].p.bosses["malofur-mangrinder"].lastFight>0,
+    "confirmação tardia não promoveu o carimbo pendente");
+}
+
+// --- 5) Vitória fura o gate (boss-defeated é prova suficiente) ------------
+{
+  const auth=waitArenaBoss(engine.initializeAuthority(bossDesc(player(),"malofur-mangrinder"),
+    "e".repeat(64),1000));
+  silence(auth);
+  const boss=(auth.authority.mobs||[]).find((m)=>m.boss);
+  boss.hp=1;
+  const out=engine.advanceAuthorityState(JSON.stringify(auth),4000,
+    auth.authority.clock+4000);
+  must(out.terminalReason==="boss-defeated","kill não terminou em boss-defeated no gate");
+  const a=JSON.parse(out.state).authority;
+  must(a.players[0].p.bosses["malofur-mangrinder"].lastFight>0,
+    "boss-defeated sem confirmação não carimbou lastFight");
+}
+
 console.log("test_boss_lasthit_flow OK");
