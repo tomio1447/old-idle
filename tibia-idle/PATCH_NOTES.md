@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Fala/ícones de cast mais perto do personagem
+
+- **Ajuste**: textos de magia e os ícones de runa/potion subiam ~1 tile
+  acima da cabeça (a âncora somava 34px×escala sobre o nameY, que já fica
+  acima da sprite). Agora a bolha nasce logo acima do nome/barra de HP
+  (10px×escala) e continua deslizando com o fade de sempre — visualmente
+  centrada na criatura como no client oficial.
+
+---
+
 ## 2026-11-24 — Dança da Scarlett: movimento e QTE separados
 
 - **Bug**: durante a sequência, WASD/setas moviam o personagem E alimentavam

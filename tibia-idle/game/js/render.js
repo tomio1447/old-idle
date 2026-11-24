@@ -925,7 +925,10 @@ function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
     const p = Math.max(0, Math.min(1, 1 - lifeLeft / max));
     const a = Math.max(0, Math.pow(1 - p, 1.35));
     if (a <= 0.02) { dono.speech.splice(i, 1); continue; }
-    const ty = y - 34 * s - (sp.slot || 0) * 13 * s - p * 10 * s;
+    // Âncora logo acima do nome/HP bar (o `y` recebido já é o nameY,
+    // acima da sprite) — antes 34*s deixava a fala flutuando ~1 tile
+    // acima do esperado; fica centralizada na criatura como no client.
+    const ty = y - 10 * s - (sp.slot || 0) * 13 * s - p * 10 * s;
     ctx.globalAlpha = a;
     if (sp.icon) {
       // Ícone do item (runa/potion) — sobe deslizante na altura da fonte.
