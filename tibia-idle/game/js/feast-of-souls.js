@@ -59,12 +59,13 @@ const FEAST_OF_SOULS_ROOMS = {
   },
 };
 
-/* The Unwelcome: neutro em TODOS os elementos (0%), exceto death — imune
- * e CURA 200% do dano de death que sofreria (mecânica aplicada em
- * combat.js / authoritative_engine.js via def.deathAbsorbs). */
-const FEAST_UNWELCOME_NEUTRAL_RESIST = {
-  physical: 0, energy: 0, earth: 0, fire: 0, ice: 0, holy: 0,
-  death: 0, lifedrain: 0, manadrain: 0, drown: 0,
+/* The Unwelcome: imune a TODO dano (0% tomado em todos os elementos —
+ * TibiaWiki "0% Imune"). Oficialmente só morre pela vida compartilhada
+ * com a Brother Worm, que aparece/some na sala junto com os Wormlings
+ * (mecânica no authoritative_engine — auth.unwelcome). */
+const FEAST_UNWELCOME_IMMUNE_RESIST = {
+  physical: 100, energy: 100, earth: 100, fire: 100, ice: 100, holy: 100,
+  death: 100, lifedrain: 100, manadrain: 100, drown: 100,
 };
 
 (function registerFeastOfSouls() {
@@ -202,10 +203,9 @@ const FEAST_UNWELCOME_NEUTRAL_RESIST = {
     armor: 10,
     defense: 15,
     speed: 0.00007,
-    // Neutro em todos os elementos (0%). Mecânica: imune a death e cura
-    // 200% do dano de death que sofreria (deathAbsorbs em combat.js/engine).
-    resist: FEAST_UNWELCOME_NEUTRAL_RESIST,
-    deathAbsorbs: true,
+    // Imune a TODO dano — só cai quando a Brother Worm morre (vida
+    // compartilhada, espelhada pela autoridade em auth.unwelcome).
+    resist: FEAST_UNWELCOME_IMMUNE_RESIST,
     requirement: { level: 250, text: "Requer nível 250+ (Feast of Souls)" },
     cooldown: FEAST_OF_SOULS_COOLDOWN_MS,
   };

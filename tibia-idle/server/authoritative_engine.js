@@ -8723,6 +8723,118 @@ function tickAuthSpawnQueue(auth,now){
   auth.pendingSpawns=auth.pendingSpawns.filter((sp)=>!sp.done);
 }
 function respawn(auth,now){spawnHuntWave(auth,now,{force:true,keepPack:true});}
+/* ---- The Unwelcome (Feast of Souls) ----
+ * Mecânica oficial (TibiaWiki): o boss é IMUNE a todo dano — só cai pela
+ * vida compartilhada com a Brother Worm (ela morrendo, ele morre). Poucos
+ * segundos após a entrada, Wormlings nascem e respawnam sem parar — ao
+ * morrer explodem ~750 earth em raio 2. A Brother Worm aparece/some na
+ * sala repetidamente (oficialmente no centro). */
+const UNWELCOME_WORMLING_CAP=4,UNWELCOME_WORMLING_FIRST_MS=6000,
+  UNWELCOME_WORMLING_RESPAWN_MS=8000,UNWELCOME_BROTHER_FIRST_MS=15000,
+  UNWELCOME_BROTHER_VISIBLE_MS=30000,UNWELCOME_BROTHER_HIDDEN_MS=20000,
+  UNWELCOME_WORMLING_EXPLODE_DMG=750,UNWELCOME_WORMLING_EXPLODE_RADIUS=2;
+function unwelcomeQueueSpawn(auth,mob,cx,cy){
+  const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+  const cell=claimSpawnCell(auth,cx,cy);
+  mob.cx=cell.cx;mob.cy=cell.cy;mob.x=(mob.cx+.5)/gw;mob.y=(mob.cy+.5)/gh;
+  mob.sx=mob.x;mob.sy=mob.y;
+  auth.pendingSpawns=auth.pendingSpawns||[];
+  auth.pendingSpawns.push({mob,cx:mob.cx,cy:mob.cy,startedAt:auth.clock,blink:0,done:false});
+}
+function unwelcomeMakeBrother(auth){
+  const m=makeMob(auth,"brother-worm",false,null,{hp:290000,maxHp:290000});
+  if(!m)return null;
+  // Oficial (TibiaWiki): 290k hp, neutro a tudo, fraco a fire (+10%),
+  // cura com dano de death (-100%), exp/loot 0 — o loot cai do Unwelcome.
+  m.exp=0;m.unwelcomeLinked=true;
+  m.def=Object.assign({},m.def,{
+    resist:{physical:0,energy:0,earth:0,fire:-10,ice:0,holy:0,lifedrain:0,manadrain:0,drown:0},
+    absorbs:{death:100},imune:["paralyze","invisible"],loot:[]});
+  return m;
+}
+function unwelcomeWormlingExplode(auth,mob,stepTs,now){
+  if(!auth||!mob)return;
+  const ts=Number(stepTs)||Number(now)||auth.clock;
+  auth.events=auth.events||[];
+  const from=entityGridCell(mob,auth);
+  auth.events.push({t:"effect",x:Number(mob.x)||.5,y:Number(mob.y)||.5,screen:true,
+    fx:"hit-by-poison",ts});
+  for(const victim of auth.players||[]){
+    if(!victim||!victim.p||victim.p.hp<=0||victim.permadead)continue;
+    const to=entityGridCell(victim,auth);
+    if(Math.max(Math.abs(to.cx-from.cx),Math.abs(to.cy-from.cy))>UNWELCOME_WORMLING_EXPLODE_RADIUS)continue;
+    const target=entityPosition(victim,.13,.6);
+    const dmg=absorbIncomingDamage(auth,victim,victim.p,UNWELCOME_WORMLING_EXPLODE_DMG,now,target,"earth",mob);
+    if(dmg<=0)continue;
+    victim.p.hp-=dmg;
+    auth.events.push({t:"taken",dmg,x:target.x,y:target.y,targetId:String(victim.id),
+      el:"earth",fx:ELEMENT_FX.earth,screen:true,ts});
+    if(victim.p.hp<=0){authMarkPlayerDeath(auth,victim,now);
+      auth.events.push({t:"death",x:target.x,y:target.y,targetId:String(victim.id),
+        permadead:!!victim.permadead,screen:true,ts});}
+  }
+}
+function unwelcomeTick(auth,now){
+  if(!auth||String(auth.bossId||"")!=="the-unwelcome"||auth.ended)return;
+  now=Number(now)||auth.clock;
+  const st=auth.unwelcome||(auth.unwelcome={startedAt:now});
+  if(!st.startedAt)st.startedAt=now;
+  // Após desserializar, st.brother e o mob em auth.mobs viram cópias
+  // distintas — reconcilia pelo vivo (flag unwelcomeLinked).
+  let brother=st.brother||null;
+  const live=(auth.mobs||[]).find((m)=>m&&m.unwelcomeLinked);
+  if(live&&live!==brother)brother=live;
+  const pend=(auth.pendingSpawns||[]).find((s)=>s&&s.mob&&s.mob.unwelcomeLinked);
+  if(pend&&pend.mob!==brother)brother=pend.mob;
+  st.brother=brother;
+  // _auth não serializa — religa após reload do descritor quente.
+  if(brother&&!brother._auth)
+    Object.defineProperty(brother,"_auth",{value:auth,enumerable:false,writable:true,configurable:true});
+  const boss=(auth.mobs||[]).find((m)=>m&&m.boss&&m.hp>0);
+  // Brother Worm morta → pool compartilhada: o boss imune cai junto (o
+  // bloco de morte do próximo passo encerra com loot/crédito do boss).
+  if(brother&&brother.hp<=0){
+    if(boss)boss.hp=0;
+    st.brotherDone=true;
+  }else if(boss&&brother&&Number(brother.maxHp)>0){
+    // A barra do boss espelha a pool compartilhada (o próprio é intocável).
+    boss.maxHp=Number(brother.maxHp);
+    boss.hp=Math.max(1,Math.min(boss.maxHp,Number(brother.hp)||0));
+  }
+  // Wormlings: nascem segundos após entrar e respawnam sem parar.
+  const wormlings=(auth.mobs||[]).filter((m)=>m&&m.unwelcomeWormling&&m.hp>0).length+
+    (auth.pendingSpawns||[]).filter((s)=>s&&s.mob&&s.mob.unwelcomeWormling).length;
+  if(wormlings<UNWELCOME_WORMLING_CAP&&
+     now>=Math.max(Number(st.startedAt)+UNWELCOME_WORMLING_FIRST_MS,Number(st.wormlingNextAt)||0)){
+    const m=makeMob(auth,"wormling",false);
+    if(m){m.unwelcomeWormling=true;m.exp=0;unwelcomeQueueSpawn(auth,m,m.cx,m.cy);}
+    st.wormlingNextAt=now+UNWELCOME_WORMLING_RESPAWN_MS;
+  }
+  // Brother Worm: aparece/some na sala (oficialmente no centro).
+  if(!st.brotherDone){
+    const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+    const inField=!!live;
+    const pending=!!pend;
+    if(inField&&st.brotherHideAt&&now>=Number(st.brotherHideAt)){
+      auth.mobs=auth.mobs.filter((m)=>m!==brother);
+      auth.events=auth.events||[];
+      auth.events.push({t:"effect",x:Number(brother.x)||.5,y:Number(brother.y)||.5,
+        screen:true,fx:"poff",ts:now});
+      st.brotherHideAt=0;st.brotherNextAt=now+UNWELCOME_BROTHER_HIDDEN_MS;
+    }else if(brother&&!inField&&!pending&&brother.hp>0&&st.brotherNextAt&&
+             now>=Number(st.brotherNextAt)){
+      unwelcomeQueueSpawn(auth,brother,Math.floor(gw/2),Math.floor(gh/2));
+      st.brotherNextAt=0;st.brotherHideAt=now+UNWELCOME_BROTHER_VISIBLE_MS;
+    }else if(!brother&&now>=Number(st.startedAt)+UNWELCOME_BROTHER_FIRST_MS){
+      const m=unwelcomeMakeBrother(auth);
+      if(m){
+        st.brother=m;
+        unwelcomeQueueSpawn(auth,m,Math.floor(gw/2),Math.floor(gh/2));
+        st.brotherHideAt=now+UNWELCOME_BROTHER_VISIBLE_MS;
+      }
+    }
+  }
+}
 /* Cooldown do boss só conta quando a luta ENGAGE: o boss deu ou levou dano
  * (ou a luta já encerrou por combate). Instância quebrada/orphan — create
  * nunca confirmado, watchdog matando a row sem tick — não carimba nada.
@@ -9899,6 +10011,15 @@ function step(auth,now,opts){if(auth.ended)return;
       auth.malice.pendingRespawns=auth.malice.pendingRespawns||[];
       auth.malice.pendingRespawns.push({at:now+MALICE_TRASH_RESPAWN_MS});
     }
+    /* The Unwelcome: a Brother Worm divide a vida do boss — a morte dela
+     * derruba o boss imune (o próximo split de survivors/dead encerra com
+     * loot/crédito do boss). Wormlings explodem ao morrer (earth, raio 2). */
+    if(mob.unwelcomeLinked){
+      const uBoss=(auth.mobs||[]).find((m)=>m&&m.boss&&m.hp>0);
+      if(uBoss)uBoss.hp=0;
+      if(auth.unwelcome)auth.unwelcome.brotherDone=true;
+    }
+    if(mob.unwelcomeWormling)unwelcomeWormlingExplode(auth,mob,stepTs,now);
     const leader=auth.players[0];
     const lootDrops=reward(auth,mob,auth.players,stepTs),deadPos=entityPosition(mob,.5,.5);
     auth.events.push({t:"kill",mob:mob.slug,mobId:String(mob.id),targetId:String(mob.id),name:mob.def?mob.def.name:mob.slug,
@@ -9923,6 +10044,7 @@ function step(auth,now,opts){if(auth.ended)return;
   }
 
   bloodrottenTick(auth,now);
+  unwelcomeTick(auth,now);
   /* ---------- ATAQUE DOS MONSTROS (melee + skills) ---------- */
   for(const mob of auth.mobs){
     if(mob.def?.noAttack)continue;
@@ -10194,12 +10316,13 @@ function initializeAuthority(descriptor,instanceId,now){
     }
     if(!boss)boss=auth.mobs[0];
     if(boss)boss.boss=true;
-    // The Unwelcome (Feast of Souls): neutro em todos os elementos e imune
-    // a death (cura 200% do dano que sofreria) — mesmo def do cliente.
+    // The Unwelcome (Feast of Souls): imune a TODO dano (resist 100 em
+    // todos os elementos) — oficialmente só cai pela vida compartilhada
+    // com a Brother Worm (auth.unwelcome / unwelcomeTick).
     if(boss&&String(auth.bossId||"")==="the-unwelcome"){
       boss.def=Object.assign({},boss.def,{
-        resist:{physical:0,energy:0,earth:0,fire:0,ice:0,holy:0,death:0,lifedrain:0,manadrain:0,drown:0},
-        deathAbsorbs:true,
+        resist:{physical:100,energy:100,earth:100,fire:100,ice:100,holy:100,death:100,
+          lifedrain:100,manadrain:100,drown:100},
       });
     }
     // lastFight NÃO é carimbado aqui: o cooldown do boss só conta quando a

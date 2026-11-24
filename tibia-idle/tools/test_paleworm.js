@@ -1,5 +1,5 @@
 /* Regressão: The Pale Worm (Feast of Souls) — sala OTBM, BOSS_DEFS,
- * gate dos 3 bosses, lobby 1–9 (arquivo separado do Megalomania) e a
+ * gate dos 3 bosses, lobby 1–5 (arquivo separado do Megalomania) e a
  * mecânica do The Unwelcome (neutro + imune a death que cura 200%). */
 "use strict";
 const crypto=require("crypto"),fs=require("fs"),path=require("path"),vm=require("vm");
@@ -31,16 +31,16 @@ must(pw.requirement&&pw.requirement.enforced===true&&Array.isArray(pw.requiremen
   "gate do Pale Worm não exige os 3 bosses anteriores (enforced)");
 
 const uw=ctx.BOSS_DEFS["the-unwelcome"];
-must(uw&&uw.deathAbsorbs===true,"Unwelcome sem mecânica deathAbsorbs");
+must(uw&&!uw.deathAbsorbs,"Unwelcome ainda tem deathAbsorbs (cura ao sofrer hit)");
 for(const el of ["physical","energy","earth","fire","ice","holy","death","lifedrain","manadrain","drown"])
-  must(uw.resist&&uw.resist[el]===0,"Unwelcome não está neutro em "+el);
+  must(uw.resist&&uw.resist[el]===100,"Unwelcome não está imune em "+el);
 
 const it=ctx.GAMEDATA.items;
 must(it["pale-worm-s-scalp"]&&it["pale-worm-s-scalp"].sell===489000&&it["pale-worm-s-scalp"].cid===32598&&it["pale-worm-s-scalp"].w===0.75,
   "pale-worm-s-scalp importado errado (Yasir 489.000)");
 must(it["spectral-scrap-of-cloth"]&&it["spectral-scrap-of-cloth"].sell===0&&it["spectral-scrap-of-cloth"].cid===32629&&it["spectral-scrap-of-cloth"].w===3.5,
   "spectral-scrap-of-cloth importado errado (sem NPC)");
-must(it["ghost-backpack"]&&it["ghost-backpack"].sell===0&&it["ghost-backpack"].cid===32620&&it["ghost-backpack"].w===5,
+must(it["ghost-backpack"]&&it["ghost-backpack"].sell===0&&it["ghost-backpack"].cid===32620&&it["ghost-backpack"].w===0,
   "ghost-backpack importado errado (sem NPC)");
 must(fs.existsSync(path.join(game,"assets","item","pale-worm-s-scalp.png"))&&
   fs.existsSync(path.join(game,"assets","item","spectral-scrap-of-cloth.png"))&&
@@ -116,28 +116,28 @@ const desc=engine.initializeAuthority({
 },"b".repeat(64),1000);
 // Boss nasce deferido (arenaBossSpawn.pending) — o override deve valer lá.
 const pend=desc.authority.arenaBossSpawn&&desc.authority.arenaBossSpawn.pending;
-must(pend&&pend.def&&pend.def.deathAbsorbs===true&&pend.def.resist&&
-  ["physical","energy","earth","fire","ice","holy","death"].every((el)=>pend.def.resist[el]===0),
-  "engine não aplicou resist neutra + deathAbsorbs no The Unwelcome");
+must(pend&&pend.def&&!pend.def.deathAbsorbs&&pend.def.resist&&
+  ["physical","energy","earth","fire","ice","holy","death"].every((el)=>pend.def.resist[el]===100),
+  "engine não aplicou imunidade total (sem cura) no The Unwelcome");
 // Regressão do _auth não-enumerável: o estado materializado deve serializar.
 must((()=>{try{JSON.stringify(engine.materializeAuthority(desc));return true;}catch(e){return false;}})(),
   "estado materializado do Unwelcome não serializa (ciclo _auth?)");
 
 const emob={id:"b",slug:"the-unwelcome",x:.5,y:.5,def:pend.def,hp:1000,maxHp:1000,
   _auth:{events:[],clock:1000}};
-must(engine.applyOutgoingDamage(emob,"death",100,1000)===0&&emob.hp===1200&&
-  emob._auth.events.length===1&&emob._auth.events[0].t==="mobheal"&&emob._auth.events[0].heal===200,
-  "engine: Unwelcome não curou 200% do dano death");
-must(engine.applyOutgoingDamage(emob,"fire",100,1000)===100&&emob.hp===1200,
-  "engine: Unwelcome não está neutro em fire");
+must(engine.applyOutgoingDamage(emob,"death",100,1000)===0&&emob.hp===1000&&
+  emob._auth.events.length===0,
+  "engine: Unwelcome levou dano ou curou com death (deveria ser imune, sem cura)");
+must(engine.applyOutgoingDamage(emob,"fire",100,1000)===0&&emob.hp===1000,
+  "engine: Unwelcome não está imune a fire");
 
 /* ---------------- integração (estático) ---------------- */
 const gameSrc=fs.readFileSync(path.join(js,"game.js"),"utf8");
 const indexSrc=fs.readFileSync(path.join(game,"index.html"),"utf8");
 const accSrc=fs.readFileSync(path.join(js,"account-client.js"),"utf8");
 const serverSrc=fs.readFileSync(path.join(__dirname,"..","server","server.js"),"utf8");
-must(gameSrc.includes('ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "the-pale-worm"]'),
-  "modal de bosses não lista o Pale Worm na seção FEAST OF SOULS");
+must(gameSrc.includes('ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "brain-head"]'),
+  "modal de bosses divergente na seção FEAST OF SOULS");
 must(gameSrc.includes("function feastBossesKilled")&&gameSrc.includes("boss.requirement.killsRequired")&&
   gameSrc.includes("req.killsRequired && Array.isArray(req.killsRequired)"),
   "gate killsRequired não está no bossReadyInfo/checklist");
@@ -151,14 +151,15 @@ must(accSrc.includes('type==="pale-lobby"')&&accSrc.includes('"pale-lobby",'),
 must(serverSrc.includes("/api/pale-lobby/state")&&serverSrc.includes("__PALE_LOBBY")&&
   serverSrc.includes("createPaleWormLobbyController"),
   "rotas/controller do lobby Pale Worm ausentes no server.js");
-must(serverSrc.includes('the-pale-worm"?9:5'),
-  "PUT de instância não permite 9 membros no Pale Worm");
+must(!serverSrc.includes('the-pale-worm"?9:5')&&
+  serverSrc.includes('WORLD_BOSS_MAX_MEMBERS:5'),
+  "PUT de instância divergente no cap de membros do Pale Worm (5)");
 
 /* ---------------- lobby Pale Worm (separado do mega) ---------------- */
 const paleMod=require(path.join(__dirname,"..","server","pale_worm_lobby.js"));
 const megaMod=require(path.join(__dirname,"..","server","megalomania_lobby.js"));
-must(paleMod.MAX_SLOTS===9&&megaMod.MAX_SLOTS===5,
-  "lobby Pale Worm deve ter 9 vagas e o Megalomania continua com 5 (intocado)");
+must(paleMod.MAX_SLOTS===5&&megaMod.MAX_SLOTS===5,
+  "lobby Pale Worm deve ter 5 vagas como o Megalomania");
 must(JSON.stringify(paleMod.GATE_BOSSES)===JSON.stringify(["the-dread-maiden","the-fear-feaster","the-unwelcome"]),
   "gate de bosses do lobby Pale Worm divergente");
 
@@ -199,8 +200,8 @@ db.chars.set(4,charOf(4,"Outro",40,["the-dread-maiden","the-fear-feaster","the-u
   must(r.code===403&&/Dread Maiden/.test(r.body.msg),"create aceitou char sem as kills dos 3 bosses");
   // create ok
   r=await ctrl.createLobby(db,{id:10},db.chars.get(1),{inTemple:true,playerName:"Lider"});
-  must(r.code===200&&r.body.ok&&r.body.lobby.slots.length===9&&r.body.lobby.filled===1,
-    "create do lobby não abre com 9 slots");
+  must(r.code===200&&r.body.ok&&r.body.lobby.slots.length===5&&r.body.lobby.filled===1,
+    "create do lobby não abre com 5 slots");
   // invite char sem gate → 403
   r=await ctrl.invite(db,{id:10},"SemGate");
   must(r.code===403&&/SemGate: /.test(r.body.msg),"invite aceitou convidado sem gate");
@@ -244,5 +245,5 @@ db.chars.set(4,charOf(4,"Outro",40,["the-dread-maiden","the-fear-feaster","the-u
   r=await ctrl.leaveFight(db,{id:30});
   must(r.code===200&&r.body.remaining===0&&r.body.shouldEndInstance===true,
     "último lutador saiu sem sinalizar encerramento da sala");
-  console.log("ok: pale worm lobby 9 slots + gate + takeover (mega intocado)");
+  console.log("ok: pale worm lobby 5 slots + gate + takeover");
 })().catch((e)=>{console.error(e);process.exit(1);});

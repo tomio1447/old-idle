@@ -212,7 +212,7 @@ function createPaleWormLobbyController(opts) {
       leaderAccountId: Number(acc.id),
       leaderName: String(optsIn.playerName || character.name || "Leader"),
       slots: [slotPayload(acc.id, optsIn.playerName || character.name, character),
-        null, null, null, null, null, null, null, null],
+        ...Array(MAX_SLOTS - 1).fill(null)],
       createdAt: ts,
       instanceId: null,
       startedAt: null,

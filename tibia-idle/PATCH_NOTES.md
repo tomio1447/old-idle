@@ -4,6 +4,28 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — The Unwelcome: mecânica oficial (Feast of Souls)
+
+- **Imune a todo dano** (resist 100% em todos os elementos) — a cura de
+  200% ao sofrer hit de death foi removida; oficialmente o boss só cai
+  pela vida compartilhada com a Brother Worm.
+- **Wormlings**: nascem poucos segundos após a entrada e respawnam sem
+  parar (cap 4 simultâneos); ao morrer explodem ~750 de earth em raio 2
+  SQM — comportamento oficial.
+- **Brother Worm** (290k hp): aparece na sala segundos depois e
+  some/reaparece ciclicamente (~30s visível, ~20s escondida). Neutra a
+  tudo, fraca a fire (+10%), cura com dano de death (-100%), exp/loot 0 —
+  o loot e o crédito ficam com o Unwelcome.
+- **Vida compartilhada**: a barra do Unwelcome espelha o HP da Brother
+  Worm; ela morrendo, o boss cai junto e a luta encerra como
+  `boss-defeated` (recompensa normal).
+- Fix de consistência do refactor alpha: lobby do Pale Worm criava 9
+  slots com `MAX_SLOTS=5` — agora o array segue o cap.
+
+Teste: `node tools/test_unwelcome.js`. Ctrl+F5 (`unwelcome-mech-v1`).
+
+---
+
 ## 2026-11-23 — PvP: painel de controle por personagem (4 botões verticais)
 
 - **Coluna de auxiliares**: dentro do box arrastável, 1 botão por char
