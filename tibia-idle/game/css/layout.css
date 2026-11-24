@@ -7312,6 +7312,9 @@ body.fullhd .party-panel.collapsed { width: auto; }
 }
 .pvp-char-btn:hover { opacity: 1; }
 .pvp-char-slot.open .pvp-char-btn { opacity: 1; box-shadow: 0 0 8px rgba(255,215,94,.35); }
+/* Char selecionado = âncora da câmera. */
+.pvp-char-btn.sel { opacity: 1; border-color: #ffd75e !important;
+  box-shadow: 0 0 10px rgba(255,215,94,.6), inset 0 0 4px rgba(255,215,94,.25); }
 /* Chip do modo de controle (PvP Tactical AI): AI/HARD/DEAD no canto do char. */
 .pvp-char-ai {
   position: absolute; top: -5px; right: -5px; padding: 0 3px; border-radius: 2px;

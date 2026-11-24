@@ -118,7 +118,14 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
     const me = typeof pvpMyAccountId === "function" ? pvpMyAccountId() : 0;
     const ownAcc = (e) => me && e && e.p &&
       Number(e.accountId !== undefined ? e.accountId : (e.p && e.p.accountId)) === me;
-    focus = combat.players.find((e) => ownAcc(e) && Number(e.p.hp) > 0) ||
+    /* Câmera no char SELECIONADO (_pvpSelChar, pvp-ui.js — clique no botão
+     * da coluna ou no char na arena). Sem seleção/char morto: primeiro
+     * vivo da conta como antes. */
+    const selId = typeof _pvpSelChar !== "undefined" && _pvpSelChar != null
+      ? String(_pvpSelChar) : "";
+    focus = (selId && combat.players.find((e) =>
+        String(e.id) === selId && ownAcc(e) && Number(e.p.hp) > 0)) ||
+      combat.players.find((e) => ownAcc(e) && Number(e.p.hp) > 0) ||
       combat.players.find(ownAcc) || combat.player;
   }
   if (focus && Number.isFinite(focus.x) && Number.isFinite(focus.y)) {

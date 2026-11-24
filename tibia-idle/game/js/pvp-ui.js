@@ -759,7 +759,22 @@ function pvpHandleCombatClick(cell) {
     !pvpIsOwnEnt(e, accId) && Number(e.pvpTeam || e.team) !== myTeam);
   const dist = (e) => Math.max(Math.abs(Number(e.cx) - cell.cx), Math.abs(Number(e.cy) - cell.cy));
   const hit = foes.filter((e) => dist(e) <= 1).sort((a, b) => dist(a) - dist(b))[0];
-  if (!hit) return false;
+  if (!hit) {
+    // Clique num char PRÓPRIO (vivo) na arena: seleciona — a câmera passa
+    // a seguir ele. Clicar de novo no selecionado volta pro fallback.
+    const mineHit = (c.players || []).filter((e) => e && e.p &&
+      Number(e.p.hp) > 0 && pvpIsOwnEnt(e, accId) && dist(e) <= 1)
+      .sort((a, b) => dist(a) - dist(b))[0];
+    if (mineHit) {
+      const id = String(mineHit.id);
+      _pvpSelChar = _pvpSelChar === id ? null : id;
+      if (typeof toast === "function" && _pvpSelChar)
+        toast(`Câmera seguindo <b>${pvpEsc(mineHit.p.name || "char")}</b>.`);
+      pvpActionsTick();
+      return true;
+    }
+    return false;
+  }
   // Só o líder da guild designa o alvo do time — o servidor também valida.
   const team = (c.pvpBattle.teams || {})[myTeam] || {};
   if (Number(team.leaderAccountId) !== accId) {
@@ -876,6 +891,9 @@ function pvpActMakeDraggable(el, grip) {
  * opções por vocação abrindo pra lateral. Estado local por char —
  * combat._pvpCharCtrl[id] viaja no visual da própria entrada. ---- */
 let _pvpCharOpen = null;
+/* Char SELECIONADO pra câmera — clicar no botão da coluna ou no próprio
+ * char na arena muda o foco. Null = fallback (primeiro vivo da conta). */
+let _pvpSelChar = null;
 const PVP_VOC_COLORS = { knight: "#d96a5a", monk: "#e0a34a", sorcerer: "#5f9fd8", druid: "#63b06b", paladin: "#c9a35a" };
 function pvpVocBase(voc) {
   const v = String(voc || "").toLowerCase();
@@ -927,13 +945,14 @@ function pvpCharColTick(col) {
   for (const ent of aux) {
     const id = String(ent.id), ctrl = pvpCharCtrl(c, id), bv = pvpVocBase(ent.p && ent.p.voc);
     const opts = pvpCharOptsFor(ent), open = _pvpCharOpen === id;
+    const sel = _pvpSelChar === id;
     // Controle (PvP Tactical AI): chip do modo atual do char na batalha.
     const aiCtl = c.pvpBattle && c.pvpBattle.aiControl, aiMode = aiCtl && aiCtl[id];
     const aiChip = aiMode && aiMode !== "HUMAN"
       ? `<i class="pvp-char-ai" data-m="${String(aiMode).replace(/"/g, "")}">` +
         `${aiMode === "AI_HARD" ? "AI" : aiMode === "DEAD" ? "✝" : aiMode === "DISABLED" ? "OFF" : "…"}</i>` : "";
     html += `<div class="pvp-char-slot${open ? " open" : ""}">` +
-      `<button class="pvp-char-btn" data-cid="${id}" title="${String(ent.p.name).replace(/"/g, "")} (${bv || "char"})${aiMode ? " — " + aiMode : ""}"` +
+      `<button class="pvp-char-btn${sel ? " sel" : ""}" data-cid="${id}" title="${String(ent.p.name).replace(/"/g, "")} (${bv || "char"})${aiMode ? " — " + aiMode : ""} — câmera"` +
       ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">${aiChip}${pvpCharBtnLabel(ent)}</button>`;
     if (open) {
       html += `<div class="pvp-char-opts">`;
@@ -951,6 +970,7 @@ function pvpCharColTick(col) {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-cid");
       _pvpCharOpen = _pvpCharOpen === id ? null : id;
+      _pvpSelChar = id; // câmera segue o selecionado
       pvpActionsTick();
     });
   });
@@ -979,8 +999,14 @@ function pvpActionsTick() {
   const st = c && c.pvpBattle;
   const inBattle = !!st && !st.finished;
   if (!inBattle) {
+    _pvpSelChar = null; _pvpCharOpen = null;
     if (_pvpActionsEl) _pvpActionsEl.style.display = "none";
     return;
+  }
+  // Char selecionado morreu → câmera volta pro fallback automático.
+  if (_pvpSelChar) {
+    const e = (c.players || []).find((x) => String(x.id) === _pvpSelChar);
+    if (!e || !e.p || Number(e.p.hp) <= 0) _pvpSelChar = null;
   }
   if (!_pvpActionsEl) {
     const el = document.createElement("div");
