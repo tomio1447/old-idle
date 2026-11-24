@@ -4442,7 +4442,22 @@ async function MysqlStore() {
           const persist=!!next.terminalReason||(now-(Number(hot.savedAt)||0))>=persistMs||hot.dirty===true;
           if(persist){
             hot.dirty=false;
-            const str=typeof next.state==="string"?next.state:JSON.stringify(next.state);
+            /* Guerra PvP: o p completo de ~40 chars era gravado 3×
+             * (authority + members + state.players → ~5MB, ~100ms de
+             * stringify na thread a cada 4s). members[].p e
+             * state.players[].p são regenerados por materializeAuthority
+             * a partir de authority.players no load — vão thin no blob.
+             * O descritor vivo NÃO é mutado (Object.assign em cima). */
+            const desc=next.state;
+            const slim=desc&&typeof desc==="object"&&desc.authority&&desc.authority.pvpBattle;
+            const str=typeof desc==="string"?desc:
+              slim?JSON.stringify(Object.assign({},desc,{
+                members:Array.isArray(desc.members)?desc.members.map((m)=>m&&m.p?{id:m.id,hp:m.hp,mp:m.mp}:m):desc.members,
+                state:desc.state&&typeof desc.state==="object"?Object.assign({},desc.state,{
+                  players:Array.isArray(desc.state.players)
+                    ?desc.state.players.map((e)=>e&&e.p?Object.assign({},e,{p:null}):e)
+                    :desc.state.players}):desc.state}))
+              :JSON.stringify(desc);
             /* CAS por version: sem FOR UPDATE, uma escrita externa (checkpoint,
              * patch) podia commitar entre a leitura da head e este UPDATE.
              * Se alguém bumpou a versão, devolvemos conflito — o tick seguinte

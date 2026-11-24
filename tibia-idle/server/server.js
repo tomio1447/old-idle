@@ -923,8 +923,19 @@ function accountPublicView(acc){
       return Array.isArray(arr)?arr.map(Number).filter((n)=>n>0):[];})(),
   };
 }
+const ACCOUNT_WALLET_SYNC_TTL_MS=30000;
+const accountWalletSyncAt=new Map();
 async function ensureAccountWallet(db,acc){
   if(!acc)return acc;
+  /* Guerra PvP: migrateAccountGold + accountWardrobe abrem transação FOR
+   * UPDATE na row da conta a CADA request de tick (~200/s no roster) —
+   * serializava o combate inteiro. São migrações one-time: roda no máximo
+   * 1×/30s por conta; os campos que o tick precisa (gold/vip) já vêm na
+   * leitura do token. */
+  const last=Number(accountWalletSyncAt.get(acc.id))||0;
+  if(Date.now()-last<ACCOUNT_WALLET_SYNC_TTL_MS)return acc;
+  accountWalletSyncAt.set(acc.id,Date.now());
+  if(accountWalletSyncAt.size>2048)accountWalletSyncAt.clear();
   if(typeof db.migrateAccountGold==="function"){
     const migrated=await db.migrateAccountGold(acc.id);
     if(migrated)Object.assign(acc,migrated);
@@ -1761,11 +1772,21 @@ function instanceHotAuthApi(){
       const [s]=await conn.query("SELECT state FROM account_instances WHERE account_id=?",[Number(row.account_id)]);
       const ser=s[0]?s[0].state:null;
       if(ser==null)return hot;
-      const descriptor=typeof ser==="string"?JSON.parse(ser):ser;
+      let descriptor=typeof ser==="string"?JSON.parse(ser):ser;
+      // Blob thin (persist sem members[].p/state.players[].p): reconstrói
+      // os derivados a partir de authority.players antes de servir.
+      if(pvpDescriptorThin(descriptor))descriptor=materializeAuthority(descriptor);
       hot={descriptor,rowVersion:Number(row.version),savedAt:Date.now()};
       pvpAuthCacheSet(row.instance_id,hot);
       return hot;
     }};
+}
+/* Blob persistido thin (ver persist quente em db.js): authority.players
+ * tem o p canônico; members[].p e state.players[].p vêm null e são
+ * regenerados por materializeAuthority. */
+function pvpDescriptorThin(d){
+  return !!(d&&typeof d==="object"&&d.authority&&d.authority.pvpBattle&&
+    Array.isArray(d.members)&&d.members.some((m)=>m&&!m.p));
 }
 function instancePatchHotOpts(resolved){
   return (resolved&&(resolved.pvp||resolved.worldBoss))?{hotAuth:instanceHotAuthApi()}:null;
@@ -2358,7 +2379,20 @@ const PVP_CLIENT_HEAVY_KEYS=["missions","missionsDone","charmsPagos","bestiary",
   "wardrobe","forgeHistory","quests","helperPresets","itemInstances","bag","lootPouch","lootConfig","supplyStash",
   "depotNotification","exaltationBox","dummies","prey","hazardKills","playtime","_sharedInv","_accountCosmetics",
   "trainingExercise","soulWarTaints","forge","_forgeMeta","_forgeBase","_pouchBase"];
-function pvpSlimClientState(state,viewerAccountId){
+/* Whitelist do `p` de chars de OUTRAS contas na arena: só o que o cliente
+ * usa pra renderizar/status (nome, voc, hp/mp, outfit, emblemas,
+ * condições). ~55KB → ~1.5KB por rival — a resposta do tick caía de ~1MB
+ * pra ~150KB. Os chars do próprio viewer continuam completos. */
+const PVP_RIVAL_P_KEYS=["id","accountId","name","voc","level","hp","mp","maxHp","maxMp",
+  "outfit","mount","mountOutfit","conditions","emote","skull","war","shield","guildEmblem",
+  "emblem","partyEmblem","guild","guildName","guildId","speed","dir","invisible","sneak",
+  "dead","downedAt","reviveAt","permadead","summons","summonedBy","magicShieldPool",
+  "magicShieldCap","soul","cap","pvpTeam","team","pvpSlim"];
+function pvpRivalSlimP(p){
+  const out={};for(const k of PVP_RIVAL_P_KEYS)if(p[k]!==undefined)out[k]=p[k];
+  out.pvpSlim=true;return out;
+}
+function pvpSlimClientState(state,viewerAccountId,shared){
   if(!state||typeof state!=="object")return state;
   // NÃO muta `state`: com o descritor quente em memória (hotAuth), o objeto
   // recebido É a autoridade viva — trocar `state.authority` pelo stub ou
@@ -2367,27 +2401,54 @@ function pvpSlimClientState(state,viewerAccountId){
   const auth=state.authority;
   if(auth&&typeof auth==="object")out.authority={ended:!!auth.ended,terminalReason:auth.terminalReason||null,
     clock:Number(auth.clock)||0,pvpSlim:true};
+  /* Tick (shared != null): os chars da PRÓPRIA conta também perdem as heavy
+   * keys — o merge do cliente é Object.assign (campos ausentes sobrevivem
+   * do save local) e guarda missions/wheel/imbuements/config explicitamente.
+   * No GET/resume (shared == null) o próprio p fica completo porque o
+   * cliente reconstrói G.p a partir do snapshot. ~55KB → ~10KB por char. */
+  const tickMode=!!shared;
+  const slimOwnP=(p)=>{
+    const out=Object.assign({},p);for(const k of PVP_CLIENT_HEAVY_KEYS)delete out[k];
+    return out;
+  };
   // members[].p rival: só filtro por conta no cliente (pvpIsOwnEnt) — id/nome
   // bastam. O char próprio continua completo (resume usa member.p → G.p).
   const slimMember=(ent)=>{
-    if(!ent||!ent.p||Number(ent.p.accountId)===Number(viewerAccountId))return ent;
+    if(!ent||!ent.p)return ent;
+    if(Number(ent.p.accountId)===Number(viewerAccountId))
+      return tickMode?Object.assign({},ent,{p:slimOwnP(ent.p)}):ent;
     return Object.assign({},ent,{p:{id:ent.p.id,accountId:ent.p.accountId,name:ent.p.name,
       hp:ent.p.hp,mp:ent.p.mp,pvpSlim:true}});
   };
-  const slim=(ent)=>{
-    if(!ent||!ent.p||Number(ent.p.accountId)===Number(viewerAccountId))return ent;
-    const p=Object.assign({},ent.p);for(const k of PVP_CLIENT_HEAVY_KEYS)delete p[k];
-    return Object.assign({},ent,{p});
-  };
   if(Array.isArray(state.members))out.members=state.members.map(slimMember);
-  if(state.state&&Array.isArray(state.state.players))
-    out.state=Object.assign({},state.state,{players:state.state.players.map(slim)});
+  if(state.state&&Array.isArray(state.state.players)){
+    const src=state.state.players;
+    /* Rivais slimados são idênticos pra TODOS os viewers: a versão slimada
+     * é compartilhada por step de sim (rev = authClock) — cada request só
+     * recoloca os chars da própria conta em vez de re-slimar 40× por tick. */
+    const rev=String(state.state.authClock||state.savedAt||"");
+    let slimPlayers;
+    if(shared&&shared.rev===rev&&Array.isArray(shared.players))slimPlayers=shared.players;
+    else{
+      slimPlayers=src.map((ent)=>ent&&ent.p?Object.assign({},ent,{p:pvpRivalSlimP(ent.p)}):ent);
+      if(shared){shared.rev=rev;shared.players=slimPlayers;}
+    }
+    out.state=Object.assign({},state.state,{players:Number(viewerAccountId)
+      ?src.map((ent,i)=>ent&&ent.p&&Number(ent.p.accountId)===Number(viewerAccountId)
+          ?(tickMode?Object.assign({},ent,{p:slimOwnP(ent.p)}):ent):slimPlayers[i])
+      :slimPlayers});
+    /* blockedCells é estático por mapa (~22KB): sai só no GET/resume; no tick
+     * o merge do cliente preserva a cópia recebida no join. */
+    if(tickMode)delete out.state.blockedCells;
+  }
   return out;
 }
-function instanceSummary(row,includeState,viewerAccountId){
+function instanceSummary(row,includeState,viewerAccountId,sharedSlim){
   if(!row)return null;let state=null;
   if(includeState&&row.state){try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){state=null;}}
-  if(state&&viewerAccountId&&String(row.kind||"")==="pvp")state=pvpSlimClientState(state,viewerAccountId);
+  if(state&&String(row.kind||"")==="pvp"&&pvpDescriptorThin(state))
+    state=materializeAuthority(state);
+  if(state&&viewerAccountId&&String(row.kind||"")==="pvp")state=pvpSlimClientState(state,viewerAccountId,sharedSlim);
   return {id:row.instance_id,version:Number(row.version)||0,status:row.status,ownerAccountId:Number(row.account_id)||null,kind:row.kind,
     huntId:row.hunt_id||null,bossId:row.boss_id||null,instanceMode:row.instance_mode,
     partyId:row.party_id?Number(row.party_id):null,partyVersion:row.party_version?Number(row.party_version):null,
@@ -2493,7 +2554,9 @@ async function loadInstance(db,token,charId){
   if(row&&resolved.pvp&&row.state===undefined){
     const hot=pvpAuthCacheGet(row.instance_id);
     if(hot)row.state=hot.descriptor;
-    else{const full=await db.instanceGet(row.account_id);if(full)row.state=full.state;}
+    else{const full=await db.instanceGet(row.account_id);if(full){
+      let st=full.state;try{st=typeof st==="string"?JSON.parse(st):st;}catch(_e){}
+      row.state=pvpDescriptorThin(st)?materializeAuthority(st):st;}}
   }
   if(!row||row.status!=="active")return {code:200,body:{ok:true,instance:null,lastStatus:row?row.status:null,
     terminalReason:row&&row.terminal_reason||null}};
@@ -3440,7 +3503,7 @@ async function tickInstance(db,body){
    * ficavam lentos. A resposta por viewer só muda quando o descriptor
    * avança; requests dentro de ~150ms recebem os mesmos bytes (o cliente
    * ticka a cada 200ms — a defasagem é menor que um passo de sim). */
-  let pvpRespCache=null,pvpRespKey=null;
+  let pvpRespCache=null,pvpRespKey=null,hotShared=null;
   if(resolved.pvp){
     const hot=pvpAuthCacheGet(result.instance.instance_id);
     if(hot){
@@ -3448,9 +3511,10 @@ async function tickInstance(db,body){
       pvpRespKey=String(acc.id);
       const hitEnt=pvpRespCache.get(pvpRespKey);
       if(hitEnt&&Date.now()-hitEnt.at<150)return {code:200,body:{__raw:hitEnt.raw}};
+      hotShared=hot.slimShared||(hot.slimShared={});
     }
   }
-  const responseInstance=instanceSummary(result.instance,true,acc.id);
+  const responseInstance=instanceSummary(result.instance,true,acc.id,hotShared);
   if((resolved.party||resolved.worldBoss||resolved.pvp)&&resolved.character&&responseInstance.state&&responseInstance.state.members&&
     responseInstance.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
     responseInstance.state.activeCharacterId=String(resolved.character.id);

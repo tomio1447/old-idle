@@ -973,28 +973,54 @@ const { getDb } = require(path.join(ROOT, "server/db.js"));
   /* Snapshot enxuto por viewer: a autoridade vira stub e chars de outras
    * contas perdem os campos pesados — o tick de 4.8MB travava a aba. */
   {
-    const m = server.match(/const PVP_CLIENT_HEAVY_KEYS=[\s\S]*?function pvpSlimClientState\(state,viewerAccountId\)\{[\s\S]*?\n\}/);
+    const m = server.match(/const PVP_CLIENT_HEAVY_KEYS=[\s\S]*?function pvpSlimClientState\(state,viewerAccountId,shared\)\{[\s\S]*?\n\}/);
     ok(!!m, "pvpSlimClientState presente no servidor");
     const slimCtx = {};
     vm.createContext(slimCtx);
-    vm.runInContext(m[0] + "\n;this.__slim=pvpSlimClientState;this.__heavy=PVP_CLIENT_HEAVY_KEYS;", slimCtx);
+    vm.runInContext(m[0] + "\n;this.__slim=pvpSlimClientState;", slimCtx);
     const ownP = { id: 1, accountId: 100, name: "Own", hp: 10, mp: 5, equip: { a: 1 }, depot: { x: 1 }, missions: { m: 1 } };
-    const foeP = { id: 2, accountId: 200, name: "Foe", hp: 9, mp: 4, equip: { a: 2 }, depot: { x: 2 }, missions: { m: 2 } };
-    const st = slimCtx.__slim({
+    const foeP = { id: 2, accountId: 200, name: "Foe", hp: 9, mp: 4, outfit: { type: "mage" },
+                   equip: { a: 2 }, depot: { x: 2 }, missions: { m: 2 } };
+    const mkState = () => ({
       authority: { ended: false, players: [{ p: ownP }, { p: foeP }], clock: 1234 },
       members: [{ id: 1, p: ownP, hp: 10, mp: 5 }, { id: 2, p: foeP, hp: 9, mp: 4 }],
-      state: { players: [{ id: 1, p: ownP, pvpTeam: 1 }, { id: 2, p: foeP, pvpTeam: 2 }],
+      state: { authClock: 7777, players: [{ id: 1, p: ownP, pvpTeam: 1 }, { id: 2, p: foeP, pvpTeam: 2 }],
                pvpBattle: { mapId: "ank_open", scores: { 1: 0, 2: 0 } } },
-    }, 100);
+    });
+    const shared = {};
+    const st = slimCtx.__slim(mkState(), 100, shared);
     ok(st.authority && st.authority.pvpSlim && !st.authority.players && st.authority.clock === 1234,
       "autoridade vira stub (sem players) mas mantém ended/terminalReason/clock");
-    ok(st.members[0].p.depot && st.members[1].p.pvpSlim && !st.members[1].p.depot,
-      "members: char próprio completo, rival reduzido ao mínimo");
-    ok(st.state.players[0].p.depot && !st.state.players[1].p.depot && !st.state.players[1].p.missions,
-      "state.players: rival sem campos pesados");
-    ok(st.state.players[1].p.equip && st.state.players[1].p.accountId === 200 && st.state.players[1].pvpTeam === 2,
-      "state.players: rival mantém equip/accountId/pvpTeam (outfit + war shield)");
+    ok(!st.members[0].p.depot && st.members[0].p.name === "Own" && st.members[0].p.hp === 10 &&
+       st.members[1].p.pvpSlim && !st.members[1].p.depot,
+      "members (tick): próprio sem heavy keys, rival reduzido ao mínimo");
+    const stGet = slimCtx.__slim(mkState(), 100);
+    ok(stGet.members[0].p.depot && stGet.state.players[0].p.depot,
+      "GET/resume (sem shared): char próprio completo para reconstruir G.p");
+    ok(!st.state.players[0].p.depot && st.state.players[0].p.equip &&
+       st.state.players[0].p.hp === 10 && st.state.players[0].p.name === "Own",
+      "state.players (tick): próprio sem heavy keys mas com campos vivos (equip/hp)");
+    ok(!st.state.players[1].p.depot && !st.state.players[1].p.missions &&
+       !st.state.players[1].p.equip,
+      "state.players: rival reduzido à whitelist de render (sem campos pesados)");
+    ok(st.state.players[1].p.name === "Foe" && st.state.players[1].p.hp === 9 &&
+       st.state.players[1].p.accountId === 200 && st.state.players[1].p.outfit &&
+       st.state.players[1].p.pvpSlim && st.state.players[1].pvpTeam === 2,
+      "state.players: rival mantém name/hp/accountId/outfit + pvpTeam (render + war shield)");
     ok(st.state.pvpBattle && st.state.pvpBattle.mapId === "ank_open", "pvpBattle preservado para o placar");
+    const st2 = slimCtx.__slim(mkState(), 200, shared);
+    ok(st2.state.players[0].p.pvpSlim && !st2.state.players[0].p.depot &&
+       st2.state.players[1].p.name === "Foe" && !st2.state.players[1].p.depot &&
+       st2.state.players[1].p.equip,
+      "viewer 200: rival 100 sai pelo slim compartilhado, próprio com campos vivos");
+    const st3 = slimCtx.__slim(mkState(), 200, shared);
+    ok(st3.state.players[0] === st2.state.players[0],
+      "mesmo step (authClock): rival slimado é o mesmo objeto entre requests (cache por step)");
+    const st5 = slimCtx.__slim({ authority: mkState().authority, members: [],
+      state: { authClock: 8888, players: [{ id: 1, p: ownP }] } }, 200, shared);
+    ok(st5.state.players[0] !== st2.state.players[0] && st5.state.players[0].p !== ownP &&
+       st5.state.players[0].p.pvpSlim,
+      "step novo (authClock muda): slim reconstruído em objeto novo");
   }
   {
     const renderSrc = fs.readFileSync(path.join(ROOT, "game/js/render.js"), "utf8");
@@ -1003,7 +1029,7 @@ const { getDb } = require(path.join(ROOT, "server/db.js"));
       "war shields no renderer (verde=aliado, vermelho=rival)");
     ok(acc.includes('data.source==="tick"') && acc.includes("G.combat.pvpBattle"),
       "SSE de tick não dispara GET extra do estado durante a batalha");
-    ok(server.includes("instanceSummary(row,true,acc.id)") && server.includes("instanceSummary(result.instance,true,acc.id)"),
+    ok(server.includes("instanceSummary(row,true,acc.id)") && server.includes("instanceSummary(result.instance,true,acc.id,hotShared)"),
       "GET e tick devolvem o snapshot enxuto por viewer");
   }
   // Dessincronia e cores de time (cliente).
