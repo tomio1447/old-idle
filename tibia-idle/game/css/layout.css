@@ -7318,6 +7318,13 @@ body.fullhd .party-panel.collapsed { width: auto; }
 /* Char selecionado = âncora da câmera. */
 .pvp-char-btn.sel { opacity: 1; border-color: #ffd75e !important;
   box-shadow: 0 0 10px rgba(255,215,94,.6), inset 0 0 4px rgba(255,215,94,.25); }
+/* Tag BCP (Botão de Comando PvP) + contador de controlados por vocação. */
+.pvp-bcp-tag { align-self: center; color: #ffd75e; font: 700 8px "Trebuchet MS",sans-serif;
+  letter-spacing: 1px; writing-mode: vertical-rl; opacity: .8; margin-right: 1px; }
+.pvp-voc-n { position: absolute; top: -5px; left: -5px; padding: 0 3px;
+  background: #4a3a20; color: #ffe680; border-radius: 2px;
+  font: 700 9px "Trebuchet MS",sans-serif; font-style: normal;
+  border: 1px solid #7a6033; pointer-events: none; }
 /* Badge da hotkey (F1..F12) no canto do botão WALL. */
 .pvp-act { position: relative; }
 .pvp-hk { position: absolute; top: -4px; right: -4px; padding: 0 3px;

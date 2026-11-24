@@ -936,38 +936,38 @@ function pvpCharCtrl(c, id) {
   if (!c._pvpCharCtrl[id]) c._pvpCharCtrl[id] = { chase: true, mode: "sd" };
   return c._pvpCharCtrl[id];
 }
-function pvpCharOptsFor(ent) {
-  return PVP_CHAR_OPTS[pvpVocBase(ent && ent.p && ent.p.voc)] || [];
-}
-function pvpCharBtnLabel(ent) {
-  const n = String((ent && ent.p && ent.p.name) || "?").replace(/[^A-Za-z]/g, "");
-  return (n.slice(0, 2) || "??").toUpperCase();
-}
-/* Re-render da coluna de chars + painel de opções lateral. */
+
+const PVP_VOC_SHORT = { knight: "KN", monk: "MK", paladin: "PA", sorcerer: "SO", druid: "DR" };
+const PVP_VOC_ORDER = ["knight", "monk", "paladin", "sorcerer", "druid"];
+/* Re-render da coluna BCP (Botão de Comando PvP): UM botão por vocação —
+ * a opção escolhida aplica em TODOS os controlados AFK daquela vocação
+ * (auxiliares da conta + AI_HARD aliados). Badge = nº de controlados. */
 function pvpCharColTick(col) {
   const c = typeof G !== "undefined" && G && G.combat;
   if (!col || !c) return;
   const aux = pvpAuxChars(c);
-  if (!aux.length) { col.style.display = "none"; _pvpCharOpen = null; return; }
-  col.style.display = "flex";
-  let html = "";
+  const byVoc = {};
   for (const ent of aux) {
-    const id = String(ent.id), ctrl = pvpCharCtrl(c, id), bv = pvpVocBase(ent.p && ent.p.voc);
-    const opts = pvpCharOptsFor(ent), open = _pvpCharOpen === id;
-    const sel = _pvpSelChar === id;
-    // Controle (PvP Tactical AI): chip do modo atual do char na batalha.
-    const aiCtl = c.pvpBattle && c.pvpBattle.aiControl, aiMode = aiCtl && aiCtl[id];
-    const aiChip = aiMode && aiMode !== "HUMAN"
-      ? `<i class="pvp-char-ai" data-m="${String(aiMode).replace(/"/g, "")}">` +
-        `${aiMode === "AI_HARD" ? "AI" : aiMode === "DEAD" ? "✝" : aiMode === "DISABLED" ? "OFF" : "…"}</i>` : "";
+    const bv = pvpVocBase(ent && ent.p && ent.p.voc);
+    if (bv) (byVoc[bv] = byVoc[bv] || []).push(ent);
+  }
+  const vocs = PVP_VOC_ORDER.filter((v) => byVoc[v]);
+  if (!vocs.length) { col.style.display = "none"; _pvpCharOpen = null; return; }
+  col.style.display = "flex";
+  let html = `<div class="pvp-bcp-tag" title="Botão de Comando PvP — por vocação">BCP</div>`;
+  for (const bv of vocs) {
+    const list = byVoc[bv], opts = PVP_CHAR_OPTS[bv] || [], open = _pvpCharOpen === bv;
+    // Estado mostrado = do 1º char do grupo (todos convergem após 1 clique).
+    const ctrl = pvpCharCtrl(c, String(list[0].id));
     html += `<div class="pvp-char-slot${open ? " open" : ""}">` +
-      `<button class="pvp-char-btn${sel ? " sel" : ""}" data-cid="${id}" title="${String(ent.p.name).replace(/"/g, "")} (${bv || "char"})${aiMode ? " — " + aiMode : ""} — câmera"` +
-      ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">${aiChip}${pvpCharBtnLabel(ent)}</button>`;
+      `<button class="pvp-char-btn" data-voc="${bv}" title="BCP ${bv} — ${list.length} controlado(s)"` +
+      ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">` +
+      `<i class="pvp-voc-n">${list.length}</i>${PVP_VOC_SHORT[bv]}</button>`;
     if (open) {
       html += `<div class="pvp-char-opts">`;
       for (const o of opts) {
         const on = o.toggle ? !!ctrl.chase : ctrl.mode === o.id;
-        html += `<button class="pvp-act pvp-char-opt${on ? " on" : " off"}" data-cid="${id}" data-opt="${o.id}"` +
+        html += `<button class="pvp-act pvp-char-opt${on ? " on" : " off"}" data-voc="${bv}" data-opt="${o.id}"` +
           ` title="${o.title || o.label}"><img src="${o.img}" alt="" draggable="false"><span>${o.label}</span></button>`;
       }
       html += `</div>`;
@@ -977,26 +977,27 @@ function pvpCharColTick(col) {
   col.innerHTML = html;
   col.querySelectorAll(".pvp-char-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-cid");
-      _pvpCharOpen = _pvpCharOpen === id ? null : id;
-      _pvpSelChar = id; // câmera segue o selecionado
+      const bv = btn.getAttribute("data-voc");
+      _pvpCharOpen = _pvpCharOpen === bv ? null : bv;
       pvpActionsTick();
     });
   });
   col.querySelectorAll(".pvp-char-opt").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-cid"), opt = btn.getAttribute("data-opt");
+      const bv = btn.getAttribute("data-voc"), opt = btn.getAttribute("data-opt");
       const cc = G && G.combat; if (!cc) return;
-      const ctrl = pvpCharCtrl(cc, id), ent = aux.find((e) => String(e.id) === id);
-      const name = ent && ent.p ? ent.p.name : id;
+      const list = byVoc[bv] || []; if (!list.length) return;
       if (opt === "chase") {
-        ctrl.chase = !ctrl.chase;
+        const nv = !pvpCharCtrl(cc, String(list[0].id)).chase;
+        for (const e of list) pvpCharCtrl(cc, String(e.id)).chase = nv;
         if (typeof toast === "function")
-          toast(`<b>${name}</b>: CHASE ${ctrl.chase ? "<b>ON</b> — segue o alvo" : "<b>OFF</b> — segura a formação"}.`);
+          toast(`<b>${bv.toUpperCase()} (${list.length})</b>: CHASE ${nv ? "<b>ON</b>" : "<b>OFF</b>"}.`);
       } else {
-        ctrl.mode = ctrl.mode === opt ? "sd" : opt;
-        const lbl = { ue: "UE (área)", sd: "SD", paralyze: "PARALYZE", heal: "HEAL FRIEND", bow: "BOW + área", xbow: "CROSSBOW + exori" }[ctrl.mode] || ctrl.mode;
-        if (typeof toast === "function") toast(`<b>${name}</b>: prioridade <b>${lbl}</b>.`);
+        const cur = pvpCharCtrl(cc, String(list[0].id)).mode;
+        const nv = cur === opt ? "sd" : opt;
+        for (const e of list) pvpCharCtrl(cc, String(e.id)).mode = nv;
+        const lbl = { ue: "UE (área)", sd: "SD", paralyze: "PARALYZE", heal: "HEAL FRIEND", bow: "BOW + área", xbow: "CROSSBOW + exori" }[nv] || nv;
+        if (typeof toast === "function") toast(`<b>${bv.toUpperCase()} (${list.length})</b>: prioridade <b>${lbl}</b>.`);
       }
       pvpActionsTick();
     });
