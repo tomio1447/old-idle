@@ -7315,6 +7315,35 @@ body.fullhd .party-panel.collapsed { width: auto; }
 /* Char selecionado = âncora da câmera. */
 .pvp-char-btn.sel { opacity: 1; border-color: #ffd75e !important;
   box-shadow: 0 0 10px rgba(255,215,94,.6), inset 0 0 4px rgba(255,215,94,.25); }
+/* Badge da hotkey (F1..F12) no canto do botão WALL. */
+.pvp-act { position: relative; }
+.pvp-hk { position: absolute; top: -4px; right: -4px; padding: 0 3px;
+  background: #2e4a8a; color: #dbe6ff; border-radius: 2px;
+  font: 700 9px "Trebuchet MS",sans-serif; font-style: normal;
+  border: 1px solid #4a6ab0; pointer-events: none; }
+/* Menu de contexto do WALL (botão direito) + seletor de hotkey. */
+.pvp-hk-menu { position: fixed; z-index: 9999; display: flex; flex-direction: column;
+  background: rgba(16,12,10,.97); border: 1px solid #5a4a33; border-radius: 3px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.6); padding: 3px; min-width: 132px; }
+.pvp-hk-opt { background: transparent; border: 0; color: #e8dfc8; text-align: left;
+  font: 700 11px "Trebuchet MS",sans-serif; letter-spacing: .5px;
+  padding: 6px 10px; cursor: pointer; border-radius: 2px; }
+.pvp-hk-opt:hover { background: rgba(255,215,94,.14); color: #ffd75e; }
+.pvp-hk-opt.off { color: #b0888a; }
+.pvp-hk-pick { position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.45); }
+.pvp-hk-pick-box { background: rgba(20,14,10,.98); border: 2px solid #5a4a33;
+  border-radius: 4px; padding: 14px; text-align: center;
+  box-shadow: 0 6px 24px rgba(0,0,0,.7); }
+.pvp-hk-title { color: #ffd75e; font: 700 13px "Trebuchet MS",sans-serif;
+  letter-spacing: 1px; margin-bottom: 10px; }
+.pvp-hk-grid { display: grid; grid-template-columns: repeat(4, 46px); gap: 6px; }
+.pvp-hk-key { height: 30px; border-radius: 3px; cursor: pointer;
+  background: rgba(16,12,10,.92); border: 2px solid #5a4a33;
+  color: #e8dfc8; font: 700 11px "Trebuchet MS",sans-serif; }
+.pvp-hk-key:hover { border-color: #ffd75e; color: #ffd75e; }
+.pvp-hk-hint { margin-top: 8px; color: #8a7a5a; font: 400 10px "Trebuchet MS",sans-serif; }
 /* Chip do modo de controle (PvP Tactical AI): AI/HARD/DEAD no canto do char. */
 .pvp-char-ai {
   position: absolute; top: -5px; right: -5px; padding: 0 3px; border-radius: 2px;

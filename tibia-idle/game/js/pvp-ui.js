@@ -994,11 +994,91 @@ function pvpCharColTick(col) {
   });
 }
 
+/* ==================== MAGIC WALL — hotkey ====================
+ * Binding persistido por conta em localStorage (F1..F12). A tecla arma/
+ * desarma a mira exatamente como o clique no botão WALL. */
+const PVP_WALL_HK_KEY = "tibia-idle-pvp-wall-hk";
+const PVP_WALL_HK_KEYS = ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"];
+function pvpWallHotkey() {
+  try { return localStorage.getItem(PVP_WALL_HK_KEY) || ""; } catch (e) { return ""; }
+}
+function pvpToggleWallAim() {
+  const cc = typeof G !== "undefined" && G && G.combat;
+  if (!cc || !cc.pvpBattle) return;
+  cc._pvpWallAim = !cc._pvpWallAim;
+  if (typeof toast === "function")
+    toast(cc._pvpWallAim ? "Clique no SQM onde soltar a <b>Magic Wall</b>."
+                         : "Magic Wall cancelada.", cc._pvpWallAim ? undefined : "bad");
+  pvpActionsTick();
+}
+let _pvpHkMenuEl = null, _pvpHkPickEl = null;
+function pvpHkClosePopups() {
+  if (_pvpHkMenuEl) { _pvpHkMenuEl.remove(); _pvpHkMenuEl = null; }
+  if (_pvpHkPickEl) { _pvpHkPickEl.remove(); _pvpHkPickEl = null; }
+}
+function pvpWallHotkeyMenu(ev) {
+  pvpHkClosePopups();
+  const el = document.createElement("div");
+  el.className = "pvp-hk-menu";
+  const bound = pvpWallHotkey();
+  el.innerHTML = `<button class="pvp-hk-opt" data-op="pick">SELECT HOTKEY</button>` +
+    (bound ? `<button class="pvp-hk-opt off" data-op="clear">CLEAR (${pvpEsc(bound)})</button>` : "");
+  el.style.left = Math.min(ev.clientX, window.innerWidth - 150) + "px";
+  el.style.top = Math.min(ev.clientY, window.innerHeight - 90) + "px";
+  document.body.appendChild(el);
+  _pvpHkMenuEl = el;
+  el.querySelectorAll(".pvp-hk-opt").forEach((b) => b.addEventListener("click", () => {
+    if (b.getAttribute("data-op") === "clear") {
+      try { localStorage.removeItem(PVP_WALL_HK_KEY); } catch (e) { /* ignore */ }
+      if (typeof toast === "function") toast("Hotkey da Magic Wall removida.");
+      pvpHkClosePopups(); pvpActionsTick();
+    } else pvpWallHotkeyPicker();
+  }));
+}
+function pvpWallHotkeyPicker() {
+  pvpHkClosePopups();
+  const el = document.createElement("div");
+  el.className = "pvp-hk-pick";
+  el.innerHTML = `<div class="pvp-hk-pick-box"><div class="pvp-hk-title">SELECT HOTKEY</div>
+    <div class="pvp-hk-grid">${PVP_WALL_HK_KEYS.map((k) =>
+      `<button class="pvp-hk-key" data-k="${k}">${k}</button>`).join("")}</div>
+    <div class="pvp-hk-hint">ESC cancela</div></div>`;
+  document.body.appendChild(el);
+  _pvpHkPickEl = el;
+  el.querySelectorAll(".pvp-hk-key").forEach((b) => b.addEventListener("click", () => {
+    const k = b.getAttribute("data-k");
+    try { localStorage.setItem(PVP_WALL_HK_KEY, k); } catch (e) { /* ignore */ }
+    if (typeof toast === "function") toast(`Magic Wall na tecla <b>${k}</b>.`);
+    pvpHkClosePopups(); pvpActionsTick();
+  }));
+}
+document.addEventListener("keydown", (e) => {
+  if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" ||
+      e.target.tagName === "SELECT" || e.target.isContentEditable)) return;
+  if (_pvpHkPickEl) { // picker aberto: ESC fecha
+    if (e.key === "Escape") { pvpHkClosePopups(); e.preventDefault(); }
+    return;
+  }
+  if (_pvpHkMenuEl && e.key === "Escape") { pvpHkClosePopups(); e.preventDefault(); return; }
+  const hk = pvpWallHotkey();
+  if (hk && e.key === hk) {
+    const c = typeof G !== "undefined" && G && G.combat;
+    if (c && c.pvpBattle && !c.pvpBattle.finished) { pvpToggleWallAim(); e.preventDefault(); }
+  }
+});
+// Clique fora fecha o menu/picker de hotkey.
+document.addEventListener("click", (e) => {
+  if (_pvpHkMenuEl && !_pvpHkMenuEl.contains(e.target)) { _pvpHkMenuEl.remove(); _pvpHkMenuEl = null; }
+  if (_pvpHkPickEl && !_pvpHkPickEl.querySelector(".pvp-hk-pick-box").contains(e.target))
+    pvpHkClosePopups();
+});
+
 function pvpActionsTick() {
   const c = typeof G !== "undefined" && G && G.combat;
   const st = c && c.pvpBattle;
   const inBattle = !!st && !st.finished;
   if (!inBattle) {
+    pvpHkClosePopups();
     _pvpSelChar = null; _pvpCharOpen = null;
     if (_pvpActionsEl) _pvpActionsEl.style.display = "none";
     return;
@@ -1014,8 +1094,8 @@ function pvpActionsTick() {
     el.innerHTML =
       `<div class="pvp-act-grip" title="Arrastar">✥</div>
        <div class="pvp-act-row">
-       <button class="pvp-act" id="pvp-act-wall" title="Magic Wall: clique e escolha o SQM — um char da PT com cooldown livre conjura (consome a runa)">
-         <img src="assets/item/magic-wall-rune.png" alt="" draggable="false"><span>WALL</span>
+       <button class="pvp-act" id="pvp-act-wall" title="Magic Wall: clique e escolha o SQM — um char da PT com cooldown livre conjura (consome a runa). Botão direito: hotkey">
+         <img src="assets/item/magic-wall-rune.png" alt="" draggable="false"><span>WALL</span><i class="pvp-hk"></i>
        </button>
        <button class="pvp-act on" id="pvp-act-target" title="Magias de ataque da PT. OFF = sequência de cooldowns livre pra Magic Wall">
          <span class="pvp-act-reticle"></span><span>TARGET</span>
@@ -1024,13 +1104,12 @@ function pvpActionsTick() {
        <div class="pvp-char-col" id="pvp-char-col"></div>`;
     document.body.appendChild(el);
     pvpActMakeDraggable(el, el.querySelector(".pvp-act-grip"));
-    el.querySelector("#pvp-act-wall").addEventListener("click", () => {
-      const cc = G && G.combat; if (!cc) return;
-      cc._pvpWallAim = !cc._pvpWallAim;
-      if (typeof toast === "function")
-        toast(cc._pvpWallAim ? "Clique no SQM onde soltar a <b>Magic Wall</b>."
-                             : "Magic Wall cancelada.", cc._pvpWallAim ? undefined : "bad");
-      pvpActionsTick();
+    el.querySelector("#pvp-act-wall").addEventListener("click", pvpToggleWallAim);
+    // Botão direito no WALL: menu com "SELECT HOTKEY" — o jogador atribui
+    // uma tecla que arma a mira igual ao clique no botão.
+    el.querySelector("#pvp-act-wall").addEventListener("contextmenu", (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      pvpWallHotkeyMenu(ev);
     });
     el.querySelector("#pvp-act-target").addEventListener("click", () => {
       const cc = G && G.combat; if (!cc) return;
@@ -1044,7 +1123,12 @@ function pvpActionsTick() {
     pvpActPlace(el);
   }
   _pvpActionsEl.style.display = "flex";
-  _pvpActionsEl.querySelector("#pvp-act-wall").classList.toggle("on", !!c._pvpWallAim);
+  const wallBtn = _pvpActionsEl.querySelector("#pvp-act-wall");
+  wallBtn.classList.toggle("on", !!c._pvpWallAim);
+  // Badge da hotkey atribuída (F1..F12) no canto do botão WALL.
+  const hkBadge = wallBtn.querySelector(".pvp-hk"), hk = pvpWallHotkey();
+  hkBadge.textContent = hk || "";
+  hkBadge.style.display = hk ? "block" : "none";
   const tgt = _pvpActionsEl.querySelector("#pvp-act-target");
   tgt.classList.toggle("on", !c._pvpAttackOff);
   tgt.classList.toggle("off", !!c._pvpAttackOff);
