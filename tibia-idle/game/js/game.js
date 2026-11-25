@@ -7497,48 +7497,94 @@ function initAccountLogin() {
   }
   function openRecoverModal() {
     if (!openAccountModal(`
-      <div class="panel-title">Recuperar senha
+      <div class="panel-title">🔐 Recuperar senha
         <span style="flex:1"></span><button class="sm" id="acc-recover-cancel">✕</button>
       </div>
-      <div class="panel-body account-flow-body">
-        <div class="tiny dim mb4">Informe o login ou o e-mail da conta. Enviaremos um código de 6 dígitos para o e-mail cadastrado.</div>
-        <div class="field"><label for="acc-recover-ident">Login ou e-mail</label>
-          <input id="acc-recover-ident" maxlength="120" placeholder="login ou seu@email.com" autocomplete="username"></div>
-        <button class="full" id="acc-recover-send">Enviar código</button>
-        <div class="field mt8"><label for="acc-recover-code">Código recebido</label>
-          <input id="acc-recover-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+      <div class="panel-body account-flow-body ev-body">
+        <div class="ev-strip"><span>Informe o login ou e-mail da conta — enviamos um código de 6 dígitos para o e-mail cadastrado.</span></div>
+        <div class="field">
+          <label for="acc-recover-ident">Login ou e-mail</label>
+          <div class="ev-email-row">
+            <input id="acc-recover-ident" maxlength="120" placeholder="login ou seu@email.com" autocomplete="username">
+            <button class="ev-btn-sec" type="button" id="acc-recover-send">Enviar código</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="ev-label-row"><label>Código recebido</label>
+            <button class="ev-link" type="button" id="acc-rec-otp-clear">Limpar dígitos</button></div>
+          <div class="ev-otp" id="acc-rec-otp">${_otpHtml("acc-rec-otp")}</div>
+        </div>
         <div class="field"><label for="acc-recover-pass">Nova senha</label>
           <input id="acc-recover-pass" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password"></div>
-        <button class="primary full mt8" id="acc-recover-confirm">Trocar senha</button>
-        <div class="tiny dim center mt8" id="acc-recover-msg"></div>
+        <button class="primary full" id="acc-recover-confirm">Trocar senha</button>
+        <div class="ev-status" id="acc-recover-msg" style="display:none" role="alert"></div>
+        <details class="ev-help">
+          <summary>Não recebeu o código?</summary>
+          <ul>
+            <li>Verifique <b>Spam / Lixo Eletrônico</b> — principalmente em Hotmail e Outlook.</li>
+            <li>Cada envio invalida o código anterior e há limite de envios por dia.</li>
+          </ul>
+        </details>
       </div>`)) return;
     $("#acc-recover-cancel").onclick = closeAccountModal;
     const status = $("#acc-recover-msg");
     const send = $("#acc-recover-send");
+    const otpGrid = $("#acc-rec-otp");
+    const confirm = $("#acc-recover-confirm");
+    const otpBoxes = _otpWire(otpGrid, () => confirm.click());
+    let resendSec = 0;
+    const setStatus = (type, text) => {
+      status.style.display = text ? "" : "none";
+      status.className = "ev-status" + (type ? " is-" + type : "");
+      status.textContent = text || "";
+    };
+    const shake = () => {
+      otpGrid.classList.remove("is-shake");
+      void otpGrid.offsetWidth;
+      otpGrid.classList.add("is-shake");
+    };
+    const tick = setInterval(() => {
+      if (!document.getElementById("acc-rec-otp")) { clearInterval(tick); return; }
+      if (resendSec > 0) {
+        resendSec--;
+        send.textContent = "Aguarde (" + resendSec + "s)";
+        if (resendSec === 0) { send.disabled = false; send.textContent = "Reenviar código"; }
+      }
+    }, 1000);
+    $("#acc-rec-otp-clear").onclick = () => { otpBoxes.forEach((b) => { b.value = ""; }); otpBoxes[0].focus(); };
+
     send.onclick = async () => {
       if (send.disabled) return;
       const ident = ($("#acc-recover-ident").value || "").trim();
-      if (!ident) { status.textContent = "Informe o login ou o e-mail."; return; }
-      send.disabled = true; status.textContent = "Enviando...";
+      if (!ident) { setStatus("error", "Informe o login ou o e-mail."); return; }
+      send.disabled = true; setStatus("info", "Enviando...");
       try {
         const r = await accountRecoverRequest(ident);
-        status.textContent = (r.msg || "Se a conta existir, enviamos o código.") +
-          (r.devCode ? " (teste: " + r.devCode + ")" : "");
-        const codeInput = $("#acc-recover-code");
-        if (codeInput) codeInput.focus();
-      } finally { send.disabled = false; }
+        const rData = (r && r.data) || r || {};
+        setStatus(rData.ok === false ? "error" : "info",
+          (rData.msg || "Se a conta existir, enviamos o código.") +
+          (rData.devCode ? " (teste: " + rData.devCode + ")" : ""));
+        if (rData.ok === false) { send.disabled = false; return; }
+        resendSec = 60;
+        otpBoxes[0].focus();
+      } catch (e) { send.disabled = false; setStatus("error", "Falha ao enviar o código."); }
     };
-    const confirm = $("#acc-recover-confirm");
     confirm.onclick = async () => {
       if (confirm.disabled) return;
       const ident = ($("#acc-recover-ident").value || "").trim();
-      const code = ($("#acc-recover-code").value || "").trim();
+      const code = otpBoxes.map((b) => b.value).join("");
       const pass = $("#acc-recover-pass").value || "";
-      if (!ident || !code || !pass) { status.textContent = "Preencha login, código e nova senha."; return; }
-      confirm.disabled = true; status.textContent = "Alterando senha...";
+      if (!ident || code.length !== 6 || !pass) {
+        if (code.length !== 6) shake();
+        setStatus("error", "Preencha login, os 6 dígitos do código e a nova senha.");
+        return;
+      }
+      confirm.disabled = true; setStatus("info", "Alterando senha...");
       try {
         const r = await accountRecoverConfirm(ident, code, pass);
-        if (!r.ok) { status.textContent = r.msg || "Código incorreto ou expirado."; return; }
+        const rData = (r && r.data) || r || {};
+        if (!rData.ok) { shake(); setStatus("error", rData.msg || "Código incorreto ou expirado."); return; }
+        clearInterval(tick);
         closeAccountModal();
         msg("Senha alterada! Entre com a nova senha.");
         const loginInput = $("#acc-login");
@@ -7632,6 +7678,37 @@ function initAccountLogin() {
     });
     $("#acc-new-login").focus();
   }
+  /* OTP de 6 caixas compartilhado (e-mail / recuperação): HTML + wiring de
+   * digitação, colar inteiro, backspace e setas. */
+  const _otpHtml = (prefix) => [0, 1, 2, 3, 4, 5].map((i) =>
+    `<input class="ev-otp-box" id="${prefix}-${i}" type="text" inputmode="numeric" maxlength="1"
+      autocomplete="${i === 0 ? "one-time-code" : "off"}" aria-label="Dígito ${i + 1}">`).join("");
+  function _otpWire(gridEl, onEnter) {
+    const boxes = Array.from(gridEl.querySelectorAll(".ev-otp-box"));
+    boxes.forEach((box, idx) => {
+      box.addEventListener("input", () => {
+        const clean = box.value.replace(/\D/g, "");
+        box.value = clean.slice(-1);
+        if (clean && idx < boxes.length - 1) boxes[idx + 1].focus();
+      });
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && !box.value && idx > 0) boxes[idx - 1].focus();
+        if (e.key === "ArrowLeft" && idx > 0) boxes[idx - 1].focus();
+        if (e.key === "ArrowRight" && idx < boxes.length - 1) boxes[idx + 1].focus();
+        if (e.key === "Enter" && onEnter) onEnter();
+      });
+      box.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const pasted = ((e.clipboardData || window.clipboardData).getData("text") || "")
+          .replace(/\D/g, "").slice(0, boxes.length);
+        if (!pasted) return;
+        pasted.split("").forEach((ch, i) => { if (boxes[i]) boxes[i].value = ch; });
+        boxes[Math.min(pasted.length, boxes.length - 1)].focus();
+      });
+    });
+    return boxes;
+  }
+
   function showEmailVerify(token, account, characters) {
     let email = (account && account.email) || "";
     const hasEmail = !!email;
@@ -7656,10 +7733,7 @@ function initAccountLogin() {
         <div class="field">
           <div class="ev-label-row"><label>Código de verificação</label>
             <button class="ev-link" type="button" id="acc-otp-clear">Limpar dígitos</button></div>
-          <div class="ev-otp" id="acc-otp">${[0, 1, 2, 3, 4, 5].map((i) =>
-            `<input class="ev-otp-box" id="acc-otp-${i}" type="text" inputmode="numeric" maxlength="1"
-              autocomplete="${i === 0 ? "one-time-code" : "off"}" aria-label="Dígito ${i + 1}">`).join("")}
-          </div>
+          <div class="ev-otp" id="acc-otp">${_otpHtml("acc-otp")}</div>
         </div>
         <button class="primary full" id="acc-email-verify">Confirmar e-mail</button>
         <div class="ev-status" id="acc-email-msg" style="display:none"></div>
@@ -7679,7 +7753,7 @@ function initAccountLogin() {
     const editBtn = $("#acc-email-edit");
     const timerEl = $("#acc-ev-timer");
     const otpGrid = $("#acc-otp");
-    const otpBoxes = Array.from(otpGrid.querySelectorAll(".ev-otp-box"));
+    const otpBoxes = _otpWire(otpGrid, () => verify.click());
     const verify = $("#acc-email-verify");
     let expireSec = -1;   // -1 = ainda não enviou
     let resendSec = 0;
@@ -7720,28 +7794,6 @@ function initAccountLogin() {
       else editBtn.textContent = "Alterar e-mail";
     };
     $("#acc-otp-clear").onclick = () => { otpBoxes.forEach((b) => { b.value = ""; }); otpBoxes[0].focus(); };
-
-    otpBoxes.forEach((box, idx) => {
-      box.addEventListener("input", () => {
-        const clean = box.value.replace(/\D/g, "");
-        box.value = clean.slice(-1);
-        if (clean && idx < 5) otpBoxes[idx + 1].focus();
-      });
-      box.addEventListener("keydown", (e) => {
-        if (e.key === "Backspace" && !box.value && idx > 0) otpBoxes[idx - 1].focus();
-        if (e.key === "ArrowLeft" && idx > 0) otpBoxes[idx - 1].focus();
-        if (e.key === "ArrowRight" && idx < 5) otpBoxes[idx + 1].focus();
-        if (e.key === "Enter") verify.click();
-      });
-      box.addEventListener("paste", (e) => {
-        e.preventDefault();
-        const pasted = ((e.clipboardData || window.clipboardData).getData("text") || "")
-          .replace(/\D/g, "").slice(0, 6);
-        if (!pasted) return;
-        pasted.split("").forEach((ch, i) => { if (otpBoxes[i]) otpBoxes[i].value = ch; });
-        otpBoxes[Math.min(pasted.length, 5)].focus();
-      });
-    });
 
     send.onclick = async () => {
       if (send.disabled) return;
