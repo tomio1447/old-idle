@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — Armas Crypt: sprites animadas oficiais (GIFs da wiki)
+
+- As 7 armas Crypt (bile/jaw/spine/slicer/breaker/splitter/strike) agora usam as tiras `_anim.png` montadas dos **GIFs oficiais da TibiaWiki** (update 15.20) em vez dos frames do DAT convertido — bile/jaw tinham tiras erradas do DAT e os outros 5 eram estáticos.
+- `weapondata.js`/`weapons.json`: `af/aw/ah` reais por item (bile 7, jaw 7, spine 8, slicer 11, breaker 20, splitter 9, strike 20 frames @32×32). PNG estático = frame 0 oficial.
+- `ASSET_VERSION` 71→72 (`weapondata.js?v=crypt-anim-v2`).
+
+---
+
 ## 2026-11-25 — E-mail transacional com template temático + SMTP Cloudflare
 
 - `server/mailer.js` reescrito: o e-mail de código (verificação e recuperação) agora usa template HTML temático — pergaminho/selo de cera (`imagens/backconfirmemail.png`) embutido como CID, wordmark GLOBAL-IDLE dourado, card escuro com o código de 6 dígitos em gold monospace.
