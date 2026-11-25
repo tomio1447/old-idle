@@ -2388,7 +2388,8 @@ async function accountLogin(login, password) {
 /* 2º passo do login com 2FA: código TOTP do app ou código enviado por e-mail. */
 async function accountLogin2fa(tfa, code, method) {
   const r = await _api("POST", "/api/login/2fa",
-    { tfa: tfa || "", code: code || "", method: method === "email" ? "email" : "totp" });
+    { tfa: tfa || "", code: code || "",
+      method: (method === "email" || method === "whatsapp") ? method : "totp" });
   if (!r.data.ok) return { ok: false, msg: r.data.msg || "Código inválido",
     expired: r.data.error === "TFA_EXPIRED" };
   return _accountLoginSuccess(r.data);
@@ -2397,6 +2398,11 @@ async function accountLogin2fa(tfa, code, method) {
 /* Pede o envio do código de login por e-mail (fallback do TOTP). */
 async function accountLogin2faEmail(tfa) {
   const r = await _api("POST", "/api/login/2fa/email", { tfa: tfa || "" });
+  return r.data || { ok: false, msg: "Falha ao enviar o código" };
+}
+/* Fallback por WhatsApp — só conta com telefone já verificado. */
+async function accountLogin2faWhatsapp(tfa) {
+  const r = await _api("POST", "/api/login/2fa/whatsapp", { tfa: tfa || "" });
   return r.data || { ok: false, msg: "Falha ao enviar o código" };
 }
 

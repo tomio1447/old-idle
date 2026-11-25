@@ -7951,7 +7951,7 @@ function initAccountLogin() {
     const tfa = qs.get("tfa");
     if (tfa) {
       history.replaceState(null, "", location.pathname);
-      showTfaStep(tfa, qs.get("hasEmail") === "1");
+      showTfaStep(tfa, qs.get("hasEmail") === "1", qs.get("hasPhone") === "1");
     }
   } catch (e) {}
 
@@ -8000,7 +8000,7 @@ function initAccountLogin() {
       const result = await accountLogin(login, pass);
       if (bootGen!==accountBootGeneration) return;
       if (!result.ok) { msg(result.msg || "Falha no login"); return; }
-      if (result.need2fa) { showTfaStep(result.tfa, result.hasEmail); return; }
+      if (result.need2fa) { showTfaStep(result.tfa, result.hasEmail, result.hasPhone); return; }
       msg(""); showPicker(result.token, result.account, result.characters);
     } finally {
       button.disabled = false;
@@ -8011,7 +8011,7 @@ function initAccountLogin() {
    * Método padrão = TOTP do autenticador; o link por e-mail aparece só
    * quando a conta tem e-mail cadastrado (fallback de celular perdido). */
   let _tfaTicket = null;
-  function showTfaStep(tfa, hasEmail) {
+  function showTfaStep(tfa, hasEmail, hasPhone) {
     const loginCard = $("#acc-login-card") ||
       ($("#account-login-form") ? $("#account-login-form").closest(".auth-card") || $("#account-login-form") : null);
     const tfaForm = $("#account-tfa-form");
@@ -8021,6 +8021,8 @@ function initAccountLogin() {
     tfaForm.style.display = "";
     const emailBtn = $("#acc-tfa-email");
     if (emailBtn) emailBtn.style.display = hasEmail ? "" : "none";
+    const waBtn = $("#acc-tfa-whatsapp");
+    if (waBtn) waBtn.style.display = hasPhone ? "" : "none";
     const stEl = $("#acc-tfa-msg");
     if (stEl) { stEl.style.display = "none"; stEl.className = "ev-status"; stEl.textContent = ""; }
     $("#acc-tfa-code").value = "";
@@ -8053,6 +8055,18 @@ function initAccountLogin() {
         _tfaTicket.method = "email";
         setStatus("success", r.msg + (r.devCode ? " (teste: " + r.devCode + ")" : ""));
       } finally { emailBtn.disabled = false; }
+    };
+    const waBtn = $("#acc-tfa-whatsapp");
+    if (waBtn) waBtn.onclick = async () => {
+      if (!_tfaTicket || waBtn.disabled) return;
+      waBtn.disabled = true;
+      setStatus("info", "Enviando no WhatsApp...");
+      try {
+        const r = await accountLogin2faWhatsapp(_tfaTicket.tfa);
+        if (!r.ok) { setStatus("error", r.msg || "Falha ao enviar."); return; }
+        _tfaTicket.method = "whatsapp";
+        setStatus("success", r.msg + (r.devCode ? " (teste: " + r.devCode + ")" : ""));
+      } finally { waBtn.disabled = false; }
     };
     tfaForm.addEventListener("submit", async (event) => {
       event.preventDefault();

@@ -8058,7 +8058,9 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .auth-card .oauth-login { width: 100%; margin: 0; }
 .auth-card .oauth-btn:last-child { margin-bottom: 0; }
 .tfa-code { text-align: center; font-family: "Courier New", monospace; font-size: 17px; font-weight: 700; letter-spacing: .18em; }
-.tfa-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.tfa-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+.tfa-send-col { display: flex; flex-direction: column; gap: 6px; }
+.tfa-actions .tfa-send-col button { width: 100%; }
 .tfa-actions button { padding: 9px 12px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14); background: rgba(24,28,38,.94); color: #f8fafc; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; }
 .tfa-actions button:hover:not(:disabled) { background: rgba(36,42,56,.98); border-color: rgba(212,175,55,.45); }
 .tfa-actions button:disabled { opacity: .55; cursor: not-allowed; }

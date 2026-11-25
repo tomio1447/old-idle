@@ -10,6 +10,8 @@ const ALPHA_UPDATE_AT = "25/11/2026 às 06:27";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — WhatsApp como canal de verificação: vincule seu telefone recebendo o código no WhatsApp e use como alternativa ao e-mail no login com 2FA",
+  "FIX — Login com 2FA não travava mais em 'Entrando...': a tela de código abre corretamente para senha e login social",
   "NOVO — RMT agora exige verificação 18+: CPF do titular + data de nascimento + consentimento, com saque PIX travado no próprio CPF — vendas de TC só liberam após a verificação",
   "NOVO — E-mail real em produção: confirmação de cadastro, recuperação de senha e códigos de 2FA chegam de suporte@global-idle.com (domínio autenticado) — confira o Lixo Eletrônico no primeiro envio",
   "NOVO — Telas de verificação redesenhadas: código de 6 dígitos em caixas separadas (cole o código inteiro de uma vez), timer de expiração e botão de reenvio com cooldown",

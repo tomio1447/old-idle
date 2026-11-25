@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — WhatsApp como canal de verificação (Cloud API oficial Meta)
+
+- **`server/whatsapper.js`**: envio via `graph.facebook.com/{ver}/{phone_number_id}/messages` — template aprovado com `{{1}}` = código (fora da janela 24h só template entrega), `WHATSAPP_OTP_BUTTON` para botão "copiar código", fallback texto livre quando não há template, cota `WHATSAPP_DAILY_CAP` (cada msg cobra da Meta), `WHATSAPP_REAL=1` igual ao `MAIL_REAL`. Phone normalizado p/ E.164 (BR +55 default).
+- **Vínculo de telefone**: `POST /api/account/phone/send` agora envia o código **no WhatsApp do próprio número** quando configurado — antes sempre ia pro e-mail. Falha na Meta → fallback automático pro e-mail; sem WhatsApp configurado o comportamento anterior se mantém.
+- **2FA no login por WhatsApp**: novo `POST /api/login/2fa/whatsapp` — fallback do TOTP que só dispara se a conta tiver `phone_verified` (senão o invasor vincularia o próprio número). Máx. 3 envios por challenge, mesma coluna `tfa_code` do e-mail, rate-limit `login-2fa-wa` 6/10min. Respostas `need2fa` agora trazem `hasPhone` (login senha + OAuth → `?tfa=&hasPhone=1`).
+- UI: botão "💬 Enviar código por WhatsApp" no card 2FA ao lado do e-mail; texto do card de telefone atualizado. Fix incluído: login 2FA destravado (`#acc-login-card` que faltava no HTML).
+
+---
+
 ## 2026-11-25 — RMT exige verificação 18+ (CPF + PIX do próprio titular)
 
 - **Gate de venda de TC**: `POST /api/rmt/requests` só aceita `verification_status='verified'` — pendente/reprovado/não verificado recebe erro dedicado (`KYC_PENDING`/`KYC_REJECTED`/`KYC_REQUIRED`).

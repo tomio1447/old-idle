@@ -196,7 +196,7 @@ function _cfgAccountPanelHtml(account) {
         <input class="cfgm-input" type="text" id="cfgm-phone-code" maxlength="6" placeholder="Código de 6 dígitos">
         <button type="button" class="cfgm-act" id="cfgm-phone-confirm">Confirmar número</button>
       </div>
-      <p class="cfgm-hint">O código chega no e-mail da conta enquanto não há envio por SMS.</p>
+      <p class="cfgm-hint">O código chega no WhatsApp do número informado (ou no e-mail da conta se o WhatsApp estiver indisponível).</p>
     </div>
 
     <div class="cfgm-card">

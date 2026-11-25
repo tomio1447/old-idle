@@ -76,6 +76,7 @@ const store = require("./store");
 const rmt = require("./rmt");
 const twitch = require("./twitch");
 const oauth = require("./oauth");
+const whatsapper = require("./whatsapper");
 const partners = require("./partners");
 const mailer = require("./mailer");
 
@@ -1122,7 +1123,8 @@ async function login(db, body) {
       exp: Date.now() + TFA_CHALLENGE_TTL_MS, emailsSent: 0 });
     if (tfaChallenges.size > 4096) tfaChallenges.clear();
     return { code: 200, body: { ok: true, need2fa: true, tfa,
-      hasEmail: !!String(acc.email || "") } };
+      hasEmail: !!String(acc.email || ""),
+      hasPhone: !!(acc.phone && acc.phone_verified) } };
   }
   return loginSessionPayload(db, acc);
 }
@@ -1199,9 +1201,10 @@ async function login2fa(db, body) {
   const acc = await db.findAccountById(c.ch.accId);
   if (!acc) return tfaExpiredRes();
   const code = String(body.code || "").trim();
-  const method = body.method === "email" ? "email" : "totp";
+  const method = (body.method === "email" || body.method === "whatsapp") ? body.method : "totp";
   let ok = false;
-  if (method === "email") {
+  if (method === "email" || method === "whatsapp") {
+    /* Código por canal assíncrono — mesma coluna tfa_code para os dois. */
     const stored = String(acc.tfa_code || "");
     ok = !!stored && stored === code &&
       Number(acc.tfa_code_expires || 0) > Date.now();
@@ -1228,6 +1231,27 @@ async function login2faEmail(db, body) {
   return { code: 200, body: { ok: true, emailSent: !!sent.ok,
     msg: sent.ok ? "Código enviado para o e-mail da conta."
       : "Falha ao enviar o e-mail. Tente novamente.",
+    ...(sent.mock ? { devCode: code } : {}) } };
+}
+/* Fallback 2FA por WhatsApp: só para conta com telefone JÁ verificado —
+ * senão o invasor registraria o próprio número e receberia o código. */
+async function login2faWhatsapp(db, body) {
+  const c = tfaChallenge(body);
+  if (!c) return tfaExpiredRes();
+  const acc = await db.findAccountById(c.ch.accId);
+  if (!acc || !acc.phone || !acc.phone_verified)
+    return { code: 200, body: { ok: false, msg: "Conta sem WhatsApp verificado." } };
+  if ((c.ch.whatsappsSent || 0) >= 3)
+    return { code: 200, body: { ok: false, msg: "Limite de envios — use o último código." } };
+  c.ch.whatsappsSent = (c.ch.whatsappsSent || 0) + 1;
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  if (typeof db.setAccountTfaCode === "function")
+    await db.setAccountTfaCode(acc.id, code, Date.now() + TFA_CODE_TTL_MS);
+  const sent = await whatsapper.sendLoginCode(acc.phone, code, acc.login);
+  return { code: 200, body: { ok: true, whatsappSent: !!sent.ok,
+    msg: sent.ok ? "Código enviado no WhatsApp do telefone cadastrado."
+      : sent.reason === "wa-daily-cap" ? "Limite diário de mensagens — tente amanhã."
+      : "Falha ao enviar no WhatsApp. Tente novamente.",
     ...(sent.mock ? { devCode: code } : {}) } };
 }
 async function tfaSetup(db, body) {
@@ -1351,7 +1375,8 @@ async function oauthFinish(db, st, provider, p) {
     tfaChallenges.set(tfa, { accId: acc.id, tries: 0,
       exp: Date.now() + TFA_CHALLENGE_TTL_MS, emailsSent: 0 });
     if (tfaChallenges.size > 4096) tfaChallenges.clear();
-    return { need2fa: true, tfa, hasEmail: !!String(acc.email || "") };
+    return { need2fa: true, tfa, hasEmail: !!String(acc.email || ""),
+      hasPhone: !!(acc.phone && acc.phone_verified) };
   }
   const token = newToken();
   if (SYNC_BUS) SYNC_BUS.revokeAccount(acc.id);
@@ -5352,6 +5377,9 @@ async function requestPhoneCode(db, body) {
   const phone = String(body.phone || "").trim().slice(0, 24);
   if (!PHONE_RE.test(phone))
     return { code: 400, body: { ok: false, msg: "Informe um telefone válido (ex.: +55 47 99999-9999)." } };
+  const waOn = whatsapper.configured();
+  if (!waOn && !EMAIL_RE.test(email))
+    return { code: 400, body: { ok: false, msg: "Cadastre um e-mail válido primeiro — sem WhatsApp configurado o código vai por e-mail." } };
   const quota = mailQuotaCheck(acc, acc.phone_code_expires, PHONE_CODE_TTL_MS);
   if (quota) return quota;
   const code = String(Math.floor(100000 + Math.random() * 900000));
@@ -5359,12 +5387,31 @@ async function requestPhoneCode(db, body) {
   if (typeof db.setAccountPhone === "function") await db.setAccountPhone(acc.id, phone);
   if (typeof db.setAccountPhoneVerified === "function") await db.setAccountPhoneVerified(acc.id, false);
   if (typeof db.setAccountPhoneCode === "function") await db.setAccountPhoneCode(acc.id, code, expiresAt);
+  /* Canal: WhatsApp (Cloud API) quando configurado — o código chega no
+   * próprio número sendo vinculado. Fallback: e-mail da conta. */
+  if (waOn) {
+    const sent = await whatsapper.sendVerificationCode(phone, code);
+    if (sent.ok) return { code: 200, body: { ok: true, channel: "whatsapp",
+      msg: "Código enviado no WhatsApp para " + phone + ".",
+      ...(sent.mock ? { devCode: code } : {}) } };
+    /* Falha na Meta → cai pro e-mail se houver (o jogador não fica preso). */
+    if (EMAIL_RE.test(email) && typeof mailer.sendPhoneCode === "function") {
+      const fb = await mailer.sendPhoneCode(email, code, acc.login, phone);
+      return { code: 200, body: { ok: !!fb.ok, channel: "email",
+        msg: fb.ok ? "WhatsApp indisponível — código enviado para " + email + "."
+          : "Falha no WhatsApp e no e-mail. Tente novamente mais tarde.",
+        ...(fb.mock ? { devCode: code } : {}) } };
+    }
+    return { code: 200, body: { ok: false, channel: "whatsapp",
+      msg: sent.reason === "wa-daily-cap" ? "Limite diário de mensagens — tente amanhã."
+        : "Falha ao enviar no WhatsApp. Confira o número e tente novamente." } };
+  }
   const sent = (typeof mailer.sendPhoneCode === "function")
     ? await mailer.sendPhoneCode(email, code, acc.login, phone)
     : { ok: false };
   return { code: 200, body: {
     ok: true,
-    emailSent: !!sent.ok,
+    emailSent: !!sent.ok, channel: "email",
     msg: sent.ok ? "Código enviado para " + email + "." : "Falha ao enviar o e-mail. Configure o SMTP no servidor.",
     ...(sent.mock ? { devCode: code } : {}),
   } };
@@ -6840,6 +6887,11 @@ async function main() {
         const r = await login2faEmail(db, await readBody(req));
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/login/2fa/whatsapp") {
+        const limited=rateLimit(req,"login-2fa-wa",6,600000);if(limited)return send(res,limited.code,limited.body);
+        const r = await login2faWhatsapp(db, await readBody(req));
+        return send(res, r.code, r.body);
+      }
       if (req.method === "POST" && url === "/api/account/2fa/setup") {
         const limited=rateLimit(req,"2fa-setup",10,600000);if(limited)return send(res,limited.code,limited.body);
         const r = await tfaSetup(db, await readBody(req));
@@ -7329,7 +7381,7 @@ async function main() {
           if (r.need2fa) {
             res.writeHead(302, Object.assign(hardenedHeaders(res), {
               Location: "/?tfa=" + encodeURIComponent(r.tfa) + "&provider=" + st.provider +
-                (r.hasEmail ? "&hasEmail=1" : "") }));
+                (r.hasEmail ? "&hasEmail=1" : "") + (r.hasPhone ? "&hasPhone=1" : "") }));
             return res.end();
           }
           if (r.ban) {
