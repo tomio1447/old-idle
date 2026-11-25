@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — Loadscreen mantém a cena do jogo como background
+
+- Antes: o overlay de loading era quase opaco e `#app` ficava `visibility:hidden` — a tela apagava para preto a cada load (entrada em boss/hunt, transição de mapa).
+- Agora: o overlay é translúcido (escurece a cena ~55-82%) e `#app` permanece visível durante loads de sessão — o jogador continua vendo o mapa esmaecido atrás do card de loading, sem flash preto.
+- `boot-loading` (primeiro paint após reload) continua escondendo `#app` — nesse caso o jogo ainda não montou o DOM e não há cena para manter.
+
+---
+
+
 ## 2026-11-25 — Fix: instância quebrada não cai mais na seleção de personagem
 
 - **Bug**: quando a instância quebrava ao entrar num boss/hunt (create rejeitado ou watchdog de 45s), o `reloadIntoBrokenInstance` dava `location.reload()` **sem armar o autoload** — o boot não achava `autoId` e caía na tela de seleção de personagem, parecendo que o jogo tinha caído.

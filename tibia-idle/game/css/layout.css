@@ -5642,9 +5642,11 @@ a:hover { color: #aab6f7; }
   inset: 0;
   z-index: 10050;
   padding: 20px;
+  /* Translúcido: a cena atual (templo/mapa) continua visível esmaecida
+   * atrás da loadscreen em vez de a tela apagar para preto. */
   background:
-    radial-gradient(circle at center, rgba(28, 24, 16, .45) 0%, rgba(7, 8, 11, .96) 75%),
-    #0a0b0e;
+    radial-gradient(circle at center, rgba(28, 24, 16, .30) 0%, rgba(7, 8, 11, .82) 78%),
+    rgba(10, 11, 14, .55);
   align-items: center;
   justify-content: center;
 }
@@ -5656,8 +5658,10 @@ html.boot-loading #btn-config-login,
 html.game-loading-on #btn-config-login,
 html.boot-loading #client-version-label,
 html.game-loading-on #client-version-label { display: none !important; }
-html.boot-loading #app,
-html.game-loading-on #app { visibility: hidden; }
+/* #app só é escondido no boot-loading (primeiro paint após reload — DOM ainda
+ * não montou o jogo). No game-loading de sessão o app fica atrás do overlay:
+ * é ele que fornece o background mantido durante o load. */
+html.boot-loading #app { visibility: hidden; }
 html.boot-loading #modal,
 html.game-loading-on #modal,
 html.boot-loading #alpha-announce-modal,
