@@ -122,6 +122,38 @@ window.FORGE_TRANSFER = {
   coreCost: 1,
 };
 
+/* Convergence (Winter Update 2023) — exclusivo de itens classificação 4.
+ * Fontes oficiais (Canary/crystalserver):
+ *   - Convergence Fusion: funde DOIS itens DIFERENTES do MESMO slot e mesmo
+ *     tier; resultado GARANTIDO (sem bonus/cores); custa 130 Dust + gold.
+ *   - Convergence Transfer: transfere o tier SEM a perda de 1 nível;
+ *     custa 160 Dust + gold bem maior.
+ * Os preços abaixo são os oficiais da tabela de tiers (addTier no
+ * item_tiers.lua do crystalserver). */
+window.FORGE_CONVERGENCE_FUSION = {
+  dustCost: 130,
+};
+window.FORGE_CONVERGENCE_TRANSFER = {
+  dustCost: 160,
+  coreCost: 1,
+};
+/* Convergence Fusion: chave = tier de DESTINO (tier atual + 1). */
+window.FORGE_CONVERGENCE_FUSION_COST = {
+  4: {
+    1: 55000000, 2: 110000000, 3: 170000000, 4: 300000000, 5: 875000000,
+    6: 2350000000, 7: 6950000000, 8: 21250000000, 9: 50000000000,
+    10: 125000000000,
+  },
+};
+/* Convergence Transfer: chave = tier do DOADOR (resultado = mesmo tier). */
+window.FORGE_CONVERGENCE_TRANSFER_COST = {
+  4: {
+    1: 65000000, 2: 165000000, 3: 375000000, 4: 800000000, 5: 2000000000,
+    6: 5250000000, 7: 14500000000, 8: 42500000000, 9: 100000000000,
+    10: 300000000000,
+  },
+};
+
 window.FORGE_FUSION_COST = {
   1: { 0: 25000 },
   2: { 0: 750000, 1: 5000000 },
@@ -224,6 +256,18 @@ function forgeTransferGoldCost(slug, donorTier) {
   return row && row[donorTier] ? row[donorTier] : 0;
 }
 
+function forgeConvergenceFusionGoldCost(slug, currentTier) {
+  var cls = forgeItemClass(slug);
+  var row = FORGE_CONVERGENCE_FUSION_COST[cls] || null;
+  return row && row[currentTier + 1] ? row[currentTier + 1] : 0;
+}
+
+function forgeConvergenceTransferGoldCost(slug, donorTier) {
+  var cls = forgeItemClass(slug);
+  var row = FORGE_CONVERGENCE_TRANSFER_COST[cls] || null;
+  return row && row[donorTier] ? row[donorTier] : 0;
+}
+
 function forgeBagItems(p) {
   var out = [];
   if (typeof ensureItemInstances === "function") ensureItemInstances(p);
@@ -259,6 +303,9 @@ window.FORGE_UI = {
   slug: null,
   targetSlug: null,
   useCore: false,
+  convMode: "fusion",
+  convPartner: null,
+  convTarget: null,
 };
 window.DEPOT_UI = { tab: "depot" };
 

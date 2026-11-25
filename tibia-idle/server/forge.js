@@ -36,6 +36,35 @@ const FORGE_FUSION_COST = {
   },
 };
 
+const FORGE_TRANSFER = { dustCost: 100, coreCost: 1 };
+const FORGE_TRANSFER_COST = {
+  2: { 2: 5000000 },
+  3: { 2: 10000000, 3: 20000000 },
+  4: {
+    2: 20000000, 3: 40000000, 4: 65000000, 5: 100000000, 6: 250000000,
+    7: 750000000, 8: 2500000000, 9: 8000000000, 10: 15000000000,
+  },
+};
+
+/* Convergence (WU23): exclusivo de classificação 4 — espelho das tabelas
+ * oficiais do crystalserver (item_tiers.lua, addTier). */
+const FORGE_CONVERGENCE_FUSION = { dustCost: 130 };
+const FORGE_CONVERGENCE_TRANSFER = { dustCost: 160, coreCost: 1 };
+const FORGE_CONVERGENCE_FUSION_COST = {
+  4: {
+    1: 55000000, 2: 110000000, 3: 170000000, 4: 300000000, 5: 875000000,
+    6: 2350000000, 7: 6950000000, 8: 21250000000, 9: 50000000000,
+    10: 125000000000,
+  },
+};
+const FORGE_CONVERGENCE_TRANSFER_COST = {
+  4: {
+    1: 65000000, 2: 165000000, 3: 375000000, 4: 800000000, 5: 2000000000,
+    6: 5250000000, 7: 14500000000, 8: 42500000000, 9: 100000000000,
+    10: 300000000000,
+  },
+};
+
 function instTier(inst) {
   return Math.max(0, Math.floor(Number(inst && inst.tier) || 0));
 }
@@ -158,7 +187,148 @@ function forgeFuseAuth(p, instId, useCore, ITEMS, rng) {
   };
 }
 
+/* ---------- Convergence (espelho do forge.js do cliente) ---------- */
+
+/* Parceiro válido da Convergence Fusion: outro item classificação 4 do
+ * MESMO slot e mesmo tier — pode ser um item diferente (oficial). */
+function forgeConvergenceFusionPartner(p, inst, partnerInstId, tier, ITEMS) {
+  const it = ITEMS[inst.slug];
+  for (const other of (p.itemInstances || [])) {
+    if (!other || other.id === inst.id || other.loc !== "bag") continue;
+    if (partnerInstId && String(other.id) !== String(partnerInstId)) continue;
+    const oit = ITEMS[other.slug];
+    if (!oit || oit.cls !== 4 || oit.s !== it.s) continue;
+    if (instTier(other) !== tier) continue;
+    if (forgeHasImbuement(p, other.id, other.slug)) continue;
+    return other;
+  }
+  return null;
+}
+
+function forgeCanConvergeFuse(p, instId, partnerInstId, ITEMS) {
+  const inst = findInst(p, instId);
+  if (!inst || inst.loc !== "bag")
+    return { ok: false, msg: "Selecione um item físico da mochila para fundir." };
+  const it = ITEMS && ITEMS[inst.slug];
+  if (!forgeIsEligibleItem(it))
+    return { ok: false, msg: "Item não pode ser usado na Exaltation Forge." };
+  if (it.cls !== 4)
+    return { ok: false, msg: "Convergence é exclusiva de itens classificação 4." };
+  if (forgeHasImbuement(p, inst.id, inst.slug))
+    return { ok: false, msg: "Remova os imbuements do item equipado antes de forjar." };
+  const tier = instTier(inst), maxTier = FORGE_MAX_TIER[it.cls] || 0;
+  if (tier >= maxTier)
+    return { ok: false, msg: "Tier máximo (T" + maxTier + ") atingido." };
+
+  const anyPartner = forgeConvergenceFusionPartner(p, inst, null, tier, ITEMS);
+  if (!anyPartner)
+    return { ok: false, msg: "A Convergence Fusion precisa de outro item classificação 4 do mesmo slot e mesmo tier na mochila." };
+  const partner = partnerInstId
+    ? forgeConvergenceFusionPartner(p, inst, partnerInstId, tier, ITEMS)
+    : anyPartner;
+  if (!partner)
+    return { ok: false, msg: "Selecione um item parceiro válido (mesmo slot e mesmo tier)." };
+
+  const gold = (FORGE_CONVERGENCE_FUSION_COST[it.cls] || {})[tier + 1] || 0;
+  if (!gold) return { ok: false, msg: "Custo de Convergence Fusion não definido para este tier." };
+  const haveGold = Math.max(0, Math.floor(Number(p.gold) || 0));
+  if (haveGold < gold) return { ok: false, msg: "Faltam " + (gold - haveGold) + " gp." };
+  if ((Number(p.dust) || 0) < FORGE_CONVERGENCE_FUSION.dustCost)
+    return { ok: false, msg: "Faltam " + (FORGE_CONVERGENCE_FUSION.dustCost - (Number(p.dust) || 0)) + " Dust." };
+
+  return {
+    ok: true, inst, partner, name: itemLabel(it, inst.slug),
+    current: tier, next: tier + 1, gold,
+    dust: FORGE_CONVERGENCE_FUSION.dustCost,
+  };
+}
+
+/* Convergence Fusion: resultado GARANTIDO — sem roll, sem cores, sem
+ * bonus. O item alvo sobe de tier e o parceiro é consumido inteiro. */
+function forgeConvergeFuseAuth(p, instId, partnerInstId, ITEMS) {
+  const chk = forgeCanConvergeFuse(p, instId, partnerInstId, ITEMS);
+  if (!chk.ok) return chk;
+
+  p.gold = Math.max(0, Math.floor(Number(p.gold) || 0) - chk.gold);
+  p.dust = Math.max(0, Math.floor(Number(p.dust) || 0) - chk.dust);
+
+  chk.inst.tier = chk.next;
+  p.itemInstances = (p.itemInstances || []).filter((i) => i && i.id !== chk.partner.id);
+  return {
+    ok: true, success: true, tier: chk.next, slug: chk.inst.slug,
+    msg: "Convergence Fusion concluída! " + chk.name +
+      " agora é T" + chk.next + " (resultado garantido).",
+  };
+}
+
+/* Transfer — regular (tier - 1) e convergence (mesmo tier, class 4). */
+function forgeCanTransfer(p, donorId, targetId, convergence, ITEMS) {
+  const donor = findInst(p, donorId), target = findInst(p, targetId);
+  if (!donor || !target || donor.loc !== "bag" || target.loc !== "bag")
+    return { ok: false, msg: "Doador e alvo precisam estar fisicamente na mochila." };
+  const dit = ITEMS && ITEMS[donor.slug], tit = ITEMS && ITEMS[target.slug];
+  if (!forgeIsEligibleItem(dit) || !forgeIsEligibleItem(tit))
+    return { ok: false, msg: "Selecione um item doador e um alvo válidos." };
+  if (forgeHasImbuement(p, donor.id, donor.slug) || forgeHasImbuement(p, target.id, target.slug))
+    return { ok: false, msg: "Itens equipados com imbuement não podem participar da transferência." };
+  if (donor.id === target.id)
+    return { ok: false, msg: "A transferência precisa de dois itens distintos." };
+  if (dit.cls !== tit.cls)
+    return { ok: false, msg: "Os itens precisam ter a mesma classificação." };
+  const donorTier = instTier(donor);
+  if (convergence) {
+    if (dit.cls !== 4)
+      return { ok: false, msg: "Convergence é exclusiva de itens classificação 4." };
+    if (donorTier < 1)
+      return { ok: false, msg: "O item doador precisa ter tier." };
+  } else if (donorTier < 2) {
+    return { ok: false, msg: "O item doador precisa ser no mínimo T2." };
+  }
+  if (instTier(target) > 0)
+    return { ok: false, msg: "O item alvo precisa estar sem tier." };
+
+  const gold = convergence
+    ? ((FORGE_CONVERGENCE_TRANSFER_COST[dit.cls] || {})[donorTier] || 0)
+    : ((FORGE_TRANSFER_COST[dit.cls] || {})[donorTier] || 0);
+  if (!gold) return { ok: false, msg: "Custo de transferência não definido para este item." };
+  const haveGold = Math.max(0, Math.floor(Number(p.gold) || 0));
+  if (haveGold < gold) return { ok: false, msg: "Faltam " + (gold - haveGold) + " gp." };
+  const dustCost = convergence ? FORGE_CONVERGENCE_TRANSFER.dustCost : FORGE_TRANSFER.dustCost;
+  if ((Number(p.dust) || 0) < dustCost)
+    return { ok: false, msg: "Faltam " + (dustCost - (Number(p.dust) || 0)) + " Dust." };
+  const coreCost = convergence ? FORGE_CONVERGENCE_TRANSFER.coreCost : FORGE_TRANSFER.coreCost;
+  if ((Number(p.exaltedCores) || 0) < coreCost)
+    return { ok: false, msg: "Falta 1 Exalted Core." };
+
+  return {
+    ok: true, donor, target, donorName: itemLabel(dit, donor.slug),
+    targetName: itemLabel(tit, target.slug),
+    resultTier: convergence ? donorTier : donorTier - 1,
+    gold, dust: dustCost, cores: coreCost, convergence: !!convergence,
+  };
+}
+
+function forgeTransferAuth(p, donorId, targetId, convergence, ITEMS) {
+  const chk = forgeCanTransfer(p, donorId, targetId, convergence, ITEMS);
+  if (!chk.ok) return chk;
+
+  p.gold = Math.max(0, Math.floor(Number(p.gold) || 0) - chk.gold);
+  p.dust = Math.max(0, Math.floor(Number(p.dust) || 0) - chk.dust);
+  p.exaltedCores = Math.max(0, Math.floor(Number(p.exaltedCores) || 0) - chk.cores);
+
+  chk.target.tier = chk.resultTier;
+  p.itemInstances = (p.itemInstances || []).filter((i) => i && i.id !== chk.donor.id);
+  return {
+    ok: true, success: true, tier: chk.resultTier, slug: chk.target.slug,
+    msg: (chk.convergence
+      ? "Convergence Transfer concluída! " + chk.targetName + " recebeu T" + chk.resultTier + " (sem perda de tier)."
+      : "Transferência concluída! " + chk.targetName + " recebeu T" + chk.resultTier + "."),
+  };
+}
+
 module.exports = {
   FORGE_FUSION, FORGE_MAX_TIER, FORGE_SLOTS,
   forgeCanFuse, forgeFuseAuth,
+  forgeCanConvergeFuse, forgeConvergeFuseAuth,
+  forgeCanTransfer, forgeTransferAuth,
 };

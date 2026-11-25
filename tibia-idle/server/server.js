@@ -54,7 +54,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   equipFromContainerAuth, unequipFromContainerAuth, depotActionAuth,
   assignCharm: authAssignCharm, clearCharm: authClearCharm,
   buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm } = require("./authoritative_engine");
-const { forgeCanFuse, forgeFuseAuth } = require("./forge");
+const { forgeCanFuse, forgeFuseAuth, forgeConvergeFuseAuth, forgeTransferAuth } = require("./forge");
 /* Catalisadores de Weapon Proficiency — tabela + lógica compartilhada com
  * o cliente. O require interno de proficiency.js resolve os globals que o
  * engine acabou de ligar (window.PROFDATA, GAMEDATA.items, itemLiberado). */
@@ -1879,10 +1879,45 @@ async function forgeFuseApi(db,body){
   if(active.row&&active.row.status==="active")
     return {code:409,body:{ok:false,error:"FORGE_IN_INSTANCE",msg:"A Exaltation Forge só funciona na cidade."}};
   const p=await loadCityPlayer(db,acc,character);
-  const result=forgeFuseAuth(p,instId,!!body.use_core,ITEMS);
+  const convergence=!!body.convergence;
+  const partnerInstId=String(body.partner_inst_id||"");
+  const result=convergence
+    ?forgeConvergeFuseAuth(p,instId,partnerInstId,ITEMS)
+    :forgeFuseAuth(p,instId,!!body.use_core,ITEMS);
   if(!result.ok)return {code:400,body:Object.assign({error:"FORGE_FUSION_DENIED"},result)};
   /* O parceiro saiu do itemInstances sem recalcular o espelho — recria o
    * invariante bag[slug] = nº de instâncias (mesmo padrão do pouch move). */
+  authSyncBagCountsFromInstances(p);
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,
+    success:!!result.success,tier:result.tier,slug:result.slug,msg:result.msg,
+    gold:p.gold,dust:p.dust,slivers:p.slivers,exaltedCores:p.exaltedCores,
+    bag:p.bag||{},itemInstances:p.itemInstances||[]})};
+}
+
+/* Transfer (regular e Convergence) — autoritativo pelo mesmo motivo da
+ * fusion: a versão client-side sumia com um sync do shared_inventory. */
+async function forgeTransferApi(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version);
+  const donorId=String(body.donor_inst_id||""),targetId=String(body.target_inst_id||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!donorId||!targetId)
+    return {code:400,body:{ok:false,error:"FORGE_INVALID_TRANSFER",msg:"Transferência inválida."}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  if(Number(character.save_version)!==expected)
+    return {code:409,body:{ok:false,error:"SAVE_CONFLICT",msg:"Save alterado em outra sessão.",characters:[accountCharacterSummary(character,acc.gold)]}};
+  const active=await resolveInstanceRow(db,acc,charId);
+  if(active.error)return active.error;
+  if(active.row&&active.row.status==="active")
+    return {code:409,body:{ok:false,error:"FORGE_IN_INSTANCE",msg:"A Exaltation Forge só funciona na cidade."}};
+  const p=await loadCityPlayer(db,acc,character);
+  const result=forgeTransferAuth(p,donorId,targetId,!!body.convergence,ITEMS);
+  if(!result.ok)return {code:400,body:Object.assign({error:"FORGE_TRANSFER_DENIED"},result)};
   authSyncBagCountsFromInstances(p);
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
@@ -6662,6 +6697,9 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/forge/fuse") {
         const r = await forgeFuseApi(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/forge/transfer") {
+        const r = await forgeTransferApi(db, await readBody(req));return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/training/buy") {
         const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);

@@ -4034,7 +4034,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   margin-top: 17px;
   height: 35px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   border: 2px solid;
   border-color: #161616 #686868 #686868 #161616;
   background:
@@ -4063,6 +4063,13 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   filter: drop-shadow(1px 1px 0 #000);
 }
 .forge-client-tab-icon.fusion { background: url(../assets/item/dust.gif) center/22px 22px no-repeat; }
+.forge-client-tab-icon.convergence::before,
+.forge-client-tab-icon.convergence::after {
+  content: ""; position: absolute; top: 10px; width: 12px; height: 7px;
+  background: #d9a441; border: 1px solid #1a130c;
+}
+.forge-client-tab-icon.convergence::before { left: 0; transform: skewY(20deg); }
+.forge-client-tab-icon.convergence::after { right: 0; transform: skewY(-20deg); }
 .forge-client-tab-icon.transfer::before {
   content: ""; position: absolute; left: 1px; top: 5px; width: 19px; height: 10px;
   border-left: 5px solid #37bde8; border-bottom: 5px solid #37bde8;
@@ -4238,6 +4245,12 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   font: inherit;
   font-size: 9px;
   cursor: pointer;
+}
+.forge-client-conv-toggle {
+  display: flex; justify-content: center; gap: 10px; margin: 2px 0 6px;
+}
+.forge-client-conv-toggle .forge-client-mini-btn {
+  font-size: 11px; height: 22px; padding: 2px 12px; text-align: center;
 }
 .forge-client-mini-btn.active { color: #fff; background: #50504d; }
 .forge-client-mini-btn span { float: right; color: #69d7ff; font-weight: bold; }

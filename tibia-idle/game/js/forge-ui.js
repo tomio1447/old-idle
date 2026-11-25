@@ -56,6 +56,7 @@ function forgeResourceSummaryHtml(p) {
 function forgeClientTabHtml() {
   var tabs = [
     { id: 'fusion', label: 'Fusion', cls: 'fusion' },
+    { id: 'convergence', label: 'Convergence', cls: 'convergence' },
     { id: 'transfer', label: 'Transfer', cls: 'transfer' },
     { id: 'conversion', label: 'Conversion', cls: 'conversion' },
     { id: 'history', label: 'History', cls: 'history' },
@@ -236,6 +237,143 @@ function renderForgeTransferPanel(p, donorRef) {
     + '</div>';
 }
 
+/* Grid genérico de itens da forja (lista de seleção ou de alvos). */
+function forgeClientItemGridHtml(entries, selRef, dataAttr, emptyMsg) {
+  if (!entries || !entries.length) {
+    return '<div class="forge-client-target-grid"><div class="forge-client-empty">' + emptyMsg + '</div></div>';
+  }
+  var html = '<div class="forge-client-target-grid">';
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    html += forgeClientItemTile(e.slug, '', e.ref === selRef ? 'sel' : '',
+      dataAttr + '="' + e.ref + '" title="' + e.it.n + ' - ' + (e.currentTier ? 'T' + e.currentTier : 'T0') + '"', 34, e.currentTier);
+  }
+  return html + '</div>';
+}
+
+/* ---------- Convergence (WU23 — itens classificação 4) ---------- */
+function renderForgeConvergencePanel(p) {
+  var convMode = FORGE_UI.convMode === 'transfer' ? 'transfer' : 'fusion';
+  return '<div class="forge-client-conv-toggle">'
+    + '<button class="forge-client-mini-btn' + (convMode === 'fusion' ? ' active' : '') + '" data-conv-mode="fusion">Convergence Fusion</button>'
+    + '<button class="forge-client-mini-btn' + (convMode === 'transfer' ? ' active' : '') + '" data-conv-mode="transfer">Convergence Transfer</button>'
+    + '</div>'
+    + (convMode === 'transfer' ? renderForgeConvTransferPanel(p) : renderForgeConvFusionPanel(p));
+}
+
+function renderForgeConvFusionPanel(p) {
+  var bag4 = forgeBagItems(p).filter(function(e) { return e.cls === 4; });
+  var info = FORGE_UI.slug ? forgeItemSummary(p, FORGE_UI.slug) : null;
+  if (!info || info.cls !== 4 || !info.inBag) {
+    FORGE_UI.slug = bag4.length ? bag4[0].ref : null;
+    info = FORGE_UI.slug ? forgeItemSummary(p, FORGE_UI.slug) : null;
+  }
+  var partners = info ? forgeConvergenceFusionPartners(p, FORGE_UI.slug) : [];
+  if (!FORGE_UI.convPartner || !partners.some(function(t) { return t.ref === FORGE_UI.convPartner; })) {
+    FORGE_UI.convPartner = partners.length ? partners[0].ref : null;
+  }
+  var partnerInfo = FORGE_UI.convPartner ? forgeItemSummary(p, FORGE_UI.convPartner) : null;
+  var chk = info ? forgeCanConvergeFuse(p, FORGE_UI.slug, FORGE_UI.convPartner)
+                 : { ok: false, msg: 'Select a classification 4 item.' };
+  var gold = info ? forgeConvergenceFusionGoldCost(info.slug, info.tier) : 0;
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
+  var dustOk = (p.dust || 0) >= FORGE_CONVERGENCE_FUSION.dustCost;
+  var canUpgrade = info && (info.tier || 0) < (info.maxTier || 0);
+  var effect = info && canUpgrade ? forgeEffectForSlot(info.slot, info.tier + 1, p) : null;
+
+  return ''
+    + '<div class="forge-client-section-title">Select Items For Convergence Fusion</div>'
+    + '<div class="forge-client-select-row transfer">'
+    +   '<div class="forge-client-item-list">'
+    +     forgeClientItemGridHtml(bag4, FORGE_UI.slug, 'data-forge-ref', 'No classification 4 items in backpack.')
+    +   '</div>'
+    +   '<div class="forge-client-arrows"><span></span><span></span><span></span></div>'
+    +   '<div class="forge-client-item-list targets">'
+    +     forgeClientItemGridHtml(partners, FORGE_UI.convPartner, 'data-conv-partner', 'No partner: needs another class 4 item, same slot + same tier.')
+    +   '</div>'
+    + '</div>'
+    + '<div class="forge-client-section-title">Further Items Needed For Convergence Fusion</div>'
+    + '<div class="forge-client-further">'
+    +   '<div class="forge-client-need-icons">'
+    +     forgeClientItemTile(partnerInfo ? partnerInfo.slug : null, partnerInfo ? '1' : '0/1', partnerInfo ? 'ok' : 'bad', '', 38, partnerInfo ? partnerInfo.tier : 0)
+    +     forgeClientResourceTile('dust', (p.dust || 0) + '/' + FORGE_CONVERGENCE_FUSION.dustCost, dustOk ? 'ok' : 'bad', 34)
+    +   '</div>'
+    +   '<div class="forge-client-rates">'
+    +     '<div class="forge-client-rate-row"><span>Success Rate:</span><b class="green">100%</b></div>'
+    +     '<div class="forge-client-rate-row"><span>Tier Loss:</span><b class="green">0%</b></div>'
+    +     '<div class="forge-client-rate-row"><span>Consumed:</span><b>' + (partnerInfo ? partnerInfo.name + ' T' + partnerInfo.tier : '-') + '</b></div>'
+    +   '</div>'
+    +   '<div class="forge-client-arrows one"><span></span></div>'
+    +   '<div class="forge-client-result-box">'
+    +     '<div class="forge-client-ghost-icons">'
+    +       forgeClientItemTile(info ? info.slug : null, '', '', '', 30)
+    +       forgeClientItemTile(partnerInfo ? partnerInfo.slug : null, '', '', '', 30)
+    +     '</div>'
+    +     forgeClientCostValue(fmtFull(gold), gold ? (haveGold >= gold ? 'green' : 'red') : '')
+    +     '<button class="forge-client-action" id="forge-convfuse-apply"' + (chk.ok ? '' : ' disabled') + '>Fuse</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="forge-client-desc">'
+    +   '<p>Convergence Fusion lets you fuse two DIFFERENT items of the same body slot and same tier. <span class="info-dot">i</span></p>'
+    +   '<p>The result is guaranteed, but no bonus effects can be triggered. Only classification 4 items. <span class="info-dot">i</span></p>'
+    +   (effect ? '<p class="forge-client-effect">Next: ' + effect.text + '</p>' : '')
+    +   (!chk.ok ? '<p class="forge-client-warning">' + chk.msg + '</p>' : '')
+    + '</div>';
+}
+
+function renderForgeConvTransferPanel(p) {
+  var donors = forgeBagItems(p).filter(function(e) { return e.cls === 4 && e.currentTier >= 1; });
+  var donor = FORGE_UI.slug ? forgeItemSummary(p, FORGE_UI.slug) : null;
+  if (!donor || donor.cls !== 4 || donor.tier < 1 || !donor.inBag) {
+    FORGE_UI.slug = donors.length ? donors[0].ref : null;
+    donor = FORGE_UI.slug ? forgeItemSummary(p, FORGE_UI.slug) : null;
+  }
+  var targets = donor ? forgeConvergenceTransferTargets(p, FORGE_UI.slug) : [];
+  if (!FORGE_UI.convTarget || !targets.some(function(t) { return t.ref === FORGE_UI.convTarget; })) {
+    FORGE_UI.convTarget = targets.length ? targets[0].ref : null;
+  }
+  var targetInfo = FORGE_UI.convTarget ? forgeItemSummary(p, FORGE_UI.convTarget) : null;
+  var chk = (donor && targetInfo) ? forgeCanConvergeTransfer(p, FORGE_UI.slug, FORGE_UI.convTarget)
+                                  : { ok: false, msg: donor ? 'No class 4 target item without tier.' : 'Select a class 4 donor item with tier.' };
+  var gold = donor ? forgeConvergenceTransferGoldCost(donor.slug, donor.tier) : 0;
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
+  var dustOk = (p.dust || 0) >= FORGE_CONVERGENCE_TRANSFER.dustCost;
+  var coreOk = (p.exaltedCores || 0) >= FORGE_CONVERGENCE_TRANSFER.coreCost;
+
+  return ''
+    + '<div class="forge-client-section-title">Select Items For Convergence Transfer</div>'
+    + '<div class="forge-client-select-row transfer">'
+    +   '<div class="forge-client-item-list">'
+    +     forgeClientItemGridHtml(donors, FORGE_UI.slug, 'data-forge-ref', 'No class 4 items with tier in backpack.')
+    +   '</div>'
+    +   '<div class="forge-client-arrows"><span></span><span></span><span></span></div>'
+    +   '<div class="forge-client-item-list targets">'
+    +     forgeClientItemGridHtml(targets, FORGE_UI.convTarget, 'data-conv-target', 'No class 4 item without tier.')
+    +   '</div>'
+    + '</div>'
+    + '<div class="forge-client-section-title">Further Items Needed For Convergence Transfer</div>'
+    + '<div class="forge-client-further transfer">'
+    +   '<div class="forge-client-need-icons">'
+    +     forgeClientResourceTile('dust', (p.dust || 0) + '/' + FORGE_CONVERGENCE_TRANSFER.dustCost, dustOk ? 'ok' : 'bad', 34)
+    +     forgeClientResourceTile('exalted-core', String(FORGE_CONVERGENCE_TRANSFER.coreCost), coreOk ? 'ok' : 'bad', 34)
+    +   '</div>'
+    +   '<div class="forge-client-rates wide">'
+    +     '<div class="forge-client-rate-row"><span>Donor:</span><b>' + (donor ? donor.name + ' T' + donor.tier : '-') + '</b></div>'
+    +     '<div class="forge-client-rate-row"><span>Target:</span><b>' + (targetInfo ? targetInfo.name : '-') + '</b></div>'
+    +     '<div class="forge-client-rate-row"><span>Result Tier:</span><b class="green">T' + (donor ? donor.tier : 0) + ' (no tier loss)</b></div>'
+    +   '</div>'
+    +   '<div class="forge-client-result-box">'
+    +     forgeClientCostValue(fmtFull(gold), gold ? (haveGold >= gold ? 'green' : 'red') : '')
+    +     '<button class="forge-client-action" id="forge-convtransfer-apply"' + (chk.ok ? '' : ' disabled') + '>Transfer</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="forge-client-desc">'
+    +   '<p>Convergence Transfer moves the tier to a clean class 4 item WITHOUT losing one tier.</p>'
+    +   '<p>It costs substantially more gold than a regular transfer.</p>'
+    +   (!chk.ok ? '<p class="forge-client-warning">' + chk.msg + '</p>' : '')
+    + '</div>';
+}
+
 function renderForgeConversionPanel(p) {
   var capCost = typeof forgeDustLimitCost === 'function' ? forgeDustLimitCost(p) : 0;
   var canCap = capCost > 0 && (p.dust || 0) >= capCost;
@@ -264,8 +402,11 @@ function forgeRememberHistory(p, msg) {
 function forgeFusionCostHtml(chk, result) {
   var parts = [fmtFull(chk.gold) + ' gp', chk.dust + ' Dust'];
   if (chk.useCore) parts.push('1 Exalted Core');
-  if (result.success) parts.push('1× ' + chk.info.name);
-  else if (/segundo item foi perdido/i.test(result.msg || '')) parts.push('1× ' + chk.info.name);
+  /* Convergence: o consumido é o PARCEIRO (pode ser item diferente do
+   * fundido); na fusão regular é uma cópia do mesmo item. */
+  var consumedName = (chk.partner && chk.partner.name) || chk.info.name;
+  if (result.success) parts.push('1× ' + consumedName);
+  else if (/segundo item foi perdido/i.test(result.msg || '')) parts.push('1× ' + consumedName);
   return parts.join(' · ');
 }
 
@@ -330,6 +471,7 @@ function renderForgeModal() {
   if (!FORGE_UI.mode) FORGE_UI.mode = 'fusion';
   var content = '';
   if (FORGE_UI.mode === 'transfer') content = renderForgeTransferPanel(p, FORGE_UI.slug);
+  else if (FORGE_UI.mode === 'convergence') content = renderForgeConvergencePanel(p);
   else if (FORGE_UI.mode === 'conversion') content = renderForgeConversionPanel(p);
   else if (FORGE_UI.mode === 'history') content = renderForgeHistoryPanel(p);
   else content = renderForgeFusionPanel(p, FORGE_UI.slug);
@@ -383,6 +525,27 @@ function bindForgeModal() {
     });
   });
 
+  body.querySelectorAll('[data-conv-mode]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      FORGE_UI.convMode = el.dataset.convMode;
+      openForgeModal();
+    });
+  });
+
+  body.querySelectorAll('[data-conv-partner]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      FORGE_UI.convPartner = el.dataset.convPartner;
+      openForgeModal();
+    });
+  });
+
+  body.querySelectorAll('[data-conv-target]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      FORGE_UI.convTarget = el.dataset.convTarget;
+      openForgeModal();
+    });
+  });
+
   body.querySelectorAll('[data-forge-core]').forEach(function(el) {
     el.addEventListener('click', function() {
       FORGE_UI.useCore = !FORGE_UI.useCore;
@@ -432,9 +595,98 @@ function bindForgeModal() {
 
   var transferBtn = body.querySelector('#forge-transfer-apply');
   if (transferBtn) transferBtn.addEventListener('click', function() {
+    /* Online: transfer também é autoritativa — mutar o espelho local tinha
+     * o mesmo revert de sync documentado na fusion. */
+    var chkT = forgeCanTransfer(G.p, FORGE_UI.slug, FORGE_UI.targetSlug);
+    var token = typeof accountSessionToken === 'function' ? accountSessionToken() : '';
+    if (token && chkT.ok && typeof accountForgeTransfer === 'function' && G.p && G.p.id) {
+      transferBtn.disabled = true;
+      accountForgeTransfer(token, G.p.id, {
+        donorInstId: chkT.donor.instanceId, targetInstId: chkT.target.instanceId,
+      }).then(function(r) {
+        if (r.ok) forgeRememberHistory(G.p, r.msg);
+        if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+        if (typeof renderAll === 'function') renderAll();
+        openForgeModal();
+      }).catch(function() {
+        if (typeof toast === 'function') toast('Falha de conexão na transferência.', 'err');
+        openForgeModal();
+      });
+      return;
+    }
     var r = forgeTransfer(G.p, FORGE_UI.slug, FORGE_UI.targetSlug);
     if (r.ok) forgeRememberHistory(G.p, r.msg);
     if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+    if (typeof renderAll === 'function') renderAll();
+    openForgeModal();
+  });
+
+  var convFuseBtn = body.querySelector('#forge-convfuse-apply');
+  if (convFuseBtn) convFuseBtn.addEventListener('click', function() {
+    var chk = forgeCanConvergeFuse(G.p, FORGE_UI.slug, FORGE_UI.convPartner);
+    if (!chk.ok) {
+      if (typeof toast === 'function') toast(chk.msg, 'err');
+      return;
+    }
+    convFuseBtn.disabled = true;
+    var token = typeof accountSessionToken === 'function' ? accountSessionToken() : '';
+    if (token && typeof accountForgeFuse === 'function' && G.p && G.p.id) {
+      accountForgeFuse(token, G.p.id, {
+        instId: chk.info.instanceId, partnerInstId: chk.partnerId, convergence: true,
+      }).then(function(r) {
+        if (!r.ok) {
+          if (typeof toast === 'function') toast(r.msg || 'A fusão falhou', 'err');
+          openForgeModal();
+          return;
+        }
+        forgeRememberHistory(G.p, r.msg);
+        if (typeof renderAll === 'function') renderAll();
+        forgeShowFusionSuspense(G.p, chk, r);
+      }).catch(function() {
+        if (typeof toast === 'function') toast('Falha de conexão na fusão.', 'err');
+        openForgeModal();
+      });
+      return;
+    }
+    var r = forgeConvergeFuse(G.p, FORGE_UI.slug, FORGE_UI.convPartner);
+    if (!r.ok) {
+      if (typeof toast === 'function') toast(r.msg, 'err');
+      openForgeModal();
+      return;
+    }
+    forgeRememberHistory(G.p, r.msg);
+    if (typeof save === 'function') save();
+    if (typeof renderAll === 'function') renderAll();
+    forgeShowFusionSuspense(G.p, chk, r);
+  });
+
+  var convTransferBtn = body.querySelector('#forge-convtransfer-apply');
+  if (convTransferBtn) convTransferBtn.addEventListener('click', function() {
+    var chk = forgeCanConvergeTransfer(G.p, FORGE_UI.slug, FORGE_UI.convTarget);
+    if (!chk.ok) {
+      if (typeof toast === 'function') toast(chk.msg, 'err');
+      return;
+    }
+    convTransferBtn.disabled = true;
+    var token = typeof accountSessionToken === 'function' ? accountSessionToken() : '';
+    if (token && typeof accountForgeTransfer === 'function' && G.p && G.p.id) {
+      accountForgeTransfer(token, G.p.id, {
+        donorInstId: chk.donor.instanceId, targetInstId: chk.target.instanceId, convergence: true,
+      }).then(function(r) {
+        if (r.ok) forgeRememberHistory(G.p, r.msg);
+        if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+        if (typeof renderAll === 'function') renderAll();
+        openForgeModal();
+      }).catch(function() {
+        if (typeof toast === 'function') toast('Falha de conexão na transferência.', 'err');
+        openForgeModal();
+      });
+      return;
+    }
+    var r = forgeConvergeTransfer(G.p, FORGE_UI.slug, FORGE_UI.convTarget);
+    if (r.ok) forgeRememberHistory(G.p, r.msg);
+    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+    if (typeof save === 'function') save();
     if (typeof renderAll === 'function') renderAll();
     openForgeModal();
   });

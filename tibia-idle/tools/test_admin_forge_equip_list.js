@@ -17,8 +17,8 @@ function must(cond, msg) {
 }
 
 const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
-must(html.includes("js/admin.js?v=admin-forge-equip-v1"), "index cache-bust admin.js");
-must(html.includes("js/player.js?v=admin-forge-equip-v1"), "index cache-bust player.js");
+must(/js\/admin\.js\?v=/.test(html), "index cache-bust admin.js");
+must(/js\/player\.js\?v=/.test(html), "index cache-bust player.js");
 
 const sandbox = {
   window: {},

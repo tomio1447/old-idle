@@ -315,6 +315,141 @@ function forgeTransfer(p, donorRef, targetRef) {
   };
 }
 
+/* ---------- Convergence (WU23, itens classificação 4) ---------- */
+
+/* Parceiros da Convergence Fusion: MESMO slot do corpo + mesmo tier, mas
+ * podem ser itens DIFERENTES (é o ponto da mecânica oficial — fundir
+ * Soulshredder com Soulcutter). Classificação 4 obrigatória. */
+function forgeConvergenceFusionPartners(p, ref) {
+  var info = forgeItemSummary(p, ref);
+  if (!info || info.cls !== 4 || !info.instanceId) return [];
+  return forgeBagItems(p).filter(function(e) {
+    return e.instanceId && e.instanceId !== info.instanceId &&
+      e.cls === 4 && e.slot === info.slot && e.currentTier === info.tier;
+  });
+}
+
+function forgeCanConvergeFuse(p, ref, partnerRef) {
+  ensureForge(p);
+  var info = forgeItemSummary(p, ref);
+  if (!info) return { ok: false, msg: "Item não pode ser usado na Exaltation Forge." };
+  if (info.cls !== 4) return { ok: false, msg: "Convergence é exclusiva de itens classificação 4." };
+  if (!info.inBag || !info.instanceId) return { ok: false, msg: "Selecione um item físico da mochila para fundir." };
+  if (info.hasImbue) return { ok: false, msg: "Remova os imbuements do item equipado antes de forjar." };
+  if (info.tier >= info.maxTier) return { ok: false, msg: "Tier máximo (T" + info.maxTier + ") atingido." };
+  var partners = forgeConvergenceFusionPartners(p, ref);
+  if (!partners.length) return { ok: false, msg: "A Convergence Fusion precisa de outro item classificação 4 do mesmo slot e mesmo tier na mochila." };
+  var partner = partnerRef ? forgeItemSummary(p, partnerRef) : null;
+  if (!partner) partner = forgeItemSummary(p, partners[0].ref);
+  if (!partner || !partner.instanceId || !partner.inBag ||
+      partner.cls !== 4 || partner.slot !== info.slot || partner.tier !== info.tier ||
+      partner.instanceId === info.instanceId)
+    return { ok: false, msg: "Selecione um item parceiro válido (mesmo slot e mesmo tier)." };
+  if (partner.hasImbue) return { ok: false, msg: "O item parceiro não pode ter imbuements." };
+
+  var gold = forgeConvergenceFusionGoldCost(info.slug, info.tier);
+  if (!gold) return { ok: false, msg: "Custo de Convergence Fusion não definido para este tier." };
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
+  if (haveGold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - haveGold) + " gp." };
+  if ((p.dust || 0) < FORGE_CONVERGENCE_FUSION.dustCost)
+    return { ok: false, msg: "Faltam " + (FORGE_CONVERGENCE_FUSION.dustCost - (p.dust || 0)) + " Dust." };
+
+  return {
+    ok: true, info: info, partner: partner, partnerId: partner.instanceId,
+    current: info.tier, next: info.tier + 1,
+    gold: gold, dust: FORGE_CONVERGENCE_FUSION.dustCost,
+    useCore: false, successPct: 100,
+  };
+}
+
+/* Convergence Fusion: resultado GARANTIDO — sem roll, sem bonus, sem cores.
+ * O item selecionado sobe de tier; o parceiro é consumido inteiro. */
+function forgeConvergeFuse(p, ref, partnerRef) {
+  var chk = forgeCanConvergeFuse(p, ref, partnerRef);
+  if (!chk.ok) return chk;
+
+  if (typeof accountSpendGold === "function") accountSpendGold(chk.gold);
+  else p.gold = Math.max(0, (p.gold || 0) - chk.gold);
+  p.dust -= chk.dust;
+
+  var target = findItemInstance(p, chk.info.instanceId);
+  var partner = findItemInstance(p, chk.partnerId);
+  if (!target || !partner) return { ok: false, msg: "Os itens selecionados não estão mais disponíveis." };
+
+  target.tier = chk.next;
+  deleteItemInstance(p, partner.id);
+  return {
+    ok: true, success: true, tier: chk.next,
+    msg: "Convergence Fusion concluída! " + forgeEntryLabel(chk.info.slug) +
+      " agora é T" + chk.next + " (resultado garantido).",
+  };
+}
+
+/* Alvos da Convergence Transfer: itens classificação 4 sem tier. */
+function forgeConvergenceTransferTargets(p, donorRef) {
+  ensureForge(p);
+  var donor = forgeItemSummary(p, donorRef);
+  if (!donor || donor.cls !== 4 || donor.tier < 1) return [];
+  return forgeBagItems(p).filter(function(e) {
+    return e.instanceId && e.instanceId !== donor.instanceId &&
+      e.cls === 4 && e.currentTier <= 0;
+  });
+}
+
+function forgeCanConvergeTransfer(p, donorRef, targetRef) {
+  ensureForge(p);
+  var donor = forgeItemSummary(p, donorRef);
+  var target = forgeItemSummary(p, targetRef);
+  if (!donor || !target) return { ok: false, msg: "Selecione um item doador e um alvo válidos." };
+  if (donor.cls !== 4 || target.cls !== 4)
+    return { ok: false, msg: "Convergence é exclusiva de itens classificação 4." };
+  if (!donor.instanceId || !target.instanceId || !donor.inBag || !target.inBag)
+    return { ok: false, msg: "Doador e alvo precisam estar fisicamente na mochila." };
+  if (donor.hasImbue || target.hasImbue)
+    return { ok: false, msg: "Itens equipados com imbuement não podem participar da transferência." };
+  if (donor.instanceId === target.instanceId)
+    return { ok: false, msg: "A transferência precisa de dois itens distintos." };
+  if (donor.tier < 1) return { ok: false, msg: "O item doador precisa ter tier." };
+  if (target.tier > 0) return { ok: false, msg: "O item alvo precisa estar sem tier." };
+
+  var gold = forgeConvergenceTransferGoldCost(donor.slug, donor.tier);
+  if (!gold) return { ok: false, msg: "Custo de Convergence Transfer não definido para este item." };
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
+  if (haveGold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - haveGold) + " gp." };
+  if ((p.dust || 0) < FORGE_CONVERGENCE_TRANSFER.dustCost)
+    return { ok: false, msg: "Faltam " + (FORGE_CONVERGENCE_TRANSFER.dustCost - (p.dust || 0)) + " Dust." };
+  if ((p.exaltedCores || 0) < FORGE_CONVERGENCE_TRANSFER.coreCost)
+    return { ok: false, msg: "Falta 1 Exalted Core." };
+
+  return {
+    ok: true, donor: donor, target: target,
+    resultTier: donor.tier,            // <- SEM a perda de 1 tier (oficial)
+    gold: gold, dust: FORGE_CONVERGENCE_TRANSFER.dustCost,
+    cores: FORGE_CONVERGENCE_TRANSFER.coreCost,
+  };
+}
+
+function forgeConvergeTransfer(p, donorRef, targetRef) {
+  var chk = forgeCanConvergeTransfer(p, donorRef, targetRef);
+  if (!chk.ok) return chk;
+
+  if (typeof accountSpendGold === "function") accountSpendGold(chk.gold);
+  else p.gold = Math.max(0, (p.gold || 0) - chk.gold);
+  p.dust -= chk.dust;
+  p.exaltedCores -= chk.cores;
+  var donorInst = findItemInstance(p, chk.donor.instanceId);
+  var targetInst = findItemInstance(p, chk.target.instanceId);
+  if (!donorInst || !targetInst) return { ok: false, msg: "Os itens selecionados não estão mais disponíveis." };
+  targetInst.tier = chk.resultTier;
+  deleteItemInstance(p, donorInst.id);
+
+  return {
+    ok: true, tier: chk.resultTier,
+    msg: "Convergence Transfer concluída! " + forgeEntryLabel(chk.target.slug) +
+      " recebeu T" + chk.resultTier + " (sem perda de tier).",
+  };
+}
+
 function forgeConvergenceDustToSlivers(p) {
   ensureForge(p);
   if ((p.dust || 0) < FORGE_CONVERGENCE.dustToSlivers.dust) {

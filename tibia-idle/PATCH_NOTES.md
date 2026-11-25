@@ -4,6 +4,28 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Exaltation Forge: aba Convergence (WU23)
+
+- Nova aba **Convergence** na forja — exclusiva de itens **classificação
+  4**, com as duas mecânicas oficiais do Winter Update 2023 (valores do
+  crystalserver):
+- **Convergence Fusion**: funde **dois itens diferentes do mesmo slot do
+  corpo** (ex.: Soulshredder + Soulcutter), desde que mesmo tier —
+  resultado **garantido** (sem roll, sem cores, sem bonus). Custa
+  **130 Dust** + gold da tabela oficial (55M → T1 até 125B → T10).
+- **Convergence Transfer**: transfere o tier **sem perder 1 nível**
+  (doador T5 → alvo T5), para qualquer item class 4 sem tier — inclusive
+  doador T1, que a transfer regular não aceita. Custa **160 Dust** +
+  1 Exalted Core + gold da tabela oficial (65M–300B).
+- Online as duas operações são **autoritativas no servidor** (`/api/forge/
+  fuse` ganhou `convergence`+`partner_inst_id`; novo `/api/forge/transfer`).
+  A **transfer regular também passou a usar o endpoint** — fechando o
+  mesmo revert de sync do shared_inventory que a fusion já tinha.
+- Aba com sub-toggle Fusion/Transfer, grids de seleção/parceiro/alvo e
+  os mesmos painéis de custo do client oficial.
+
+---
+
 ## 2026-11-29 — PvP: alcance unificado em 10 SQM
 
 - Pedido de balance: na guerra de guilds, tudo passa a alcançar **10 SQM
