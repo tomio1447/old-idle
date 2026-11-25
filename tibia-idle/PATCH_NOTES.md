@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Turnstile: anti-bot na criação de conta
+
+- `POST /api/register` exige `captchaToken` verificado no siteverify da Cloudflare quando `TURNSTILE_SECRET` está configurada — bloqueia criação em massa e probing de logins (roda antes de qualquer consulta ao banco), enviando o IP real como `remoteip`.
+- `GET /api/captcha/config` expõe a sitekey pública; o modal "Criar conta" carrega o `api.js` sob demanda e renderiza o widget (tema dark) — token é coletado no submit e resetado a cada falha (uso único).
+- CSP liberado para `challenges.cloudflare.com` (script-src/frame-src/connect-src). Sem as chaves, a verificação fica desabilitada — dev/local não trava.
+- `.env.example` documenta `TURNSTILE_SITEKEY`/`TURNSTILE_SECRET`.
+
+---
+
 ## 2026-11-25 — Armas Crypt: sprites animadas oficiais (GIFs da wiki)
 
 - As 7 armas Crypt (bile/jaw/spine/slicer/breaker/splitter/strike) agora usam as tiras `_anim.png` montadas dos **GIFs oficiais da TibiaWiki** (update 15.20) em vez dos frames do DAT convertido — bile/jaw tinham tiras erradas do DAT e os outros 5 eram estáticos.

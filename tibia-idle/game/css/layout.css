@@ -6954,6 +6954,14 @@ body.fullhd .party-panel.collapsed { width: auto; }
 #modal-body:not(.gi-picker) .account-flow-body .voc-card .vn { color: #f7f2e2; }
 #modal-body:not(.gi-picker) .account-flow-body .voc-card .vd { color: #a89f88; }
 
+/* Turnstile (anti-bot) centralizado no fluxo de criar conta. */
+.account-flow-body .turnstile-wrap {
+  justify-content: center;
+  margin: 10px 0 2px;
+  min-height: 65px;
+}
+.account-flow-body .turnstile-wrap iframe { border-radius: 0; }
+
 /* --- títulos dos modais pré-login: faixa escura + dourado --- */
 .alpha-announce-box > .panel-title,
 .ui-mode-box > .panel-title {

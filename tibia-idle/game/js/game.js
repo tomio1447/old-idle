@@ -7538,6 +7538,22 @@ function initAccountLogin() {
     };
   }
 
+  /* Turnstile (anti-bot): carrega o script da Cloudflare sob demanda e
+   * renderiza o widget só quando o servidor tem sitekey configurada. */
+  let _tsScriptPromise = null;
+  function ensureTurnstileScript() {
+    if (window.turnstile) return Promise.resolve();
+    if (_tsScriptPromise) return _tsScriptPromise;
+    _tsScriptPromise = new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      s.async = true; s.defer = true;
+      s.onload = res; s.onerror = () => rej(new Error("turnstile-load"));
+      document.head.appendChild(s);
+    });
+    return _tsScriptPromise;
+  }
+
   function openRegisterModal() {
     if (!openAccountModal(`
       <div class="panel-title">Criar conta
@@ -7552,11 +7568,25 @@ function initAccountLogin() {
           <input id="acc-new-password" name="password" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password"></div>
         <div class="field"><label for="acc-new-email">E-mail (confirmação da conta)</label>
           <input id="acc-new-email" type="email" maxlength="120" placeholder="seu@email.com" autocomplete="email"></div>
+        <div id="acc-turnstile" class="turnstile-wrap" style="display:none"></div>
         <button class="primary full" id="acc-btn-register" type="submit">Criar conta</button>
         <div class="tiny dim center mt8" id="acc-register-msg"></div>
       </form>`)) return;
     $("#acc-register-cancel").onclick = closeAccountModal;
     const register = $("#acc-btn-register");
+    let tsWidget = null;
+    (async () => {
+      let sitekey = "";
+      try { sitekey = (await accountCaptchaConfig()).sitekey; } catch (e) {}
+      const box = document.getElementById("acc-turnstile");
+      if (!sitekey || !box) return;
+      try {
+        await ensureTurnstileScript();
+        if (!document.getElementById("acc-turnstile")) return;
+        box.style.display = "flex";
+        tsWidget = window.turnstile.render(box, { sitekey: sitekey, theme: "dark" });
+      } catch (e) { /* script bloqueado — o servidor decide se aceita */ }
+    })();
     $("#acc-register-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       if (register.disabled) return;
@@ -7568,10 +7598,19 @@ function initAccountLogin() {
       if (!displayName) { status.textContent = "Informe o nome da conta."; return; }
       if (!login || !pass) { status.textContent = "Informe login e senha."; return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { status.textContent = "Informe um e-mail válido."; return; }
+      let captchaToken = "";
+      if (tsWidget != null) {
+        captchaToken = window.turnstile.getResponse(tsWidget) || "";
+        if (!captchaToken) { status.textContent = "Confirme a verificação anti-bot."; return; }
+      }
       register.disabled = true; status.textContent = "Criando conta...";
       try {
-        const result = await accountRegister(login, pass, email, displayName);
-        if (!result.ok) { status.textContent = result.msg || "Falha ao criar conta."; return; }
+        const result = await accountRegister(login, pass, email, displayName, captchaToken);
+        if (!result.ok) {
+          status.textContent = result.msg || "Falha ao criar conta.";
+          if (tsWidget != null) window.turnstile.reset(tsWidget);
+          return;
+        }
         closeAccountModal();
         $("#acc-login").value = login; $("#acc-password").value = "";
         msg("Conta criada! Informe sua senha para entrar.");

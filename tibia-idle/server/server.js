@@ -88,6 +88,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const EMAIL_VERIFY_REQUIRED = process.env.EMAIL_VERIFY_REQUIRED === "1";
 const ACCOUNT_MAX_CHARS = 4;
 const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
+// Turnstile (Cloudflare) — anti-bot na criação de conta. Sem as chaves a
+// verificação fica desabilitada (dev/local): /api/captcha/config expõe a
+// sitekey pública pro cliente decidir se renderiza o widget.
+const TURNSTILE_SITEKEY = String(process.env.TURNSTILE_SITEKEY || "").trim();
+const TURNSTILE_SECRET = String(process.env.TURNSTILE_SECRET || "").trim();
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)||120000);
 const SESSION_TTL_MS=Math.max(1000,parseInt(process.env.SESSION_TTL_MS||"86400000",10)||86400000);
 const INSTANCE_WORKER_INTERVAL_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_INTERVAL_MS||"1000",10)||1000);
@@ -352,7 +358,7 @@ function accountCanSelfAdmin(acc){
 function hardenedHeaders(res){const headers={
   "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
   "Permissions-Policy":"camera=(), microphone=(), geolocation=()",
-  "Content-Security-Policy":"default-src 'self'; img-src 'self' data: blob: https://static-cdn.jtvnw.net; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://arena.ai https://*.arena.ai",
+  "Content-Security-Policy":"default-src 'self'; img-src 'self' data: blob: https://static-cdn.jtvnw.net; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://arena.ai https://*.arena.ai",
 };if(res._corsOrigin){headers["Access-Control-Allow-Origin"]=res._corsOrigin;headers.Vary="Origin";}return headers;}
 function sendSyncExpired(res,reason){
   res.writeHead(200,Object.assign(hardenedHeaders(res),{"Content-Type":"text/event-stream; charset=utf-8",
@@ -978,7 +984,21 @@ async function ensureTestAccounts(db) {
 /* ------------------------------ rotas ------------------------------ */
 
 const DISPLAY_NAME_RE = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 .'-]{2,23}$/;
-async function register(db, body) {
+/* Verifica o token do Turnstile no siteverify da Cloudflare. Sem secret
+ * configurado a checagem é desabilitada (dev/local) e sempre passa. */
+async function verifyTurnstile(token, remoteIp) {
+  if (!TURNSTILE_SECRET) return true;
+  if (!token) return false;
+  try {
+    const params = new URLSearchParams({ secret: TURNSTILE_SECRET, response: String(token) });
+    if (remoteIp) params.set("remoteip", remoteIp);
+    const r = await fetch(TURNSTILE_VERIFY_URL, { method: "POST", body: params });
+    const j = await r.json();
+    return !!j.success;
+  } catch (e) { return false; }
+}
+
+async function register(db, body, remoteIp) {
   const login = String(body.login || "").trim();
   const password = String(body.password || "");
   const email = String(body.email || "").trim().slice(0, 120);
@@ -990,6 +1010,13 @@ async function register(db, body) {
   if (!DISPLAY_NAME_RE.test(displayName))
     return { code: 400, body: { ok: false, error: "BAD_DISPLAY_NAME",
       msg: "Nome da conta inválido (3-24 caracteres; comece com letra)" } };
+  // Anti-bot antes de qualquer consulta/escrita: bloqueia criação em massa
+  // e probing de logins existentes. Token Turnstile é de uso único (~5min).
+  if (TURNSTILE_SECRET) {
+    const human = await verifyTurnstile(body.captchaToken || body["cf-turnstile-response"], remoteIp);
+    if (!human) return { code: 200, body: { ok: false, error: "CAPTCHA",
+      msg: "Verificação anti-bot falhou. Recarregue e tente novamente." } };
+  }
   const exist = await db.findAccountByLogin(login);
   // Duplicidade é erro de formulário, não falha de transporte. Responder
   // 200 evita o falso "Failed to load resource" no console; `ok:false`
@@ -6499,11 +6526,15 @@ async function main() {
         const limited=rateLimit(req,"chat-send",30,60000);if(limited)return send(res,limited.code,limited.body);
         const r=await chatSend(db,await readBody(req));return send(res,r.code,r.body);
       }
+      if (req.method === "GET" && url === "/api/captcha/config") {
+        return send(res, 200, { ok: true, sitekey: TURNSTILE_SITEKEY, required: !!TURNSTILE_SECRET });
+      }
       if (req.method === "POST" && url === "/api/register") {
         if(MAINTENANCE_MODE){const m=maintenanceAuthReject();return send(res,m.code,m.body);}
         const limited=rateLimit(req,"register",10,3600000);if(limited)return send(res,limited.code,limited.body);
         const body = await readBody(req);
-        const r = await register(db, body);
+        const remoteIp=String((TRUST_PROXY&&req.headers["x-forwarded-for"])||req.socket.remoteAddress||"").split(",")[0].trim();
+        const r = await register(db, body, remoteIp);
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/login") {
