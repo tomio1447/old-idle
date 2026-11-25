@@ -86,6 +86,19 @@ async function main() {
   const listAll = vm.runInContext("marketOfferListHTML()", ctx);
   must(/T5/.test(listAll) && />A</.test(listAll), "sem filtro mostra todas (T0 e T5)");
 
+  // 3b) Badge de tier no ícone — linha da busca e cabeçalho do detalhe
+  vm.runInContext(`_mOfferTierIdx = {"falcon-plate": new Set([0, 2])};`, ctx);
+  const itemRow = vm.runInContext(
+    `marketItemRowHTML(marketBuildCatalog().find((i)=>i.slug==="falcon-plate"))`, ctx);
+  must(/tier-badge[^>]*>T2/.test(itemRow), "linha da busca mostra badge T2 no ícone");
+  const plainRow = vm.runInContext(
+    `marketItemRowHTML(marketBuildCatalog().find((i)=>i.slug==="sword"))`, ctx);
+  must(plainRow.indexOf("tier-badge") === -1, "item sem oferta com tier não mostra badge");
+  const det = vm.runInContext(
+    `marketDetailHTML(marketBuildCatalog().find((i)=>i.slug==="falcon-plate"))`, ctx);
+  must(/tier-badge[^>]*>T2/.test(det), "detalhe mostra badge T2 no ícone grande");
+  must(/dab0ff">T2<\/span>/.test(det), "detalhe lista o tier anunciado no nome");
+
   // 4) marketEnsureTierIdx popula o índice a partir do fetcher
   vm.runInContext(`_mOfferTierIdx = null; _mTierIdxLoading = false; _mTier = "";`, ctx);
   vm.runInContext("marketEnsureTierIdx(null, null)", ctx);

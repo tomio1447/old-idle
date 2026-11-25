@@ -373,8 +373,24 @@ function marketEnsureTierIdx(body, p) {
       idx[slug] = new Set((r.tiers[slug] || []).map((t) => Math.max(0, Number(t) || 0)));
     }
     _mOfferTierIdx = idx;
-    if (_mTier) marketUpdateBrowseList(body, p);
+    marketUpdateBrowseList(body, p);
+    if (_mBrowseItem) marketUpdateBrowseDetail(body, p);
   });
+}
+
+/* Tiers >0 das ofertas ativas do item (via índice), ordenados asc. */
+function marketOfferTiersOf(slug) {
+  const set = _mOfferTierIdx && _mOfferTierIdx[slug];
+  if (!set) return [];
+  return [...set].filter((t) => t > 0).sort((a, b) => a - b);
+}
+/* Badge T# para o canto do ícone — mostra o maior tier anunciado e, no
+ * tooltip, todos os tiers com oferta ativa do item. */
+function marketTierBadgeHTML(slug) {
+  const tiers = marketOfferTiersOf(slug);
+  if (!tiers.length) return "";
+  return `<span class="tier-badge" title="${tiers.map((t) => "T" + t).join(", ")}" ` +
+    `style="position:absolute;top:-4px;right:-4px;font-size:8px;height:14px;min-width:14px;line-height:12px">T${tiers[tiers.length - 1]}</span>`;
 }
 
 /* ---------------------------------------------------------- Filtros do browse */
@@ -670,7 +686,7 @@ function marketItemRowHTML(it) {
   const tier = it.tier ? `T${it.tier}` : "";
   const lvl = Number(it.lvl || 0);
   return `<div class="m-item-row ${active}" data-slug="${it.slug}" title="${it.name}">
-    ${marketIconHTML(it.slug, 24)}
+    <div style="position:relative;flex:none">${marketIconHTML(it.slug, 24)}${marketTierBadgeHTML(it.slug)}</div>
     <span class="m-item-name">${it.name}</span>
     ${tier ? `<span class="tiny dim" style="color:#dab0ff">${tier}</span>` : ""}
     ${lvl > 0 ? `<span class="m-item-lv">Lv ${lvl}</span>` : ""}
@@ -692,12 +708,13 @@ function marketDetailHTML(it) {
   if (it.vocs && it.vocs.length) attrs.push(it.vocs.slice(0, 2).join("/"));
   if (Number(it.imbSlots) > 0) attrs.push(`${it.imbSlots} imb slot${it.imbSlots > 1 ? "s" : ""}`);
   const price = Number(md.price || gd.sell || 0);
-  const tier = it.tier ? `<span style="color:#dab0ff">T${it.tier}</span>` : "";
+  const offerTiers = marketOfferTiersOf(it.slug);
+  const tier = offerTiers.length ? `<span style="color:#dab0ff">${offerTiers.map((t) => "T" + t).join(", ")}</span>` : "";
   const isCoin = marketIsCoinSlug(it.slug);
   return `
     <div id="m-detail-info">
       <div class="row" style="gap:8px;align-items:flex-start;margin-bottom:8px">
-        <div style="position:relative">${marketIconHTML(it.slug, 40)}${it.tier ? `<span class="tier-badge" style="position:absolute;top:-4px;right:-4px;font-size:8px;height:14px;min-width:14px;line-height:12px">T${it.tier}</span>` : ""}</div>
+        <div style="position:relative">${marketIconHTML(it.slug, 40)}${marketTierBadgeHTML(it.slug)}</div>
         <div style="flex:1;min-width:0">
           <div class="small" style="font-weight:bold;color:#ffe680">${it.name} ${tier}</div>
           <div class="tiny dim">${MARKET_CAT_LABEL[it.category] || it.category}${it.cid ? " · CID " + it.cid : ""}</div>
