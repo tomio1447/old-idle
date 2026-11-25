@@ -34,6 +34,8 @@ let _mBrowseCat = "all";  // categoria selecionada no browser
 let _mBrowseItem = null;  // slug do item selecionado
 let _mBrowseView = "sell"; // sell | buy ofertas do item selecionado
 let _mBrowseOffers = [];  // ofertas do item selecionado
+let _mOfferTierIdx = null;   // slug -> Set<tier> das ofertas ativas (p/ filtro)
+let _mTierIdxLoading = false;
 let _mBrowseLoading = false;
 let _mBrowseLvl = "";     // nível máximo do filtro (vazio = todos)
 let _mBrowseVoc = "";     // vocação do filtro (vazio = todas)
@@ -358,6 +360,23 @@ function renderMarket() {
   modal.classList.add("show", "wide");
 }
 
+/* Índice slug→tiers das ofertas ativas — o filtro de tier do browse filtra
+ * itens que têm OFERTA com tier (catálogo em si não tem tier). */
+function marketEnsureTierIdx(body, p) {
+  if (_mOfferTierIdx || _mTierIdxLoading || typeof marketOfferTiersIndex !== "function") return;
+  _mTierIdxLoading = true;
+  marketOfferTiersIndex().then((r) => {
+    _mTierIdxLoading = false;
+    if (!r || !r.ok) return;
+    const idx = {};
+    for (const slug in (r.tiers || {})) {
+      idx[slug] = new Set((r.tiers[slug] || []).map((t) => Math.max(0, Number(t) || 0)));
+    }
+    _mOfferTierIdx = idx;
+    if (_mTier) marketUpdateBrowseList(body, p);
+  });
+}
+
 /* ---------------------------------------------------------- Filtros do browse */
 function marketFilteredItems(catalog) {
   const q = _mQ.trim().toLowerCase();
@@ -366,7 +385,13 @@ function marketFilteredItems(catalog) {
     if (q && it.name.toLowerCase().indexOf(q) === -1 && it.slug.indexOf(q) === -1) return false;
     if (_mTier) {
       const t = Number(_mTier);
-      if (t === 0 ? (it.tier || 0) !== 0 : (it.tier || 0) < t) return false;
+      // filtra pelo tier das OFERTAS ativas do item (catálogo não tem tier);
+      // enquanto o índice não carrega, não esconde nada (re-render ao chegar).
+      if (_mOfferTierIdx) {
+        const set = _mOfferTierIdx[it.slug];
+        if (!set) return false;
+        if (t === 0 ? !set.has(0) : ![...set].some((x) => x >= t)) return false;
+      }
     }
     if (_mBrowseVoc) {
       const voc = _mBrowseVoc.toLowerCase();
@@ -424,6 +449,7 @@ function marketAttachDetailEvents(body, p) {
 }
 
 function marketUpdateBrowseList(body, p) {
+  if (_mTier) marketEnsureTierIdx(body, p);
   const catalog = marketBuildCatalog();
   const allItems = marketFilteredItems(catalog);
   const MAX_RENDER_ITEMS = 250;
@@ -591,6 +617,8 @@ function renderMarketBrowse(body, p) {
 
   // Selecionar item (atualiza detalhe sem recriar a barra de busca)
   marketAttachItemRowEvents(body, p);
+  // pré-carrega o índice slug→tiers p/ o filtro de tier
+  marketEnsureTierIdx(body, p);
 
   // Criar ofertas / ações no item selecionado
   marketAttachDetailEvents(body, p);
@@ -694,7 +722,7 @@ function marketOfferRowHTML(o, kind) {
   const rowStyle = unfair ? ' style="color:#ff6a6a"' : '';
   return `<tr${rowStyle}>
     <td class="m-td-seller">${seller}</td>
-    <td class="m-td-qty">${o.qty}</td>
+    <td class="m-td-qty">${o.qty}${tier ? ` <span style="color:#dab0ff">T${tier}</span>` : ""}</td>
     <td class="m-td-price">${price}</td>
     <td class="m-td-total">${total}</td>
     <td class="m-td-time">${marketTimeLeft(o)}</td>
@@ -725,8 +753,12 @@ function marketOffersTableHTML(offers, kind) {
 
 function marketOfferListHTML() {
   if (!_mBrowseItem || !_mBrowseOffers) return '<div class="m-empty">Selecione um item</div>';
-  const sells = _mBrowseOffers.filter((o) => o.kind === "item");
-  const buys = _mBrowseOffers.filter((o) => o.kind === "buy");
+  // o filtro de tier do browse também recorta as ofertas exibidas
+  const t = _mTier === "" ? null : Number(_mTier);
+  const tierOk = (o) => t === null ? true
+    : (t === 0 ? (o.tier || 0) === 0 : (o.tier || 0) >= t);
+  const sells = _mBrowseOffers.filter((o) => o.kind === "item" && tierOk(o));
+  const buys = _mBrowseOffers.filter((o) => o.kind === "buy" && tierOk(o));
   return `
     <div class="m-offer-cols">
       <div class="m-offer-col">
@@ -789,6 +821,7 @@ function marketRenderItemOffers(p, slug, loading) {
       if (Number.isFinite(Number(d.bank)) || Number.isFinite(Number(d.coinBalance))) { _mBank = Number(d.bank); marketRefreshHeader(); }
       toast(`Comprou <b>${marketItemName(d.item ? d.item.slug : _mBrowseItem)}</b> — foi para o ${dest}`, "level");
       addLog("sell", `Market: comprou de <b>${d.seller_name}</b> por ${fmtFull(d.total || d.price)}${d.price_tc ? " TC" : " gp"} → ${dest}`);
+      _mOfferTierIdx = null;
       marketLoadItemOffers(p, slug);
       renderAll && renderAll();
     })));
@@ -980,6 +1013,7 @@ function renderMarketSell(body, p) {
     }
     addLog("sell", `Market: ofertou <b>${selItem.n}</b> por ${fmtFull(price)}${!isCoin && _mPriceTc ? " TC" : " gp"}`);
     _mSel = null; _mPrice = "";
+    _mOfferTierIdx = null; // nova oferta pode mudar o índice de tiers
     renderMarket();
     renderAll && renderAll();
   }));
@@ -1022,6 +1056,7 @@ function renderMarketMine(body, p) {
           marketRefundItem(p, id);
         }
         if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
+        _mOfferTierIdx = null;
         toast(`Oferta cancelada — ${Number(r.refundCoins) > 0 ? "TC devolvidos à conta" : "devolvido à mochila"}`, "level");
         renderMarket();
         renderAll && renderAll();

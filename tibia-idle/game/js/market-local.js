@@ -396,6 +396,18 @@
 
     window.marketCreateOffer = async (body) => localCreateOffer(body);
     window.marketListOffers = async (filtro) => localListOffers(filtro);
+    window.marketOfferTiersIndex = async () => {
+      const r = await localListOffers({});
+      const tiers = {};
+      for (const o of (r.offers || [])) {
+        if (!o.slug) continue;
+        const s = String(o.slug);
+        const t = Math.max(0, Math.floor(Number(o.tier) || 0));
+        if (!tiers[s]) tiers[s] = [];
+        if (tiers[s].indexOf(t) === -1) tiers[s].push(t);
+      }
+      return { ok: true, tiers };
+    };
     window.marketMineOffers = async (token) => localMineOffers(token);
     window.marketBuyOffer = async (body) => localBuyOffer(body);
     window.marketCancelOffer = async (token, id) => localCancelOffer(token, id);

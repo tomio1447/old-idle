@@ -5462,6 +5462,19 @@ async function marketList(db, q) {
   if (q.get("tier")) filter.tier = q.get("tier");
   if (q.get("seller")) filter.seller = q.get("seller");
   if (q.get("slug")) filter.slug = q.get("slug");
+  /* ?tiers=1 → índice leve slug→tiers das ofertas ativas (o browse usa para
+   * o filtro de tier sem baixar todas as ofertas). */
+  if (q.get("tiers")) {
+    const all = await db.marketOffers({});
+    const tiers = {};
+    for (const o of all) {
+      if (!o.slug) continue;
+      const s = String(o.slug);
+      const t = Math.max(0, Math.floor(Number(o.tier) || 0));
+      (tiers[s] = tiers[s] || []).includes(t) || tiers[s].push(t);
+    }
+    return { code: 200, body: { ok: true, tiers } };
+  }
   const offers = await db.marketOffers(filter);
   // inclui o preço médio de cada item (stats) para o cliente avisar
   // ofertas 25% acima/abaixo da média

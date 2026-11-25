@@ -2917,6 +2917,13 @@ async function marketListOffers(filtro) {
   return r.data.ok ? { ok: true, offers: r.data.offers } : { ok: false, msg: r.data.msg };
 }
 
+/* Índice slug → tiers das ofertas ativas (para o filtro de tier do browse,
+ * que precisa saber quais itens têm oferta com tier sem carregar todas). */
+async function marketOfferTiersIndex() {
+  const r = await _api("GET", "/api/market/offers?tiers=1");
+  return r.data.ok ? { ok: true, tiers: r.data.tiers || {} } : { ok: false, msg: r.data.msg };
+}
+
 /* Minhas ofertas. */
 async function marketMineOffers(token) {
   const r = await _api("GET", "/api/market/mine", null, token);

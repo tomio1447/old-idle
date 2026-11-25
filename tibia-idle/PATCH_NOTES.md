@@ -4,6 +4,19 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Market: tier nas ofertas e filtro de tier funcionando
+
+- Ofertas com tier agora **mostram o badge T#** na lista (o servidor já
+  gravava o tier corretamente — só faltava renderizar).
+- Filtro "Tier" do browse **filtra pelos tiers das ofertas ativas** (o
+  item do catálogo não tem tier — antes "T1+" não exibia nada). O
+  filtro também recorta a tabela de ofertas do item selecionado.
+- Novo índice leve `GET /api/market/offers?tiers=1` (slug → tiers
+  ativos) carregado ao abrir o browse; modo local (offline) tem o
+  mesmo índice. O índice é invalidado ao criar/comprar/cancelar oferta.
+
+---
+
 ## 2026-11-29 — Fix: grants SQL/admin de itens instanciados não somem mais
 
 - Bug: conceder item instanciado (ex.: Falcon Bow — usa `itemInstances`
