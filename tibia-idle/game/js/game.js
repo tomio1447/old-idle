@@ -7888,20 +7888,23 @@ function initAccountLogin() {
         sessionStorage.setItem("tibia-idle-sso-provider", qs.get("provider"));
       history.replaceState(null, "", location.pathname);
     }
+    /* Login social em conta com 2FA: o callback manda /?tfa=<ticket> em vez
+     * de sso — cai direto na tela de código (mesma do login por senha). */
+    const tfa = qs.get("tfa");
+    if (tfa) {
+      history.replaceState(null, "", location.pathname);
+      showTfaStep(tfa, qs.get("hasEmail") === "1");
+    }
   } catch (e) {}
 
   /* Botões "Continuar com Google/Twitch": só aparecem se o provedor estiver
-   * configurado no servidor (/api/auth/providers). */
-  (async () => {
-    try {
-      if (typeof accountAuthProviders !== "function") return;
-      const pr = await accountAuthProviders();
-      if (!pr || (!pr.google && !pr.twitch && !pr.discord)) return;
-      const box = $("#account-login");
-      if (!box) return;
-      const wrap = document.createElement("div");
-      wrap.className = "oauth-login";
-      let h = '<div class="oauth-divider"><span>ou continue com</span></div>';
+   * configurado no servidor (/api/auth/providers). Renderiza no login e no
+   * card do 2FA (#acc-tfa-social) — lá dentro também passa pelo TOTP. */
+  function renderOauthButtons(pr, host) {
+    if (!host) return;
+    const wrap = document.createElement("div");
+    wrap.className = "oauth-login";
+    let h = '<div class="oauth-divider"><span>ou continue com</span></div>';
       if (pr.google) h += `<button type="button" class="oauth-btn oauth-google" data-provider="google">
         <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.1h6.5c-.1 1.1-.8 2.7-2.4 3.8l-.02.15 3.5 2.7.24.02c2.2-2 3.5-5 3.5-8.5z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.8-2.9c-1 .7-2.4 1.2-4.1 1.2-3.1 0-5.8-2.1-6.8-5l-.14.01-3.7 2.9-.05.13C3.2 21.3 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.2 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.7.4-2.4l-.01-.16-3.8-2.9-.12.06C.4 8.2 0 10 0 12s.4 3.8 1.2 5.4l4-3z"/><path fill="#EA4335" d="M12 4.6c2.2 0 3.7 1 4.6 1.8l3.3-3.2C17.9 1.2 15.2 0 12 0 7.3 0 3.2 2.7 1.2 6.6l4 3c1-2.8 3.7-5 6.8-5z"/></svg>
         <span>Google</span></button>`;
@@ -7911,11 +7914,19 @@ function initAccountLogin() {
       if (pr.discord) h += `<button type="button" class="oauth-btn oauth-discord" data-provider="discord">
         <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#5865F2" d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.6 1.25a18.27 18.27 0 0 0-5.5 0 12.6 12.6 0 0 0-.61-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.05 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.22-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.13c.13-.09.25-.19.37-.29a.07.07 0 0 1 .07-.01c3.93 1.8 8.18 1.8 12.06 0a.07.07 0 0 1 .07.01c.12.1.25.2.37.3a.08.08 0 0 1-.01.12c-.6.35-1.22.64-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.37 1.22 2a.08.08 0 0 0 .08.02 19.84 19.84 0 0 0 6.02-3.03.08.08 0 0 0 .03-.05c.5-5.18-.84-9.68-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42z"/></svg>
         <span>Discord</span></button>`;
-      wrap.innerHTML = h;
-      box.appendChild(wrap);
-      wrap.querySelectorAll(".oauth-btn").forEach((b) => {
-        b.addEventListener("click", () => { location.href = "/api/auth/" + b.dataset.provider; });
-      });
+    wrap.innerHTML = h;
+    host.appendChild(wrap);
+    wrap.querySelectorAll(".oauth-btn").forEach((b) => {
+      b.addEventListener("click", () => { location.href = "/api/auth/" + b.dataset.provider; });
+    });
+  }
+  (async () => {
+    try {
+      if (typeof accountAuthProviders !== "function") return;
+      const pr = await accountAuthProviders();
+      if (!pr || (!pr.google && !pr.twitch && !pr.discord)) return;
+      renderOauthButtons(pr, $("#account-login"));
+      renderOauthButtons(pr, $("#acc-tfa-social"));
     } catch (e) {}
   })();
   $("#account-login-form").addEventListener("submit", async (event) => {
@@ -7951,14 +7962,21 @@ function initAccountLogin() {
     tfaForm.style.display = "";
     const emailBtn = $("#acc-tfa-email");
     if (emailBtn) emailBtn.style.display = hasEmail ? "" : "none";
-    $("#acc-tfa-msg").textContent = "";
+    const stEl = $("#acc-tfa-msg");
+    if (stEl) { stEl.style.display = "none"; stEl.className = "ev-status"; stEl.textContent = ""; }
     $("#acc-tfa-code").value = "";
     $("#acc-tfa-code").focus();
   }
   (function wireTfaForm() {
     const tfaForm = $("#account-tfa-form");
     if (!tfaForm) return;
-    const status = () => $("#acc-tfa-msg");
+    const setStatus = (type, text) => {
+      const el = $("#acc-tfa-msg");
+      if (!el) return;
+      el.style.display = text ? "" : "none";
+      el.className = "ev-status" + (type ? " is-" + type : "");
+      el.textContent = text || "";
+    };
     $("#acc-tfa-back").onclick = () => {
       _tfaTicket = null;
       tfaForm.style.display = "none";
@@ -7969,12 +7987,12 @@ function initAccountLogin() {
     if (emailBtn) emailBtn.onclick = async () => {
       if (!_tfaTicket || emailBtn.disabled) return;
       emailBtn.disabled = true;
-      status().textContent = "Enviando...";
+      setStatus("info", "Enviando...");
       try {
         const r = await accountLogin2faEmail(_tfaTicket.tfa);
-        if (!r.ok) { status().textContent = r.msg || "Falha ao enviar."; return; }
+        if (!r.ok) { setStatus("error", r.msg || "Falha ao enviar."); return; }
         _tfaTicket.method = "email";
-        status().textContent = r.msg + (r.devCode ? " (teste: " + r.devCode + ")" : "");
+        setStatus("success", r.msg + (r.devCode ? " (teste: " + r.devCode + ")" : ""));
       } finally { emailBtn.disabled = false; }
     };
     tfaForm.addEventListener("submit", async (event) => {
@@ -7982,14 +8000,14 @@ function initAccountLogin() {
       const btn = $("#acc-btn-tfa");
       if (!_tfaTicket || btn.disabled) return;
       const code = ($("#acc-tfa-code").value || "").trim();
-      if (!/^\d{6}$/.test(code)) { status().textContent = "Informe o código de 6 dígitos."; return; }
-      btn.disabled = true; status().textContent = "Verificando...";
+      if (!/^\d{6}$/.test(code)) { setStatus("error", "Informe o código de 6 dígitos."); return; }
+      btn.disabled = true; setStatus("info", "Verificando...");
       const bootGen = ++accountBootGeneration;
       try {
         const result = await accountLogin2fa(_tfaTicket.tfa, code, _tfaTicket.method);
         if (bootGen !== accountBootGeneration) return;
         if (!result.ok) {
-          status().textContent = result.msg || "Código inválido.";
+          setStatus("error", result.msg || "Código inválido.");
           if (result.expired) { _tfaTicket = null; tfaForm.style.display = "none"; $("#account-login-form").style.display = ""; }
           return;
         }

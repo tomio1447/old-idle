@@ -8049,6 +8049,18 @@ body.fullhd .party-panel.collapsed { width: auto; }
   .ev-otp-box { height: 42px; font-size: 17px; }
   .ev-email-row { flex-direction: column; }
 }
+
+/* ---------- Login 2FA (#account-tfa-form) — card translúcido ---------- */
+.tfa-card { padding: 16px 18px 18px; border-radius: 8px; background: rgba(13,16,23,.88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(212,175,55,.45); box-shadow: 0 0 0 1px rgba(0,0,0,.9), 0 20px 48px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,232,150,.14); display: flex; flex-direction: column; gap: 12px; }
+.tfa-prompt { margin: 0; text-align: center; font-size: 14px; font-weight: 700; color: #f8fafc; text-shadow: 0 2px 6px rgba(0,0,0,.95); }
+.tfa-card label { font-size: 12px; font-weight: 700; color: #cbd5e1; text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+.tfa-code { text-align: center; font-family: "Courier New", monospace; font-size: 17px; font-weight: 700; letter-spacing: .18em; }
+.tfa-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.tfa-actions button { padding: 9px 12px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14); background: rgba(24,28,38,.94); color: #f8fafc; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; }
+.tfa-actions button:hover:not(:disabled) { background: rgba(36,42,56,.98); border-color: rgba(212,175,55,.45); }
+.tfa-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.tfa-card .oauth-login { width: 100%; margin: 0; }
+.tfa-card .oauth-btn:last-child { margin-bottom: 0; }
 .cfgm-badge { padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; border: 1px solid transparent; }
 .cfgm-badge.is-ok { color: #a8e6a1; background: rgba(90,122,58,.28); border-color: rgba(140,180,100,.45); }
 .cfgm-badge.is-warn { color: #ffd65a; background: rgba(150,110,30,.22); border-color: rgba(230,184,76,.42); }

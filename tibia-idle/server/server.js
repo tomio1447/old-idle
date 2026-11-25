@@ -1343,6 +1343,16 @@ async function oauthFinish(db, st, provider, p) {
     if (ban) return { ban };
   }
   acc = await ensureAccountWallet(db, acc);
+  /* 2FA também no login social: sem o gate aqui, vincular um OAuth a uma
+   * conta com TOTP criaria um bypass completo do segundo fator. Vínculo
+   * em conta já logada (st.token) não exige — a sessão já passou no 2FA. */
+  if (!linked && acc.totp_enabled && acc.totp_secret) {
+    const tfa = newToken();
+    tfaChallenges.set(tfa, { accId: acc.id, tries: 0,
+      exp: Date.now() + TFA_CHALLENGE_TTL_MS, emailsSent: 0 });
+    if (tfaChallenges.size > 4096) tfaChallenges.clear();
+    return { need2fa: true, tfa, hasEmail: !!String(acc.email || "") };
+  }
   const token = newToken();
   if (SYNC_BUS) SYNC_BUS.revokeAccount(acc.id);
   if (typeof db.createSession === "function")
@@ -7316,6 +7326,12 @@ async function main() {
           }
           if (!profile) return page(400, "Provedor inválido", "Fluxo de login desconhecido.", false);
           const r = await oauthFinish(db, st, st.provider, profile);
+          if (r.need2fa) {
+            res.writeHead(302, Object.assign(hardenedHeaders(res), {
+              Location: "/?tfa=" + encodeURIComponent(r.tfa) + "&provider=" + st.provider +
+                (r.hasEmail ? "&hasEmail=1" : "") }));
+            return res.end();
+          }
           if (r.ban) {
             const b = r.ban;
             return page(403, "Conta suspensa", "Esta conta está suspensa" +
