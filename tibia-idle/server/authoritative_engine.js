@@ -1710,6 +1710,44 @@ function authSyncBagCountsFromInstances(p){
   p.bag=nextBag;
   p.itemInstances=rest;
 }
+/* Contagens órfãs na bag de itens instanciados (grant SQL/admin que gravou
+ * só bag[slug] sem itemInstances): materializa as instâncias faltantes na
+ * hidratação — authSyncBagCountsFromInstances descartaria a contagem e o
+ * item sumiria. Roda em canonicalPlayer/loadCityPlayer, NUNCA dentro do
+ * sync: quem remove instância (sellAuthBagItem & cia) confia no sync para
+ * derrubar a contagem. O tier legado de p.forge vai para a 1ª instância
+ * criada, mesmo critério da migração do cliente. */
+function authReconcileOrphanBagCounts(p){
+  if(!p)return;
+  p.bag=p.bag||{};p.itemInstances=Array.isArray(p.itemInstances)?p.itemInstances:[];
+  const tierClaimed={};
+  for(const slug of Object.keys(p.bag)){
+    if(!authItemNeedsBagInstance(slug))continue;
+    let want=Math.max(0,Math.floor(Number(p.bag[slug])||0));
+    for(const inst of p.itemInstances){
+      if(!inst||inst.loc!=="bag"||inst.slug!==slug)continue;
+      const it=ITEMS[slug];
+      const chargeable=!!(it&&it.charges&&(it.s==="ring"||it.s==="amulet"||it.s==="boots")&&!it.imbSlots);
+      if(chargeable){
+        const full=Math.floor(Number(it.charges)||0);
+        const ch=inst.charges==null?full:Math.floor(Number(inst.charges)||0);
+        if(full>0&&ch>0&&ch<full)continue;
+      }
+      want--;
+    }
+    for(let i=0;i<want;i++){
+      let tier=0;
+      if(!tierClaimed[slug]&&p.forge&&typeof p.forge==="object"){
+        tier=Math.max(0,Math.floor(Number(p.forge[slug])||0));
+        if(tier>0)tierClaimed[slug]=true;
+      }
+      p.itemInstances.push({
+        id:"srv-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1e6).toString(36)+"-"+i,
+        slug,loc:"bag",tier,
+      });
+    }
+  }
+}
 /**
  * Vende um stack/instância da mochila (autoritativo).
  * slug+instId → uma instância; só slug → stack inteiro (ou moeda).
@@ -5806,6 +5844,7 @@ function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String
   p.config=p.config||{};
   sanitizePlayerSpells(p,ALL_SPELLS);
   if(Array.isArray(p.config.combo))p.config.combo=sanitizeCombo(p.config.combo,p.voc);
+  authReconcileOrphanBagCounts(p);
   return p;}
 function claimSpawnCell(auth,cx,cy){
   const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
@@ -10993,7 +11032,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   canPlayerDamagePlayer,livingHostilePlayers,playersAreAllies,applyPlayerPvpDamage,
   CURRENCY_GOLD,
   shareAccountGoldWallets,sharePartyCapacity,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,destroyAuthBagItem,setAuthAutoSupplyStash,setAuthLootConfig,
-  authItemNeedsBagInstance,authSyncBagCountsFromInstances,
+  authItemNeedsBagInstance,authSyncBagCountsFromInstances,authReconcileOrphanBagCounts,
   ensureLootConfig,isAuthNoCollect,isAuthNoSell,tryAuthAutoSell,
   moveLootPouchToBag,moveBagToPouchAuth,authAddItemToBag,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,

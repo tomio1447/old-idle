@@ -50,7 +50,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, openAuthPrimalBag, claimAnnihilatorReward, annihilatorRewardOffer, claimAnnihilatorCart, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
-  destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authAddItemToBag,
+  destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authReconcileOrphanBagCounts, authAddItemToBag,
   equipFromContainerAuth, unequipFromContainerAuth, depotActionAuth,
   assignCharm: authAssignCharm, clearCharm: authClearCharm,
   buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm } = require("./authoritative_engine");
@@ -1672,6 +1672,10 @@ async function loadCityPlayer(db, acc, character) {
     // Fallback sem shared: stamina individual (legado).
     staminaRegenPlayer(p, Date.now(), 0.5);
   }
+  // Contagens órfãs na bag de itens instanciados (grant SQL/admin) viram
+  // instâncias aqui — antes o próximo authSyncBagCountsFromInstances dos
+  // endpoints de cidade descartava a contagem e o item sumia.
+  authReconcileOrphanBagCounts(p);
   return p;
 }
 

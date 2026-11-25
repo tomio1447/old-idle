@@ -1016,6 +1016,29 @@ function ensureItemInstances(p) {
       }
       p._forgeLegacyTierMigrated = 1;
     }
+    // Contagens órfãs de itens instanciados na bag (grant SQL/admin que
+    // gravou só bag[slug] sem itemInstances): materializa as instâncias
+    // ANTES do sync — ele descartaria a contagem e o item sumiria. O tier
+    // de p.forge vai para a 1ª instância criada (critério da migração).
+    const orphanTierClaimed = {};
+    for (const slug in p.bag) {
+      const want = Math.max(0, Math.floor(Number(p.bag[slug]) || 0));
+      if (!want || !itemUsesInstances(slug)) continue;
+      let have = 0;
+      for (const inst of p.itemInstances) {
+        if (!inst || inst.loc !== "bag" || inst.slug !== slug) continue;
+        if (isChargeStackableAccessory(slug) && accessoryChargesArePartial(slug, inst.charges)) continue;
+        have++;
+      }
+      for (let i = have; i < want; i++) {
+        let tier = 0;
+        if (!orphanTierClaimed[slug] && p.forge && p.forge[slug]) {
+          tier = Math.max(0, Math.floor(Number(p.forge[slug]) || 0));
+          orphanTierClaimed[slug] = true;
+        }
+        p.itemInstances.push({ id: nextItemInstanceId(p), slug: slug, loc: "bag", tier: tier });
+      }
+    }
     syncBagCountsFromInstances(p);
     return p.itemInstances;
   }

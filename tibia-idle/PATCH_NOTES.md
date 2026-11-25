@@ -4,6 +4,27 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Fix: grants SQL/admin de itens instanciados não somem mais
+
+- Bug: conceder item instanciado (ex.: Falcon Bow — usa `itemInstances`
+  por ter `imbSlots`) gravando só a **contagem** em `bag[slug]` fazia o
+  item **sumir no próximo save**: `syncBagCountsFromInstances` descarta
+  contagens de itens instanciados sem instância correspondente — e a
+  forja nunca o listava (só enxerga instâncias).
+- Cliente: `ensureItemInstances` agora **materializa as instâncias
+  faltantes** a partir de contagens órfãs na bag antes do sync (tier de
+  `p.forge` vai para a 1ª criada, mesmo critério da migração legada).
+- Servidor: nova `authReconcileOrphanBagCounts` aplicada nas duas
+  hidratações — `canonicalPlayer` (entrada em qualquer instância) e
+  `loadCityPlayer` (todos os endpoints de cidade). Propositalmente fora
+  do sync: quem remove instância (venda, consumo) confia no sync para
+  derrubar a contagem.
+- Como conceder itens instanciados daqui em diante: escrever a
+  **instância** em `itemInstances` (`{id, slug, loc:"bag", tier}`) — ou
+  só a contagem em `bag` que a reconciliação materializa no próximo load.
+
+---
+
 ## 2026-11-29 — Exaltation Forge: aba Convergence (WU23)
 
 - Nova aba **Convergence** na forja — exclusiva de itens **classificação
