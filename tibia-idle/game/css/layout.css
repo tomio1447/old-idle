@@ -2603,6 +2603,12 @@ button.full { width: 100%; }
   border-color: #8a6d1d;
 }
 .account-character-card.dragging { opacity: .45; filter: grayscale(.4); }
+/* Party obrigatória: card bloqueado até os 4 personagens existirem. */
+.account-character-card.is-locked { opacity: .55; filter: grayscale(.35); cursor: not-allowed; }
+.account-character-card.is-locked:hover { border-color: #686252 #17150f #17150f #686252; filter: grayscale(.35); }
+.gi-picker-warn span { color: #ffd65a; }
+.gi-picker-warn.is-alert span { animation: gi-picker-warn-blink .45s ease 3; color: #ff9a5a; }
+@keyframes gi-picker-warn-blink { 50% { opacity: .35; } }
 .account-character-card[draggable="true"] { cursor: grab; }
 .account-character-card[draggable="true"]:active { cursor: grabbing; }
 .account-party-hint { color: #b9ad7a; }

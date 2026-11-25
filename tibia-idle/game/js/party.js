@@ -642,22 +642,6 @@ async function partySync() {
     // espelha no personagem para a UI/badge
     if (G && G.p) {
       G.p._partyOnline = st;
-      if (!st) G.p._partyInvites = G.p._partyInvites || 0;
-      if (typeof renderPartyButton === "function") renderPartyButton(G.p);
-      if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
-    }
-    // inbox (badge ✉) a cada 3 polls (~18s) — mantém leve
-    PARTY_POLL_N += 1;
-    if (PARTY_POLL_N % 3 === 0) {
-      const inbox = await partyFetchInbox();
-      if (inbox.ok && G && G.p) {
-        const filtered = (typeof partyFilterStaleInbox === "function")
-          ? partyFilterStaleInbox(inbox.invites || [], st)
-          : (inbox.invites || []);
-        G.p._partyInvites = filtered.length;
-        if (typeof renderPartyButton === "function") renderPartyButton(G.p);
-        if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
-      }
     }
     // FOLLOW: líder entrou em hunt/boss -> teleporta o membro junto
     if (st && st.follow && st.follow.nonce && !st.isLeader) {

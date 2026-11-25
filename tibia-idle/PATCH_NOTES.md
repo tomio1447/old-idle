@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Party automática + 4 personagens obrigatórios
+
+- **Sistema multiplayer de party removido**: botão PARTY da topbar, modal de party/analisador e `party-ui.js` deletados. A party continua existindo — os 4 personagens da conta já a formam automaticamente na criação (`partySyncAccount`), com XP share e entrada em grupo nos lobbies mantidos.
+- **4 personagens obrigatórios para entrar**: picker exibe cards bloqueados (🔒, sem ENTRAR, sem arraste) + aviso "crie os N restantes" enquanto a conta tiver menos de 4; autoload bloqueado e `GET /api/characters/<id>` devolve `403 PARTY_INCOMPLETE` (gate server-side, sem bypass de cliente).
+- **Tutorial atualizado**: fase de montar party manual virou espera automática; troca de personagem para configurar Helper agora guia pelo botão CONTA (picker) em vez do modal de party.
+- Colaterais: o painel OTC de membros (canto superior direito) e a aba "Curar aliado" do Helper sumiram junto com `party-ui.js` — spells de cura em aliado continuam configuradas nos presets salvos.
+
+---
+
 ## 2026-11-26 — Botão SUPORTE (Discord) na topbar
 
 - Quadrado hero ao lado do WhatsApp: ícone oficial do Discord (SVG inline), glow blurple `#5865F2`, abre `https://discord.gg/nJeqFDrvP3` em nova aba.

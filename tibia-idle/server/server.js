@@ -1511,6 +1511,12 @@ async function loadCharacter(db, token, id) {
   const character = await db.findCharacter(id);
   if (!character || Number(character.account_id) !== Number(acc.id))
     return { code:404, body:{ok:false,msg:"Personagem não encontrado"} };
+  // Party obrigatória: a conta só entra no jogo com os 4 personagens
+  // criados — a party da conta é montada automaticamente na criação.
+  const roster = await db.charactersOf(acc.id);
+  if (roster.length < ACCOUNT_MAX_CHARS)
+    return { code:403, body:{ok:false, error:"PARTY_INCOMPLETE",
+      msg:`Sua party precisa de ${ACCOUNT_MAX_CHARS} personagens — crie todos antes de entrar.`} };
   let data = character.data;
   let sharedInventory = null;
   try {

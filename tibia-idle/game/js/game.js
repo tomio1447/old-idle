@@ -6376,7 +6376,6 @@ function renderAll() {
   if (typeof renderOtcAnalyser === "function") renderOtcAnalyser();
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
-  if (typeof renderPartyButton === "function") renderPartyButton(p);
   if (typeof renderRewardButton === "function") renderRewardButton(p);
   if (typeof renderQuestsButton === "function") renderQuestsButton(p);
   // painel de party estilo OTC (canto superior direito da tela do jogo)
@@ -6622,7 +6621,6 @@ function bindControls() {
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
   if (typeof bindPreyButton === "function") bindPreyButton();
-  if (typeof bindPartyButton === "function") bindPartyButton();
   if (typeof bindLoyaltyButton === "function") bindLoyaltyButton();
   if (typeof bindTrainingButton === "function") bindTrainingButton();
   // Reward Chest: botão da topbar (badge = bosses com drops pendentes).
@@ -7361,6 +7359,9 @@ function initAccountLogin() {
            -(ib<0?_partyOrder.length+characters.indexOf(b):ib);
     });
     if(typeof accountCharacterCacheWrite==="function")accountCharacterCacheWrite(characters);
+    /* Party obrigatória: sem os 4 personagens ninguém entra — os cards
+     * ficam bloqueados até a party estar completa (montagem automática). */
+    const partyIncomplete=characters.length<ACCOUNT_MAX_CHARS;
     try {
       sessionStorage.setItem("tibia-idle-token", token);
       sessionStorage.setItem("tibia-idle-account", JSON.stringify(account));
@@ -7372,7 +7373,7 @@ function initAccountLogin() {
       accountSetCoins(Math.max(0,Number(account.coins)||0));
     if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
     const cards = characters.length ? characters.map((c) => `
-      <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""}"
+      <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""} ${partyIncomplete&&!c.identityMismatch?"is-locked":""}"
         ${c.identityMismatch?`data-repair-char="${c.id}"`:`data-acc-char="${c.id}"`}>
         <span class="account-character-handle" title="Arrastar para reordenar">⋮⋮</span>
         <span class="account-character-outfit" data-account-portrait="${c.id}"></span>
@@ -7383,7 +7384,7 @@ function initAccountLogin() {
         <span class="account-character-voc">${vocationName({voc:c.voc || "knight",promoted:!!c.promoted})}</span>
         <span class="account-character-action">
           <span class="account-character-level">${Number(c.level) || 1}</span>
-          <span class="account-character-enter">${c.identityMismatch?"REPARAR":"ENTRAR ›"}</span>
+          <span class="account-character-enter">${c.identityMismatch?"REPARAR":(partyIncomplete?"🔒":"ENTRAR ›")}</span>
         </span>
       </button>`).join("") :
       `<div class="account-character-empty">Nenhum personagem nesta conta.</div>`;
@@ -7398,7 +7399,9 @@ function initAccountLogin() {
         </div>
       </header>
       <div class="panel-body account-flow-body">
-        ${characters.length?`<div class="gi-divider-hint"><span>Arraste os personagens para ordenar a party — o 1º da lista é o líder</span></div>`:""}
+        ${partyIncomplete
+          ? `<div class="gi-divider-hint gi-picker-warn" id="acc-party-warn"><span>⚔️ Crie os ${ACCOUNT_MAX_CHARS - characters.length} personagens restantes — sua party se forma sozinha com os ${ACCOUNT_MAX_CHARS}</span></div>`
+          : `<div class="gi-divider-hint"><span>Arraste os personagens para ordenar a party — o 1º da lista é o líder</span></div>`}
         <div class="account-character-list">${cards}</div>
         <footer class="gi-modal__footer">
           ${characters.length < ACCOUNT_MAX_CHARS
@@ -7415,6 +7418,11 @@ function initAccountLogin() {
     $("#modal-body").classList.add("gi-picker");
     paintAccountPortraits(characters);
     $$("#modal-body [data-acc-char]").forEach((row) => row.addEventListener("click", () => {
+      if (partyIncomplete) {
+        const warn=$("#acc-party-warn");
+        if (warn) { warn.classList.remove("is-alert"); void warn.offsetWidth; warn.classList.add("is-alert"); }
+        return;
+      }
       const summary = characters.find((c) => String(c.id) === String(row.dataset.accChar));
       if (summary) enterCharacter(token, summary);
     }));
@@ -7447,7 +7455,7 @@ function initAccountLogin() {
           }
         }catch(e){}
       };
-      if(characters.length>1)$$("#modal-body .account-character-card").forEach((el)=>{
+      if(characters.length>1&&!partyIncomplete)$$("#modal-body .account-character-card").forEach((el)=>{
         el.setAttribute("draggable","true");
         el.addEventListener("dragstart",(e)=>{
           _dragCard=el;_dragMoved=true;e.dataTransfer.effectAllowed="move";
@@ -7907,7 +7915,7 @@ function initAccountLogin() {
         msg("");if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
         try{sessionStorage.removeItem("tibia-idle-online-autoload");}catch(e){}
         const target=(result.characters||[]).find(c=>String(c.id)===String(autoId));
-        if(target)enterCharacter(sessionToken()||token,target);
+        if(target&&(result.characters||[]).length>=ACCOUNT_MAX_CHARS)enterCharacter(sessionToken()||token,target);
         else {
           if (typeof showGameLoading === "function") showGameLoading(false);
           showPicker(sessionToken()||token, result.account, result.characters || []);

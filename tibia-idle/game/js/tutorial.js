@@ -3,13 +3,12 @@
  * Publico-alvo nao conhece as mecanicas do Tibia, entao o fluxo forca:
  *   1) Criar 4 personagens com 4 vocacoes DIFERENTES (das 5 existentes:
  *      knight/paladin/druid/sorcerer/monk) na tela de personagens da conta.
- *   2) Montar uma Party com os 4 personagens (o modal de Party ganha uma
- *      lista dos personagens da conta com um botao "Invite" — ver
- *      party-ui.js/partyOnlineHtml).
+ *   2) A Party se forma sozinha: os 4 personagens da conta ja viram party
+ *      automaticamente (partySyncAccount no servidor) — sem passo manual.
  *   3) Ir em HUNTS e entrar na hunt do Rato (Esgoto de Rookgaard, id "rats").
  *   4) Um hint explica o Helper; depois disso o jogador precisa trocar de
- *      personagem PELO MODAL DA PARTY (clique no membro = trocar, ja
- *      existente em party-ui.js) e configurar o Helper de cada um dos 4.
+ *      personagem PELA TELA DE PERSONAGENS (botao CONTA, clique no card =
+ *      trocar) e configurar o Helper de cada um dos 4.
  *   5) Ao concluir os 4, credita 3 dias de VIP na conta (uma vez) e agenda
  *      1500 cargas de cada exercise weapon nos 4 personagens do tutorial
  *      (creditadas na proxima vez que cada um carregar — ver
@@ -284,36 +283,11 @@ function tutorialCheckParty(state) {
   return state.charIds.every((id) => ids.has(String(id)));
 }
 function tutorialRenderPartyStep(state) {
-  // dentro do modal de party (ja aberto)?
-  const modalOpen = document.getElementById("modal") &&
-    document.getElementById("modal").classList.contains("show");
-  const partyBox = document.getElementById("party-content");
-  if (modalOpen && partyBox) {
-    const createBtn = document.getElementById("party-create");
-    if (createBtn) {
-      tutorialRender(createBtn.getBoundingClientRect(),
-        "Crie a party — você vai virar o líder e poderá convidar seus outros personagens.",
-        []);
-      return;
-    }
-    const ids = tutorialPartyMemberIds();
-    const pendingId = state.charIds.find((id) => !ids.has(String(id)));
-    if (pendingId) {
-      const name = tutorialCharName(pendingId);
-      const rows = Array.from(document.querySelectorAll("[data-invite-account-name]"));
-      const row = rows.find((b) => b.dataset.inviteAccountName === name) || rows[0];
-      if (row) {
-        tutorialRender(row.getBoundingClientRect(),
-          `Convide <b>${name}</b> para a party (clique em Invite).`, []);
-        return;
-      }
-      tutorialRender(null, `Convide <b>${name}</b> pelo campo "Adicionar jogador (por nome)".`, []);
-      return;
-    }
-  }
+  // A party se forma sozinha com os 4 personagens da conta — aqui só
+  // esperamos o estado online sincronizar para seguir para a hunt.
   tutorialRender(null,
-    "Vamos montar sua <b>Party</b>! Abra o menu Party e adicione os outros 3 personagens da sua conta.",
-    [{ label: "Abrir Party", primary: true, onClick: () => { if (typeof openPartyModal === "function") openPartyModal(); } }]);
+    "Sua <b>Party</b> já é formada pelos 4 personagens da conta — aguarde um instante.",
+    []);
 }
 
 /* ------------------------------------------------------- fase: hunt */
@@ -364,18 +338,19 @@ function tutorialRenderHelperStep(state, pendingId, chars) {
   const inRats = typeof G !== "undefined" && G && G.combat && G.combat.huntId === "rats";
   if (String(G.p.id) !== String(pendingId)) {
     const name = tutorialCharName(pendingId, chars);
-    // Modal de Party ja aberto: destaca o membro pendente.
-    const partyOpen = document.getElementById("modal") && document.getElementById("modal").classList.contains("show");
-    const member = partyOpen && document.querySelector(`#party-content [data-party-switch="${pendingId}"]`);
+    // Picker de personagens (CONTA) aberto: destaca o card do pendente.
+    const modalEl = document.getElementById("modal"), bodyEl = document.getElementById("modal-body");
+    const pickerOpen = modalEl && modalEl.classList.contains("show") && bodyEl && bodyEl.classList.contains("gi-picker");
+    const member = pickerOpen && document.querySelector(`#modal-body [data-acc-char="${pendingId}"]`);
     if (member) {
       tutorialRender(member.getBoundingClientRect(),
-        `Clique em <b>${name}</b> na Party para trocar para ele e abrir o Helper.`, []);
+        `Clique em <b>${name}</b> para trocar para ele e abrir o Helper.`, []);
       return;
     }
-    if (partyOpen) { tutorialHideOverlay(); return; }
+    if (pickerOpen) { tutorialHideOverlay(); return; }
     tutorialRender(null,
-      `Use a <b>Party</b> para trocar para <b>${name}</b> e configurar o Helper dela(e).`,
-      [{ label: "Abrir Party", primary: true, onClick: () => { if (typeof openPartyModal === "function") openPartyModal(); } }]);
+      `Abra a <b>CONTA</b> e troque para <b>${name}</b> para configurar o Helper dela(e).`,
+      [{ label: "Abrir Conta", primary: true, onClick: () => { if (typeof openAccountCharacterPicker === "function") openAccountCharacterPicker(); } }]);
     return;
   }
   if (!inRats) {
