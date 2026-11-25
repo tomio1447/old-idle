@@ -4,6 +4,24 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — Guerra de Venore: times que não saíam da safezone
+
+- **Bug**: na arena `venore_town` (modo control) os dois times nasciam
+  nas safezones e **a guerra nunca acontecia** — o placar corria pra um
+  lado só por acidente de posição.
+- **Causa**: o goal `CONTEST` da IA (`pvp-ai.js`) lia `controlZone.cx/cy`
+  — mas `controlZone` é um rect `{x1..x2,y1..y2}` (`pvpLocalRect`).
+  `Number(undefined)||0` mandava **todo char AI_HARD pra (0,0)**.
+  Team 2 (sz no canto esquerdo) já nasceu quase em (0,0) → congelou na
+  safezone; team 1 marchou da direita, ficou preso no meio do mapa e
+  dominava a zona de controle de tabela.
+- **Fix**: o goal do CONTEST passa a ser o **centro do rect** da zona
+  (mesmo cálculo de `pvpBattleGoal`), com fallback pro shape legado
+  `{cx,cy}`.
+- Teste atualizado: os mocks de `controlZone` agora usam o shape de
+  produção (rect) e a asserção cobre o goal no centro — era exatamente
+  o mock `{cx,cy,r}` que escondia o bug.
+
 ## 2026-11-24 — Mana Buffer (15.25) agora vale no servidor
 
 - **Bug**: a mecânica do "Mana Buffer" (Sorcerer/Druid) existia só na

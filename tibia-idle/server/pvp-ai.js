@@ -532,11 +532,18 @@ function pvpAiDecide(auth, item, now) {
         regroup: true } });
   }
 
-  /* CONTEST — modo control: disputar a zona vale mais que kill solto. */
+  /* CONTEST — modo control: disputar a zona vale mais que kill solto.
+   * controlZone é um rect {x1..x2,y1..y2} (pvpLocalRect) — o goal é o
+   * centro, como em pvpBattleGoal. Ler z.cx/z.cy enviava o time pra
+   * (0,0): os bots ficavam presos na safezone e a guerra nunca rolava. */
   if (v.battle.mode === "control" && !v.battle.inControl && pb.controlZone) {
     const z = pb.controlZone;
+    const zcx = Number.isFinite(Number(z.cx)) ? Math.round(Number(z.cx))
+      : Math.round((Number(z.x1) + Number(z.x2)) / 2);
+    const zcy = Number.isFinite(Number(z.cy)) ? Math.round(Number(z.cy))
+      : Math.round((Number(z.y1) + Number(z.y2)) / 2);
     cand.push({ action: "CONTEST", prio: AI_PRIO.CONTEST + mapW.contest,
-      goal: { cx: Number(z.cx) || 0, cy: Number(z.cy) || 0, td: 0, zone: true } });
+      goal: { cx: zcx, cy: zcy, td: 0, zone: true } });
   }
 
   /* HOLD — ficar parado (segurar posição sob paralyze/cerco). */

@@ -596,7 +596,8 @@ console.log("== FASE 6: control mode → domination ao segurar a zona ==");
   const auth = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]);
   const now = Date.now(); auth.clock = now;
   auth.pvpBattle.mode = "control"; auth.pvpBattle.holder = 1;
-  auth.pvpBattle.controlZone = { cx: 5, cy: 2, r: 3 };
+  // Shape de produção: rect {x1..x2,y1..y2} (pvpLocalRect), centro (5,2).
+  auth.pvpBattle.controlZone = { x1: 4, y1: 1, x2: 6, y2: 3 };
   PVP_AI.pvpAiCoordinatorTick(auth, now);
   ok(auth.pvpBattle.aiCoord[1].strategy === "domination", "segurando → domination");
   ok(auth.pvpBattle.aiCoord[2].strategy === "offensive" &&
@@ -647,12 +648,18 @@ console.log("== FASE 7: control — zona > perseguição ==");
   const it = auth.players[0];
   it._aiCtl = { mode: "AI_HARD", since: now - 60000, prev: "HUMAN" };
   auth.pvpBattle.mode = "control"; auth.pvpBattle.holder = 2;
-  auth.pvpBattle.controlZone = { cx: 5, cy: 2, r: 3 };
+  auth.pvpBattle.controlZone = { x1: 4, y1: 1, x2: 6, y2: 3 };
   const w = PVP_AI.pvpAiDecide(auth, it, now);
   ok(w && (w.action === "CONTEST" || w.action === "ATTACK"),
     "zona perdida → disputar/atacar");
-  if (w.action === "CONTEST")
+  if (w.action === "CONTEST") {
     ok(w.prio >= 85, "CONTEST recebe o peso do mapa (+15)");
+    /* Regressão Venore: o goal é o CENTRO do rect — ler z.cx/z.cy num
+     * rect {x1..x2,y1..y2} mandava o time inteiro pra (0,0) e a guerra
+     * nunca acontecia (times congelados nas safezones). */
+    ok(w.goal && w.goal.cx === 5 && w.goal.cy === 2,
+      "goal do CONTEST = centro do rect da zona, não (0,0)");
+  }
 }
 
 console.log("== FASE 7: regroup — time espalhado reagrupa ==");
@@ -661,7 +668,7 @@ console.log("== FASE 7: regroup — time espalhado reagrupa ==");
     mkChar(4, 100, 1, 9, 1), mkChar(2, 200, 2, 5, 2)]);
   const now = Date.now(); auth.clock = now;
   auth.pvpBattle.mode = "control"; auth.pvpBattle.holder = 2;
-  auth.pvpBattle.controlZone = { cx: 5, cy: 2, r: 3 };
+  auth.pvpBattle.controlZone = { x1: 4, y1: 1, x2: 6, y2: 3 };
   auth.pvpBattle.teams[1].leaderAccountId = 100;
   PVP_AI.pvpAiCoordinatorTick(auth, now);
   const coord = auth.pvpBattle.aiCoord[1];
