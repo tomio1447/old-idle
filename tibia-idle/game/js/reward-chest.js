@@ -289,6 +289,11 @@ function renderRewardButton(p) {
 
 function rewardChestDeleteBundle(p, bundleId) {
   if (!p || !bundleId) return;
+  /* Online: o baú é server-owned — o delete só vale via /api/reward/claim
+   * (discard), que aplica a remoção no shared VIVO. Splice local seria
+   * ressuscitado pelo próximo sync (o save preserva rewardChestBundles do
+   * servidor). */
+  if (rewardChestIsOnline()) return rewardChestOnlineClaim(p, { bundleId, discard: true });
   const bundle = rewardChestFindBundle(p, bundleId);
   if (!bundle) return;
   const delArr = p.rewardChestBundles || [];
@@ -296,6 +301,7 @@ function rewardChestDeleteBundle(p, bundleId) {
   if (delIdx >= 0) delArr.splice(delIdx, 1);
   if (typeof save === "function") save();
   if (typeof renderRewardButton === "function") renderRewardButton(p);
+  return true;
 }
 
 function rewardBossCard(bundle) {
@@ -305,10 +311,12 @@ function rewardBossCard(bundle) {
     : (typeof mobImg === "function" ? mobImg : null);
   const sprite = bundle.sprite && portrait
     ? portrait(bundle.sprite, 84) : `<img src="assets/item/reward-chest.png" alt="">`;
-  return `<button class="reward-boss-card" data-reward-boss="${bundle.id}"
+  return `<button class="reward-boss-card${empty ? ' reward-boss-card--empty' : ''}" data-reward-boss="${bundle.id}"
                   title="${empty ? 'Apagar registro de ' : 'Abrir recompensa de '}${bundle.name}">
     <span class="reward-boss-sprite">${sprite}</span>
-    <span class="reward-boss-chest"><img src="assets/item/reward-chest.png" alt="Reward Chest"></span>
+    <span class="reward-boss-chest">${empty
+      ? '<span class="reward-boss-trash">✕</span>'
+      : '<img src="assets/item/reward-chest.png" alt="Reward Chest">'}</span>
     <b>${empty ? '! ' : ''}${bundle.name}</b><small>${empty ? 'NOTHING · clique para apagar' : `${fmtFull(count)} item(ns) · clique para abrir`}</small>
   </button>`;
 }
@@ -344,7 +352,7 @@ function openRewardChest(bundleId) {
               : mobImg(bundle.sprite, 54))
             : "🎁"}</span>
           <div><b>${bundle.name}</b><small>${itens.length ? `${itens.length} tipos · ${fmtFull(total)} itens` : "NOTHING — o boss não dropou nada"}</small></div>
-          <button class="primary sm" id="reward-claim-all">${itens.length ? 'RECOLHER TUDO' : 'APAGAR'}</button>
+          <button class="${itens.length ? 'primary' : 'danger'} sm" id="reward-claim-all">${itens.length ? 'RECOLHER TUDO' : '✕ APAGAR'}</button>
         </div>
         ${itens.length ? `
         <div class="reward-slot-grid">
@@ -410,9 +418,16 @@ function openRewardChest(bundleId) {
     if (typeof hideTip === "function") hideTip();
     const count = Object.values(bundle.items || {}).reduce((sum,n) => sum + n, 0);
     if (count <= 0) {
-      rewardChestDeleteBundle(p, bundle.id);
-      toast(`Registro de <b>${bundle.name}</b> apagado.`);
-      openRewardChest();
+      const result = rewardChestDeleteBundle(p, bundle.id);
+      const done = () => {
+        toast(`Registro de <b>${bundle.name}</b> apagado.`);
+        openRewardChest();
+      };
+      if (result && typeof result.then === "function") {
+        result
+          .then((r) => { if (r && r.ok) done(); else openRewardChest(); })
+          .catch((e) => { console.error("Delete bundle error:", e); toast("Erro ao apagar.", "bad"); openRewardChest(); });
+      } else if (result) done();
       return;
     }
     const result = rewardChestClaimBundle(p, bundle.id);

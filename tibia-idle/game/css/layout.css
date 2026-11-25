@@ -1157,6 +1157,11 @@ button.reward-boss-card {
   border-color:#6f6857 #1a1813 #1a1813 #6f6857;
 }
 button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; filter:brightness(1.12); }
+button.reward-boss-card--empty .reward-boss-sprite { filter:grayscale(.85) brightness(.62); }
+button.reward-boss-card--empty:hover { border-color:#b04a4a #3a1717 #3a1717 #b04a4a; }
+button.reward-boss-card--empty > small { color:#b97f7f; }
+button.reward-boss-card--empty .reward-boss-chest { background:#1a0d0d; border-color:#6b3131; }
+.reward-boss-trash { color:#e08a8a; font-size:17px; font-weight:bold; line-height:1; text-shadow:0 1px 2px #000; }
 .reward-boss-sprite {
   height:92px; display:flex; align-items:flex-end; justify-content:center;
   image-rendering:pixelated; pointer-events:none;

@@ -776,7 +776,7 @@ function accountClaimRewardChest(token,charId,opts){
     const body=Object.assign({
       token,char_id:Number(charId),
       expected_version:Number(summary&&summary.saveVersion)||0,
-      bundleId:opts.bundleId||null,slug:opts.slug||null,all:!!opts.all,
+      bundleId:opts.bundleId||null,slug:opts.slug||null,all:!!opts.all,discard:!!opts.discard,
     },accountLeaseFields());
     const r=await _api("POST","/api/reward/claim",body);
     if(r.data.ok){

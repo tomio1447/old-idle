@@ -47,7 +47,7 @@ const {
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
   sanitizeHelperPresets, sanitizeWheelState, sanitizeImbuementState, advanceTrainingPlayer, staminaRegenPlayer,
-  rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
+  rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll, rewardChestDiscardBundle,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, openAuthPrimalBag, claimAnnihilatorReward, annihilatorRewardOffer, claimAnnihilatorCart, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
   destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authReconcileOrphanBagCounts, authAddItemToBag,
@@ -1829,6 +1829,7 @@ function applyRewardChestClaim(p,body){
   if(body&&body.all)return rewardChestClaimAll(p);
   const bundleId=body&&(body.bundleId||body.bundle_id)||null;
   const slug=body&&body.slug?String(body.slug):"";
+  if(body&&body.discard&&bundleId)return rewardChestDiscardBundle(p,bundleId);
   if(bundleId&&slug)return rewardChestClaimOne(p,slug,bundleId)?1:0;
   if(bundleId)return rewardChestClaimBundle(p,bundleId);
   if(slug)return rewardChestClaimOne(p,slug,null)?1:0;

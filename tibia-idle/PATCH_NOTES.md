@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — Fix: pacote de boss sem drop ressuscitava após APAGAR
+
+- **Bug**: clicar APAGAR num pacote "NOTHING" removia o bundle só localmente — como `rewardChestBundles` é inventário compartilhado server-owned, o próximo sync o ressuscitava.
+- **Fix**: descarte autoritativo — `/api/reward/claim` aceita `discard:true`; `rewardChestDiscardBundle` no engine remove apenas pacotes vazios (pacote com loot nunca é destruído) e a remoção é aplicada no shared VIVO pelo pipeline existente `chestRemovalDiff`/`removeBundleIds` (funciona também dentro de instância ativa).
+- **Estética**: botão APAGAR agora usa o estilo `danger` (vermelho, com ✕) em vez do azul primário; cards de boss sem drop ganham visual de descarte — sprite esmaecido, texto avermelhado e o canto mostra ✕ em vez do baú dourado.
+
+---
+
 ## 2026-11-29 — Fix: item instanciado duplicando ("equipa 1, somem 2")
 
 - **Bug**: o `itemInstances` podia listar a **mesma instância 2×** (mesmo

@@ -6590,6 +6590,18 @@ function rewardChestClaimBundle(p,bundleId){
   rewardChestRemoveBundleIfEmpty(p,bundle);
   return types;
 }
+/* Descarte de pacote vazio ("NOTHING"): só remove se o bundle não tiver item
+ * com contagem — um discard de pacote com drops não pode sumir com o loot. */
+function rewardChestDiscardBundle(p,bundleId){
+  if(!p||bundleId==null)return 0;
+  rewardChestEnsure(p);
+  const bundle=(p.rewardChestBundles||[]).find((b)=>String(b.id)===String(bundleId));
+  if(!bundle)return 0;
+  if(Object.keys(bundle.items||{}).some((k)=>Number(bundle.items[k])>0))return 0;
+  const i=p.rewardChestBundles.indexOf(bundle);
+  if(i>=0)p.rewardChestBundles.splice(i,1);
+  return 1;
+}
 /* COLLECT ALL drena os bundles UM BOSS POR VEZ, na ordem em que entraram no
  * baú: o boss totalmente recolhido some da lista; o que sobrar parcial fica
  * visível com o restante. Sem limite artificial — apenas a cap livre do
@@ -11065,7 +11077,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   meleeDamage,distanceDamage,addSkillTries,addManaSpent,advanceTrainingPlayer,staminaRegenPlayer,FULL_STAMINA,playerDamage,playerSkill,attackSkillName,
   skillTriesNeeded,mlTriesNeeded,SKILL_MUL,VOC,gearSkillBonus,progressAttack,progressWeaponSkill,
   weaponAmmoKind,ammoCompatibleWithWeapon,ammoMatrixTargets,ammoMatrixCells,quiverPerfectShot,wandPerfectShot,weaponPerfectShot,distanceHitChance,
-  rewardChestEnsure,rewardChestAdd,rewardChestClaimOne,rewardChestClaimBundle,rewardChestClaimAll,
+  rewardChestEnsure,rewardChestAdd,rewardChestClaimOne,rewardChestClaimBundle,rewardChestClaimAll,rewardChestDiscardBundle,
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   pvpBattleTick,pvpBattleTarget,pvpBattleGoal,pvpBattleRespawn,pvpBattleCredit,pvpBattleControlCounts,
