@@ -2,7 +2,7 @@
  * Edite ALPHA_ANNOUNCE_UPDATES abaixo para listar mudanças recentes. */
 "use strict";
 
-const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
+const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
