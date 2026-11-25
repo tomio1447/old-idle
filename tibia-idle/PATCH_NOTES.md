@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — Modais de conta com a estética da cidade
+
+- O modal "Confirmar e-mail" (e os irmãos do fluxo de conta: criar, reparar, recuperar senha) usava o tema slate/roxo do global-idle — inputs azulados com foco roxo e card arredondado frio.
+- Agora `account-flow-body` recebe a paleta da cidade: card marrom beveled (`#24221e`, bordas `#6f6857/#1a1813`), título escuro com dourado `#ffe680`, inputs quentes (`#1c1a16`, bevel `#17150f/#4b493e`, foco dourado), labels/links `#a89f88`/`#d4af37`, voc-cards quentes.
+- O seletor de personagens (`.gi-picker`) já tem a moldura ornamentada própria — fica intacto.
+
+---
+
+
 ## 2026-11-25 — Loadscreen mantém a cena do jogo como background
 
 - Antes: o overlay de loading era quase opaco e `#app` ficava `visibility:hidden` — a tela apagava para preto a cada load (entrada em boss/hunt, transição de mapa).

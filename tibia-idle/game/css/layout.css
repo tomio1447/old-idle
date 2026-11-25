@@ -6912,6 +6912,48 @@ body.fullhd .party-panel.collapsed { width: auto; }
   color: #ff9a6a;
 }
 
+/* --- Modais de fluxo de conta (confirmar e-mail, criar, reparar, recuperar):
+ * mesma moldura quente/beveled da cidade. O seletor de personagens
+ * (.gi-picker) já tem a moldura ornamentada própria — fica de fora. */
+#modal-body:not(.gi-picker):has(.account-flow-body) {
+  background: #24221e;
+  border: 2px solid;
+  border-color: #6f6857 #1a1813 #1a1813 #6f6857;
+  border-radius: 0;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .75);
+}
+#modal-body:not(.gi-picker) > .panel-title:has(+ .account-flow-body) {
+  background: #1a1915;
+  color: #ffe680;
+  text-shadow: 1px 1px 0 #000;
+  border-bottom: 1px solid #16140f;
+}
+#modal-body:not(.gi-picker) .account-flow-body { color: #d8d0bc; }
+#modal-body:not(.gi-picker) .account-flow-body .dim { color: #a89f88; }
+#modal-body:not(.gi-picker) .account-flow-body a { color: #d4af37; }
+#modal-body:not(.gi-picker) .account-flow-body .field label { color: #a89f88; }
+#modal-body:not(.gi-picker) .account-flow-body .field input,
+#modal-body:not(.gi-picker) .account-flow-body .field select {
+  background: #1c1a16;
+  color: #f7f2e2;
+  border: 2px solid;
+  border-color: #17150f #4b493e #4b493e #17150f;
+  border-radius: 0;
+}
+#modal-body:not(.gi-picker) .account-flow-body .field input:focus,
+#modal-body:not(.gi-picker) .account-flow-body .field select:focus {
+  outline: 1px solid var(--gold);
+}
+#modal-body:not(.gi-picker) .account-flow-body .voc-card {
+  background: #1c1a16; border-color: #4b493e; border-radius: 4px;
+}
+#modal-body:not(.gi-picker) .account-flow-body .voc-card:hover { border-color: #a89f88; }
+#modal-body:not(.gi-picker) .account-flow-body .voc-card.sel {
+  border-color: #d4af37; background: #2c2921;
+}
+#modal-body:not(.gi-picker) .account-flow-body .voc-card .vn { color: #f7f2e2; }
+#modal-body:not(.gi-picker) .account-flow-body .voc-card .vd { color: #a89f88; }
+
 /* --- títulos dos modais pré-login: faixa escura + dourado --- */
 .alpha-announce-box > .panel-title,
 .ui-mode-box > .panel-title {
