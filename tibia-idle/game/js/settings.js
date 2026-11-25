@@ -143,6 +143,8 @@ function _cfgBadge(ok, text) {
 /* Ícones de marca dos cards — Discord usa o mesmo path Clyde do botão OAuth;
  * o autenticador é o quadrado vermelho + cadeado do Oracle Authenticator. */
 const _CFG_ICONS = {
+  mail: `<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#4caf50" d="M45,16.2l-5,2.75l-5,4.75L35,40h7c1.657,0,3-1.343,3-3V16.2z"/><path fill="#1e88e5" d="M3,16.2l3.614,1.71L13,23.7V40H6c-1.657,0-3-1.343-3-3V16.2z"/><path fill="#e53935" d="M35,11.2L24,19.45L13,11.2L12,17L13,23.7L24,31.95L35,23.7L36,17L35,11.2z"/><path fill="#c62828" d="M3,12.298V16.2l10,7.5V11.2L9.876,8.859C9.132,8.301,8.228,8,7.298,8h0C4.924,8,3,9.924,3,12.298z"/><path fill="#fbc02d" d="M45,12.298V16.2l-10,7.5V11.2l3.124-2.341C38.868,8.301,39.772,8,40.702,8h0C43.076,8,45,9.924,45,12.298z"/></svg>`,
+  phone: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#25d366" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>`,
   ig: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.4" fill="none" stroke="#E1306C" stroke-width="2"/><circle cx="12" cy="12" r="4.4" fill="none" stroke="#E1306C" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.5" fill="#E1306C"/></svg>`,
   dc: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#5865F2" d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.6 1.25a18.27 18.27 0 0 0-5.5 0 12.6 12.6 0 0 0-.61-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.05 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.22-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.13c.13-.09.25-.19.37-.29a.07.07 0 0 1 .07-.01c3.93 1.8 8.18 1.8 12.06 0a.07.07 0 0 1 .07.01c.12.1.25.2.37.3a.08.08 0 0 1-.01.12c-.6.35-1.22.64-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.37 1.22 2a.08.08 0 0 0 .08.02 19.84 19.84 0 0 0 6.02-3.03.08.08 0 0 0 .03-.05c.5-5.18-.84-9.68-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42z"/></svg>`,
   tfa: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><defs><linearGradient id="cfgOraGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5503a"/><stop offset="1" stop-color="#c74634"/></linearGradient></defs><rect x="1.6" y="1.6" width="20.8" height="20.8" rx="5" fill="url(#cfgOraGrad)"/><path fill="#fff" d="M12 5.6a3.4 3.4 0 0 0-3.4 3.4v1.9H7.6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-1V9A3.4 3.4 0 0 0 12 5.6zm-1.6 3.4a1.6 1.6 0 1 1 3.2 0v1.9h-3.2V9z"/><path fill="#c74634" d="M12 13.6a1.3 1.3 0 0 0-.65 2.43l-.3 1.47h1.9l-.3-1.47A1.3 1.3 0 0 0 12 13.6z"/></svg>`,
@@ -168,7 +170,7 @@ function _cfgAccountPanelHtml(account) {
   return `
     <div class="cfgm-card">
       <div class="cfgm-card-top">
-        <span class="cfgm-card-title">E-mail da conta ${emailBadge}</span>
+        <span class="cfgm-card-title">${_cfgIco("mail")}E-mail da conta ${emailBadge}</span>
       </div>
       <div class="cfgm-fields">
         <input class="cfgm-input" type="email" id="cfgm-email" value="${_esc(a.email || "")}" placeholder="seu@email.com">
@@ -184,7 +186,7 @@ function _cfgAccountPanelHtml(account) {
 
     <div class="cfgm-card">
       <div class="cfgm-card-top">
-        <span class="cfgm-card-title">Número de telefone ${phoneBadge}</span>
+        <span class="cfgm-card-title">${_cfgIco("phone")}Número de telefone ${phoneBadge}</span>
       </div>
       <div class="cfgm-fields">
         <input class="cfgm-input" type="tel" id="cfgm-phone" value="${_esc(a.phone || "")}" placeholder="+55 (47) 99999-9999">
