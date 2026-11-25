@@ -919,6 +919,12 @@ function accountPublicView(acc){
     email:String(acc&&acc.email||""),
     emailVerified:!!(acc&&acc.email_verified),
     totpEnabled:!!(acc&&acc.totp_enabled),
+    phone:String(acc&&acc.phone||""),
+    phoneVerified:!!(acc&&acc.phone_verified),
+    /* Vínculos comunitários guardados em accounts.social (mesmo JSON do
+     * OAuth google/twitch). */
+    socialLinks:(()=>{const s=(acc&&acc.social&&typeof acc.social==="object")?acc.social:{};
+      return {instagram:String(s.instagram||""),discord:String(s.discord||"")};})(),
     gold:Math.max(0,Math.floor(Number(acc.gold)||0)),
     vipUntil, vip:vipUntil>Date.now(),
     missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
@@ -5279,6 +5285,66 @@ async function verifyEmailCode(db, body) {
   return { code: 200, body: { ok: true, emailVerified: true } };
 }
 
+/* ------------------------- telefone + redes sociais ---------------------
+ * Telefone: código de 6 dígitos entregue NO E-MAIL da conta (ainda não há
+ * provedor de SMS) — confirma a posse da conta e vincula o número. Quando
+ * um gateway de SMS existir, troca-se só o canal de entrega.
+ * Redes: vínculo comunitário (handle digitado pelo jogador) dentro de
+ * accounts.social, ao lado das identidades OAuth google/twitch. */
+const PHONE_CODE_TTL_MS = 10 * 60 * 1000;
+const PHONE_RE = /^\+?[0-9 ()-]{8,20}$/;
+async function requestPhoneCode(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const email = String(acc.email || "").trim();
+  if (!EMAIL_RE.test(email))
+    return { code: 400, body: { ok: false, msg: "Cadastre um e-mail válido primeiro — o código é enviado por e-mail." } };
+  const phone = String(body.phone || "").trim().slice(0, 24);
+  if (!PHONE_RE.test(phone))
+    return { code: 400, body: { ok: false, msg: "Informe um telefone válido (ex.: +55 47 99999-9999)." } };
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + PHONE_CODE_TTL_MS;
+  if (typeof db.setAccountPhone === "function") await db.setAccountPhone(acc.id, phone);
+  if (typeof db.setAccountPhoneVerified === "function") await db.setAccountPhoneVerified(acc.id, false);
+  if (typeof db.setAccountPhoneCode === "function") await db.setAccountPhoneCode(acc.id, code, expiresAt);
+  const sent = (typeof mailer.sendPhoneCode === "function")
+    ? await mailer.sendPhoneCode(email, code, acc.login, phone)
+    : { ok: false };
+  return { code: 200, body: {
+    ok: true,
+    emailSent: !!sent.ok,
+    msg: sent.ok ? "Código enviado para " + email + "." : "Falha ao enviar o e-mail. Configure o SMTP no servidor.",
+    ...(TEST_SERVER ? { devCode: code } : {}),
+  } };
+}
+async function verifyPhoneCode(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const code = String(body.code || "").trim();
+  if (!/^\d{6}$/.test(code)) return { code: 400, body: { ok: false, msg: "Código inválido." } };
+  const stored = String(acc.phone_code || "");
+  const expiresAt = Number(acc.phone_code_expires) || 0;
+  if (!stored || expiresAt < Date.now()) return { code: 400, body: { ok: false, msg: "Código expirado. Solicite um novo." } };
+  if (code !== stored) return { code: 400, body: { ok: false, msg: "Código incorreto." } };
+  if (typeof db.setAccountPhoneVerified === "function") await db.setAccountPhoneVerified(acc.id, true);
+  if (typeof db.setAccountPhoneCode === "function") await db.setAccountPhoneCode(acc.id, "", 0);
+  return { code: 200, body: { ok: true, phoneVerified: true, phone: String(acc.phone || "") } };
+}
+async function setAccountSocialLink(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const provider = String(body.provider || "").trim().toLowerCase();
+  if (provider !== "instagram" && provider !== "discord")
+    return { code: 400, body: { ok: false, msg: "Rede inválida." } };
+  const handle = String(body.handle || "").trim().slice(0, 60);
+  const social = (acc.social && typeof acc.social === "object" && !Array.isArray(acc.social)) ? acc.social : {};
+  if (handle) social[provider] = handle.replace(/^@/, "");
+  else delete social[provider];
+  if (typeof db.setAccountSocial === "function") await db.setAccountSocial(acc.id, social);
+  return { code: 200, body: { ok: true,
+    social: { instagram: String(social.instagram || ""), discord: String(social.discord || "") } } };
+}
+
 /* ------------------------- recuperação de senha -------------------------
  * Fluxo em 2 passos, sem token (o jogador não está logado):
  *   POST /api/account/recover         {login|email}  → código por e-mail
@@ -6792,6 +6858,18 @@ async function main() {
       if(req.method==="POST"&&url==="/api/account/email/verify"){
         const limited=rateLimit(req,"email-verify",20,600000);if(limited)return send(res,limited.code,limited.body);
         const r=await verifyEmailCode(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/phone/send"){
+        const limited=rateLimit(req,"phone-send",10,600000);if(limited)return send(res,limited.code,limited.body);
+        const r=await requestPhoneCode(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/phone/verify"){
+        const limited=rateLimit(req,"phone-verify",20,600000);if(limited)return send(res,limited.code,limited.body);
+        const r=await verifyPhoneCode(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/social"){
+        const limited=rateLimit(req,"social-link",30,600000);if(limited)return send(res,limited.code,limited.body);
+        const r=await setAccountSocialLink(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/account/recover"){
         const limited=rateLimit(req,"acc-recover",5,600000);if(limited)return send(res,limited.code,limited.body);

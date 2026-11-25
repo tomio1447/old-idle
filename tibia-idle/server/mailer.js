@@ -159,4 +159,16 @@ async function sendLoginCode(to, code, login) {
   return send(to, subject, text, html);
 }
 
-module.exports = { configured, sendVerificationCode, sendRecoveryCode, sendLoginCode };
+async function sendPhoneCode(to, code, login, phone) {
+  const subject = "Confirmação de telefone — Global-Idle";
+  const text = "Olá " + (login || "jogador") + ",\n\nSeu código para confirmar o telefone " +
+    (phone || "") + " é: " + code + "\n\nEle expira em 10 minutos.";
+  const html = mailShell("CONFIRMAÇÃO DE TELEFONE",
+    "Olá <b>" + escapeHtml(login || "jogador") + "</b>,<br>" +
+    "seu código para confirmar o telefone <b>" + escapeHtml(phone || "") + "</b> é:",
+    code,
+    "O código expira em <b>10 minutos</b>.<br>Se você não pediu este código, ignore este e-mail.");
+  return send(to, subject, text, html);
+}
+
+module.exports = { configured, sendVerificationCode, sendRecoveryCode, sendLoginCode, sendPhoneCode };

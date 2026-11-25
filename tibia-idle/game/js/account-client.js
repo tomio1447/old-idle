@@ -2413,6 +2413,18 @@ async function account2faDisable(token, code) {
   const r = await _api("POST", "/api/account/2fa/disable", { token: token || "", code: code || "" });
   return r.data || { ok: false, msg: "Falha ao desativar" };
 }
+async function accountPhoneSend(token, phone) {
+  const r = await _api("POST", "/api/account/phone/send", { token: token || "", phone: phone || "" });
+  return r.data || { ok: false, msg: "Falha ao enviar o código" };
+}
+async function accountPhoneVerify(token, code) {
+  const r = await _api("POST", "/api/account/phone/verify", { token: token || "", code: code || "" });
+  return r.data || { ok: false, msg: "Falha ao confirmar" };
+}
+async function accountSocialLink(token, provider, handle) {
+  const r = await _api("POST", "/api/account/social", { token: token || "", provider: provider || "", handle: handle || "" });
+  return r.data || { ok: false, msg: "Falha ao salvar" };
+}
 
 async function accountMe(token) {
   const r = await _api("GET", "/api/me", null, token);

@@ -733,6 +733,7 @@ JsonStore.prototype.createAccount = function (login, hash, role, coins, email, d
                 display_name: String(displayName || login).slice(0, 24),
                 email_verified: 0, email_code: "", email_code_expires: 0,
                 totp_secret: null, totp_enabled: 0, tfa_code: "", tfa_code_expires: 0,
+                phone: null, phone_verified: 0, phone_code: "", phone_code_expires: 0,
                 role: role || "user", coins: coins || 0, gold: 0, gold_migrated: true,
                 level: 1, exp: 0,
                 vip_until: 0, market_gold: 0, cosmetics: {},
@@ -1422,6 +1423,28 @@ JsonStore.prototype.setAccountEmailVerified = function (accountId, verified) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
   a.email_verified = verified ? 1 : 0;
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountPhone = function (accountId, phone) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.phone = phone == null ? null : String(phone).slice(0, 24);
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountPhoneCode = function (accountId, code, expiresAt) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.phone_code = String(code || "");
+  a.phone_code_expires = Math.max(0, Math.floor(Number(expiresAt) || 0));
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountPhoneVerified = function (accountId, verified) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.phone_verified = verified ? 1 : 0;
   this._save();
   return a;
 };
@@ -3129,6 +3152,7 @@ async function MysqlStore() {
       return { id: r.insertId, login, password_hash: hash, email: em, display_name: dn,
         email_verified: 0, email_code: "", email_code_expires: 0,
         totp_secret: null, totp_enabled: 0, tfa_code: "", tfa_code_expires: 0,
+        phone: null, phone_verified: 0, phone_code: "", phone_code_expires: 0,
         role: role || "user", coins: coins || 0, level: 1, exp: 0,
         gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {}, tutorial: {}, cosmetics: {} };
     },
@@ -3607,6 +3631,21 @@ async function MysqlStore() {
       const rows = await this.query("SELECT * FROM accounts WHERE email = ? AND email != ''",
         [String(email || "").slice(0, 120)]);
       return hydrateAccount(rows[0] || null);
+    },
+    async setAccountPhone(accountId, phone) {
+      await this.run("UPDATE accounts SET phone = ? WHERE id = ?",
+        [phone == null ? null : String(phone).slice(0, 24), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountPhoneCode(accountId, code, expiresAt) {
+      await this.run("UPDATE accounts SET phone_code = ?, phone_code_expires = ? WHERE id = ?",
+        [String(code || ""), Math.max(0, Math.floor(Number(expiresAt) || 0)), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountPhoneVerified(accountId, verified) {
+      await this.run("UPDATE accounts SET phone_verified = ? WHERE id = ?",
+        [verified ? 1 : 0, Number(accountId)]);
+      return this.findAccountById(accountId);
     },
     async findAccountBySocial(provider, key) {
       const prov = String(provider || ""), k = String(key || "");
@@ -6202,6 +6241,12 @@ async function ensureSchema(pool) {
     /* Verificação social (OAuth Twitch: id/login/follows por canal) —
      * gate do voucher do streamer; ver server/twitch.js. */
     "ADD COLUMN social MEDIUMTEXT NULL",
+    /* Telefone da conta (confirmação por código enviado ao e-mail até
+     * haver provedor de SMS) + vínculos sociais em social.instagram/discord. */
+    "ADD COLUMN phone VARCHAR(24) DEFAULT NULL",
+    "ADD COLUMN phone_verified TINYINT(1) NOT NULL DEFAULT 0",
+    "ADD COLUMN phone_code CHAR(6) DEFAULT NULL",
+    "ADD COLUMN phone_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0",
   ]) { try { await pool.query("ALTER TABLE accounts " + col); } catch (e) { /* já existe */ } }
   try { await pool.query("ALTER TABLE accounts ADD UNIQUE KEY uq_accounts_display_name (display_name)"); }
   catch (e) { /* já existe */ }

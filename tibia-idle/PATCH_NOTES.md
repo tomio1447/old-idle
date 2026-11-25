@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Configurações vira Gerenciador de Contas
+
+- Modal de Configurações ganhou **abas internas**: `Configurações` (idioma, interface, FULLHD, auto-reconnect — inalterado) e `Conta & Segurança`, com rodapé fixo (Sair/Fechar) e estética escura em cards (`cfgm-*`).
+- **E-mail**: alterar/confirmar com código de 6 dígitos (endpoints já existentes).
+- **Telefone** (novo): `POST /api/account/phone/send|verify` — código enviado **ao e-mail da conta** enquanto não há provedor de SMS (`mailer.sendPhoneCode`); colunas `phone/phone_verified/phone_code/phone_code_expires`.
+- **2FA**: card com estado Ativado/Desativado — ativar mostra QR + chave manual inline e valida o 1º código; desativar exige o código atual (endpoints já existentes).
+- **Redes sociais**: Instagram e Discord vinculam handle em `accounts.social` via `POST /api/account/social` (mesmo JSON do OAuth google/twitch) — vínculo comunitário declarado, não OAuth verificado.
+- `accountPublicView` agora expõe `phone`, `phoneVerified` e `socialLinks`.
+
+---
+
 ## 2026-11-26 — Party automática + 4 personagens obrigatórios
 
 - **Sistema multiplayer de party removido**: botão PARTY da topbar, modal de party/analisador e `party-ui.js` deletados. A party continua existindo — os 4 personagens da conta já a formam automaticamente na criação (`partySyncAccount`), com XP share e entrada em grupo nos lobbies mantidos.
