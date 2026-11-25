@@ -4308,7 +4308,24 @@ function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
     if(def>0){dmg=Math.max(1,Math.floor(dmg*(1-def/100)));preyDefenseTickOnHit(p,mob.slug);}
     dmg=mantraAbsorve(p,dmg,element);
   }
-  return absorbMagicShield(auth,item,p,dmg,now,pos,element);
+  let out=absorbMagicShield(auth,item,p,dmg,now,pos,element);
+  /* Mana Buffer (15.25, oficial — espelho do cliente em combat.js): um
+   * golpe LETAL em Sorcerer/Druid desvia o dano excedente para a MANA —
+   * 8 de mana por ponto de vida evitado + taxa de 25% da mana máxima,
+   * cobrável uma vez a cada 2s. Se a mana não cobrir, morre normalmente. */
+  if(out>0&&(p.voc==="sorcerer"||p.voc==="druid")&&out>=p.hp&&p.hp>0){
+    const excesso=out-p.hp+1;
+    const taxa=(now-(p.manaBufferAt||0)>=2000)?Math.floor(maxStats(p).mp*0.25):0;
+    const custo=excesso*8+taxa;
+    if((Number(p.mp)||0)>=custo){
+      p.mp-=custo;
+      if(taxa)p.manaBufferAt=now;
+      auth.events.push({t:"manabuffer",vida:excesso,mana:custo,
+        x:pos.x,y:pos.y,targetId:String(item.id),screen:true,ts:now});
+      return p.hp-1;   // o caller aplica p.hp-=out → cai exatamente em 1
+    }
+  }
+  return out;
 }
 function ensureSupplyStats(auth){
   if(!auth)return;

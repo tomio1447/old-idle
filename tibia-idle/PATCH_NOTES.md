@@ -4,6 +4,21 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Mana Buffer (15.25) agora vale no servidor
+
+- **Bug**: a mecânica do "Mana Buffer" (Sorcerer/Druid) existia só na
+  sim local — **online não funcionava**: golpe letal matava o mage
+  normalmente.
+- Regra oficial espelhada em `absorbIncomingDamage` (cobre melee,
+  skills, runas, explosões e PvP): golpe que zeraria o HP deixa o mage
+  com **1hp** e o excedente sai da mana — **8 mana por ponto de vida** +
+  taxa de 25% da mana máxima (1×/2s). Sem mana suficiente, morre.
+- Evento `manabuffer` já era renderizado no cliente (floater "-N mana"
+  + log) — agora emitido pelo servidor também.
+- Novo `tools/test_mana_buffer.js` cobre: sobrevivência a 1hp, custo
+  excedente×8 + taxa 25%, taxa não repetida <2s, morte sem mana,
+  druid incluso, outras vocações fora.
+
 ## 2026-11-24 — Brain Head: mecânica oficial (Cerebellum que curam o boss)
 
 - **Boss estático** em `{1024,1027,7}` e **8 Cerebellum estáticos** nas
