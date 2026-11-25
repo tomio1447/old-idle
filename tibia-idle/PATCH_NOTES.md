@@ -4,6 +4,21 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — Recuperar senha com OTP + cards translúcidos de login/2FA
+
+- **Recuperar senha** ganhou o mesmo tratamento da verificação de e-mail: código em 6 caixas (colar inteiro, backspace, setas, Enter confirma), botão "Enviar código" com cooldown de 60s ("Aguarde (Ns)" → "Reenviar código"), status tipado (erro/sucesso/info) com shake nas caixas e ajuda anti-spam. Helpers `_otpHtml`/`_otpWire` compartilhados com a verificação de e-mail.
+- **Login e 2FA** agora usam o mesmo card translúcido (`auth-card`: `rgba(13,16,23,.88)` + `backdrop-filter: blur(8px)` + borda dourada); botões sociais Google/Twitch/Discord renderizados dentro de cada card via `renderOauthButtons(host)` — sem o bloco duplicado abaixo.
+- **Segurança — OAuth não pula mais o 2FA**: `oauthFinish` passa a criar o mesmo challenge efêmero (5 min / 5 tentativas) do login por senha quando a conta tem `totp_enabled`, e o callback redireciona `/?tfa=<ticket>`; o boot abre a tela de código direto. Vincular provedor numa conta já logada não re-desafia.
+
+## 2026-11-25 — E-mail real em produção (Brevo) + limites anti-abuse
+
+- `MAIL_REAL=1` faz o mailer enviar de verdade mesmo sob `TEST_SERVER=1`; o servidor só devolve `devCode` quando o envio é mock — sem vazamento de código na resposta em prod. Remetente `suporte@global-idle.com` com domínio autenticado no Brevo (SPF/DKIM/DMARC via Cloudflare).
+- **Rate limit de e-mail**: cooldown de 60s por conta derivado de `*_code_expires` (resiste a restart), teto de 6 envios/dia por conta somando e-mail + telefone + recuperação, e cota global de 250 e-mails/dia (abaixo do plano Free do Brevo). Tunáveis `EMAIL_DAILY_CAP`/`ACCOUNT_MAIL_DAILY_MAX`/`MAIL_SEND_COOLDOWN_MS`; desligado em mock local.
+- **Confirmar e-mail** redesenhado: OTP de 6 caixas com auto-avanço e colar inteiro, timer real de 10:00 (expira → pill vermelha), cooldown de reenvio, edição inline do endereço, shake em erro e ajuda anti-spam.
+- Gerenciador de Contas com paleta da cidade + ícones de marca nos cards (Gmail, WhatsApp, Discord, Instagram, autenticador estilo Oracle); fix do badge "undefined".
+
+---
+
 ## 2026-11-26 — Login/vínculo com Discord (OAuth)
 
 - `server/oauth.js`: `discordAuthUrl`/`discordExchange`/`discordProfile` no mesmo trilho Google/Twitch — callback unificado `/api/oauth/callback`, `/api/auth/discord`, `discord` em `/api/auth/providers`.

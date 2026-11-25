@@ -6,10 +6,17 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "20/11/2026 às 20:50";
+const ALPHA_UPDATE_AT = "25/11/2026 às 06:27";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — E-mail real em produção: confirmação de cadastro, recuperação de senha e códigos de 2FA chegam de suporte@global-idle.com (domínio autenticado) — confira o Lixo Eletrônico no primeiro envio",
+  "NOVO — Telas de verificação redesenhadas: código de 6 dígitos em caixas separadas (cole o código inteiro de uma vez), timer de expiração e botão de reenvio com cooldown",
+  "NOVO — Recuperar senha com o mesmo visual: OTP de 6 caixas, cooldown de reenvio e feedback de erro animado",
+  "FIX — Segurança: login social (Google/Twitch/Discord) agora também exige o 2FA quando ele está ativo na conta — antes o OAuth pulava a verificação",
+  "NOVO — Login e 2FA em cards translúcidos sobre o cenário, com os botões sociais dentro do próprio card",
+  "NOVO — Proteção anti-abuse de e-mail: 60s entre envios, máx. 6 códigos/dia por conta e cota global diária no servidor",
+  "NOVO — Gerenciador de Contas com a estética da cidade e ícones de marca nos cards (Gmail, WhatsApp, Discord, Instagram, autenticador)",
   "NOVO — Topbar redesenhada: botões PERSONAGEM e STORE quadrados 78px com glow dourado no canto superior direito",
   "NOVO — Non-Transferable Tibia Coins (NT TC): saldo separado que só gasta na STORE — não pode ser vendido no Market",
   "NOVO — Cupons de streamer na aba Vouchers da STORE: DRUWELL e buto__pvp dão VIP, montaria exclusiva e NT TC",
