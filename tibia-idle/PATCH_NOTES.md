@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — Fix: instância quebrada não cai mais na seleção de personagem
+
+- **Bug**: quando a instância quebrava ao entrar num boss/hunt (create rejeitado ou watchdog de 45s), o `reloadIntoBrokenInstance` dava `location.reload()` **sem armar o autoload** — o boot não achava `autoId` e caía na tela de seleção de personagem, parecendo que o jogo tinha caído.
+- **Fix**: o reload agora arma `tibia-idle-online-autoload` (+ `AUTOLOGIN_KEY` offline) com o char do marker e exibe o overlay "Recuperando instância..." — o boot entra direto no mesmo char e o `reenterBrokenInstance` volta pro mapa automaticamente.
+- **Fallback**: se o autoload se perder, o boot recupera o char do marker — guardado por `sessionCharId()` (nunca sequestra a entrada de outro personagem da conta).
+- Limites mantidos: até 2 re-entradas automáticas por mapa quebrado (3ª vai pro templo), marker expira em 15min.
+
+---
+
+
 ## 2026-11-25 — Fix: pacote de boss sem drop ressuscitava após APAGAR
 
 - **Bug**: clicar APAGAR num pacote "NOTHING" removia o bundle só localmente — como `rewardChestBundles` é inventário compartilhado server-owned, o próximo sync o ressuscitava.

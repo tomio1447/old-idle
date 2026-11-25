@@ -21,11 +21,20 @@ if (start < 0 || end < 0) { console.error("FAIL: bloco não encontrado"); proces
 const block = src.slice(start, end);
 
 const store = {};
+const sstore = {};
 const localStorage = {
   getItem: (k) => (k in store ? store[k] : null),
   setItem: (k, v) => { store[k] = String(v); },
   removeItem: (k) => { delete store[k]; },
 };
+const sessionStorage = {
+  getItem: (k) => (k in sstore ? sstore[k] : null),
+  setItem: (k, v) => { sstore[k] = String(v); },
+  removeItem: (k) => { delete sstore[k]; },
+};
+let bootLoadingMsg = "";
+const armBootLoading = (t) => { bootLoadingMsg = String(t || ""); };
+const AUTOLOGIN_KEY = "tibia-idle-autologin-v1";
 let reloaded = false;
 const location = { reload() { reloaded = true; } };
 const calls = { toast: [], log: [], boss: [], hunt: [], arba: [] };
@@ -41,13 +50,14 @@ const arbazilothPickMode = (id) => calls.arba.push(id);
 const INSTANCE_SESSION_KEY = "tibia-idle-active-instance-v1";
 
 const F = new Function(
-  "G", "BOSS_DEFS", "GAMEDATA", "localStorage", "location",
+  "G", "BOSS_DEFS", "GAMEDATA", "localStorage", "sessionStorage", "location",
   "clearInstanceSession", "toast", "addLog", "startBoss", "startHunt",
-  "arbazilothPickMode", "INSTANCE_SESSION_KEY",
+  "arbazilothPickMode", "INSTANCE_SESSION_KEY", "AUTOLOGIN_KEY", "armBootLoading",
   block + ";return {markBrokenInstance,reloadIntoBrokenInstance," +
     "consumeBrokenInstanceReentry,reenterBrokenInstance,BROKEN_INSTANCE_KEY};"
-)(G, BOSS_DEFS, GAMEDATA, localStorage, location, clearInstanceSession,
-  toast, addLog, startBoss, startHunt, arbazilothPickMode, INSTANCE_SESSION_KEY);
+)(G, BOSS_DEFS, GAMEDATA, localStorage, sessionStorage, location, clearInstanceSession,
+  toast, addLog, startBoss, startHunt, arbazilothPickMode, INSTANCE_SESSION_KEY,
+  AUTOLOGIN_KEY, armBootLoading);
 const { markBrokenInstance, reloadIntoBrokenInstance, consumeBrokenInstanceReentry,
   reenterBrokenInstance, BROKEN_INSTANCE_KEY } = F;
 
@@ -60,6 +70,12 @@ console.log("== Quebra marca o mapa e dispara reload ==");
     "marker hunt com charId do char ativo");
   ok(reloadIntoBrokenInstance("instance-create-timeout") && reloaded,
     "reloadIntoBrokenInstance recarrega a página");
+  ok(sstore["tibia-idle-online-autoload"] === "7",
+    "reload arma o autoload do char (boot não cai na seleção)");
+  ok(sstore[AUTOLOGIN_KEY] === "7",
+    "reload arma o autologin offline do char");
+  ok(/Recuperando/i.test(bootLoadingMsg),
+    "boot loading mostra 'Recuperando instância' em vez da tela de seleção");
 }
 
 console.log("\n== Fluxos excluídos não geram marker ==");
@@ -146,6 +162,11 @@ console.log("\n== Pontos de quebra ligados ao reload ==");
     "rejeição do create → reload de volta pro mapa");
   ok(src.includes("reenterBrokenInstance()"),
     "boot re-entra no mapa quebrado");
+  ok(/if \(!autoId\)[\s\S]*BROKEN_INSTANCE_KEY[\s\S]*sessionCharId\(\)[\s\S]*autoId = String\(broken\.charId\)/
+      .test(src),
+    "boot usa o marker como fallback de autoId (guardado por sessionCharId)");
+  ok(src.includes('sessionStorage.setItem("tibia-idle-online-autoload", String(marker.charId))'),
+    "reloadIntoBrokenInstance arma o autoload antes do reload");
 }
 
 if (failures) { console.error("\n" + failures + " FALHA(S)"); process.exit(1); }

@@ -122,6 +122,15 @@ function reloadIntoBrokenInstance(reason) {
   if (!marker) return false;
   clearInstanceSession(reason || "instance-broken", true);
   try { localStorage.removeItem(INSTANCE_SESSION_KEY); } catch (e) {}
+  /* O boot online só entra direto no personagem com o autoload armado — sem
+   * ele o reload da instância quebrada caía na seleção de personagem e
+   * parecia que o jogo tinha caído. Arma o char do marker + overlay de
+   * loading até o reenterBrokenInstance voltar pro mapa. */
+  if (marker.charId) {
+    try { sessionStorage.setItem("tibia-idle-online-autoload", String(marker.charId)); } catch (e) {}
+    try { sessionStorage.setItem(AUTOLOGIN_KEY, String(marker.charId)); } catch (e) {}
+  }
+  if (typeof armBootLoading === "function") armBootLoading("Recuperando instância...");
   try { location.reload(); } catch (e) {}
   return true;
 }
@@ -7691,6 +7700,18 @@ function initAccountLogin() {
   const token = sessionToken();
   if (token && acc) {
     let autoId="";try{autoId=sessionStorage.getItem("tibia-idle-online-autoload")||"";}catch(e){}
+    if (!autoId) {
+      // Instância quebrada com o autoload perdido no caminho: recupera o
+      // char do marker — mas só se ainda é o char DESTA sessão (nunca
+      // sequestra a entrada de outro personagem da conta).
+      try {
+        const broken = JSON.parse(localStorage.getItem(BROKEN_INSTANCE_KEY) || "null");
+        if (broken && !broken.consumed && broken.charId && sessionCharId() &&
+            String(broken.charId) === String(sessionCharId()) &&
+            Date.now() - (Number(broken.at) || 0) < BROKEN_INSTANCE_TTL_MS)
+          autoId = String(broken.charId);
+      } catch (e) { /* marker corrompido */ }
+    }
     const bootLoad = typeof isBootLoadingArmed === "function" && isBootLoadingArmed();
     if (autoId || bootLoad) {
       if (typeof showGameLoading === "function")
