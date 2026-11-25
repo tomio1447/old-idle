@@ -4,6 +4,22 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Fix: sprites animadas Crypt Bile/Jaw (404) + stats oficiais
+
+- `crypt-bile_anim.png` / `crypt-jaw_anim.png` gerados a partir do cid
+  oficial do client 15.x (**51315/51314**) — 39 e 30 frames reais de
+  animação (a wand/rod gotejam, como no Tibia). Static PNGs regravados
+  do frame 0 do mesmo cid.
+- **Stats corrigidos**: o `weapondata.js` estava stale desde a quest
+  15.20 — apontava pros cids errados (52332-38). Sincronizado com o
+  `weapons.json` (fonte de verdade) nos 7 itens Crypt: bile agora é
+  **fire 95-115 + pierce fire** (era physical 85-135), jaw **earth
+  95-115 + pierce earth**, spine com **hit +100** e pierce holy, e os
+  demais com `pierce` do elemento oficial.
+- ASSET_VERSION 70→71 (novas artes).
+
+---
+
 ## 2026-11-29 — Market: tier nas ofertas e filtro de tier funcionando
 
 - Ofertas com tier agora **mostram o badge T#** na lista (o servidor já
