@@ -4483,6 +4483,21 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 .topbar-hero-btn--partners svg { filter: drop-shadow(0 0 5px rgba(169, 112, 255, .65)); }
 .topbar-hero-btn--partners .topbar-hero-label { color: #dcc2ff; font-size: 10px; letter-spacing: .4px; }
+/* Variante WhatsApp: mesmo quadrado, glow verde da marca (#25d366). */
+.topbar-hero-btn--whatsapp {
+  text-decoration: none;
+  background: radial-gradient(circle at 50% 22%, rgba(28, 130, 70, .5) 0%, rgba(10, 24, 16, .94) 70%);
+  border-color: #25d366;
+  box-shadow: 0 0 18px rgba(37, 211, 102, .35),
+              inset 0 1px 0 rgba(140, 255, 190, .22);
+}
+.topbar-hero-btn--whatsapp:hover {
+  border-color: #5ff09a;
+  box-shadow: 0 0 28px rgba(37, 211, 102, .58),
+              inset 0 1px 0 rgba(170, 255, 205, .42);
+}
+.topbar-hero-btn--whatsapp svg { filter: drop-shadow(0 0 5px rgba(37, 211, 102, .65)); }
+.topbar-hero-btn--whatsapp .topbar-hero-label { color: #b8ffd4; font-size: 10px; letter-spacing: .4px; }
 @media (max-width: 640px) {
   .topbar-hero { gap: 6px; right: 8px; }
   .topbar-hero-btn { gap: 2px; padding: 3px; }
