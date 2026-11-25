@@ -8058,6 +8058,10 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .auth-card .oauth-login { width: 100%; margin: 0; }
 .auth-card .oauth-btn:last-child { margin-bottom: 0; }
 .tfa-code { text-align: center; font-family: "Courier New", monospace; font-size: 17px; font-weight: 700; letter-spacing: .18em; }
+.tfa-methods { display: flex; gap: 6px; margin-bottom: 10px; }
+.tfa-method { flex: 1; padding: 7px 6px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14); background: rgba(9,11,16,.7); color: #cbd5e1; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s, color .15s; white-space: nowrap; }
+.tfa-method:hover { border-color: rgba(212,175,55,.4); }
+.tfa-method.is-active { background: rgba(234,179,8,.16); border-color: rgba(234,179,8,.55); color: #ffe680; }
 .tfa-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
 .tfa-send-col { display: flex; flex-direction: column; gap: 6px; }
 .tfa-actions .tfa-send-col button { width: 100%; }

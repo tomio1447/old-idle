@@ -8011,6 +8011,7 @@ function initAccountLogin() {
    * Método padrão = TOTP do autenticador; o link por e-mail aparece só
    * quando a conta tem e-mail cadastrado (fallback de celular perdido). */
   let _tfaTicket = null;
+  let _tfaSetMethod = null;
   function showTfaStep(tfa, hasEmail, hasPhone) {
     const loginCard = $("#acc-login-card") ||
       ($("#account-login-form") ? $("#account-login-form").closest(".auth-card") || $("#account-login-form") : null);
@@ -8023,6 +8024,10 @@ function initAccountLogin() {
     if (emailBtn) emailBtn.style.display = hasEmail ? "" : "none";
     const waBtn = $("#acc-tfa-whatsapp");
     if (waBtn) waBtn.style.display = hasPhone ? "" : "none";
+    const mEmail = $("#acc-tfa-m-email"), mWa = $("#acc-tfa-m-wa");
+    if (mEmail) mEmail.style.display = hasEmail ? "" : "none";
+    if (mWa) mWa.style.display = hasPhone ? "" : "none";
+    if (_tfaSetMethod) _tfaSetMethod("totp");
     const stEl = $("#acc-tfa-msg");
     if (stEl) { stEl.style.display = "none"; stEl.className = "ev-status"; stEl.textContent = ""; }
     $("#acc-tfa-code").value = "";
@@ -8044,6 +8049,32 @@ function initAccountLogin() {
       $("#acc-login-card").style.display = "";
       msg("");
     };
+    /* Seletor de método: o jogador escolhe ONDE recebe o código —
+     * app autenticador (TOTP), e-mail ou WhatsApp (telefone verificado). */
+    const promptEl = tfaForm.querySelector(".tfa-prompt");
+    const TFA_PROMPTS = {
+      totp: "Sua conta pede o código do app autenticador.",
+      email: "Sua conta pede o código enviado por e-mail.",
+      whatsapp: "Sua conta pede o código enviado no WhatsApp.",
+    };
+    const methodBtns = Array.from(tfaForm.querySelectorAll("#acc-tfa-methods [data-m]"));
+    const setMethod = (m) => {
+      if (_tfaTicket) _tfaTicket.method = m;
+      methodBtns.forEach((b) => b.classList.toggle("is-active", b.dataset.m === m));
+      if (promptEl) promptEl.textContent = TFA_PROMPTS[m] || TFA_PROMPTS.totp;
+    };
+    _tfaSetMethod = setMethod;
+    /* Cooldown 60s entre envios (o servidor também rejeita com a msg). */
+    const cooldown = (btn, base) => {
+      let s = 60;
+      btn.dataset.cd = "1"; btn.disabled = true;
+      btn.textContent = "Aguarde (" + s + "s)";
+      const t = setInterval(() => {
+        if (!document.getElementById(btn.id)) { clearInterval(t); return; }
+        if (--s <= 0) { clearInterval(t); delete btn.dataset.cd; btn.disabled = false; btn.textContent = base; }
+        else btn.textContent = "Aguarde (" + s + "s)";
+      }, 1000);
+    };
     const emailBtn = $("#acc-tfa-email");
     if (emailBtn) emailBtn.onclick = async () => {
       if (!_tfaTicket || emailBtn.disabled) return;
@@ -8052,9 +8083,10 @@ function initAccountLogin() {
       try {
         const r = await accountLogin2faEmail(_tfaTicket.tfa);
         if (!r.ok) { setStatus("error", r.msg || "Falha ao enviar."); return; }
-        _tfaTicket.method = "email";
+        setMethod("email");
         setStatus("success", r.msg + (r.devCode ? " (teste: " + r.devCode + ")" : ""));
-      } finally { emailBtn.disabled = false; }
+        cooldown(emailBtn, "✉ Enviar código por e-mail");
+      } finally { if (!emailBtn.dataset.cd) emailBtn.disabled = false; }
     };
     const waBtn = $("#acc-tfa-whatsapp");
     if (waBtn) waBtn.onclick = async () => {
@@ -8064,10 +8096,18 @@ function initAccountLogin() {
       try {
         const r = await accountLogin2faWhatsapp(_tfaTicket.tfa);
         if (!r.ok) { setStatus("error", r.msg || "Falha ao enviar."); return; }
-        _tfaTicket.method = "whatsapp";
+        setMethod("whatsapp");
         setStatus("success", r.msg + (r.devCode ? " (teste: " + r.devCode + ")" : ""));
-      } finally { waBtn.disabled = false; }
+        cooldown(waBtn, "💬 Enviar código por WhatsApp");
+      } finally { if (!waBtn.dataset.cd) waBtn.disabled = false; }
     };
+    /* Aba do método dispara o envio automaticamente (cooldown protege). */
+    methodBtns.forEach((b) => b.addEventListener("click", () => {
+      if (!_tfaTicket) return;
+      setMethod(b.dataset.m);
+      if (b.dataset.m === "email" && emailBtn && !emailBtn.disabled) emailBtn.click();
+      if (b.dataset.m === "whatsapp" && waBtn && !waBtn.disabled) waBtn.click();
+    }));
     tfaForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const btn = $("#acc-btn-tfa");

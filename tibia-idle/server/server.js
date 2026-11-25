@@ -1221,9 +1221,13 @@ async function login2faEmail(db, body) {
   const acc = await db.findAccountById(c.ch.accId);
   if (!acc || !EMAIL_RE.test(String(acc.email || "")))
     return { code: 200, body: { ok: false, msg: "Conta sem e-mail cadastrado." } };
+  const cooldown = 60000 - (Date.now() - (c.ch.lastSendAt || 0));
+  if (cooldown > 0)
+    return { code: 200, body: { ok: false, msg: "Aguarde " + Math.ceil(cooldown / 1000) + "s para reenviar." } };
   if ((c.ch.emailsSent || 0) >= 3)
     return { code: 200, body: { ok: false, msg: "Limite de envios — use o último código." } };
   c.ch.emailsSent = (c.ch.emailsSent || 0) + 1;
+  c.ch.lastSendAt = Date.now();
   const code = String(Math.floor(100000 + Math.random() * 900000));
   if (typeof db.setAccountTfaCode === "function")
     await db.setAccountTfaCode(acc.id, code, Date.now() + TFA_CODE_TTL_MS);
@@ -1241,9 +1245,13 @@ async function login2faWhatsapp(db, body) {
   const acc = await db.findAccountById(c.ch.accId);
   if (!acc || !acc.phone || !acc.phone_verified)
     return { code: 200, body: { ok: false, msg: "Conta sem WhatsApp verificado." } };
+  const cooldown = 60000 - (Date.now() - (c.ch.lastSendAt || 0));
+  if (cooldown > 0)
+    return { code: 200, body: { ok: false, msg: "Aguarde " + Math.ceil(cooldown / 1000) + "s para reenviar." } };
   if ((c.ch.whatsappsSent || 0) >= 3)
     return { code: 200, body: { ok: false, msg: "Limite de envios — use o último código." } };
   c.ch.whatsappsSent = (c.ch.whatsappsSent || 0) + 1;
+  c.ch.lastSendAt = Date.now();
   const code = String(Math.floor(100000 + Math.random() * 900000));
   if (typeof db.setAccountTfaCode === "function")
     await db.setAccountTfaCode(acc.id, code, Date.now() + TFA_CODE_TTL_MS);
