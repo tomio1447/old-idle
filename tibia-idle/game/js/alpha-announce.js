@@ -93,38 +93,12 @@ function openAlphaAnnounceModal() {
   return true;
 }
 
-function openSocialAnnounceModal() {
-  const modal = document.getElementById("social-announce-modal");
-  if (!modal) return false;
-  const link = document.getElementById("alpha-announce-discord");
-  if (link) {
-    link.href = ALPHA_DISCORD_URL;
-    link.textContent = ALPHA_DISCORD_URL;
-  }
-  modal.classList.add("show");
-  modal.setAttribute("aria-hidden", "false");
-  return true;
-}
-
-function closeSocialAnnounceModal() {
-  const el = document.getElementById("social-announce-modal");
-  if (!el) return;
-  el.classList.remove("show");
-  el.setAttribute("aria-hidden", "true");
-}
-
 function bindAlphaAnnounceModal() {
   const modal = document.getElementById("alpha-announce-modal");
   if (!modal || modal.dataset.bound === "1") return;
   modal.dataset.bound = "1";
   const ok = document.getElementById("alpha-announce-ok");
-  // o segundo modal (redes sociais) abre logo após fechar o de patch notes
-  if (ok) ok.addEventListener("click", () => {
-    closeAlphaAnnounceModal();
-    openSocialAnnounceModal();
-  });
-  const socialOk = document.getElementById("social-announce-ok");
-  if (socialOk) socialOk.addEventListener("click", () => closeSocialAnnounceModal());
+  if (ok) ok.addEventListener("click", () => closeAlphaAnnounceModal());
 }
 
 function bindAlphaTestBanner() {
