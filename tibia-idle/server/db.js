@@ -319,7 +319,7 @@ JsonStore.prototype.findAccountByEmail = function (email) {
  * google.sub / twitch.id dentro de accounts.social (JSON). */
 JsonStore.prototype.findAccountBySocial = function (provider, key) {
   const prov = String(provider || ""), k = String(key || "");
-  if (!k || (prov !== "google" && prov !== "twitch")) return null;
+  if (!k || (prov !== "google" && prov !== "twitch" && prov !== "discord")) return null;
   return (this.accounts || []).find((a) => {
     let s = a.social;
     if (typeof s === "string") { try { s = JSON.parse(s); } catch (e) { s = null; } }
@@ -3649,8 +3649,8 @@ async function MysqlStore() {
     },
     async findAccountBySocial(provider, key) {
       const prov = String(provider || ""), k = String(key || "");
-      if (!k || (prov !== "google" && prov !== "twitch")) return null;
-      const path = prov === "google" ? "$.google.sub" : "$.twitch.id";
+      if (!k || (prov !== "google" && prov !== "twitch" && prov !== "discord")) return null;
+      const path = prov === "google" ? "$.google.sub" : (prov === "discord" ? "$.discord.id" : "$.twitch.id");
       const rows = await this.query(
         "SELECT a.* FROM accounts a WHERE JSON_UNQUOTE(JSON_EXTRACT(a.social, ?)) = ?",
         [path, k]);

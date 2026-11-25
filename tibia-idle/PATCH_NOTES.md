@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Login/vínculo com Discord (OAuth)
+
+- `server/oauth.js`: `discordAuthUrl`/`discordExchange`/`discordProfile` no mesmo trilho Google/Twitch — callback unificado `/api/oauth/callback`, `/api/auth/discord`, `discord` em `/api/auth/providers`.
+- `oauthFinish` grava `social.discord = {id,username,globalName,email}` e a conta do Discord com **e-mail verificado** pode vincular por e-mail (mesmo privilégio do Google).
+- `findAccountBySocial` aceita provider `discord` (`$.discord.id`) nas duas stores.
+- Botão "Continuar com Discord" (Clyde, blurple) no login quando `DISCORD_CLIENT_ID/SECRET` estão no `.env`.
+- Card Discord no Gerenciador de Contas: com OAuth configurado vira "Conectar com Discord" (vínculo verificado) + "Desvincular conta" (`unlinkOauth` no `/api/account/social`); handle manual migra para `social.discord_handle` e fica como fallback quando OAuth não está configurado. `socialLinks.discordVerified` distingue os dois na UI.
+
+---
+
 ## 2026-11-26 — Configurações vira Gerenciador de Contas
 
 - Modal de Configurações ganhou **abas internas**: `Configurações` (idioma, interface, FULLHD, auto-reconnect — inalterado) e `Conta & Segurança`, com rodapé fixo (Sair/Fechar) e estética escura em cards (`cfgm-*`).

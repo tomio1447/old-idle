@@ -924,7 +924,13 @@ function accountPublicView(acc){
     /* Vínculos comunitários guardados em accounts.social (mesmo JSON do
      * OAuth google/twitch). */
     socialLinks:(()=>{const s=(acc&&acc.social&&typeof acc.social==="object")?acc.social:{};
-      return {instagram:String(s.instagram||""),discord:String(s.discord||"")};})(),
+      const dc=(s.discord&&typeof s.discord==="object")?s.discord:null;
+      return {
+        instagram:String(s.instagram||""),
+        /* Discord verificado (OAuth) tem prioridade sobre o handle manual. */
+        discord:(dc&&(String(dc.username||dc.globalName||"")))||String(s.discord_handle||""),
+        discordVerified:!!(dc&&dc.id),
+      };})(),
     gold:Math.max(0,Math.floor(Number(acc.gold)||0)),
     vipUntil, vip:vipUntil>Date.now(),
     missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
@@ -1305,7 +1311,7 @@ async function oauthFinish(db, st, provider, p) {
   }
   if (!acc && typeof db.findAccountBySocial === "function")
     acc = await db.findAccountBySocial(provider, p.key);
-  if (!acc && provider === "google" && p.emailVerified && p.email &&
+  if (!acc && (provider === "google" || provider === "discord") && p.emailVerified && p.email &&
       typeof db.findAccountByEmail === "function")
     acc = await db.findAccountByEmail(p.email);
   if (!acc) {
@@ -1327,6 +1333,9 @@ async function oauthFinish(db, st, provider, p) {
       follows: Object.assign({}, prevFollows || {}), at: Date.now() };
     if (p.follows === true || p.follows === false)
       social.twitch.follows[twitch.requiredChannel()] = p.follows;
+  } else if (provider === "discord") {
+    social.discord = { id: p.key, username: String(p.login || ""),
+      globalName: String(p.name || ""), email: String(p.email || ""), at: Date.now() };
   }
   if (typeof db.setAccountSocial === "function") await db.setAccountSocial(acc.id, social);
   if (typeof db.banActiveForAccount === "function") {
@@ -5338,8 +5347,16 @@ async function setAccountSocialLink(db, body) {
     return { code: 400, body: { ok: false, msg: "Rede inválida." } };
   const handle = String(body.handle || "").trim().slice(0, 60);
   const social = (acc.social && typeof acc.social === "object" && !Array.isArray(acc.social)) ? acc.social : {};
-  if (handle) social[provider] = handle.replace(/^@/, "");
-  else delete social[provider];
+  /* Discord: o nó `social.discord` é reservado à identidade OAuth
+   * ({id,username,...}) — o handle manual mora em `discord_handle` e o
+   * desvínculo OAuth usa a flag `unlinkOauth`. */
+  if (provider === "discord" && body.unlinkOauth === true) {
+    delete social.discord;
+  } else {
+    const key = provider === "discord" ? "discord_handle" : provider;
+    if (handle) social[key] = handle.replace(/^@/, "");
+    else delete social[key];
+  }
   if (typeof db.setAccountSocial === "function") await db.setAccountSocial(acc.id, social);
   return { code: 200, body: { ok: true,
     social: { instagram: String(social.instagram || ""), discord: String(social.discord || "") } } };
@@ -7198,11 +7215,13 @@ async function main() {
        *   ?token= no início vincula o provedor à conta logada. */
       if (req.method === "GET" && url === "/api/auth/providers") {
         return send(res, 200, { ok: true,
-          google: oauth.googleConfigured(), twitch: oauth.twitchConfigured() });
+          google: oauth.googleConfigured(), twitch: oauth.twitchConfigured(),
+          discord: oauth.discordConfigured() });
       }
-      if (req.method === "GET" && (url === "/api/auth/google" || url === "/api/auth/twitch")) {
-        const provider = url.endsWith("google") ? "google" : "twitch";
-        const conf = provider === "google" ? oauth.googleConfigured() : oauth.twitchConfigured();
+      if (req.method === "GET" && /^\/api\/auth\/(google|twitch|discord)$/.test(url)) {
+        const provider = url.split("/").pop();
+        const conf = provider === "google" ? oauth.googleConfigured()
+          : provider === "discord" ? oauth.discordConfigured() : oauth.twitchConfigured();
         if (!conf)
           return sendText(res, 503, twitch.pageHtml("Login indisponível",
             "O login com " + provider + " ainda não está configurado no servidor.", false),
@@ -7210,7 +7229,8 @@ async function main() {
         const q = new URL(req.url, "http://x").searchParams;
         const st = oauth.newLoginState(provider, String(q.get("token") || ""));
         res.writeHead(302, Object.assign(hardenedHeaders(res), {
-          Location: provider === "google" ? oauth.googleAuthUrl(st) : oauth.twitchAuthUrl(st) }));
+          Location: provider === "google" ? oauth.googleAuthUrl(st)
+            : provider === "discord" ? oauth.discordAuthUrl(st) : oauth.twitchAuthUrl(st) }));
         return res.end();
       }
       if (req.method === "GET" && url === "/api/oauth/callback") {
@@ -7255,6 +7275,9 @@ async function main() {
           } else if (st.provider === "twitch") {
             const tok = await oauth.twitchExchange(q.get("code"));
             profile = await oauth.twitchLoginProfile(tok.access_token);
+          } else if (st.provider === "discord") {
+            const tok = await oauth.discordExchange(q.get("code"));
+            profile = await oauth.discordProfile(tok.access_token);
           }
           if (!profile) return page(400, "Provedor inválido", "Fluxo de login desconhecido.", false);
           const r = await oauthFinish(db, st, st.provider, profile);

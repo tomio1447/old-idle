@@ -7784,7 +7784,7 @@ function initAccountLogin() {
     try {
       if (typeof accountAuthProviders !== "function") return;
       const pr = await accountAuthProviders();
-      if (!pr || (!pr.google && !pr.twitch)) return;
+      if (!pr || (!pr.google && !pr.twitch && !pr.discord)) return;
       const box = $("#account-login");
       if (!box) return;
       const wrap = document.createElement("div");
@@ -7796,6 +7796,9 @@ function initAccountLogin() {
       if (pr.twitch) h += `<button type="button" class="oauth-btn oauth-twitch" data-provider="twitch">
         <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#9146FF" d="M4.3 1L1.5 5.4v15.8h5.1V23h2.8l2.1-2.1h3.2l6-5.9V1H4.3zm14.6 13l-3.1 3.1h-5l-2.1 2.1v-2.1H5.3V3h13.6v11z"/><path fill="#9146FF" d="M15.9 7.6v4.7h-2V7.6h2zm-5.6 0v4.7h-2V7.6h2z"/></svg>
         <span>Twitch</span></button>`;
+      if (pr.discord) h += `<button type="button" class="oauth-btn oauth-discord" data-provider="discord">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#5865F2" d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.6 1.25a18.27 18.27 0 0 0-5.5 0 12.6 12.6 0 0 0-.61-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.05 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.22-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.13c.13-.09.25-.19.37-.29a.07.07 0 0 1 .07-.01c3.93 1.8 8.18 1.8 12.06 0a.07.07 0 0 1 .07.01c.12.1.25.2.37.3a.08.08 0 0 1-.01.12c-.6.35-1.22.64-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.37 1.22 2a.08.08 0 0 0 .08.02 19.84 19.84 0 0 0 6.02-3.03.08.08 0 0 0 .03-.05c.5-5.18-.84-9.68-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42z"/></svg>
+        <span>Discord</span></button>`;
       wrap.innerHTML = h;
       box.appendChild(wrap);
       wrap.querySelectorAll(".oauth-btn").forEach((b) => {

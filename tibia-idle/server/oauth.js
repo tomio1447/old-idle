@@ -28,6 +28,7 @@ const googleConfigured = () => !!(env("GOOGLE_CLIENT_ID") && env("GOOGLE_CLIENT_
 /* Login Twitch usa o MESMO app do gate de voucher — basta registrar a
  * OAUTH_REDIRECT_URI como Redirect URL adicional no app. */
 const twitchConfigured = () => twitch.configured();
+const discordConfigured = () => !!(env("DISCORD_CLIENT_ID") && env("DISCORD_CLIENT_SECRET"));
 
 /* States de login (TTL 10 min): chave → {provider, token(opcional p/ vínculo), at} */
 const STATES = new Map();
@@ -98,9 +99,37 @@ async function twitchLoginProfile(accessToken) {
   };
 }
 
+/* ------------------------------ DISCORD ------------------------------- */
+function discordAuthUrl(state) {
+  return "https://discord.com/oauth2/authorize?" + new URLSearchParams({
+    client_id: env("DISCORD_CLIENT_ID"), redirect_uri: redirectUri(),
+    response_type: "code", scope: "identify email", state: String(state),
+    prompt: "consent",
+  }).toString();
+}
+const discordExchange = (code) => twitch.postForm("https://discord.com/api/oauth2/token", {
+  client_id: env("DISCORD_CLIENT_ID"), client_secret: env("DISCORD_CLIENT_SECRET"),
+  code: String(code), grant_type: "authorization_code", redirect_uri: redirectUri(),
+});
+async function discordProfile(accessToken) {
+  const r = await fetch("https://discord.com/api/users/@me",
+    { headers: { Authorization: "Bearer " + accessToken } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.id) throw new Error("discord user failed");
+  return {
+    key: String(j.id), login: String(j.username || ""),
+    name: String(j.global_name || j.username || ""),
+    email: String(j.email || "").toLowerCase(),
+    /* Discord marca `verified` quando o e-mail foi confirmado por eles —
+     * mesmo privilégio de vínculo por e-mail do Google. */
+    emailVerified: j.verified === true,
+  };
+}
+
 module.exports = {
-  redirectUri, googleConfigured, twitchConfigured,
+  redirectUri, googleConfigured, twitchConfigured, discordConfigured,
   newLoginState, takeLoginState,
   googleAuthUrl, googleExchange, googleProfile,
   twitchAuthUrl, twitchExchange, twitchLoginProfile,
+  discordAuthUrl, discordExchange, discordProfile,
 };

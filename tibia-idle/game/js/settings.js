@@ -13,6 +13,7 @@ const ClientSettings = {
 };
 
 let _cfgTab = "settings"; // aba ativa sobrevive a re-renderizações
+let _cfgProviders = null; // /api/auth/providers — OAuth Discord no card social
 
 function loadClientSettings() {
   try {
@@ -150,8 +151,11 @@ function _cfgAccountPanelHtml(account) {
     ? _cfgBadge(true, "Ativado") : _cfgBadge(false, "Desativado");
   const igBadge = soc.instagram
     ? _cfgBadge(true, "@" + _esc(soc.instagram)) : _cfgBadge(false, "Não vinculado");
-  const dcBadge = soc.discord
-    ? _cfgBadge(true, _esc(soc.discord)) : _cfgBadge(false, "Não vinculado");
+  const dcVerified = !!soc.discordVerified;
+  const dcBadge = dcVerified
+    ? _cfgBadge(true, "✓ " + _esc(soc.discord))
+    : (soc.discord ? _cfgBadge(true, _esc(soc.discord)) : _cfgBadge(false, "Não vinculado"));
+  const dcOauth = !!(_cfgProviders && _cfgProviders.discord);
   return `
     <div class="cfgm-card">
       <div class="cfgm-card-top">
@@ -207,11 +211,22 @@ function _cfgAccountPanelHtml(account) {
       <div class="cfgm-card-top">
         <span class="cfgm-card-title">Discord ${dcBadge}</span>
       </div>
+      ${dcOauth ? `
+      <div class="cfgm-fields">
+        <button type="button" class="cfgm-act ${soc.discord ? "is-danger-outline" : "is-primary"}" id="cfgm-dc-oauth">
+          ${soc.discord ? "Desvincular conta Discord" : "Conectar com Discord"}</button>
+      </div>
+      ${dcVerified ? "" : `
+      <div class="cfgm-fields">
+        <input class="cfgm-input" type="text" id="cfgm-dc" maxlength="60" value="${_esc(soc.discord || "")}" placeholder="usuario ou usuario#0000">
+        <button type="button" class="cfgm-act ${soc.discord ? "is-danger-outline" : ""}" id="cfgm-dc-btn">
+          ${soc.discord ? "Remover handle" : "Salvar handle"}</button>
+      </div>`}` : `
       <div class="cfgm-fields">
         <input class="cfgm-input" type="text" id="cfgm-dc" maxlength="60" value="${_esc(soc.discord || "")}" placeholder="usuario ou usuario#0000">
         <button type="button" class="cfgm-act ${soc.discord ? "is-danger-outline" : "is-primary"}" id="cfgm-dc-btn">
           ${soc.discord ? "Desvincular" : "Vincular Discord"}</button>
-      </div>
+      </div>`}
       <p class="cfgm-hint">Usado pela equipe para eventos, sorteios e suporte da comunidade.</p>
     </div>
 
@@ -335,6 +350,23 @@ function _bindAccountPanel(body, account) {
   });
 
   /* ---- redes sociais ---- */
+  const dcOauth = document.getElementById("cfgm-dc-oauth");
+  if (dcOauth) dcOauth.addEventListener("click", async () => {
+    const linked = !!(account.socialLinks && (account.socialLinks.discord || account.socialLinks.discordVerified));
+    if (!linked) {
+      /* Vínculo verificado: OAuth na mesma aba — o callback devolve
+       * /?sso=<token> e o boot reentra na conta já com o nó social.discord. */
+      location.href = "/api/auth/discord?token=" + encodeURIComponent(token);
+      return;
+    }
+    dcOauth.disabled = true;
+    const r = await accountSocialLink(token, "discord", "", true);
+    dcOauth.disabled = false;
+    if (!r.ok) { _cfgFeedback(r.msg || "Falha ao desvincular.", true); return; }
+    account.socialLinks = r.social || {};
+    rerender();
+    _cfgFeedback("Conta Discord desvinculada.");
+  });
   [["ig", "instagram"], ["dc", "discord"]].forEach(([key, provider]) => {
     const btn = document.getElementById("cfgm-" + key + "-btn");
     if (!btn) return;
@@ -416,7 +448,10 @@ function openConfigModal() {
 
   if (hasSession) {
     const token = sessionToken();
-    accountMe(token).then((r) => {
+    const prPromise = (typeof accountAuthProviders === "function")
+      ? accountAuthProviders().catch(() => ({})) : Promise.resolve({});
+    Promise.all([accountMe(token), prPromise]).then(([r, pr]) => {
+      _cfgProviders = pr || {};
       const panel = body.querySelector("#cfgm-panel-account");
       if (!panel || !modal.classList.contains("show")) return;
       const account = (r && r.ok && r.account) ? r.account : {};

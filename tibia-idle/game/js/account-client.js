@@ -2421,8 +2421,11 @@ async function accountPhoneVerify(token, code) {
   const r = await _api("POST", "/api/account/phone/verify", { token: token || "", code: code || "" });
   return r.data || { ok: false, msg: "Falha ao confirmar" };
 }
-async function accountSocialLink(token, provider, handle) {
-  const r = await _api("POST", "/api/account/social", { token: token || "", provider: provider || "", handle: handle || "" });
+async function accountSocialLink(token, provider, handle, unlinkOauth) {
+  const r = await _api("POST", "/api/account/social", {
+    token: token || "", provider: provider || "", handle: handle || "",
+    ...(unlinkOauth ? { unlinkOauth: true } : {}),
+  });
   return r.data || { ok: false, msg: "Falha ao salvar" };
 }
 
