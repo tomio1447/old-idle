@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — E-mail transacional com template temático + SMTP Cloudflare
+
+- `server/mailer.js` reescrito: o e-mail de código (verificação e recuperação) agora usa template HTML temático — pergaminho/selo de cera (`imagens/backconfirmemail.png`) embutido como CID, wordmark GLOBAL-IDLE dourado, card escuro com o código de 6 dígitos em gold monospace.
+- Compatibilidade de clientes: `background=` no `<td>` (maioria), bloco **VML** (`v:rect`/`v:fill`) pro Outlook desktop, `bgcolor` fallback quando imagens são bloqueadas.
+- `.env.example` documenta o bloco `SMTP_*` com a config Cloudflare Email (`smtp.mx.cloudflare.net:465`, user `api_token`).
+
+---
+
+
 ## 2026-11-25 — Modais de conta com a estética da cidade
 
 - O modal "Confirmar e-mail" (e os irmãos do fluxo de conta: criar, reparar, recuperar senha) usava o tema slate/roxo do global-idle — inputs azulados com foco roxo e card arredondado frio.
