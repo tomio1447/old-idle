@@ -676,6 +676,15 @@ function accountAuthorityVisualState(){
       selfV.pvpRegroup=1;
       combat._pvpRegroup=0;
     }
+    // PUSH (drag): intent persistente — vai no char pilotado até a
+    // autoridade executar/cancelar (pvp-push / pvp-push-fail limpam
+    // combat._pvpPush no cliente). O servidor substitui o pendente se
+    // chegar um novo drag (setNextActionPushTask).
+    if(combat._pvpPush&&out.players.length){
+      const pp=combat._pvpPush;
+      const selfV=out.players.find((v)=>v.self)||out.players[0];
+      selfV.push={id:String(pp.id),cx:pp.cx,cy:pp.cy};
+    }
   }
   // Dança da Scarlett: fila de intents (vários press entre ticks não se
   // sobrescrevem mais — o servidor julga um a um na ordem).

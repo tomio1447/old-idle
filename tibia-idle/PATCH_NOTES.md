@@ -4,6 +4,40 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Drag-to-push no PvP (Canary) + fim da câmera no aliado
+
+- **Nova mecânica**: arrastar um char pra um SQM adjacente **empurra** ele
+  1 tile — o `playerMoveThing`/`playerMoveCreature` do Canary:
+  - `pushDelay=1000ms`: o push cai ~1s depois do drag; novo drag substitui
+    o pendente (`setNextActionPushTask` cancela o anterior);
+  - à distância o pusher **anda até o alvo** e a tentativa re-avalia a
+    cada 600ms (autowalk via `walkGoal` no cliente); timeout de 15s;
+  - destino tem que ser adjacente **ao alvo**, caminhável e sem criatura
+    em cima ("not enough room");
+  - **PZ**: alvo em safezone só pode ser empurrado pra dentro de
+    safezone; safezone inimiga continua proibida; **rooted** não é
+    empurrável;
+  - desvio consciente: `pushWhenAttacking=false` faria cast cancelar o
+    push — no auto-combate o push nunca cairia; aqui cast não cancela
+    (equivale a rodar com `pushWhenAttacking=true`).
+- **Removido**: clicar num aliado/AFK selecionava o char e a **câmera
+  passava a seguir ele** (`_pvpSelChar`) — a mecânica sai nos dois lados
+  (clique em `pvp-ui.js` + branch da câmera em `grid.js`).
+- Engine: `input.push` sanitizado no `normalizeVisualState`; o self
+  agenda `_pushReq` em `syncAuthorityVisualState`; `pvpPushTick` (dentro
+  de `pvpBattleTick`) julga delay/distância/destino/PZ/rooted e emite
+  `pvp-push` / `pvp-push-fail` (com `reason` pro cliente).
+- Cliente: `pointerdown`/`pointerup` no canvas detectam o gesto; soltar
+  adjacente grava `combat._pvpPush` que viaja no visual do char pilotado
+  (`pos.push`); o click pós-drag é suprimido; click-walk manual cancela
+  o push pendente; `pvp-push` renderiza o POFF oficial e limpa o estado;
+  `pvp-push-fail` mostra o motivo num floater.
+- Arrastar o **próprio** char equivale a andar até o tile (self-move do
+  Canary — vira `walkGoal`, nem chega a agendar push).
+- Teste novo: `tools/test_pvp_push.js` — delay/retentativa/timeout,
+  destino inválido (range/room), regra de PZ nos dois sentidos, rooted,
+  self-push, transporte do input e remoção da mecânica antiga.
+
 ## 2026-11-25 — Guerra de Venore: times que não saíam da safezone
 
 - **Bug**: na arena `venore_town` (modo control) os dois times nasciam

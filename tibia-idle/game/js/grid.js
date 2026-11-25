@@ -118,19 +118,11 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
     const me = typeof pvpMyAccountId === "function" ? pvpMyAccountId() : 0;
     const ownAcc = (e) => me && e && e.p &&
       Number(e.accountId !== undefined ? e.accountId : (e.p && e.p.accountId)) === me;
-    /* Câmera no char SELECIONADO (_pvpSelChar, pvp-ui.js — clique no botão
-     * da coluna ou no char na arena). Sem seleção/char morto: primeiro
-     * vivo da conta como antes. */
-    const selId = typeof _pvpSelChar !== "undefined" && _pvpSelChar != null
-      ? String(_pvpSelChar) : "";
-    // O selecionado pode ser AFK do mesmo time (não só da própria conta).
+    /* Câmera segue o primeiro char vivo da própria conta (sem seleção
+     * manual — a mecânica de clique→câmera no aliado foi removida). */
     const myTeam = ((combat.players.find(ownAcc) || {}).pvpTeam) ||
       ((combat.players.find(ownAcc) || {}).team) || 0;
-    const mineOrAlly = (e) => ownAcc(e) ||
-      (myTeam && Number(e && (e.pvpTeam || e.team)) === myTeam);
-    focus = (selId && combat.players.find((e) =>
-        String(e.id) === selId && mineOrAlly(e) && Number(e.p.hp) > 0)) ||
-      combat.players.find((e) => ownAcc(e) && Number(e.p.hp) > 0) ||
+    focus = combat.players.find((e) => ownAcc(e) && Number(e.p.hp) > 0) ||
       combat.players.find((e) => myTeam && Number(e && (e.pvpTeam || e.team)) === myTeam && e.p && Number(e.p.hp) > 0) ||
       combat.players.find(ownAcc) || combat.player;
   }

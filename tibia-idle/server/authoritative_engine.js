@@ -1146,6 +1146,14 @@ function normalizeVisualState(raw,auth){
         if(Number.isFinite(wcx)&&Number.isFinite(wcy))
           item.wallTarget={cx:Math.round(wcx),cy:Math.round(wcy)};
       }
+      // Drag-to-push (Canary playerMoveThing): {push:{id,cx,cy}} — a célula
+      // de destino é adjacente ao alvo; a execução valida tudo no tick.
+      if(input.push&&typeof input.push==="object"){
+        const pid=String(input.push.id||"").slice(0,64),
+          pcx=Number(input.push.cx),pcy=Number(input.push.cy);
+        if(pid&&Number.isFinite(pcx)&&Number.isFinite(pcy))
+          item.push={id:pid,cx:Math.round(pcx),cy:Math.round(pcy)};
+      }
       if(input.pvpCtrl&&typeof input.pvpCtrl==="object"){
         item.pvpCtrl={chase:input.pvpCtrl.chase===undefined?1:(input.pvpCtrl.chase?1:0),
           mode:String(input.pvpCtrl.mode||"").slice(0,16)};
@@ -1369,6 +1377,16 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
             auth.pvpBattle.teams[team].targetId=tgt;
         }
       }
+    }
+    /* Drag-to-push (Canary playerMoveThing): arrastar um char pra um SQM
+     * adjacente agenda o empurrão — a execução (delay + validações) roda em
+     * pvpPushTick. Novo drag SUBSTITUI o pendente (setNextActionPushTask
+     * cancels o anterior); o eco do mesmo push não reseta o delay. */
+    if(pos.push&&auth.pvpBattle){
+      const cur=item._pushReq;
+      if(!cur||String(cur.id)!==String(pos.push.id)||cur.cx!==pos.push.cx||cur.cy!==pos.push.cy)
+        item._pushReq={id:String(pos.push.id),cx:pos.push.cx,cy:pos.push.cy,
+          at:Number(auth.clock)||Date.now()};
     }
     // TARGET OFF: desliga magias E runas de ataque só deste char (transiente,
     // não toca config.spellAttack salva) — a sequência de cooldowns fica
@@ -5660,6 +5678,8 @@ function pvpBattleTick(auth,now,dt){
   // Regroup (botão do painel): ordem de convergência do time, com
   // cooldown por conta.
   pvpProcessRegroupCalls(auth,now);
+  // Drag-to-push: empurrões pendentes (delay Canary + validações no tile).
+  pvpPushTick(auth,now);
   // Controle (Venore): domina quem tem mais chars vivos na zona; o placar
   // é o total de segundos de domínio (zona disputada/vazia não conta).
   if(String(pb.mode)==="control"&&pb.controlZone){
@@ -5697,6 +5717,68 @@ function pvpBattleStepBlocked(auth,ent,nx,ny){
   const t=pvpBattleTeamOf(ent);if(!t)return false;
   const enemy=pvpBattleSz(auth,t===1?2:1);
   return pvpBattleCellInRect(nx,ny,enemy);
+}
+/* ===================== PUSH (drag-to-push, Canary playerMoveThing) =====================
+ * Arrastar uma criatura pra um SQM adjacente empurra ela 1 tile. Regras
+ * fiéis ao Canary (game.cpp playerMoveCreature + config.lua.dist):
+ *  - pushDelay=1000ms: o push agenda e cai ~1s depois do drag (novo drag
+ *    substitui o pendente — setNextActionPushTask);
+ *  - à distância: o pusher anda até o alvo e a tentativa re-avalia a cada
+ *    600ms (o autowalk do char pilotado é client-side — walkGoal);
+ *  - toPos tem que ser adjacente ao alvo (throwRange=1), caminhável e
+ *    SEM criatura em cima ("not enough room");
+ *  - alvo em PZ só pode ser empurrado pra dentro de PZ
+ *    (ZONE_PROTECTION && !toTile PZ → cancel) — aqui PZ = safezones;
+ *  - sz inimiga: o empurrado obedece o mesmo bloqueio de passo;
+ *  - rooted (CONDITION_ROOTED) não é empurrável.
+ * Desvio consciente: pushWhenAttacking=false faria cast cancelar o push —
+ * no auto-combate (cast contínuo) o push nunca cairia; aqui cast não
+ * cancela (equivale a rodar com pushWhenAttacking=true). */
+const PVP_PUSH_DELAY_MS=1000,PVP_PUSH_RETRY_MS=600,PVP_PUSH_TIMEOUT_MS=15000;
+function pvpPushTick(auth,now){
+  const pb=auth&&auth.pvpBattle;if(!pb||pb.finished)return;
+  auth.events=auth.events||[];
+  for(const item of auth.players||[]){
+    const req=item&&item._pushReq;if(!req)continue;
+    if(!item.p||item.p.hp<=0||item.downUntil){item._pushReq=null;continue;}
+    const fail=(reason)=>{item._pushReq=null;
+      auth.events.push({t:"pvp-push-fail",sourceId:String(item.id),targetId:String(req.id),reason,
+        x:item.x,y:item.y,screen:true,ts:now});};
+    if(now-req.at>PVP_PUSH_TIMEOUT_MS){fail("noway");continue;}
+    if(now<req.at+PVP_PUSH_DELAY_MS)continue; // delay do push ainda correndo
+    const target=(auth.players||[]).find((o)=>o&&String(o.id)===String(req.id));
+    if(!target||!target.p||target.p.hp<=0||target.downUntil){fail("gone");continue;}
+    const tc=entityGridCell(target,auth),pc=entityGridCell(item,auth);
+    if(chebyshevCells(pc,tc)>1){
+      // Distância: o pusher precisa alcançar primeiro (autowalk no cliente)
+      // — re-avalia no ritmo do Canary (600ms).
+      req.at=now-PVP_PUSH_DELAY_MS+PVP_PUSH_RETRY_MS;continue;
+    }
+    const dx=req.cx-tc.cx,dy=req.cy-tc.cy,gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+    if(!dx&&!dy||Math.abs(dx)>1||Math.abs(dy)>1||
+      req.cx<0||req.cy<0||req.cx>=gw||req.cy>=gh){fail("range");continue;}
+    if(authorityCellBlocked(auth,req.cx,req.cy)){fail("room");continue;}
+    const occupied=(auth.players||[]).some((o)=>o!==target&&o.p&&o.p.hp>0&&
+        entityGridCell(o,auth).cx===req.cx&&entityGridCell(o,auth).cy===req.cy)||
+      (auth.mobs||[]).some((m)=>m&&m.hp>0&&m.cx===req.cx&&m.cy===req.cy);
+    if(occupied){fail("room");continue;}
+    // PZ: alvo dentro de safezone só sai pra outra safezone.
+    const inSz=pvpBattleCellInRect(tc.cx,tc.cy,pb.safezones&&pb.safezones[1])||
+      pvpBattleCellInRect(tc.cx,tc.cy,pb.safezones&&pb.safezones[2]);
+    const destSz=pvpBattleCellInRect(req.cx,req.cy,pb.safezones&&pb.safezones[1])||
+      pvpBattleCellInRect(req.cx,req.cy,pb.safezones&&pb.safezones[2]);
+    if(pb.pz&&inSz&&!destSz){fail("pz");continue;}
+    if(pvpBattleStepBlocked(auth,target,req.cx,req.cy)){fail("pz");continue;}
+    const rooted=target.p.conditions&&target.p.conditions.rooted;
+    if(rooted&&(Number(rooted.until)||0)>now){fail("rooted");continue;}
+    target.cx=req.cx;target.cy=req.cy;
+    snapAuthorityEntityToCell(auth,target);
+    target.walkAcc=0;
+    item._pushReq=null;
+    auth.events.push({t:"pvp-push",sourceId:String(item.id),targetId:String(target.id),
+      source:(item.p&&item.p.name)||"Player",target:(target.p&&target.p.name)||"Player",
+      x:target.x,y:target.y,screen:true,ts:now});
+  }
 }
 /* ===================== FIM GUILD PvP BATTLE ===================== */
 
@@ -10902,7 +10984,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   pvpBattleLeaderChar,pvpWallAt,pvpLosClear,pvpCastMagicWall,pvpProcessWallCalls,pvpProcessRegroupCalls,pvpWallRuneReady,authorityCellBlocked,
   sanitizePvpCtrl,pvpTryParalyze,pvpTryUeRunes,pvpEquipPreset,pvpSpellReady,pvpPrioritySpell,pvpAttackOffEff,
   PVP_BATTLE_PARALYZE_MS,PVP_PRIO_XBOW,PVP_PRIO_BOW,healPlayers,usePotion,pvpBattleGoal,
-  pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,
+  pvpBattleInSafezone,pvpBattleInAnySafezone,pvpBattleStepBlocked,pvpBattleStat,pvpPushTick,
   canPlayerDamagePlayer,livingHostilePlayers,playersAreAllies,applyPlayerPvpDamage,
   CURRENCY_GOLD,
   shareAccountGoldWallets,sharePartyCapacity,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,destroyAuthBagItem,setAuthAutoSupplyStash,setAuthLootConfig,

@@ -759,27 +759,7 @@ function pvpHandleCombatClick(cell) {
     !pvpIsOwnEnt(e, accId) && Number(e.pvpTeam || e.team) !== myTeam);
   const dist = (e) => Math.max(Math.abs(Number(e.cx) - cell.cx), Math.abs(Number(e.cy) - cell.cy));
   const hit = foes.filter((e) => dist(e) <= 1).sort((a, b) => dist(a) - dist(b))[0];
-  if (!hit) {
-    // Clique num char CONTROLÁVEL (vivo) na arena: seleciona — a câmera
-    // passa a seguir ele. Vale char próprio E AFK AI_HARD do mesmo time
-    // (os mesmos que o BCP comanda). Clicar de novo volta pro fallback.
-    const aiCtl = (c.pvpBattle && c.pvpBattle.aiControl) || {};
-    const mineHit = (c.players || []).filter((e) => e && e.p &&
-      Number(e.p.hp) > 0 && dist(e) === 0 &&
-      (pvpIsOwnEnt(e, accId) ||
-        (myTeam && Number(e.pvpTeam || e.team) === myTeam &&
-          aiCtl[String(e.id)] === "AI_HARD")))
-      .sort((a, b) => dist(a) - dist(b))[0];
-    if (mineHit) {
-      const id = String(mineHit.id);
-      _pvpSelChar = _pvpSelChar === id ? null : id;
-      if (typeof toast === "function" && _pvpSelChar)
-        toast(`Câmera seguindo <b>${pvpEsc(mineHit.p.name || "char")}</b>.`);
-      pvpActionsTick();
-      return true;
-    }
-    return false;
-  }
+  if (!hit) return false;
   // Só o líder da guild designa o alvo do time — o servidor também valida.
   const team = (c.pvpBattle.teams || {})[myTeam] || {};
   if (Number(team.leaderAccountId) !== accId) {
@@ -791,6 +771,61 @@ function pvpHandleCombatClick(cell) {
   if (typeof toast === "function")
     toast(c._pvpTeamTarget ? `Alvo do time: <b>${pvpEsc(hit.p.name || "inimigo")}</b>` : "Alvo do time liberado (IA escolhe).");
   return true;
+}
+
+/* ==================== DRAG-TO-PUSH (Canary playerMoveThing) ====================
+ * Arrastar um char pra um SQM adjacente empurra ele 1 tile. O drag é
+ * client-side; a execução (delay/validações) é toda da autoridade —
+ * o intent viaja no visual do char pilotado (`pos.push`).
+ * Regras do Canary espelhadas: empurrar o PRÓPRIO char = andar
+ * (self-move); push pendente à distância autowalka até o alvo. */
+let _pvpDragEnt = null;
+/* pointerdown na arena: registra o char vivo sob a célula (qualquer time). */
+function pvpDragStart(cell) {
+  _pvpDragEnt = null;
+  const c = typeof G !== "undefined" && G && G.combat;
+  if (!c || !c.pvpBattle || !cell) return;
+  const ent = (c.players || []).find((e) => e && e.p && Number(e.p.hp) > 0 &&
+    Math.round(Number(e.cx)) === cell.cx && Math.round(Number(e.cy)) === cell.cy);
+  if (ent) _pvpDragEnt = String(ent.id);
+}
+/* pointerup: soltou num SQM adjacente ao char arrastado → agenda o push.
+ * Retorna true se o gesto foi um drag (o click do mouseup é suprimido). */
+function pvpDragEnd(cell) {
+  const id = _pvpDragEnt; _pvpDragEnt = null;
+  const c = typeof G !== "undefined" && G && G.combat;
+  if (!c || !c.pvpBattle || !id || !cell) return false;
+  const ent = (c.players || []).find((e) => e && e.p && Number(e.p.hp) > 0 && String(e.id) === id);
+  if (!ent) return false;
+  const dx = cell.cx - Math.round(Number(ent.cx)), dy = cell.cy - Math.round(Number(ent.cy));
+  if ((!dx && !dy) || Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+    // Soltou longe/mesmo tile: não é push — deixa o click seguir normal.
+    return false;
+  }
+  const selfId = String((c.player && c.player.id) || "");
+  if (id === selfId) {
+    // Canary: arrastar o próprio char equivale a andar até o tile.
+    if (c.player) c.player.walkGoal = { cx: cell.cx, cy: cell.cy };
+    return true;
+  }
+  c._pvpPush = { id: id, cx: cell.cx, cy: cell.cy, at: Date.now() };
+  return true;
+}
+/* Tick client-side do push pendente: enquanto o char pilotado não alcança
+ * o alvo, autowalka até ele (o Canary faz o pusher "walk to the creature
+ * first"). Cancela quando o alvo morre/some, estoura o timeout, ou quando
+ * a autoridade responde (pvp-push / pvp-push-fail limpam _pvpPush). */
+function pvpPushClientTick(c) {
+  const pp = c && c._pvpPush;
+  if (!pp) return;
+  const now = Date.now();
+  const target = (c.players || []).find((e) => e && e.p && Number(e.p.hp) > 0 && String(e.id) === String(pp.id));
+  if (!target || now - pp.at > 15000) { c._pvpPush = null; return; }
+  const pl = c.player;
+  if (!pl || !pl.p || Number(pl.p.hp) <= 0) { c._pvpPush = null; return; }
+  const d = Math.max(Math.abs(Math.round(Number(pl.cx)) - Math.round(Number(target.cx))),
+                     Math.abs(Math.round(Number(pl.cy)) - Math.round(Number(target.cy))));
+  if (d > 1) pl.walkGoal = { cx: Math.round(Number(target.cx)), cy: Math.round(Number(target.cy)) };
 }
 
 /* ---------------------- Placar dentro da instância ---------------------- */
@@ -896,9 +931,6 @@ function pvpActMakeDraggable(el, grip) {
  * opções por vocação abrindo pra lateral. Estado local por char —
  * combat._pvpCharCtrl[id] viaja no visual da própria entrada. ---- */
 let _pvpCharOpen = null;
-/* Char SELECIONADO pra câmera — clicar no botão da coluna ou no próprio
- * char na arena muda o foco. Null = fallback (primeiro vivo da conta). */
-let _pvpSelChar = null;
 const PVP_VOC_COLORS = { knight: "#d96a5a", monk: "#e0a34a", sorcerer: "#5f9fd8", druid: "#63b06b", paladin: "#c9a35a" };
 function pvpVocBase(voc) {
   const v = String(voc || "").toLowerCase();
@@ -964,9 +996,8 @@ function pvpCharColTick(col) {
     const list = byVoc[bv], opts = PVP_CHAR_OPTS[bv] || [], open = _pvpCharOpen === bv;
     // Estado mostrado = do 1º char do grupo (todos convergem após 1 clique).
     const ctrl = pvpCharCtrl(c, String(list[0].id));
-    const hasSel = _pvpSelChar && list.some((e) => String(e.id) === _pvpSelChar);
     html += `<div class="pvp-char-slot${open ? " open" : ""}">` +
-      `<button class="pvp-char-btn${hasSel ? " sel" : ""}" data-voc="${bv}" title="BCP ${PVP_VOC_SHORT[bv]} — ${list.length} controlado(s)"` +
+      `<button class="pvp-char-btn" data-voc="${bv}" title="BCP ${PVP_VOC_SHORT[bv]} — ${list.length} controlado(s)"` +
       ` style="border-color:${PVP_VOC_COLORS[bv] || "#5a4a33"}">` +
       `<i class="pvp-voc-n">${list.length}</i>${PVP_VOC_SHORT[bv]}</button>`;
     if (open) {
@@ -1095,14 +1126,9 @@ function pvpActionsTick() {
   const inBattle = !!st && !st.finished;
   if (!inBattle) {
     pvpHkClosePopups();
-    _pvpSelChar = null; _pvpCharOpen = null;
+    _pvpCharOpen = null;
     if (_pvpActionsEl) _pvpActionsEl.style.display = "none";
     return;
-  }
-  // Char selecionado morreu → câmera volta pro fallback automático.
-  if (_pvpSelChar) {
-    const e = (c.players || []).find((x) => String(x.id) === _pvpSelChar);
-    if (!e || !e.p || Number(e.p.hp) <= 0) _pvpSelChar = null;
   }
   if (!_pvpActionsEl) {
     const el = document.createElement("div");

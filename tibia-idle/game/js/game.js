@@ -4339,6 +4339,34 @@ function drainEvents() {
         addLog("level", `Annihilator completa — escolha sua recompensa!`);
         break;
       }
+      case "pvp-push": {
+        // Drag-to-push executado pela autoridade: o alvo já foi teletransportado
+        // no descriptor — aqui só o efeito oficial CONST_ME_POFF no tile novo.
+        r.addEffect(ex(e), ey(e), "poff");
+        if (c && c._pvpPush && String(c._pvpPush.id) === String(e.targetId)) {
+          c._pvpPush = null;
+          if (c.player && c.player.walkGoal) c.player.walkGoal = null;
+        }
+        if (e.source && e.target)
+          addLog("party", `<b>${e.source}</b> empurrou <b>${e.target}</b>.`);
+        break;
+      }
+      case "pvp-push-fail": {
+        // O push pendente foi cancelado pela autoridade (target morreu, saiu
+        // de alcance, sala ocupada, PZ, rooted...). O Canary só manda uma
+        // mensagem pequena de retorno — floater no pusher + log curto.
+        const reasonTxt = {
+          noway: "sem caminho até o alvo", gone: "alvo indisponível",
+          range: "destino fora de alcance", room: "não há espaço",
+          pz: "zona protegida", rooted: "alvo enraizado",
+        }[String(e.reason)] || "empurrão cancelado";
+        r.addFloater(ex(e), ey(e), reasonTxt, "#e8b04a");
+        if (c && c._pvpPush && String(c._pvpPush.id) === String(e.targetId)) {
+          c._pvpPush = null;
+          if (c.player && c.player.walkGoal) c.player.walkGoal = null;
+        }
+        break;
+      }
 
     }
   }
@@ -6532,14 +6560,35 @@ function bindControls() {
   // (atrapalha a luta). Os menus internos (item/pouch/stash) previnem e
   // param a propagação nos próprios elementos; aqui só bloqueia o default.
   cv.addEventListener("contextmenu", (e) => e.preventDefault());
+  /* Drag-to-push (batalha PvP): pointerdown registra o char sob a célula;
+   * pointerup num SQM adjacente empurra. O click do mouseup é suprimido
+   * quando o gesto virou drag (não designa alvo nem anda). */
+  let _pvpSuppressClick = false;
+  cv.addEventListener("pointerdown", (e) => {
+    if (!G.combat || !G.combat.pvpBattle || typeof pvpDragStart !== "function") return;
+    const { mx, my } = canvasPos(e);
+    const cell = typeof canvasToCombatCell === "function" ? canvasToCombatCell(mx, my, cv.width, cv.height, G.combat) : null;
+    if (cell) pvpDragStart(cell);
+  });
+  cv.addEventListener("pointerup", (e) => {
+    if (!G.combat || !G.combat.pvpBattle || typeof pvpDragEnd !== "function") return;
+    const { mx, my } = canvasPos(e);
+    const cell = typeof canvasToCombatCell === "function" ? canvasToCombatCell(mx, my, cv.width, cv.height, G.combat) : null;
+    if (pvpDragEnd(cell)) _pvpSuppressClick = true;
+  });
   cv.addEventListener("click", (e) => {
+    if (_pvpSuppressClick) { _pvpSuppressClick = false; return; }
     if (G.combat) {
       const { mx, my } = canvasPos(e);
       const cell = typeof canvasToCombatCell === "function" ? canvasToCombatCell(mx, my, cv.width, cv.height, G.combat) : null;
       // Batalha PvP: clique num inimigo define o alvo do time inteiro.
       if (G.combat.pvpBattle && cell && typeof pvpHandleCombatClick === "function" && pvpHandleCombatClick(cell)) return;
       if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p) && G.combat.questId !== "annihilator") return;
-      if (cell && G.combat.player) G.combat.player.walkGoal = cell;
+      if (cell && G.combat.player) {
+        // Clique-walk manual cancela um push pendente (novo destino escolhido).
+        if (G.combat._pvpPush) G.combat._pvpPush = null;
+        G.combat.player.walkGoal = cell;
+      }
       return;
     }
     if (!G.inCity) return;

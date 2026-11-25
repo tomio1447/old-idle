@@ -625,6 +625,9 @@ function manualThinkStep(c, p, occ, now) {
 function updateGridMovement(c, p, dt, now) {
   if (!c.player) return;
   now = now || Date.now();
+  // Push pendente (drag-to-push): autowalka o char pilotado até o alvo
+  // distante — o Canary faz o pusher "walk to the creature first".
+  if (c.pvpBattle && typeof pvpPushClientTick === "function") pvpPushClientTick(c);
   const activeAlive = (!c.player.p || c.player.p.hp > 0) && (!p || p.hp > 0);
   if (activeAlive) {
     ensureCell(c.player);
