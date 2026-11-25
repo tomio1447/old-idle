@@ -7925,7 +7925,7 @@ function initAccountLogin() {
       if (typeof accountAuthProviders !== "function") return;
       const pr = await accountAuthProviders();
       if (!pr || (!pr.google && !pr.twitch && !pr.discord)) return;
-      renderOauthButtons(pr, $("#account-login"));
+      renderOauthButtons(pr, $("#acc-login-social"));
       renderOauthButtons(pr, $("#acc-tfa-social"));
     } catch (e) {}
   })();
@@ -7954,11 +7954,11 @@ function initAccountLogin() {
    * quando a conta tem e-mail cadastrado (fallback de celular perdido). */
   let _tfaTicket = null;
   function showTfaStep(tfa, hasEmail) {
-    const loginForm = $("#account-login-form");
+    const loginCard = $("#acc-login-card");
     const tfaForm = $("#account-tfa-form");
-    if (!loginForm || !tfaForm) return;
+    if (!loginCard || !tfaForm) return;
     _tfaTicket = { tfa, method: "totp" };
-    loginForm.style.display = "none";
+    loginCard.style.display = "none";
     tfaForm.style.display = "";
     const emailBtn = $("#acc-tfa-email");
     if (emailBtn) emailBtn.style.display = hasEmail ? "" : "none";
@@ -7980,7 +7980,7 @@ function initAccountLogin() {
     $("#acc-tfa-back").onclick = () => {
       _tfaTicket = null;
       tfaForm.style.display = "none";
-      $("#account-login-form").style.display = "";
+      $("#acc-login-card").style.display = "";
       msg("");
     };
     const emailBtn = $("#acc-tfa-email");
@@ -8008,7 +8008,7 @@ function initAccountLogin() {
         if (bootGen !== accountBootGeneration) return;
         if (!result.ok) {
           setStatus("error", result.msg || "Código inválido.");
-          if (result.expired) { _tfaTicket = null; tfaForm.style.display = "none"; $("#account-login-form").style.display = ""; }
+          if (result.expired) { _tfaTicket = null; tfaForm.style.display = "none"; $("#acc-login-card").style.display = ""; }
           return;
         }
         _tfaTicket = null;

@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=tfa-card-v1">
+  <link rel="stylesheet" href="css/layout.css?v=tfa-card-v2">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wod-cidade-v1">
@@ -150,6 +150,7 @@
       <div id="account-login">
         <!-- method=post + action=# + onsubmit: evita navegação nativa se
              o JS ainda não anexou preventDefault (senão o browser POST em /). -->
+        <div class="tfa-card auth-card">
         <form id="account-login-form" method="post" action="#" onsubmit="return false;">
           <div class="small dim center mb8" data-i18n="login.enter">Entre com sua conta para acessar seus personagens.</div>
           <div class="field">
@@ -171,6 +172,8 @@
           <button class="linklike mt8" id="acc-open-recover" type="button" data-i18n="login.forgot">Esqueci a senha</button>
           <div class="tiny dim center mt8" id="acc-msg"></div>
         </form>
+        <div id="acc-login-social"></div>
+        </div>
         <!-- 2º passo do login com 2FA ativo: código TOTP ou por e-mail.
              O bloco social aqui dentro é seguro: o servidor também exige
              TOTP no oauthFinish — não é bypass. -->
@@ -783,7 +786,7 @@
 <script src="js/guild-ui.js?v=guild-redesign-v1"></script>
 <script src="js/pvp-ui.js?v=deploy-2911-push"></script>
 <script src="js/preload.js?v=mounted-mask-v1"></script>
-<script src="js/game.js?v=tfa-card-v1"></script>
+<script src="js/game.js?v=tfa-card-v2"></script>
 <script src="js/scarlett-boss.js?v=deploy-2411-v1"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v2"></script>
 <script src="js/feast-of-souls.js?v=deploy-2411-v1"></script>
