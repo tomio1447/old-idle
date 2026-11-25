@@ -74,6 +74,95 @@ function clearInstanceSession(reason,localOnly) {
     accountEndInstance(sessionToken(),reason||"cleared").catch(()=>{});
 }
 
+/* ---------------- instância QUEBRADA → reload de volta pro mapa ----------------
+ * Quando a instância quebra (create nunca confirmado → watchdog 45s, ou
+ * rejeição definitiva do create), o cooldown já fica protegido pelos gates
+ * de engage — mas o jogador ainda caía no templo com a arena órfã. Aqui o
+ * cliente marca o mapa quebrado, dá location.reload() e, no boot, re-entra
+ * automaticamente no mesmo mapa com estado de cliente limpo.
+ * Marker: {charId,kind,huntId,bossId,instanceMode,reason,at,attempts,
+ * consumed}. `attempts` conta quebras do MESMO mapa (cap 2 re-entradas
+ * automáticas — a 3ª quebra manda pro templo em vez de loopar reload). */
+const BROKEN_INSTANCE_KEY = "tibia-idle-broken-instance-v1";
+const BROKEN_INSTANCE_MAX_REENTRY = 2;
+const BROKEN_INSTANCE_TTL_MS = 15 * 60 * 1000;
+function markBrokenInstance(reason) {
+  try {
+    const c = G && G.combat;
+    if (!c) return null;
+    // Fluxos próprios ficam de fora: world boss (lobby), batalha PvP
+    // (instância compartilhada) e quests (annihilator tem retorno próprio).
+    if (c.pvpBattle || c.worldBoss || (c.boss && c.boss.worldBoss) || c.questId) return null;
+    const huntId = c.huntId || null,
+      bossId = c.boss && (c.boss.id || c.boss.slug) ? String(c.boss.id || c.boss.slug) : null;
+    if (!huntId && !bossId) return null;
+    const charId = G.p && G.p.id != null ? String(G.p.id) : null;
+    let attempts = 1;
+    try {
+      const prev = JSON.parse(localStorage.getItem(BROKEN_INSTANCE_KEY) || "null");
+      if (prev && prev.charId === charId && prev.huntId === huntId && prev.bossId === bossId &&
+          Date.now() - (Number(prev.at) || 0) < BROKEN_INSTANCE_TTL_MS)
+        attempts = (Number(prev.attempts) || 1) + 1;
+    } catch (e) { /* marker anterior corrompido */ }
+    if (attempts > BROKEN_INSTANCE_MAX_REENTRY) {
+      try { localStorage.removeItem(BROKEN_INSTANCE_KEY); } catch (e) {}
+      return null;
+    }
+    const marker = { v: 1, charId, kind: bossId ? "boss" : "hunt", huntId, bossId,
+      instanceMode: c.instanceMode || (G.p && G.p.instanceMode) || "non-pvp",
+      reason: String(reason || "broken"), at: Date.now(), attempts, consumed: false };
+    localStorage.setItem(BROKEN_INSTANCE_KEY, JSON.stringify(marker));
+    return marker;
+  } catch (e) { return null; }
+}
+/* Marca + reload. Retorna true se o reload foi disparado — false cai no
+ * fluxo antigo (templo) como antes. */
+function reloadIntoBrokenInstance(reason) {
+  const marker = markBrokenInstance(reason);
+  if (!marker) return false;
+  clearInstanceSession(reason || "instance-broken", true);
+  try { localStorage.removeItem(INSTANCE_SESSION_KEY); } catch (e) {}
+  try { location.reload(); } catch (e) {}
+  return true;
+}
+/* No boot: se há marker fresco deste char, consome (consumed=true preserva
+ * o contador de tentativas) e re-entra no mapa quebrado. */
+function consumeBrokenInstanceReentry() {
+  try {
+    const marker = JSON.parse(localStorage.getItem(BROKEN_INSTANCE_KEY) || "null");
+    if (!marker || marker.consumed) return null;
+    if (Date.now() - (Number(marker.at) || 0) > BROKEN_INSTANCE_TTL_MS) {
+      localStorage.removeItem(BROKEN_INSTANCE_KEY); return null;
+    }
+    const charId = G.p && G.p.id != null ? String(G.p.id) : null;
+    if (!marker.charId || marker.charId !== charId) return null;
+    marker.consumed = true;
+    localStorage.setItem(BROKEN_INSTANCE_KEY, JSON.stringify(marker));
+    return marker;
+  } catch (e) { return null; }
+}
+function reenterBrokenInstance() {
+  const marker = consumeBrokenInstanceReentry();
+  if (!marker) return;
+  const label = marker.kind === "boss" && typeof BOSS_DEFS !== "undefined" && BOSS_DEFS[marker.bossId]
+    ? BOSS_DEFS[marker.bossId].name
+    : (marker.huntId && typeof GAMEDATA !== "undefined" && GAMEDATA.hunts[marker.huntId]
+        ? (GAMEDATA.hunts[marker.huntId].name || marker.huntId) : marker.huntId || marker.bossId);
+  if (typeof toast === "function")
+    toast(`A instância quebrou — voltando para <b>${label}</b>.`, "bad");
+  addLog("info", `Instância quebrada detectada (<b>${marker.reason}</b>). Reentrando em <b>${label}</b>.`);
+  if (marker.kind === "boss" && typeof startBoss === "function") {
+    // Arbaziloth pede o modo de novo — o resto (incl. lobbies Mega/Pale)
+    // resolve pelo próprio startBoss.
+    if (marker.bossId === "arbaziloth" && typeof arbazilothPickMode === "function") {
+      arbazilothPickMode(marker.bossId); return;
+    }
+    startBoss(marker.bossId); return;
+  }
+  if (marker.huntId && typeof startHunt === "function")
+    startHunt(marker.huntId, marker.instanceMode || "non-pvp");
+}
+
 function combatSessionParticipants(c) {
   if (c && c.players && c.players.length) return c.players.filter((e) => e && e.p);
   return G.p ? [{ id:G.p.id, name:G.p.name, p:G.p }] : [];
@@ -4782,6 +4871,10 @@ function confirmOnlineInstanceCreate(isBound,isCurrent){
       if(settled&&typeof accountInstanceActive==="function"&&accountInstanceActive())return;
       const rejected=typeof accountInstanceCreateRejection==="function"?accountInstanceCreateRejection():"";
       if(rejected){
+        // Instância quebrada: marca o mapa e recarrega de volta pra ele
+        // (fallback pro templo quando o mapa não é re-entrável).
+        if(typeof reloadIntoBrokenInstance==="function"&&
+           reloadIntoBrokenInstance("create-rejected:"+rejected))return;
         if(typeof toast==="function")toast(rejected+" Retornando ao templo.","bad");
         setTimeout(()=>{if(isCurrent()&&typeof stopHunt==="function")stopHunt(true);},0);
         return;
@@ -5875,6 +5968,10 @@ function requestOnlineAuthorityTick(){
       else if(Date.now()-G._instanceLostSince>45000){
         G._instanceLostSince=0;
         const orphan=G.combat;
+        // Instância quebrada: marca o mapa e recarrega de volta pra ele
+        // (fallback pro templo quando o mapa não é re-entrável).
+        if(typeof reloadIntoBrokenInstance==="function"&&
+           reloadIntoBrokenInstance("instance-create-timeout"))return;
         if(typeof clearInstanceSession==="function")clearInstanceSession("instance-create-timeout",true);
         if(typeof toast==="function")toast("O servidor não confirmou a instância. Retornando ao templo.","bad");
         setTimeout(()=>{if(G.combat===orphan)stopHunt(true);},0);
@@ -6463,6 +6560,8 @@ async function startGameReady(p) {
     startRuntime(null);
   } else {
     startRuntime(null);
+    // Instância quebrada no ciclo anterior → volta direto pro mapa.
+    setTimeout(()=>{if(typeof reenterBrokenInstance==="function")reenterBrokenInstance();},0);
   }
 }
 

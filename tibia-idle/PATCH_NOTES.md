@@ -4,6 +4,31 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Instância quebrada: reload de volta pro mapa
+
+- Antes: instância quebrada (create nunca confirmado → watchdog 45s, ou
+  rejeição definitiva) derrubava o jogador **no templo** — o cooldown já
+  estava protegido pelo gate de engage, mas a tentativa se perdia mesmo
+  assim.
+- Agora: ao detectar a quebra o cliente marca o mapa
+  (`tibia-idle-broken-instance-v1` no localStorage), limpa a sessão e dá
+  **location.reload()**. No boot, depois do carregamento do personagem,
+  o marker é consumido UMA vez e o jogo **re-entra automaticamente** no
+  mesmo mapa (hunt ou boss) com estado de cliente limpo.
+- **Anti-loop**: o marker conta quebras do mesmo mapa — máximo **2
+  re-entradas automáticas**; a 3ª quebra seguida manda pro templo como
+  antes (marker expira em 15min).
+- **Fora do fluxo** (mantêm o retorno ao templo): world boss (lobby
+  próprio), batalha PvP (instância compartilhada) e quests (annihilator
+  já tem retorno ao lobby). Arbaziloth reabre a escolha de modo;
+  Megalomania/Pale Worm reabrem o lobby pelo próprio `startBoss`.
+- Proteção do cd inalterada: marker+reload não passa por `stopHunt`, e o
+  gate `authMarkBossEngaged`/`bossFightEngaged` continua garantindo que
+  instância quebrada nunca carimba `lastFight`.
+- Teste novo: `tools/test_broken_instance_reentry.js` — marker/reload,
+  exclusões (pvp/world boss/quest), consumo único no boot, cap anti-loop
+  e marker de outro char/vencido.
+
 ## 2026-11-29 — Drag-to-push no PvP (Canary) + fim da câmera no aliado
 
 - **Nova mecânica**: arrastar um char pra um SQM adjacente **empurra** ele
