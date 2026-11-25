@@ -1051,6 +1051,12 @@ function authorityPlayerTarget(auth,item,living){
     const add=list.find((mob)=>!mob.boss);if(add)return add;
     return null;
   }
+  // Brain Head: enquanto houver Cerebellum vivo o boss se cura de todo
+  // dano — o Helper foca os Cerebellum primeiro (mesma regra do cliente).
+  if(auth.bh&&brainHeadCerebellumAlive(auth)){
+    const cer=list.filter((mob)=>mob.brainHeadAdd);
+    if(cer.length)return densestPackTarget(auth,item,cer)||cer[0];
+  }
   const boss=list.find((mob)=>mob.boss);
   const bossFight=!!(auth.kind==="boss"||auth.bossId||auth.worldBoss||boss);
   if(boss&&bossFight&&!boss.greedImmune&&!boss.qteImmune&&!boss.megaImmune)return boss;
@@ -2697,6 +2703,16 @@ function applyOutgoingDamage(mob,element,dmg,now,piercePct){
   const agMul=Number(mob&&mob.def&&mob.def.damageTakenMul);
   if(agMul===0)return 0;
   if(agMul>0&&agMul!==1)out=Math.max(1,Math.floor(out*agMul));
+  /* Brain Head (Feast of Souls): enquanto houver Cerebellum vivo, eles
+   * "doam" vida — o dano que o boss sofre é curado no mesmo instante (o
+   * floater de dano aparece e a cura o anula; hp nunca desce). A flag
+   * mob.brainHeal é sincronizada a cada step em syncBossImmunityFlags e
+   * _bhHeal é drenado em brainheadTick (o mob._auth nem sempre existe
+   * quando o boss veio do state e não de makeMob). */
+  if(out>0&&mob&&mob.boss&&mob.brainHeal){
+    mob.hp+=out;
+    mob._bhHeal=(Number(mob._bhHeal)||0)+out;
+  }
   return out;
 }
 function itemTypeOf(it){return String((it&&(it.t||it.type))||"");}
@@ -7279,6 +7295,28 @@ function arenaBossDeferSpawn(auth,boss,delayMs){
   auth.events.push({t:"boss-spawn-wait",ms:wait,at:auth.arenaBossSpawn.at,screen:true,ts:auth.clock});
   return true;
 }
+/* Brain Head (Feast of Souls): boss estático em {1024,1027,7} e 8
+ * Cerebellum estáticos "doam" vida — enquanto houver um vivo, todo dano
+ * que o boss sofre é curado de volta (ver applyOutgoingDamage).
+ * Offsets relativos à célula do boss (a sala é fixa, o boss não anda). */
+const BRAINHEAD_CEREBELLA=[[-1,-1],[1,-1],[1,1],[-1,1],[-8,-5],[7,-5],[-7,8],[7,6]];
+function brainHeadCerebellumAlive(auth){
+  if(!auth||!auth.bh)return false;
+  return (auth.mobs||[]).some((m)=>m&&m.brainHeadAdd&&m.hp>0);
+}
+/* Drena a cura acumulada do Brain Head em evento mobheal (um por step). */
+function brainheadTick(auth,now){
+  if(!auth||!auth.bh)return;
+  for(const m of auth.mobs||[]){
+    const healed=Number(m&&m._bhHeal)||0;
+    if(healed<=0)continue;
+    m._bhHeal=0;
+    auth.events=auth.events||[];
+    auth.events.push({t:"mobheal",heal:healed,x:Number(m.x)||.5,y:Number(m.y)||.5,
+      targetId:String(m.id||""),screen:true,brainHeadHeal:true,
+      ts:now||auth.clock||Date.now()});
+  }
+}
 /* Liga mecânicas só com boss vivo em auth.mobs (pós delay). Mega usa caminho próprio. */
 function arenaBossBindMechanics(auth,now){
   if(!auth||!auth.bossId)return false;
@@ -7318,6 +7356,27 @@ function arenaBossBindMechanics(auth,now){
     auth.scarlett={immune:true,phase:"waiting",nextAt:now+5000+Math.floor(random(auth)*5001),
       thresholdIndex:0,thresholds:[0.75,0.50,0.25]};
     boss.qteImmune=true;
+  }
+  if(auth.bossId==="brain-head"&&!auth.bh){
+    auth.bh={startedAt:now};
+    // Boss estático na célula de spawn (oficial: não se move).
+    boss.speed=0;if(boss.def)boss.def=Object.assign({},boss.def,{speed:0});
+    boss.staticAttack=100;boss.noMove=true;
+    boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
+    const bx=Number(boss.cx)||0,by=Number(boss.cy)||0;
+    const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+    for(const [dx,dy] of BRAINHEAD_CEREBELLA){
+      const m=makeMob(auth,"cerebellum",false);if(!m)continue;
+      m.brainHeadAdd=true;m.exp=0;m.speed=0;
+      if(m.def)m.def=Object.assign({},m.def,{speed:0});
+      m.staticAttack=100;m.noMove=true;
+      const cell=claimSpawnCell(auth,bx+dx,by+dy);
+      m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/w;m.y=(m.cy+.5)/h;
+      m.sx=m.x;m.sy=m.y;
+      auth.mobs.unshift(m);
+      auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,
+        targetId:String(m.id),screen:true,ts:now});
+    }
   }
   // Grand Master Oberon: precisa ser derrotado 4 vezes. Cada morte revive
   // com HP cheio e invoca 4 falcons; a quarta é a morte real.
@@ -8243,10 +8302,11 @@ function tickScarlett(auth,now){
 }
 function syncBossImmunityFlags(auth){
   for(const m of auth.mobs||[]){
-    if(!m.boss){m.greedImmune=false;m.qteImmune=false;m.megaImmune=false;continue;}
+    if(!m.boss){m.greedImmune=false;m.qteImmune=false;m.megaImmune=false;m.brainHeal=false;continue;}
     m.greedImmune=!!(auth.greed&&auth.greed.immune);
     m.qteImmune=!!(auth.scarlett&&auth.scarlett.immune)||!!(auth.mega&&auth.mega.immune);
     m.megaImmune=!!(auth.mega&&auth.mega.immune);
+    m.brainHeal=!!(auth.bh&&brainHeadCerebellumAlive(auth));
   }
 }
 /* Spawna os ajudantes de Oberon ao redor do boss (2 Falcon Knights + 2
@@ -10115,6 +10175,7 @@ function step(auth,now,opts){if(auth.ended)return;
 
   bloodrottenTick(auth,now);
   unwelcomeTick(auth,now);
+  brainheadTick(auth,now);
   /* ---------- ATAQUE DOS MONSTROS (melee + skills) ---------- */
   for(const mob of auth.mobs){
     if(mob.def?.noAttack)continue;

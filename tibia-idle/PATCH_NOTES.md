@@ -4,6 +4,23 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-24 — Brain Head: mecânica oficial (Cerebellum que curam o boss)
+
+- **Boss estático** em `{1024,1027,7}` e **8 Cerebellum estáticos** nas
+  posições oficiais (4 adjacentes + 4 nos cantos da sala) — antes eram 4
+  posições próprias e o boss em `{1024,1028,7}`.
+- **A mecânica agora existe no servidor autoritativo**: antes só rodava
+  na sim local (`combat.js`) — online o boss era um mob comum e os
+  Cerebellum nunca spawnavam de verdade.
+- Enquanto houver Cerebellum vivo, todo dano que o Brain Head sofre é
+  **curado na hora** (`mob.brainHeal`, flag sincronizada por step; o
+  floater de dano aparece junto com o `mobheal` verde — "doação" dos
+  Cerebellum). Sem Cerebellum vivo o boss perde vida normalmente.
+- `authorityPlayerTarget`: o Helper foca os Cerebellum primeiro enquanto
+  eles estiverem vivos (mesma regra do cliente).
+- `tools/test_brainhead.js` agora cobre o engine: 8 spawns estáticos nas
+  posições, cura-on-hit e vulnerabilidade após matar os Cerebellum.
+
 ## 2026-11-24 — Melee oficial em TODO o bestiário (auditoria Canary)
 
 - **Bug**: a heurística `damage === max(skills)` que detectava "melee

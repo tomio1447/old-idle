@@ -1,8 +1,9 @@
 /* brain-head-boss.js — Boss Brain Head (Feast of Souls 250+).
  * Sala: game/maps/brainheadroom.otbm
- * Mecânica: 4 Cerebellum estáticos e imunes ao redor do boss. Enquanto
- * houver Cerebellum vivo, Brain Head não leva dano. Só depois o boss fica
- * vulnerável ao jogador e o helper.
+ * Mecânica oficial: o boss nasce estático em {1024,1027,7} e 8 Cerebellum
+ * estáticos "doam" vida para ele — todo dano que o Brain Head sofre é
+ * curado enquanto houver Cerebellum vivo. Para matar o boss é preciso
+ * eliminar os Cerebellum primeiro.
  */
 "use strict";
 
@@ -11,14 +12,18 @@ const CEREBELLUM_ID = "cerebellum";
 const BRAINHEAD_ROOM = {
   otbm: "brainheadroom",
   name: "Brain Head's Room",
-  center: { x: 1024, y: 1028, z: 7 },
+  center: { x: 1024, y: 1027, z: 7 },
   spawn: { x: 1024, y: 1034, z: 7 },
-  boss: { x: 1024, y: 1028, z: 7 },
+  boss: { x: 1024, y: 1027, z: 7 },
   cerebella: [
-    { x: 1024, y: 1025, z: 7 },
-    { x: 1027, y: 1028, z: 7 },
-    { x: 1024, y: 1031, z: 7 },
-    { x: 1021, y: 1028, z: 7 },
+    { x: 1023, y: 1026, z: 7 },
+    { x: 1025, y: 1026, z: 7 },
+    { x: 1025, y: 1028, z: 7 },
+    { x: 1023, y: 1028, z: 7 },
+    { x: 1016, y: 1022, z: 7 },
+    { x: 1031, y: 1022, z: 7 },
+    { x: 1017, y: 1035, z: 7 },
+    { x: 1031, y: 1033, z: 7 },
   ],
 };
 
