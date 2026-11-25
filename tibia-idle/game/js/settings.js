@@ -140,6 +140,15 @@ function _cfgBadge(ok, text) {
   return `<span class="cfgm-badge ${ok ? "is-ok" : "is-warn"}">${text}</span>`;
 }
 
+/* Ícones de marca dos cards — Discord usa o mesmo path Clyde do botão OAuth;
+ * o autenticador é o quadrado vermelho + cadeado do Oracle Authenticator. */
+const _CFG_ICONS = {
+  ig: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.4" fill="none" stroke="#E1306C" stroke-width="2"/><circle cx="12" cy="12" r="4.4" fill="none" stroke="#E1306C" stroke-width="2"/><circle cx="17.2" cy="6.8" r="1.5" fill="#E1306C"/></svg>`,
+  dc: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#5865F2" d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.6 1.25a18.27 18.27 0 0 0-5.5 0 12.6 12.6 0 0 0-.61-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.05 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.22-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.13c.13-.09.25-.19.37-.29a.07.07 0 0 1 .07-.01c3.93 1.8 8.18 1.8 12.06 0a.07.07 0 0 1 .07.01c.12.1.25.2.37.3a.08.08 0 0 1-.01.12c-.6.35-1.22.64-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.37 1.22 2a.08.08 0 0 0 .08.02 19.84 19.84 0 0 0 6.02-3.03.08.08 0 0 0 .03-.05c.5-5.18-.84-9.68-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42z"/></svg>`,
+  tfa: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><defs><linearGradient id="cfgOraGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5503a"/><stop offset="1" stop-color="#c74634"/></linearGradient></defs><rect x="1.6" y="1.6" width="20.8" height="20.8" rx="5" fill="url(#cfgOraGrad)"/><path fill="#fff" d="M12 5.6a3.4 3.4 0 0 0-3.4 3.4v1.9H7.6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-1V9A3.4 3.4 0 0 0 12 5.6zm-1.6 3.4a1.6 1.6 0 1 1 3.2 0v1.9h-3.2V9z"/><path fill="#c74634" d="M12 13.6a1.3 1.3 0 0 0-.65 2.43l-.3 1.47h1.9l-.3-1.47A1.3 1.3 0 0 0 12 13.6z"/></svg>`,
+};
+const _cfgIco = (name) => `<span class="cfgm-ico">${_CFG_ICONS[name] || ""}</span>`;
+
 function _cfgAccountPanelHtml(account) {
   const a = account || {};
   const soc = a.socialLinks || {};
@@ -190,7 +199,7 @@ function _cfgAccountPanelHtml(account) {
 
     <div class="cfgm-card">
       <div class="cfgm-card-top">
-        <span class="cfgm-card-title">Autenticação de 2 fatores (2FA) ${tfaBadge}</span>
+        <span class="cfgm-card-title">${_cfgIco("tfa")}Autenticação de 2 fatores (2FA) ${tfaBadge}</span>
         <button type="button" class="cfgm-act ${a.totpEnabled ? "is-danger-outline" : "is-primary"}" id="cfgm-tfa-toggle">
           ${a.totpEnabled ? "Desativar 2FA" : "Ativar 2FA"}</button>
       </div>
@@ -201,7 +210,7 @@ function _cfgAccountPanelHtml(account) {
     <div class="cfgm-card">
       <span class="cfgm-card-title">Redes sociais vinculadas</span>
       <div class="cfgm-card-top">
-        <span class="cfgm-card-title">Instagram ${igBadge}</span>
+        <span class="cfgm-card-title">${_cfgIco("ig")}Instagram ${igBadge}</span>
       </div>
       <div class="cfgm-fields">
         <input class="cfgm-input" type="text" id="cfgm-ig" maxlength="60" value="${_esc(soc.instagram || "")}" placeholder="@seu_usuario">
@@ -209,7 +218,7 @@ function _cfgAccountPanelHtml(account) {
           ${soc.instagram ? "Desvincular" : "Vincular Instagram"}</button>
       </div>
       <div class="cfgm-card-top">
-        <span class="cfgm-card-title">Discord ${dcBadge}</span>
+        <span class="cfgm-card-title">${_cfgIco("dc")}Discord ${dcBadge}</span>
       </div>
       ${dcOauth ? `
       <div class="cfgm-fields">
