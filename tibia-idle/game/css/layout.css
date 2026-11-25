@@ -4503,6 +4503,21 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 .topbar-hero-btn--whatsapp svg { filter: drop-shadow(0 0 5px rgba(37, 211, 102, .65)); }
 .topbar-hero-btn--whatsapp .topbar-hero-label { color: #b8ffd4; font-size: 10px; letter-spacing: .4px; }
+/* Variante Discord (SUPORTE): mesmo quadrado, glow blurple da marca (#5865F2). */
+.topbar-hero-btn--discord {
+  text-decoration: none;
+  background: radial-gradient(circle at 50% 22%, rgba(60, 74, 168, .5) 0%, rgba(14, 16, 34, .94) 70%);
+  border-color: #5865F2;
+  box-shadow: 0 0 18px rgba(88, 101, 242, .35),
+              inset 0 1px 0 rgba(160, 170, 255, .22);
+}
+.topbar-hero-btn--discord:hover {
+  border-color: #8b96ff;
+  box-shadow: 0 0 28px rgba(88, 101, 242, .58),
+              inset 0 1px 0 rgba(190, 198, 255, .42);
+}
+.topbar-hero-btn--discord svg { filter: drop-shadow(0 0 5px rgba(88, 101, 242, .65)); }
+.topbar-hero-btn--discord .topbar-hero-label { color: #c9ceff; font-size: 10px; letter-spacing: .4px; }
 @media (max-width: 640px) {
   .topbar-hero { gap: 6px; right: 8px; }
   .topbar-hero-btn { gap: 2px; padding: 3px; }

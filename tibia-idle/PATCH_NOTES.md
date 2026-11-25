@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Botão SUPORTE (Discord) na topbar
+
+- Quadrado hero ao lado do WhatsApp: ícone oficial do Discord (SVG inline), glow blurple `#5865F2`, abre `https://discord.gg/nJeqFDrvP3` em nova aba.
+
+---
+
 ## 2026-11-26 — Autenticação em 2 fatores (TOTP + fallback por e-mail)
 
 - Login com 2FA ativo devolve `need2fa` + challenge efêmero (5 min, 5 tentativas, uso único); `/api/login/2fa` troca código TOTP (RFC 6238, janela ±1 passo) ou código de e-mail pela sessão.
