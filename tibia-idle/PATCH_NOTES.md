@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Autenticação em 2 fatores (TOTP + fallback por e-mail)
+
+- Login com 2FA ativo devolve `need2fa` + challenge efêmero (5 min, 5 tentativas, uso único); `/api/login/2fa` troca código TOTP (RFC 6238, janela ±1 passo) ou código de e-mail pela sessão.
+- Fallback "celular perdido": `/api/login/2fa/email` envia código de 6 dígitos (10 min, máx 3 envios por challenge) via `mailer.sendLoginCode` — e-mail próprio alertando que a senha pode ter vazado.
+- Gestão no painel da conta (botão "🔐"): setup gera segredo + QR (lib `qrcode`) + código manual; confirmar o 1º código ativa; desativar exige o código atual. Segredo pendente não interfere no login até confirmado.
+- Colunas novas em `accounts` (totp_secret/totp_enabled/tfa_code/tfa_code_expires) com helpers nas duas stores. Logins OAuth não passam pelo 2FA (provedor já autentica).
+- Deps: `qrcode@1.5.4` (QR do otpauth) e `nodemailer@7.0.10` (upgrade de segurança — advisories publicados cobrem até 10.1.3; uso aqui é de baixo risco: destinatários do banco + templates fixos).
+
+---
+
 ## 2026-11-26 — Turnstile: anti-bot na criação de conta
 
 - `POST /api/register` exige `captchaToken` verificado no siteverify da Cloudflare quando `TURNSTILE_SECRET` está configurada — bloqueia criação em massa e probing de logins (roda antes de qualquer consulta ao banco), enviando o IP real como `remoteip`.

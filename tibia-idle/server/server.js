@@ -918,6 +918,7 @@ function accountPublicView(acc){
     level:Math.max(1,Math.floor(Number(acc.level)||1)),
     email:String(acc&&acc.email||""),
     emailVerified:!!(acc&&acc.email_verified),
+    totpEnabled:!!(acc&&acc.totp_enabled),
     gold:Math.max(0,Math.floor(Number(acc.gold)||0)),
     vipUntil, vip:vipUntil>Date.now(),
     missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
@@ -1067,21 +1068,7 @@ function charSummaryWithGold(acc) {
   return (character) => accountCharacterSummary(character, gold);
 }
 
-async function login(db, body) {
-  const login = String(body.login || "").trim();
-  const password = String(body.password || "");
-  let acc = await db.findAccountByLogin(login);
-  if (!acc || !bcrypt.compareSync(password, acc.password_hash)) {
-    return { code: 401, body: { ok: false, msg: "Login ou senha inválidos" } };
-  }
-  // Ban ativo bloqueia o login (until=null = suspensão por tempo indeterminado).
-  if (typeof db.banActiveForAccount === "function") {
-    const ban = await db.banActiveForAccount(acc.id);
-    if (ban) return { code: 403, body: { ok: false, error: "ACCOUNT_BANNED",
-      msg: "Conta suspensa" + (ban.until ? " até " + new Date(ban.until).toLocaleDateString("pt-BR")
-        : " por tempo indeterminado") + (ban.reason ? ". Motivo: " + ban.reason : ""),
-      ban: { until: ban.until, reason: ban.reason } } };
-  }
+async function loginSessionPayload(db, acc) {
   acc = await ensureAccountWallet(db, acc);
   const token = newToken();
   // Novo login transfere a sessão e encerra streams/tickets anteriores antes
@@ -1098,6 +1085,171 @@ async function login(db, body) {
       characters: characters.map(charSummaryWithGold(acc)),
     },
   };
+}
+
+async function login(db, body) {
+  const login = String(body.login || "").trim();
+  const password = String(body.password || "");
+  let acc = await db.findAccountByLogin(login);
+  if (!acc || !bcrypt.compareSync(password, acc.password_hash)) {
+    return { code: 401, body: { ok: false, msg: "Login ou senha inválidos" } };
+  }
+  // Ban ativo bloqueia o login (until=null = suspensão por tempo indeterminado).
+  if (typeof db.banActiveForAccount === "function") {
+    const ban = await db.banActiveForAccount(acc.id);
+    if (ban) return { code: 403, body: { ok: false, error: "ACCOUNT_BANNED",
+      msg: "Conta suspensa" + (ban.until ? " até " + new Date(ban.until).toLocaleDateString("pt-BR")
+        : " por tempo indeterminado") + (ban.reason ? ". Motivo: " + ban.reason : ""),
+      ban: { until: ban.until, reason: ban.reason } } };
+  }
+  // 2FA: senha ok mas a conta exige segundo fator — emite challenge efêmero
+  // (5 min, 5 tentativas) em vez da sessão. Logins OAuth não passam aqui.
+  if (acc.totp_enabled && acc.totp_secret) {
+    const tfa = newToken();
+    tfaChallenges.set(tfa, { accId: acc.id, tries: 0,
+      exp: Date.now() + TFA_CHALLENGE_TTL_MS, emailsSent: 0 });
+    if (tfaChallenges.size > 4096) tfaChallenges.clear();
+    return { code: 200, body: { ok: true, need2fa: true, tfa,
+      hasEmail: !!String(acc.email || "") } };
+  }
+  return loginSessionPayload(db, acc);
+}
+
+/* ---- 2FA: TOTP (RFC 6238) + código por e-mail (fallback) -------------------
+ * Setup (logado): /api/account/2fa/setup gera segredo pendente + otpauth URI;
+ * /confirm valida o 1º código e ativa; /disable exige código válido.
+ * Login: /api/login com senha certa e 2FA ativo devolve need2fa+tfa
+ * (challenge de 5 min, 5 tentativas); /api/login/2fa troca challenge+código
+ * TOTP ou código de e-mail (login/2fa/email dispara o envio) pela sessão. */
+const TFA_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const TFA_CHALLENGE_MAX_TRIES = 5;
+const TFA_CODE_TTL_MS = 10 * 60 * 1000;
+const tfaChallenges = new Map();
+
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+function base32Encode(buf) {
+  let bits = 0, val = 0, out = "";
+  for (const b of buf) {
+    val = (val << 8) | b; bits += 8;
+    while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; }
+  }
+  if (bits > 0) out += B32[(val << (5 - bits)) & 31];
+  return out;
+}
+function base32Decode(str) {
+  const clean = String(str || "").toUpperCase().replace(/[^A-Z2-7]/g, "");
+  let bits = 0, val = 0; const out = [];
+  for (const ch of clean) {
+    val = (val << 5) | B32.indexOf(ch); bits += 5;
+    if (bits >= 8) { out.push((val >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return Buffer.from(out);
+}
+function totpCode(secret, stepOffset, atMs) {
+  const key = base32Decode(secret);
+  if (!key.length) return "";
+  const counter = Math.floor(Number(atMs || Date.now()) / 1000 / 30) + (stepOffset | 0);
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(counter));
+  const h = crypto.createHmac("sha1", key).update(msg).digest();
+  const off = h[19] & 0xf;
+  return String((((h[off] & 0x7f) << 24) | (h[off + 1] << 16) |
+    (h[off + 2] << 8) | h[off + 3]) % 1000000).padStart(6, "0");
+}
+function totpVerify(secret, code) {
+  const c = String(code || "").replace(/\D/g, "");
+  if (!secret || c.length !== 6) return false;
+  // janela ±1 passo (30s): tolera drift de relógio entre cliente e servidor.
+  for (const w of [-1, 0, 1]) if (totpCode(secret, w) === c) return true;
+  return false;
+}
+let QRCode = null;
+try { QRCode = require("qrcode"); } catch (e) { /* QR opcional — URI manual segue */ }
+
+function tfaChallenge(body) {
+  const key = String(body.tfa || "");
+  const ch = tfaChallenges.get(key);
+  if (!ch || ch.exp < Date.now()) { tfaChallenges.delete(key); return null; }
+  return { key, ch };
+}
+function tfaExpiredRes() {
+  return { code: 401, body: { ok: false, error: "TFA_EXPIRED",
+    msg: "Verificação expirada — faça login novamente." } };
+}
+async function login2fa(db, body) {
+  const c = tfaChallenge(body);
+  if (!c) return tfaExpiredRes();
+  if (++c.ch.tries > TFA_CHALLENGE_MAX_TRIES) {
+    tfaChallenges.delete(c.key);
+    return { code: 401, body: { ok: false, error: "TFA_EXPIRED",
+      msg: "Muitas tentativas — faça login novamente." } };
+  }
+  const acc = await db.findAccountById(c.ch.accId);
+  if (!acc) return tfaExpiredRes();
+  const code = String(body.code || "").trim();
+  const method = body.method === "email" ? "email" : "totp";
+  let ok = false;
+  if (method === "email") {
+    const stored = String(acc.tfa_code || "");
+    ok = !!stored && stored === code &&
+      Number(acc.tfa_code_expires || 0) > Date.now();
+    if (ok && typeof db.setAccountTfaCode === "function")
+      await db.setAccountTfaCode(acc.id, "", 0);
+  } else ok = totpVerify(acc.totp_secret, code);
+  if (!ok) return { code: 200, body: { ok: false, msg: "Código inválido." } };
+  tfaChallenges.delete(c.key);
+  return loginSessionPayload(db, acc);
+}
+async function login2faEmail(db, body) {
+  const c = tfaChallenge(body);
+  if (!c) return tfaExpiredRes();
+  const acc = await db.findAccountById(c.ch.accId);
+  if (!acc || !EMAIL_RE.test(String(acc.email || "")))
+    return { code: 200, body: { ok: false, msg: "Conta sem e-mail cadastrado." } };
+  if ((c.ch.emailsSent || 0) >= 3)
+    return { code: 200, body: { ok: false, msg: "Limite de envios — use o último código." } };
+  c.ch.emailsSent = (c.ch.emailsSent || 0) + 1;
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  if (typeof db.setAccountTfaCode === "function")
+    await db.setAccountTfaCode(acc.id, code, Date.now() + TFA_CODE_TTL_MS);
+  const sent = await mailer.sendLoginCode(acc.email, code, acc.login);
+  return { code: 200, body: { ok: true, emailSent: !!sent.ok,
+    msg: sent.ok ? "Código enviado para o e-mail da conta."
+      : "Falha ao enviar o e-mail. Tente novamente.",
+    ...(TEST_SERVER ? { devCode: code } : {}) } };
+}
+async function tfaSetup(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if (acc.totp_enabled)
+    return { code: 200, body: { ok: false, msg: "2FA já está ativo nesta conta." } };
+  const secret = base32Encode(crypto.randomBytes(20));
+  await db.setAccountTotp(acc.id, secret, 0);
+  const label = encodeURIComponent("Global-Idle:" + (acc.display_name || acc.login));
+  const uri = "otpauth://totp/" + label + "?secret=" + secret + "&issuer=Global-Idle";
+  let qr = null;
+  if (QRCode) { try { qr = await QRCode.toDataURL(uri, { margin: 1, width: 200 }); } catch (e) {} }
+  return { code: 200, body: { ok: true, secret, uri, qr } };
+}
+async function tfaConfirm(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if (!acc.totp_secret || acc.totp_enabled)
+    return { code: 200, body: { ok: false, msg: "Gere um novo código de ativação." } };
+  if (!totpVerify(acc.totp_secret, body.code))
+    return { code: 200, body: { ok: false, msg: "Código inválido — confira o app e tente de novo." } };
+  await db.setAccountTotp(acc.id, acc.totp_secret, 1);
+  return { code: 200, body: { ok: true, totpEnabled: true } };
+}
+async function tfaDisable(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if (!acc.totp_enabled)
+    return { code: 200, body: { ok: true, totpEnabled: false } };
+  if (!totpVerify(acc.totp_secret, body.code))
+    return { code: 200, body: { ok: false, msg: "Código inválido — informe o código atual do app." } };
+  await db.setAccountTotp(acc.id, null, 0);
+  return { code: 200, body: { ok: true, totpEnabled: false } };
 }
 
 /* ---- LOGIN SOCIAL (OAuth) -------------------------------------------
@@ -6542,6 +6694,31 @@ async function main() {
         const limited=rateLimit(req,"login",20,60000);if(limited)return send(res,limited.code,limited.body);
         const body = await readBody(req);
         const r = await login(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/login/2fa") {
+        const limited=rateLimit(req,"login-2fa",20,60000);if(limited)return send(res,limited.code,limited.body);
+        const r = await login2fa(db, await readBody(req));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/login/2fa/email") {
+        const limited=rateLimit(req,"login-2fa-email",6,600000);if(limited)return send(res,limited.code,limited.body);
+        const r = await login2faEmail(db, await readBody(req));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/account/2fa/setup") {
+        const limited=rateLimit(req,"2fa-setup",10,600000);if(limited)return send(res,limited.code,limited.body);
+        const r = await tfaSetup(db, await readBody(req));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/account/2fa/confirm") {
+        const limited=rateLimit(req,"2fa-confirm",20,600000);if(limited)return send(res,limited.code,limited.body);
+        const r = await tfaConfirm(db, await readBody(req));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/account/2fa/disable") {
+        const limited=rateLimit(req,"2fa-disable",20,600000);if(limited)return send(res,limited.code,limited.body);
+        const r = await tfaDisable(db, await readBody(req));
         return send(res, r.code, r.body);
       }
       if(req.method==="POST"&&url==="/api/logout"){

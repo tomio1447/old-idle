@@ -342,6 +342,22 @@ JsonStore.prototype.setAccountRecoveryCode = function (accountId, code, expiresA
   this._save();
   return a;
 };
+JsonStore.prototype.setAccountTotp = function (accountId, secret, enabled) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.totp_secret = secret == null ? null : String(secret);
+  a.totp_enabled = enabled ? 1 : 0;
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountTfaCode = function (accountId, code, expiresAt) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.tfa_code = String(code || "");
+  a.tfa_code_expires = Math.max(0, Math.floor(Number(expiresAt) || 0));
+  this._save();
+  return a;
+};
 JsonStore.prototype.setAccountPassword = function (accountId, hash) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
@@ -716,6 +732,7 @@ JsonStore.prototype.createAccount = function (login, hash, role, coins, email, d
                 email: String(email || "").slice(0, 120),
                 display_name: String(displayName || login).slice(0, 24),
                 email_verified: 0, email_code: "", email_code_expires: 0,
+                totp_secret: null, totp_enabled: 0, tfa_code: "", tfa_code_expires: 0,
                 role: role || "user", coins: coins || 0, gold: 0, gold_migrated: true,
                 level: 1, exp: 0,
                 vip_until: 0, market_gold: 0, cosmetics: {},
@@ -3111,6 +3128,7 @@ async function MysqlStore() {
         [login, hash, em, dn, role || "user", coins || 0]);
       return { id: r.insertId, login, password_hash: hash, email: em, display_name: dn,
         email_verified: 0, email_code: "", email_code_expires: 0,
+        totp_secret: null, totp_enabled: 0, tfa_code: "", tfa_code_expires: 0,
         role: role || "user", coins: coins || 0, level: 1, exp: 0,
         gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {}, tutorial: {}, cosmetics: {} };
     },
@@ -3611,6 +3629,16 @@ async function MysqlStore() {
     async setAccountPassword(accountId, hash) {
       await this.run("UPDATE accounts SET password_hash = ? WHERE id = ?",
         [String(hash || ""), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountTotp(accountId, secret, enabled) {
+      await this.run("UPDATE accounts SET totp_secret = ?, totp_enabled = ? WHERE id = ?",
+        [secret == null ? null : String(secret), enabled ? 1 : 0, Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountTfaCode(accountId, code, expiresAt) {
+      await this.run("UPDATE accounts SET tfa_code = ?, tfa_code_expires = ? WHERE id = ?",
+        [String(code || ""), Math.max(0, Math.floor(Number(expiresAt) || 0)), Number(accountId)]);
       return this.findAccountById(accountId);
     },
     async migrateAccountGold(accountId) {
@@ -6161,6 +6189,12 @@ async function ensureSchema(pool) {
     /* Recuperação de senha por e-mail (código de 6 dígitos, 10 min). */
     "ADD COLUMN recovery_code CHAR(6) DEFAULT NULL",
     "ADD COLUMN recovery_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0",
+    /* 2FA: segredo TOTP pendente/ativo + código de login por e-mail
+     * (fallback quando o jogador perde o autenticador). */
+    "ADD COLUMN totp_secret VARCHAR(64) DEFAULT NULL",
+    "ADD COLUMN totp_enabled TINYINT(1) NOT NULL DEFAULT 0",
+    "ADD COLUMN tfa_code CHAR(6) DEFAULT NULL",
+    "ADD COLUMN tfa_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0",
     /* Identidade pública (chat/ranking/perfil) + progresso da CONTA. */
     "ADD COLUMN display_name VARCHAR(24) DEFAULT NULL",
     "ADD COLUMN level INT UNSIGNED NOT NULL DEFAULT 1",

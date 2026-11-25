@@ -7405,6 +7405,7 @@ function initAccountLogin() {
             ? `<button class="gi-btn gi-btn--primary" id="acc-open-create-char">Criar personagem</button>`
             : `<button class="gi-btn gi-btn--danger" id="acc-logout">Logout</button>`}
           ${account.emailVerified ? "" : `<button class="gi-btn gi-btn--secondary" id="acc-verify-email">✉️ Confirmar e-mail</button>`}
+          <button class="gi-btn gi-btn--secondary" id="acc-2fa">🔐 ${account.totpEnabled ? "2FA ativo" : "Ativar 2FA"}</button>
           <button class="gi-btn gi-btn--secondary" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
           ${characters.length < ACCOUNT_MAX_CHARS
             ? `<button class="gi-btn gi-btn--danger" id="acc-logout">Logout</button>`
@@ -7477,6 +7478,8 @@ function initAccountLogin() {
     if (createCharBtn) createCharBtn.onclick = () => showCharacterCreator(token, account, characters);
     const verifyEmail = $("#acc-verify-email");
     if (verifyEmail) verifyEmail.onclick = () => showEmailVerify(token, account, characters);
+    const tfaBtn = $("#acc-2fa");
+    if (tfaBtn) tfaBtn.onclick = () => showTfaManage(token, account, characters);
     const customize=$("#acc-customize-char");
     if(customize)customize.onclick=()=>{
       if(typeof G==="undefined"||!G||!G.p){msg("Entre em um personagem antes de personalizá-lo.");return;}
@@ -7672,6 +7675,83 @@ function initAccountLogin() {
     };
   }
 
+  /* Painel de gestão do 2FA (TOTP). Fluxo de ativação: gera segredo no
+   * servidor → mostra QR + código manual → jogador confirma o 1º código
+   * do app → ativa. Desativar exige o código atual (autenticador presente). */
+  function showTfaManage(token, account, characters) {
+    const reopen = () => showPicker(token, account, characters);
+    const refresh = async () => {
+      const fresh = await accountMe(token);
+      if (fresh.ok) showPicker(token, fresh.account, fresh.characters || []);
+      else reopen();
+    };
+    if (account.totpEnabled) {
+      if (!openAccountModal(`
+        <div class="panel-title">Autenticação em 2 fatores
+          <span style="flex:1"></span><button class="sm" id="acc-tfa-m-close">✕</button>
+        </div>
+        <div class="panel-body account-flow-body">
+          <div class="tiny dim mb4">O 2FA está <b>ativo</b> nesta conta — todo login pede o código do app autenticador.</div>
+          <div class="field mt8"><label for="acc-tfa-m-code">Código atual do app (para desativar)</label>
+            <input id="acc-tfa-m-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+          <button class="danger full mt8" id="acc-tfa-m-disable">Desativar 2FA</button>
+          <div class="tiny dim center mt8" id="acc-tfa-m-msg"></div>
+        </div>`)) return;
+      $("#acc-tfa-m-close").onclick = reopen;
+      const btn = $("#acc-tfa-m-disable");
+      btn.onclick = async () => {
+        if (btn.disabled) return;
+        const code = ($("#acc-tfa-m-code").value || "").trim();
+        if (!/^\d{6}$/.test(code)) { $("#acc-tfa-m-msg").textContent = "Informe o código de 6 dígitos."; return; }
+        btn.disabled = true; $("#acc-tfa-m-msg").textContent = "Desativando...";
+        try {
+          const r = await account2faDisable(token, code);
+          if (!r.ok) { $("#acc-tfa-m-msg").textContent = r.msg || "Código inválido."; return; }
+          msg("2FA desativado."); refresh();
+        } finally { btn.disabled = false; }
+      };
+      return;
+    }
+    if (!openAccountModal(`
+      <div class="panel-title">Ativar autenticação em 2 fatores
+        <span style="flex:1"></span><button class="sm" id="acc-tfa-m-close">✕</button>
+      </div>
+      <div class="panel-body account-flow-body">
+        <div class="tiny dim mb4">Escaneie o QR com o autenticador (Google Authenticator, Aegis, 2FAS) ou digite o código manual. Depois confirme com o código de 6 dígitos gerado pelo app.</div>
+        <div class="tfa-qr" id="acc-tfa-m-qr"></div>
+        <div class="tfa-secret" id="acc-tfa-m-secret"></div>
+        <div class="field mt8"><label for="acc-tfa-m-code">Código do app</label>
+          <input id="acc-tfa-m-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+        <button class="primary full mt8" id="acc-tfa-m-confirm">Ativar 2FA</button>
+        <div class="tiny dim center mt8" id="acc-tfa-m-msg"></div>
+      </div>`)) return;
+    $("#acc-tfa-m-close").onclick = reopen;
+    const status = $("#acc-tfa-m-msg");
+    status.textContent = "Gerando código...";
+    (async () => {
+      const r = await account2faSetup(token);
+      const qrBox = $("#acc-tfa-m-qr"), secBox = $("#acc-tfa-m-secret");
+      if (!qrBox || !secBox) return;
+      if (!r.ok) { status.textContent = r.msg || "Falha ao gerar o código."; return; }
+      status.textContent = "";
+      if (r.qr) qrBox.innerHTML = `<img src="${r.qr}" alt="QR do autenticador" width="180" height="180">`;
+      else qrBox.innerHTML = `<div class="tiny dim">QR indisponível — use o código manual abaixo.</div>`;
+      secBox.textContent = r.secret || "";
+      const btn = $("#acc-tfa-m-confirm");
+      btn.onclick = async () => {
+        if (btn.disabled) return;
+        const code = ($("#acc-tfa-m-code").value || "").trim();
+        if (!/^\d{6}$/.test(code)) { status.textContent = "Informe o código de 6 dígitos do app."; return; }
+        btn.disabled = true; status.textContent = "Verificando...";
+        try {
+          const c = await account2faConfirm(token, code);
+          if (!c.ok) { status.textContent = c.msg || "Código inválido."; return; }
+          msg("2FA ativado! Guarde seu autenticador com cuidado."); refresh();
+        } finally { btn.disabled = false; }
+      };
+    })();
+  }
+
   $("#acc-open-register").addEventListener("click", openRegisterModal);
   const recoverBtn = $("#acc-open-recover");
   if (recoverBtn) recoverBtn.addEventListener("click", openRecoverModal);
@@ -7728,11 +7808,73 @@ function initAccountLogin() {
       const result = await accountLogin(login, pass);
       if (bootGen!==accountBootGeneration) return;
       if (!result.ok) { msg(result.msg || "Falha no login"); return; }
+      if (result.need2fa) { showTfaStep(result.tfa, result.hasEmail); return; }
       msg(""); showPicker(result.token, result.account, result.characters);
     } finally {
       button.disabled = false;
     }
   });
+
+  /* 2º passo do login com 2FA: troca o formulário pela tela de código.
+   * Método padrão = TOTP do autenticador; o link por e-mail aparece só
+   * quando a conta tem e-mail cadastrado (fallback de celular perdido). */
+  let _tfaTicket = null;
+  function showTfaStep(tfa, hasEmail) {
+    const loginForm = $("#account-login-form");
+    const tfaForm = $("#account-tfa-form");
+    if (!loginForm || !tfaForm) return;
+    _tfaTicket = { tfa, method: "totp" };
+    loginForm.style.display = "none";
+    tfaForm.style.display = "";
+    const emailBtn = $("#acc-tfa-email");
+    if (emailBtn) emailBtn.style.display = hasEmail ? "" : "none";
+    $("#acc-tfa-msg").textContent = "";
+    $("#acc-tfa-code").value = "";
+    $("#acc-tfa-code").focus();
+  }
+  (function wireTfaForm() {
+    const tfaForm = $("#account-tfa-form");
+    if (!tfaForm) return;
+    const status = () => $("#acc-tfa-msg");
+    $("#acc-tfa-back").onclick = () => {
+      _tfaTicket = null;
+      tfaForm.style.display = "none";
+      $("#account-login-form").style.display = "";
+      msg("");
+    };
+    const emailBtn = $("#acc-tfa-email");
+    if (emailBtn) emailBtn.onclick = async () => {
+      if (!_tfaTicket || emailBtn.disabled) return;
+      emailBtn.disabled = true;
+      status().textContent = "Enviando...";
+      try {
+        const r = await accountLogin2faEmail(_tfaTicket.tfa);
+        if (!r.ok) { status().textContent = r.msg || "Falha ao enviar."; return; }
+        _tfaTicket.method = "email";
+        status().textContent = r.msg + (r.devCode ? " (teste: " + r.devCode + ")" : "");
+      } finally { emailBtn.disabled = false; }
+    };
+    tfaForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const btn = $("#acc-btn-tfa");
+      if (!_tfaTicket || btn.disabled) return;
+      const code = ($("#acc-tfa-code").value || "").trim();
+      if (!/^\d{6}$/.test(code)) { status().textContent = "Informe o código de 6 dígitos."; return; }
+      btn.disabled = true; status().textContent = "Verificando...";
+      const bootGen = ++accountBootGeneration;
+      try {
+        const result = await accountLogin2fa(_tfaTicket.tfa, code, _tfaTicket.method);
+        if (bootGen !== accountBootGeneration) return;
+        if (!result.ok) {
+          status().textContent = result.msg || "Código inválido.";
+          if (result.expired) { _tfaTicket = null; tfaForm.style.display = "none"; $("#account-login-form").style.display = ""; }
+          return;
+        }
+        _tfaTicket = null;
+        msg(""); showPicker(result.token, result.account, result.characters);
+      } finally { btn.disabled = false; }
+    });
+  })();
 
   // Sessão existente em refresh: cobre a tela e entra direto no personagem
   // autoload (troca) — nunca mostra o formulário de login no meio.

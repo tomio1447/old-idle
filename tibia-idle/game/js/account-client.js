@@ -2352,29 +2352,66 @@ async function accountAuthProviders() {
   return r.data && r.data.ok ? r.data : { ok: false, google: false, twitch: false };
 }
 
-async function accountLogin(login, password) {
-  const r = await _api("POST", "/api/login", { login, password });
-  if (!r.data.ok) return { ok: false, msg: r.data.msg || "Falha no login" };
+/* Efeitos pós-login bem-sucedido: restaura sessão e injeta gold/coins/vip. */
+function _accountLoginSuccess(data) {
   ACCOUNT_UNAUTHORIZED_TOKEN="";
   ACCOUNT_LEASE.authFailUntil=0;
   if(ACCOUNT_UNAUTHORIZED_RELOAD){clearTimeout(ACCOUNT_UNAUTHORIZED_RELOAD);ACCOUNT_UNAUTHORIZED_RELOAD=null;}
   try{sessionStorage.removeItem("tibia-idle-session-expired");}catch(e){}
   try{window.dispatchEvent(new CustomEvent("tibia-idle-session-restored"));}catch(e){}
-  if(r.data.account){
-    if(typeof syncVipFromAccount==="function")syncVipFromAccount(r.data.account);
-    if(typeof accountSetGold==="function"&&r.data.account.gold!==undefined)
-      accountSetGold(Math.max(0,Number(r.data.account.gold)||0));
-    if(typeof accountSetCoins==="function"&&r.data.account.coins!==undefined)
-      accountSetCoins(Math.max(0,Number(r.data.account.coins)||0));
-    if(typeof accountSetCoinsNt==="function"&&r.data.account.coinsNt!==undefined)
-      accountSetCoinsNt(Math.max(0,Number(r.data.account.coinsNt)||0));
+  if(data.account){
+    if(typeof syncVipFromAccount==="function")syncVipFromAccount(data.account);
+    if(typeof accountSetGold==="function"&&data.account.gold!==undefined)
+      accountSetGold(Math.max(0,Number(data.account.gold)||0));
+    if(typeof accountSetCoins==="function"&&data.account.coins!==undefined)
+      accountSetCoins(Math.max(0,Number(data.account.coins)||0));
+    if(typeof accountSetCoinsNt==="function"&&data.account.coinsNt!==undefined)
+      accountSetCoinsNt(Math.max(0,Number(data.account.coinsNt)||0));
   }
   return {
     ok: true,
-    token: r.data.token,
-    account: r.data.account,
-    characters: r.data.characters || [],
+    token: data.token,
+    account: data.account,
+    characters: data.characters || [],
   };
+}
+
+async function accountLogin(login, password) {
+  const r = await _api("POST", "/api/login", { login, password });
+  if (!r.data.ok) return { ok: false, msg: r.data.msg || "Falha no login" };
+  // 2FA ativo na conta: servidor devolve challenge em vez da sessão.
+  if (r.data.need2fa) return { ok: true, need2fa: true,
+    tfa: r.data.tfa, hasEmail: !!r.data.hasEmail };
+  return _accountLoginSuccess(r.data);
+}
+
+/* 2º passo do login com 2FA: código TOTP do app ou código enviado por e-mail. */
+async function accountLogin2fa(tfa, code, method) {
+  const r = await _api("POST", "/api/login/2fa",
+    { tfa: tfa || "", code: code || "", method: method === "email" ? "email" : "totp" });
+  if (!r.data.ok) return { ok: false, msg: r.data.msg || "Código inválido",
+    expired: r.data.error === "TFA_EXPIRED" };
+  return _accountLoginSuccess(r.data);
+}
+
+/* Pede o envio do código de login por e-mail (fallback do TOTP). */
+async function accountLogin2faEmail(tfa) {
+  const r = await _api("POST", "/api/login/2fa/email", { tfa: tfa || "" });
+  return r.data || { ok: false, msg: "Falha ao enviar o código" };
+}
+
+/* Setup do 2FA no painel da conta (logado): segredo + QR + confirmação. */
+async function account2faSetup(token) {
+  const r = await _api("POST", "/api/account/2fa/setup", { token: token || "" });
+  return r.data || { ok: false, msg: "Falha ao gerar o código" };
+}
+async function account2faConfirm(token, code) {
+  const r = await _api("POST", "/api/account/2fa/confirm", { token: token || "", code: code || "" });
+  return r.data || { ok: false, msg: "Falha ao ativar" };
+}
+async function account2faDisable(token, code) {
+  const r = await _api("POST", "/api/account/2fa/disable", { token: token || "", code: code || "" });
+  return r.data || { ok: false, msg: "Falha ao desativar" };
 }
 
 async function accountMe(token) {

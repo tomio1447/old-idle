@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=turnstile-v1">
+  <link rel="stylesheet" href="css/layout.css?v=2fa-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wod-cidade-v1">
@@ -206,6 +206,18 @@
           </button>
           <button class="linklike mt8" id="acc-open-recover" type="button" data-i18n="login.forgot">Esqueci a senha</button>
           <div class="tiny dim center mt8" id="acc-msg"></div>
+        </form>
+        <!-- 2º passo do login com 2FA ativo: código TOTP ou por e-mail. -->
+        <form id="account-tfa-form" method="post" action="#" onsubmit="return false;" style="display:none">
+          <div class="small dim center mb8">Sua conta pede o código de verificação em 2 fatores.</div>
+          <div class="field">
+            <label for="acc-tfa-code">Código de 6 dígitos</label>
+            <input id="acc-tfa-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+          </div>
+          <button class="primary full mt8" id="acc-btn-tfa" type="submit">Verificar</button>
+          <button class="full mt8" id="acc-tfa-email" type="button" style="display:none">📧 Enviar código por e-mail</button>
+          <button class="linklike mt8" id="acc-tfa-back" type="button">← Voltar</button>
+          <div class="tiny dim center mt8" id="acc-tfa-msg"></div>
         </form>
       </div>
 
@@ -775,7 +787,7 @@
 <script src="js/announce.js?v=gm-panel-v1"></script>
 <script src="js/daily-boost.js?v=daily-boost-v2"></script>
 <script src="js/player-profile.js?v=guild-req-tab-v1"></script>
-<script src="js/account-client.js?v=turnstile-v1"></script>
+<script src="js/account-client.js?v=2fa-v1"></script>
 <script src="js/chat.js?v=chat-dock-v1"></script>
 <script src="js/marketdata.js?v=arcane-staff-v1"></script>
 <script src="js/market-ui.js?v=market-tier-v2"></script>
@@ -799,7 +811,7 @@
 <script src="js/guild-ui.js?v=guild-redesign-v1"></script>
 <script src="js/pvp-ui.js?v=deploy-2911-push"></script>
 <script src="js/preload.js?v=mounted-mask-v1"></script>
-<script src="js/game.js?v=turnstile-v1"></script>
+<script src="js/game.js?v=2fa-v1"></script>
 <script src="js/scarlett-boss.js?v=deploy-2411-v1"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v2"></script>
 <script src="js/feast-of-souls.js?v=deploy-2411-v1"></script>

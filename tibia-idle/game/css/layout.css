@@ -6962,6 +6962,20 @@ body.fullhd .party-panel.collapsed { width: auto; }
 }
 .account-flow-body .turnstile-wrap iframe { border-radius: 0; }
 
+/* 2FA: QR do autenticador + segredo para digitação manual. */
+.account-flow-body .tfa-qr {
+  display: flex; justify-content: center; margin: 8px 0;
+}
+.account-flow-body .tfa-qr img {
+  background: #fff; padding: 6px; border-radius: 4px;
+}
+.account-flow-body .tfa-secret {
+  font-family: monospace; font-size: 13px; letter-spacing: 1px;
+  text-align: center; color: #ffe680; word-break: break-all;
+  background: #1c1a16; border: 1px dashed #4b493e; padding: 6px 8px;
+  user-select: all;
+}
+
 /* --- títulos dos modais pré-login: faixa escura + dourado --- */
 .alpha-announce-box > .panel-title,
 .ui-mode-box > .panel-title {

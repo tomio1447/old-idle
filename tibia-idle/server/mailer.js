@@ -147,4 +147,16 @@ async function sendRecoveryCode(to, code, login) {
   return send(to, subject, text, html);
 }
 
-module.exports = { configured, sendVerificationCode, sendRecoveryCode };
+async function sendLoginCode(to, code, login) {
+  const subject = "Código de acesso (2FA) — Global-Idle";
+  const text = "Olá " + (login || "jogador") + ",\n\nSeu código de acesso é: " +
+    code + "\n\nEle expira em 10 minutos. Se você não tentou entrar, troque sua senha.";
+  const html = mailShell("CÓDIGO DE ACESSO",
+    "Olá <b>" + escapeHtml(login || "jogador") + "</b>,<br>" +
+    "alguém tentou entrar na sua conta Global-Idle. Seu código de acesso é:",
+    code,
+    "O código expira em <b>10 minutos</b>.<br>Se não foi você, <b>troque sua senha</b> — ela pode ter vazado.");
+  return send(to, subject, text, html);
+}
+
+module.exports = { configured, sendVerificationCode, sendRecoveryCode, sendLoginCode };
