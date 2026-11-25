@@ -136,8 +136,8 @@ function _bindSettingsPanel(body) {
 const _esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-function _cfgBadge(ok, okText, noText) {
-  return `<span class="cfgm-badge ${ok ? "is-ok" : "is-warn"}">${ok ? okText : noText}</span>`;
+function _cfgBadge(ok, text) {
+  return `<span class="cfgm-badge ${ok ? "is-ok" : "is-warn"}">${text}</span>`;
 }
 
 function _cfgAccountPanelHtml(account) {
@@ -394,10 +394,18 @@ function openConfigModal() {
     typeof accountMe === "function";
   if (!hasSession) _cfgTab = "settings";
 
+  /* Moldura "gi" da cidade: mesma do picker de personagens. Remove shells
+   * residuais antes de aplicar (convenção dos outros modais). */
+  body.classList.forEach((cls) => {
+    if (/(?:-shell|gi-picker)$/.test(cls)) body.classList.remove(cls);
+  });
+  body.classList.add("gi-picker");
   body.innerHTML = `
+    <span class="gi-corner gi-corner--tl"></span><span class="gi-corner gi-corner--tr"></span>
+    <span class="gi-corner gi-corner--bl"></span><span class="gi-corner gi-corner--br"></span>
     <div class="cfgm">
-      <header class="cfgm-header">
-        <h2 class="cfgm-title">${hasSession ? "Configurações & Conta" : t("config.title")}</h2>
+      <header class="gi-modal__header">
+        <h1 class="gi-modal__title">${hasSession ? "Configurações & Conta" : t("config.title")}</h1>
         <button type="button" class="cfgm-x" id="cfgm-close" aria-label="Fechar">✕</button>
       </header>
       ${hasSession ? `
@@ -413,14 +421,14 @@ function openConfigModal() {
           <div class="cfgm-hint">Carregando dados da conta...</div>
         </div>` : ""}
       </div>
-      <footer class="cfgm-footer">
-        ${hasSession ? `<button type="button" class="cfgm-logout" id="cfgm-logout">${t("config.logout")}</button>` : ""}
-        <button type="button" class="cfgm-done" id="cfgm-done">${t("config.close")}</button>
+      <footer class="gi-modal__footer">
+        ${hasSession ? `<button type="button" class="gi-btn gi-btn--danger" id="cfgm-logout">${t("config.logout")}</button>` : ""}
+        <button type="button" class="gi-btn gi-btn--secondary" id="cfgm-done">${t("config.close")}</button>
       </footer>
     </div>`;
   modal.classList.add("show");
 
-  const close = () => modal.classList.remove("show");
+  const close = () => { modal.classList.remove("show"); body.classList.remove("gi-picker"); };
   const closeBtn = document.getElementById("cfgm-close");
   const doneBtn = document.getElementById("cfgm-done");
   if (closeBtn) closeBtn.addEventListener("click", close);
