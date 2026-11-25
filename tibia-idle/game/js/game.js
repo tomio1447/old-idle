@@ -7309,6 +7309,12 @@ function initAccountLogin() {
     } catch (e) {}
     closeAccountModal();
     if (wasPlaying) { location.reload(); return; }
+    /* Reset dos passos do login: se a sessão foi aberta via 2FA, o card de
+     * login ficou escondido — restaura o estado inicial (login visível). */
+    const lc = $("#acc-login-card"), tf = $("#account-tfa-form");
+    if (lc) lc.style.display = "";
+    if (tf) tf.style.display = "none";
+    _tfaTicket = null;
     $("#login").style.display = "";
     $("#app").classList.remove("ready");
     msg("Logout realizado.");
@@ -8006,7 +8012,8 @@ function initAccountLogin() {
    * quando a conta tem e-mail cadastrado (fallback de celular perdido). */
   let _tfaTicket = null;
   function showTfaStep(tfa, hasEmail) {
-    const loginCard = $("#acc-login-card");
+    const loginCard = $("#acc-login-card") ||
+      ($("#account-login-form") ? $("#account-login-form").closest(".auth-card") || $("#account-login-form") : null);
     const tfaForm = $("#account-tfa-form");
     if (!loginCard || !tfaForm) return;
     _tfaTicket = { tfa, method: "totp" };
