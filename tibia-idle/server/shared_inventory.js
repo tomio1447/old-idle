@@ -295,7 +295,27 @@ function applySharedToPlayer(p, shared) {
   };
   const equipped = (Array.isArray(p.itemInstances) ? p.itemInstances : [])
     .filter((i) => i && typeof i === "object" && String(i.loc || "").startsWith("equip:"));
-  p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
+  /* Dedup por id nos dois lados: uma cópia bag stale do shared com o mesmo
+   * id da instância equipada entrava junto no concat (2 entradas, mesmo id)
+   * — a duplicata virava item fantasma ("desequipa aparecem 2, equipa 1
+   * somem 2"). A instância equipada do personagem é a mais fresca. */
+  const equippedIds = new Set();
+  const equippedDedup = [];
+  for (const inst of equipped) {
+    const id = inst && inst.id !== undefined && inst.id !== null ? String(inst.id) : "";
+    if (id && equippedIds.has(id)) continue;
+    if (id) equippedIds.add(id);
+    equippedDedup.push(inst);
+  }
+  const sharedSeen = new Set();
+  const sharedDedup = [];
+  for (const inst of shared.itemInstances) {
+    const id = inst && inst.id !== undefined && inst.id !== null ? String(inst.id) : "";
+    if (id && (sharedSeen.has(id) || equippedIds.has(id))) continue;
+    if (id) sharedSeen.add(id);
+    sharedDedup.push(Object.assign({}, inst));
+  }
+  p.itemInstances = sharedDedup.concat(equippedDedup);
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
   // Baseline da pouch: o conteúdo compartilhado no momento da hidratação.
   // A extração usa (cópia − base) como DELTA sobre o shared atual — assim

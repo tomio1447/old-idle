@@ -381,7 +381,11 @@ function stashEquippedItem(p, entry, preferred) {
           if (typeof toast === "function") toast("Itens tierados não podem ir para a Loot Pouch.");
           return false;
         }
-        deleteItemInstance(p, inst.id);
+        /* Identidade, não id: com o array já corrompido (mesmo id 2×),
+         * deletar por id removia a entrada fantasma e deixava a real. */
+        const di = (p.itemInstances || []).indexOf(inst);
+        if (di >= 0) { p.itemInstances.splice(di, 1); if (typeof syncBagCountsFromInstances === "function") syncBagCountsFromInstances(p); }
+        else deleteItemInstance(p, inst.id);
         return typeof addLootPouch === "function" ? addLootPouch(p, inst.slug, 1) : false;
       }
     }
@@ -555,12 +559,17 @@ function unequipToContainer(p, slot, dest) {
         equipEntryInstance(p, slot, inst);
         return false;
       }
-      deleteItemInstance(p, inst.id);
+      /* Remove por IDENTIDADE (não por id): com o array já corrompido,
+       * deletar por id removia a entrada fantasma e deixava a real —
+       * o push de rollback reinseria a mesma instância de novo. */
+      const di = (p.itemInstances || []).indexOf(inst);
+      if (di >= 0) { p.itemInstances.splice(di, 1); if (typeof syncBagCountsFromInstances === "function") syncBagCountsFromInstances(p); }
+      else deleteItemInstance(p, inst.id);
       ok = addLootPouch(p, inst.slug, 1);
     }
     if (!ok) {
       if (dest === "bag") equipEntryInstance(p, slot, inst);
-      else { p.itemInstances.push(inst); equipEntryInstance(p, slot, inst); }
+      else { if (!p.itemInstances.includes(inst)) p.itemInstances.push(inst); equipEntryInstance(p, slot, inst); }
       if (typeof toast === "function") toast("Mochila cheia.", "bad");
       return false;
     }

@@ -2430,7 +2430,26 @@ function accountApplySharedInventory(shared) {
   if (Array.isArray(shared.itemInstances)) {
     const equipped = (Array.isArray(p.itemInstances) ? p.itemInstances : [])
       .filter((i) => i && typeof i === "object" && String(i.loc || "").indexOf("equip:") === 0);
-    p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
+    /* Dedup por id (espelho do applySharedToPlayer): uma cópia bag stale do
+     * shared com o id da instância equipada entrava junto no concat — a
+     * duplicata virava item fantasma ("desequipa aparecem 2"). */
+    const equippedIds = new Set();
+    const equippedDedup = [];
+    for (const inst of equipped) {
+      const id = inst && inst.id !== undefined && inst.id !== null ? String(inst.id) : "";
+      if (id && equippedIds.has(id)) continue;
+      if (id) equippedIds.add(id);
+      equippedDedup.push(inst);
+    }
+    const sharedSeen = new Set();
+    const sharedDedup = [];
+    for (const inst of shared.itemInstances) {
+      const id = inst && inst.id !== undefined && inst.id !== null ? String(inst.id) : "";
+      if (id && (sharedSeen.has(id) || equippedIds.has(id))) continue;
+      if (id) sharedSeen.add(id);
+      sharedDedup.push(Object.assign({}, inst));
+    }
+    p.itemInstances = sharedDedup.concat(equippedDedup);
   }
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
   // Stamina DA CONTA: espelha o pool — a guarda de carimbo impede que um

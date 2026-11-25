@@ -1016,6 +1016,47 @@ function ensureItemInstances(p) {
       }
       p._forgeLegacyTierMigrated = 1;
     }
+    // Dedup por id: o merge shared↔equipadas e remoções parciais podiam
+    // deixar a MESMA instância listada 2× (refs do mesmo objeto ou cópias
+    // com o id igual) — a 2ª entrada virava item fantasma na mochila e
+    // sumia ao equipar ("equipa 1, somem 2"). A entrada preferida é a que
+    // o equip referencia (instId + loc casado); sem referência, a 1ª.
+    const equipLocByInstId = {};
+    for (const slot in p.equip) {
+      const e = p.equip[slot];
+      if (e && e.instId) equipLocByInstId[String(e.instId)] = "equip:" + slot;
+    }
+    const prefById = {};
+    for (const inst of p.itemInstances) {
+      if (!inst || inst.id === undefined || inst.id === null) continue;
+      const id = String(inst.id);
+      const wantLoc = equipLocByInstId[id];
+      const prev = prefById[id];
+      if (!prev || (wantLoc && inst.loc === wantLoc && prev.loc !== wantLoc)) prefById[id] = inst;
+    }
+    const placedIds = {};
+    const droppedBag = {};
+    const deduped = [];
+    for (const inst of p.itemInstances) {
+      if (!inst) continue;
+      const id = inst.id !== undefined && inst.id !== null ? String(inst.id) : null;
+      if (!id) { deduped.push(inst); continue; }
+      if (placedIds[id]) {
+        /* A contagem bag[slug] era DERIVADA das entradas (o sync a reconta
+         * sempre) — se descartei uma entrada de bag fantasma, a contagem
+         * precisa cair junto, senão o reconcile abaixo lê o número inflado
+         * como "órfão" e materializa uma instância nova (o bug de novo). */
+        if (inst.loc === "bag") droppedBag[inst.slug] = (droppedBag[inst.slug] || 0) + 1;
+        continue;
+      }
+      placedIds[id] = true;
+      deduped.push(prefById[id]);
+    }
+    p.itemInstances = deduped;
+    for (const slug in droppedBag) {
+      p.bag[slug] = Math.max(0, (Math.floor(Number(p.bag[slug]) || 0)) - droppedBag[slug]);
+      if (!p.bag[slug]) delete p.bag[slug];
+    }
     // Contagens órfãs de itens instanciados na bag (grant SQL/admin que
     // gravou só bag[slug] sem itemInstances): materializa as instâncias
     // ANTES do sync — ele descartaria a contagem e o item sumiria. O tier

@@ -4,6 +4,29 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Fix: item instanciado duplicando ("equipa 1, somem 2")
+
+- **Bug**: o `itemInstances` podia listar a **mesma instância 2×** (mesmo
+  id) — ao desequipar apareciam 2 falcon bows na mochila e ao equipar um,
+  os dois sumiam (as duas entradas eram o mesmo item).
+- **Origens fechadas**:
+  - Merge shared↔equipadas (`applySharedToPlayer` /
+    `accountApplySharedInventory`): uma cópia bag stale do shared com o
+    id da instância equipada entrava junto no concat — agora dedup por id,
+    a equipada vence;
+  - `stashEquippedAuth` (server): fazia `inst.loc="bag"` + `bag++` sem
+    sync — a contagem órfã transitória era materializada pela
+    reconciliação de hidratação. Agora recalcula via sync;
+  - Cliente: remoções por id em `unequipToContainer`/`stashEquippedItem`
+    podiam apagar a entrada errada quando o array já estava corrompido —
+    passaram a remover por identidade de objeto.
+- **Auto-cura**: a hidratação (`ensureItemInstances` /
+  `authReconcileOrphanBagCounts`) dedup por id — saves já corrompidos se
+  limpam sozinhos no próximo load, mantendo a entrada referenciada pelo
+  equip. A contagem derivada cai junto com a entrada fantasma.
+
+---
+
 ## 2026-11-29 — Forja: seleção manual do item a queimar (Convergence Fusion)
 
 - O item consumido na Convergence Fusion agora é **escolha manual** —

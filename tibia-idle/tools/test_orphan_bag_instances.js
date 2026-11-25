@@ -117,4 +117,93 @@ const q2 = { bag: { "falcon-bow": 1 }, itemInstances: [{ id: "srv-a", slug: "fal
 engine.authReconcileOrphanBagCounts(q2);
 must(q2.itemInstances.length === 1, "server: instâncias >= contagem não cria extra");
 
+// ---------- dedup por id (bug real da conta 1/1) ----------
+// Cenário DB: mesmo id 2× loc bag + contagem 2 → "2 bows na bp".
+const p4 = {
+  bag: { "falcon-bow": 2 },
+  itemInstances: [
+    { id: "it-dup", slug: "falcon-bow", loc: "bag", tier: 0 },
+    { id: "it-dup", slug: "falcon-bow", loc: "bag", tier: 0 },
+  ],
+  equip: {}, _itemInstancesVersion: 2, _itemInstSeq: 0, forge: {},
+};
+sandbox.ensureItemInstances(p4);
+must(p4.itemInstances.filter((i) => i && i.id === "it-dup").length === 1, "cliente: mesmo id 2× na bag vira 1");
+must(p4.bag["falcon-bow"] === 1, "cliente: contagem recalcula para 1 após dedup");
+
+// Cenário DB: mesmo id ×3 em equip:weapon com o equip referenciando → fica 1.
+const sharedRef = { id: "it-dup", slug: "falcon-bow", loc: "equip:weapon", tier: 0 };
+const p5 = {
+  bag: {},
+  itemInstances: [sharedRef, sharedRef, sharedRef],
+  equip: { weapon: { item: "falcon-bow", count: 1, instId: "it-dup" } },
+  _itemInstancesVersion: 2, _itemInstSeq: 0, forge: {},
+};
+sandbox.ensureItemInstances(p5);
+must(p5.itemInstances.filter((i) => i && i.id === "it-dup").length === 1, "cliente: mesmo OBJETO ×3 no equip vira 1");
+must(p5.itemInstances[0].loc === "equip:weapon", "cliente: entrada equipada preservada");
+must(p5.equip.weapon.instId === "it-dup", "cliente: vínculo do equip mantido");
+
+// Cenário merge: cópia bag (stale) + ref equipada, mesmo id → fica a equipada.
+const p6 = {
+  bag: {},
+  itemInstances: [
+    { id: "it-dup", slug: "falcon-bow", loc: "bag", tier: 0 },
+    { id: "it-dup", slug: "falcon-bow", loc: "equip:weapon", tier: 0 },
+  ],
+  equip: { weapon: { item: "falcon-bow", count: 1, instId: "it-dup" } },
+  _itemInstancesVersion: 2, _itemInstSeq: 0, forge: {},
+};
+sandbox.ensureItemInstances(p6);
+must(p6.itemInstances.length === 1 && p6.itemInstances[0].loc === "equip:weapon",
+  "cliente: dup bag+equip mesmo id → prefere a equipada");
+
+// Servidor: mesma dedup na hidratação.
+const q3 = {
+  bag: { "falcon-bow": 2 },
+  itemInstances: [
+    { id: "srv-dup", slug: "falcon-bow", loc: "bag", tier: 0 },
+    { id: "srv-dup", slug: "falcon-bow", loc: "bag", tier: 0 },
+  ],
+  equip: {},
+};
+engine.authReconcileOrphanBagCounts(q3);
+engine.authSyncBagCountsFromInstances(q3);
+must(q3.itemInstances.filter((i) => i && i.id === "srv-dup").length === 1, "server: mesmo id 2× na bag vira 1");
+must(q3.bag["falcon-bow"] === 1, "server: contagem recalcula para 1 após dedup");
+
+const q4 = {
+  bag: {},
+  itemInstances: [
+    { id: "srv-dup", slug: "falcon-bow", loc: "bag", tier: 0 },
+    { id: "srv-dup", slug: "falcon-bow", loc: "equip:weapon", tier: 0 },
+  ],
+  equip: { weapon: { item: "falcon-bow", count: 1, instId: "srv-dup" } },
+};
+engine.authReconcileOrphanBagCounts(q4);
+must(q4.itemInstances.length === 1 && q4.itemInstances[0].loc === "equip:weapon",
+  "server: dup bag+equip mesmo id → prefere a equipada");
+
+// stashEquippedAuth não deixa mais contagem órfã (era inst.loc=bag + bag++).
+const q5 = {
+  bag: {}, itemInstances: [{ id: "srv-x", slug: "falcon-bow", loc: "equip:weapon", tier: 0 }],
+  equip: { weapon: { item: "falcon-bow", count: 1, instId: "srv-x" } },
+};
+must(engine.stashEquippedAuth(q5, "weapon", "bag") === true, "server: desequipar instância ok");
+must(q5.itemInstances[0].loc === "bag", "server: instância voltou pra bag");
+must(q5.bag["falcon-bow"] === 1, "server: contagem derivada do sync (não órfã)");
+engine.authReconcileOrphanBagCounts(q5);
+must(q5.itemInstances.length === 1, "server: reconcile não materializa fantasma pós-unequip");
+
+// applySharedToPlayer: cópia stale do shared com id da equipada é descartada.
+const sharedInv = require("../server/shared_inventory.js");
+const sp2 = { equip: { weapon: { item: "falcon-bow", count: 1, instId: "it-eq" } },
+  itemInstances: [{ id: "it-eq", slug: "falcon-bow", loc: "equip:weapon", tier: 0 }] };
+const shared = { bag: {}, lootPouch: {}, supplyStash: {}, depot: [], rewardChest: {}, rewardChestBundles: [],
+  itemInstances: [{ id: "it-eq", slug: "falcon-bow", loc: "bag", tier: 0 }], seq: 0,
+  dust: 0, dustLimit: 100, slivers: 0, exaltedCores: 0 };
+sharedInv.applySharedToPlayer(sp2, shared);
+must(sp2.itemInstances.length === 1 && sp2.itemInstances[0].loc === "equip:weapon",
+  "shared merge: cópia bag stale do mesmo id é descartada (fica a equipada)");
+
 console.log("\nAll orphan bag instance checks passed.");

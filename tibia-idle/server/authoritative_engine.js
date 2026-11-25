@@ -1720,6 +1720,47 @@ function authSyncBagCountsFromInstances(p){
 function authReconcileOrphanBagCounts(p){
   if(!p)return;
   p.bag=p.bag||{};p.itemInstances=Array.isArray(p.itemInstances)?p.itemInstances:[];
+  // Dedup por id ANTES de contar: merges shared↔equipadas e remoções
+  // parciais podiam deixar a mesma instância 2× no array (refs do mesmo
+  // objeto ou cópias com o id igual) — virava item fantasma na mochila e
+  // sumia ao equipar. A entrada preferida é a que o equip referencia
+  // (instId + loc casado); sem referência, a 1ª ocorrência.
+  const equipLocByInstId={};
+  for(const slot of Object.keys(p.equip||{})){
+    const e=p.equip[slot];
+    if(e&&e.instId)equipLocByInstId[String(e.instId)]="equip:"+slot;
+  }
+  const prefById={};
+  for(const inst of p.itemInstances){
+    if(!inst||inst.id===undefined||inst.id===null)continue;
+    const id=String(inst.id);
+    const wantLoc=equipLocByInstId[id];
+    const prev=prefById[id];
+    if(!prev||(wantLoc&&inst.loc===wantLoc&&prev.loc!==wantLoc))prefById[id]=inst;
+  }
+  const placedIds={};
+  const droppedBag={};
+  const deduped=[];
+  for(const inst of p.itemInstances){
+    if(!inst)continue;
+    const id=inst.id!==undefined&&inst.id!==null?String(inst.id):null;
+    if(!id){deduped.push(inst);continue;}
+    if(placedIds[id]){
+      /* A contagem bag[slug] é DERIVADA das entradas (o sync a reconta) —
+       * descartar uma entrada de bag fantasma exige derrubar a contagem
+       * junto, senão o reconcile abaixo lê o número inflado como órfão
+       * e materializa uma instância nova (o bug de novo). */
+      if(inst.loc==="bag")droppedBag[inst.slug]=(droppedBag[inst.slug]||0)+1;
+      continue;
+    }
+    placedIds[id]=true;
+    deduped.push(prefById[id]);
+  }
+  p.itemInstances=deduped;
+  for(const slug of Object.keys(droppedBag)){
+    p.bag[slug]=Math.max(0,Math.floor(Number(p.bag[slug])||0)-droppedBag[slug]);
+    if(!p.bag[slug])delete p.bag[slug];
+  }
   const tierClaimed={};
   for(const slug of Object.keys(p.bag)){
     if(!authItemNeedsBagInstance(slug))continue;
@@ -6246,7 +6287,10 @@ function stashEquippedAuth(p,slot,dest){
   if(inst){
     if(dest==="bag"||Number(inst.tier)>0){
       inst.loc="bag";
-      p.bag=p.bag||{};p.bag[e.item]=(Number(p.bag[e.item])||0)+1;
+      /* A contagem é DERIVADA das instâncias — escrever bag++ aqui deixava
+       * um órfão transitório que o reconcile de hidratação materializava
+       * em instância fantasma (item duplicado). O sync recalcula certo. */
+      authSyncBagCountsFromInstances(p);
       return true;
     }
     // pouch só aceita sem tier: instância tier 0 vira stack na pouch
