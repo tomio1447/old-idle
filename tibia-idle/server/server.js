@@ -1228,7 +1228,7 @@ async function login2faEmail(db, body) {
   return { code: 200, body: { ok: true, emailSent: !!sent.ok,
     msg: sent.ok ? "Código enviado para o e-mail da conta."
       : "Falha ao enviar o e-mail. Tente novamente.",
-    ...(TEST_SERVER ? { devCode: code } : {}) } };
+    ...(sent.mock ? { devCode: code } : {}) } };
 }
 async function tfaSetup(db, body) {
   const acc = await db.findAccountByToken(body.token);
@@ -5259,7 +5259,8 @@ async function setVip(db, body) {
  * O jogador cadastra o e-mail, recebe um código de 6 dígitos (10 min) e o
  * confirma para autenticar a conta. `EMAIL_VERIFY_REQUIRED=1` passa a exigir
  * e-mail confirmado antes de criar personagem. Em TEST_SERVER o código é
- * devolvido como `devCode` (o mailer não envia de verdade). */
+ * devolvido como `devCode` — exceto com MAIL_REAL=1, onde o mailer envia de
+ * verdade e o devCode não é exposto. */
 async function requestEmailCode(db, body) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
@@ -5276,7 +5277,7 @@ async function requestEmailCode(db, body) {
     emailSent: !!sent.ok,
     mock: !!sent.mock,
     msg: sent.ok ? "Código enviado para " + email + "." : "Falha ao enviar o e-mail. Configure o SMTP no servidor.",
-    ...(TEST_SERVER ? { devCode: code } : {}),
+    ...(sent.mock ? { devCode: code } : {}),
   } };
 }
 async function verifyEmailCode(db, body) {
@@ -5323,7 +5324,7 @@ async function requestPhoneCode(db, body) {
     ok: true,
     emailSent: !!sent.ok,
     msg: sent.ok ? "Código enviado para " + email + "." : "Falha ao enviar o e-mail. Configure o SMTP no servidor.",
-    ...(TEST_SERVER ? { devCode: code } : {}),
+    ...(sent.mock ? { devCode: code } : {}),
   } };
 }
 async function verifyPhoneCode(db, body) {
@@ -5387,7 +5388,7 @@ async function requestPasswordRecovery(db, body) {
   return { code: 200, body: { ok: true,
     msg: "Se a conta existir, enviamos um código para o e-mail cadastrado.",
     emailSent: !!sent.ok,
-    ...(TEST_SERVER ? { devCode: code } : {}) } };
+    ...(sent.mock ? { devCode: code } : {}) } };
 }
 async function confirmPasswordRecovery(db, body) {
   const login = String(body.login || "").trim().slice(0, 32);

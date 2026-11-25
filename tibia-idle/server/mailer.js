@@ -3,9 +3,11 @@
  * SMTP via nodemailer (qualquer provedor: domínio próprio, Zoho, Gmail com
  * app password, Cloudflare Email SMTP, etc.). Em TEST_SERVER o e-mail NÃO é
  * enviado de verdade: o código é logado no console e devolvido como `devCode`
- * para o fluxo de teste não depender de credenciais. Em produção
- * (TEST_SERVER=0) exige SMTP configurado; sem ele o envio falha com motivo
- * claro.
+ * para o fluxo de teste não depender de credenciais — a menos que
+ * MAIL_REAL=1, que força envio real mesmo em TEST_SERVER (alpha: mantém as
+ * facilidades de teste, mas a verificação de e-mail vale de verdade).
+ * Em produção (TEST_SERVER=0) exige SMTP configurado; sem ele o envio falha
+ * com motivo claro.
  *
  * Config (.env) — exemplo Cloudflare Email SMTP:
  *   SMTP_HOST=smtp.mx.cloudflare.net
@@ -26,6 +28,7 @@ const SMTP_USER = String(process.env.SMTP_USER || "").trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || "");
 const SMTP_FROM = String(process.env.SMTP_FROM || "no-reply@global-idle.com").trim();
 const TEST_SERVER = process.env.TEST_SERVER === "1";
+const MAIL_REAL = process.env.MAIL_REAL === "1";
 
 /* Fundo do e-mail: pergaminho/selo de cera embutido como CID (o cliente de
  * e-mail não precisa buscar URL externa). Se o arquivo sumir do deploy, o
@@ -97,7 +100,7 @@ function mailShell(title, introHtml, code, outroHtml) {
 }
 
 async function send(to, subject, text, html) {
-  if (TEST_SERVER) {
+  if (TEST_SERVER && !MAIL_REAL) {
     console.log("[mailer][mock]", subject, "para", to, "→", /:\s*(\d{6})/.exec(text)?.[1] || text);
     return { ok: true, mock: true };
   }
