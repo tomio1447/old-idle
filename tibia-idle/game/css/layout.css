@@ -8021,6 +8021,34 @@ body.fullhd .party-panel.collapsed { width: auto; }
 .cfgm-card-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #f7ebd2; flex-wrap: wrap; }
 .cfgm-ico { display: inline-flex; align-items: center; flex: 0 0 auto; }
 .cfgm-ico svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
+
+/* ---------- Confirmar e-mail (showEmailVerify) — OTP de 6 caixas ---------- */
+.ev-body { display: flex; flex-direction: column; gap: 12px; }
+.ev-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 9px 11px; border-radius: 4px; background: rgba(10,12,18,.6); border: 1px solid rgba(168,152,122,.25); font-size: 12px; color: #d8cba8; line-height: 1.5; }
+.ev-timer { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; background: rgba(234,179,8,.12); border: 1px solid rgba(234,179,8,.35); color: #ffe680; font-family: "Courier New", monospace; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.ev-timer.is-expired { background: rgba(185,28,28,.18); border-color: rgba(248,113,113,.45); color: #fca5a5; }
+.ev-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ev-link { padding: 0; border: none; background: none; color: #eab308; font-size: 11px; font-weight: 600; cursor: pointer; text-decoration: underline; font-family: inherit; }
+.ev-link:hover { color: #ffe680; }
+.ev-email-row { display: flex; gap: 8px; }
+.ev-email-row input { flex: 1; min-width: 0; }
+.ev-btn-sec { white-space: nowrap; flex: 0 0 auto; }
+.ev-otp { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
+.ev-otp-box { width: 100%; height: 48px; text-align: center; border-radius: 5px; border: 1px solid rgba(168,152,122,.3); background: rgba(10,12,18,.7); color: #ffe680; font-family: "Courier New", monospace; font-size: 20px; font-weight: 800; transition: border-color .15s, box-shadow .15s, transform .1s; }
+.ev-otp-box:focus { outline: none; border-color: #eab308; box-shadow: 0 0 0 3px rgba(234,179,8,.18); transform: translateY(-1px); }
+.ev-otp.is-shake { animation: evShake .34s ease; }
+@keyframes evShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-4px); } }
+.ev-status { padding: 9px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; border: 1px solid transparent; }
+.ev-status.is-error { background: rgba(185,28,28,.18); border-color: rgba(248,113,113,.45); color: #fca5a5; }
+.ev-status.is-success { background: rgba(90,122,58,.28); border-color: rgba(140,180,100,.45); color: #a8e6a1; }
+.ev-status.is-info { background: rgba(234,179,8,.12); border-color: rgba(234,179,8,.35); color: #fde68a; }
+.ev-help { border-top: 1px solid rgba(168,152,122,.22); padding-top: 9px; font-size: 11px; color: #9a8f75; }
+.ev-help summary { cursor: pointer; font-weight: 600; color: #d8cba8; user-select: none; }
+.ev-help ul { margin: 7px 0 0; padding-left: 17px; line-height: 1.55; }
+@media (max-width: 480px) {
+  .ev-otp-box { height: 42px; font-size: 17px; }
+  .ev-email-row { flex-direction: column; }
+}
 .cfgm-badge { padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; border: 1px solid transparent; }
 .cfgm-badge.is-ok { color: #a8e6a1; background: rgba(90,122,58,.28); border-color: rgba(140,180,100,.45); }
 .cfgm-badge.is-warn { color: #ffd65a; background: rgba(150,110,30,.22); border-color: rgba(230,184,76,.42); }

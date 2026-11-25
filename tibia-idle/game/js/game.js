@@ -7634,48 +7634,160 @@ function initAccountLogin() {
   }
   function showEmailVerify(token, account, characters) {
     let email = (account && account.email) || "";
+    const hasEmail = !!email;
     if (!openAccountModal(`
-      <div class="panel-title">Confirmar e-mail
+      <div class="panel-title">🛡️ Confirmar e-mail
         <span style="flex:1"></span><button class="sm" id="acc-email-back">← Voltar</button>
       </div>
-      <div class="panel-body account-flow-body">
-        <div class="tiny dim mb4">Enviamos um código de 6 dígitos para o seu e-mail. Ele expira em 10 minutos.</div>
-        <div class="field"><label>E-mail</label>
-          <input id="acc-email-input" type="email" maxlength="120" placeholder="seu@email.com" value="${email}"></div>
-        <button class="full" id="acc-email-send">Enviar código</button>
-        <div class="field mt8"><label>Código de verificação</label>
-          <input id="acc-email-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
-        <button class="primary full mt8" id="acc-email-verify">Confirmar e-mail</button>
-        <div class="tiny dim center mt8" id="acc-email-msg"></div>
+      <div class="panel-body account-flow-body ev-body">
+        <div class="ev-strip">
+          <span>Digite o código de 6 dígitos enviado para a sua caixa de entrada.</span>
+          <span class="ev-timer" id="acc-ev-timer">Aguardando envio</span>
+        </div>
+        <div class="field">
+          <div class="ev-label-row"><label for="acc-email-input">E-mail cadastrado</label>
+            <button class="ev-link" type="button" id="acc-email-edit" ${hasEmail ? "" : 'style="display:none"'}>Alterar e-mail</button></div>
+          <div class="ev-email-row">
+            <input id="acc-email-input" type="email" maxlength="120" placeholder="seu@email.com"
+              value="${email}" ${hasEmail ? "disabled" : ""} autocomplete="email">
+            <button class="ev-btn-sec" type="button" id="acc-email-send">Enviar código</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="ev-label-row"><label>Código de verificação</label>
+            <button class="ev-link" type="button" id="acc-otp-clear">Limpar dígitos</button></div>
+          <div class="ev-otp" id="acc-otp">${[0, 1, 2, 3, 4, 5].map((i) =>
+            `<input class="ev-otp-box" id="acc-otp-${i}" type="text" inputmode="numeric" maxlength="1"
+              autocomplete="${i === 0 ? "one-time-code" : "off"}" aria-label="Dígito ${i + 1}">`).join("")}
+          </div>
+        </div>
+        <button class="primary full" id="acc-email-verify">Confirmar e-mail</button>
+        <div class="ev-status" id="acc-email-msg" style="display:none"></div>
+        <details class="ev-help">
+          <summary>Não recebeu o código?</summary>
+          <ul>
+            <li>Verifique <b>Spam / Lixo Eletrônico</b> — principalmente em Hotmail e Outlook.</li>
+            <li>Aguarde ~1 min antes de reenviar: cada envio invalida o código anterior.</li>
+            <li>E-mail errado? Clique em <b>Alterar e-mail</b> e envie novamente.</li>
+          </ul>
+        </details>
       </div>`, true)) return;
     $("#acc-email-back").onclick = () => showPicker(token, account, characters);
     const status = $("#acc-email-msg");
     const input = $("#acc-email-input");
     const send = $("#acc-email-send");
+    const editBtn = $("#acc-email-edit");
+    const timerEl = $("#acc-ev-timer");
+    const otpGrid = $("#acc-otp");
+    const otpBoxes = Array.from(otpGrid.querySelectorAll(".ev-otp-box"));
+    const verify = $("#acc-email-verify");
+    let expireSec = -1;   // -1 = ainda não enviou
+    let resendSec = 0;
+
+    const setStatus = (type, text) => {
+      status.style.display = text ? "" : "none";
+      status.className = "ev-status" + (type ? " is-" + type : "");
+      status.textContent = text || "";
+    };
+    const shake = () => {
+      otpGrid.classList.remove("is-shake");
+      void otpGrid.offsetWidth;
+      otpGrid.classList.add("is-shake");
+    };
+    const fmt = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+    const tick = setInterval(() => {
+      if (!document.getElementById("acc-otp")) { clearInterval(tick); return; }
+      if (expireSec > 0) {
+        expireSec--;
+        timerEl.textContent = "⏳ Expira em " + fmt(expireSec);
+        if (expireSec === 0) {
+          timerEl.classList.add("is-expired");
+          timerEl.textContent = "Código expirado";
+          setStatus("error", 'O código expirou. Clique em "Reenviar código" para gerar outro.');
+        }
+      }
+      if (resendSec > 0) {
+        resendSec--;
+        send.textContent = "Aguarde (" + resendSec + "s)";
+        if (resendSec === 0) { send.disabled = false; send.textContent = "Reenviar código"; }
+      }
+    }, 1000);
+
+    editBtn.onclick = () => {
+      const locked = input.disabled;
+      input.disabled = !locked;
+      if (locked) { input.focus(); input.select(); editBtn.textContent = "Bloquear edição"; }
+      else editBtn.textContent = "Alterar e-mail";
+    };
+    $("#acc-otp-clear").onclick = () => { otpBoxes.forEach((b) => { b.value = ""; }); otpBoxes[0].focus(); };
+
+    otpBoxes.forEach((box, idx) => {
+      box.addEventListener("input", () => {
+        const clean = box.value.replace(/\D/g, "");
+        box.value = clean.slice(-1);
+        if (clean && idx < 5) otpBoxes[idx + 1].focus();
+      });
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && !box.value && idx > 0) otpBoxes[idx - 1].focus();
+        if (e.key === "ArrowLeft" && idx > 0) otpBoxes[idx - 1].focus();
+        if (e.key === "ArrowRight" && idx < 5) otpBoxes[idx + 1].focus();
+        if (e.key === "Enter") verify.click();
+      });
+      box.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const pasted = ((e.clipboardData || window.clipboardData).getData("text") || "")
+          .replace(/\D/g, "").slice(0, 6);
+        if (!pasted) return;
+        pasted.split("").forEach((ch, i) => { if (otpBoxes[i]) otpBoxes[i].value = ch; });
+        otpBoxes[Math.min(pasted.length, 5)].focus();
+      });
+    });
+
     send.onclick = async () => {
       if (send.disabled) return;
       email = (input.value || "").trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { status.textContent = "Informe um e-mail válido."; return; }
-      send.disabled = true; status.textContent = "Enviando código...";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        setStatus("error", "Informe um e-mail válido.");
+        input.disabled = false; editBtn.style.display = ""; input.focus();
+        return;
+      }
+      input.disabled = true; editBtn.textContent = "Alterar e-mail";
+      send.disabled = true; setStatus("info", "Enviando código...");
       try {
         const r = await accountEmailSendCode(token, email);
-        if (!r.ok) { status.textContent = r.msg || "Falha ao enviar o código."; return; }
-        status.textContent = r.alreadyVerified
-          ? "E-mail já confirmado."
-          : "Código enviado para " + email + "." + (r.devCode ? " (teste: " + r.devCode + ")" : "");
-        const codeInput = $("#acc-email-code");
-        if (codeInput && typeof codeInput.focus === "function") codeInput.focus();
-      } finally { send.disabled = false; }
+        if (!r.ok) { setStatus("error", r.msg || "Falha ao enviar o código."); send.disabled = false; return; }
+        if (r.alreadyVerified) { setStatus("success", "E-mail já confirmado."); return; }
+        expireSec = 600; resendSec = 60;
+        timerEl.classList.remove("is-expired");
+        timerEl.textContent = "⏳ Expira em 10:00";
+        setStatus("info", "Código enviado para " + email + "." +
+          (r.devCode ? " (teste: " + r.devCode + ")" : ""));
+        otpBoxes[0].focus();
+      } catch (e) { send.disabled = false; setStatus("error", "Falha ao enviar o código."); }
     };
-    const verify = $("#acc-email-verify");
+
     verify.onclick = async () => {
       if (verify.disabled) return;
-      const code = ($("#acc-email-code").value || "").trim();
-      verify.disabled = true; status.textContent = "Confirmando...";
+      const code = otpBoxes.map((b) => b.value).join("");
+      if (code.length !== 6) {
+        shake();
+        setStatus("error", "Preencha todos os 6 dígitos do código de verificação.");
+        return;
+      }
+      if (expireSec === 0) {
+        setStatus("error", 'Este código já expirou. Clique em "Reenviar código".');
+        return;
+      }
+      verify.disabled = true; setStatus("info", "Confirmando...");
       try {
         const r = await accountEmailVerify(token, code);
-        if (!r.ok) { status.textContent = r.msg || "Código incorreto."; return; }
-        status.textContent = "E-mail confirmado!";
+        if (!r.ok) {
+          shake();
+          setStatus("error", r.msg || "Código incorreto. Verifique os dígitos ou peça um novo envio.");
+          return;
+        }
+        clearInterval(tick);
+        setStatus("success", "E-mail confirmado com sucesso! Entrando no Global-Idle...");
         const fresh = await accountMe(token);
         if (fresh.ok) showPicker(token, fresh.account, fresh.characters || []);
         else showPicker(token, Object.assign({}, account, { emailVerified: true }), characters);
