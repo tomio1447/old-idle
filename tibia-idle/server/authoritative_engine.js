@@ -5112,11 +5112,15 @@ const PVP_REGROUP_CALL_TTL=2000;    // chamada de regroup expira rápido (clique
 const PVP_REGROUP_CD_FREE=60000;    // cooldown do botão REGROUP — conta free
 const PVP_REGROUP_CD_VIP=10000;     // cooldown do botão REGROUP — conta VIP
 const PVP_REGROUP_ACTIVE_MS=8000;   // janela em que a ordem de convergir vale
-/* Alcance máximo de runa na guerra (runes.json não tem campo range). */
-const PVP_BATTLE_RUNE_RANGE=7;
+/* Alcance máximo de runa na guerra (runes.json não tem campo range) —
+ * balance: 10 SQM em cada direção (SD, paralyze, runas de área, wall). */
+const PVP_BATTLE_RUNE_RANGE=10;
 /* Guerra de guild: Royal Paladin (bolt/crossbow + spells de distância)
- * tem alcance PvP de ATÉ 8 SQM — pedido de balance. */
-const PVP_BATTLE_RP_RANGE=8;
+ * tem alcance PvP de ATÉ 10 SQM — pedido de balance. */
+const PVP_BATTLE_RP_RANGE=10;
+/* Exura sio/gran sio/mas res na guerra: 10 SQM de alcance (antes não
+ * havia gate — o sio cruzava o mapa inteiro). */
+const PVP_BATTLE_SIO_RANGE=10;
 /* TARGET OFF efetivo: o flag próprio do char OU a flag do time — esta
  * alcança chars AFK (AI_HARD) de contas aliadas; o painel do líder não
  * desarma chars HUMANOS de outras contas (autonomia preservada). */
@@ -7042,7 +7046,8 @@ function healPlayers(auth,now){
         // bloqueiam a cura em aliado.
         if(auth.pvpBattle){
           const _f=entityGridCell(healer,auth),_t=entityGridCell(x,auth);
-          if(!pvpLosClear(auth,_f.cx,_f.cy,_t.cx,_t.cy))return false;
+          if(chebyshevCells(_f,_t)>PVP_BATTLE_SIO_RANGE||
+            !pvpLosClear(auth,_f.cx,_f.cy,_t.cx,_t.cy))return false;
         }
         return true;
       }).sort((a,b)=>{
@@ -9276,7 +9281,7 @@ function playerAttackRangeSQM(p){
   return 1;
 }
 /* Alcance de ataque DENTRO da guerra: RP com arma de distância ganha o
- * cap PvP de 8 SQM (bolt/crossbow); demais perfis seguem o normal. */
+ * cap PvP de 10 SQM (bolt/crossbow); demais perfis seguem o normal. */
 function pvpAttackRangeSQM(auth,item){
   const base=playerAttackRangeSQM(item&&item.p);
   if(!(auth&&auth.pvpBattle)||!item||!item.p)return base;
@@ -9884,7 +9889,7 @@ function step(auth,now,opts){if(auth.ended)return;
       let acted=false;
       // Guerra de guild: mago sempre prioriza Sudden Death no alvo — burst
       // antes das magias do combo/fallback. tryUseRune já valida carga,
-      // vocação indireta (nível/ml), CDs e o alcance PvP (<=7 sqm).
+      // vocação indireta (nível/ml), CDs e o alcance PvP (<=10 sqm).
       // Painel PvP por char muda a prioridade: sorcerer UE → runas de área
       // primeiro; druida PARALYZE → trava o alvo chamado antes da SD; druida
       // HEAL → SD normal (a cura em aliados corre no tick de friend-heal).
@@ -9902,7 +9907,7 @@ function step(auth,now,opts){if(auth.ended)return;
           if(ctrlMode==="xbow")_pvpForced=pvpPrioritySpell(p,PVP_PRIO_XBOW,now);
           else if(ctrlMode==="bow"&&(living||[]).length>1)
             _pvpForced=pvpPrioritySpell(p,PVP_PRIO_BOW,now);
-          // Gate de alcance do RP: spells forçados respeitam o cap de 8sqm
+          // Gate de alcance do RP: spells forçados respeitam o cap de 10sqm
           // (antes o _pvpForced ignorava o spellInRange e cruzava o mapa).
           // E muro/parede bloqueia o projétil do exori con/gran con.
           if(_pvpForced&&primaryTarget){

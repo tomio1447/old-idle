@@ -112,7 +112,7 @@ console.log("== PARALYZE: druida trava o alvo chamado ==");
   const again = eng.pvpTryParalyze(auth, e1, e1.p, now + 100, [], now + 100);
   ok(again === false, "não desperdiça runa em alvo já paralisado");
   ok(e1.p.supplies["paralyze-rune"] === 1, "carga preservada na repetição");
-  // Fora de alcance: alvo a >7 sqm não paralisa.
+  // Fora de alcance: alvo a >10 sqm não paralisa.
   e2.cx = 25; e2.x = (25.5) / 51;
   e2._pvpParalyzeUntil = 0;
   e1.p._runeCd = 0; e1.p._offensiveCd = 0; e1.p._groupCd = {};
@@ -240,6 +240,35 @@ console.log("== BCP BOW/XBOW: auto-equip arma + quiver + melhor munição ==");
     ok(p.equip.ammo && p.equip.ammo.item !== "diamond-arrow" && am && (Number(am.lvl) || 0) <= 50,
       "nível baixo: melhor arrow permitida (" + (p.equip.ammo && p.equip.ammo.item) + ")");
   }
+}
+
+console.log("== Exura sio: alcance PvP de 10sqm ==");
+{
+  const now = Date.now();
+  // 10 sqm: dentro do alcance novo.
+  const dru = mkChar(1, 100, 1, 10, 10, { voc: "elder druid" });
+  const allyNear = mkChar(3, 100, 1, 20, 10);   // 10 sqm
+  allyNear.p.hp = 50;                            // bem abaixo do limiar
+  const auth = makeAuth([dru, allyNear]);
+  auth.blockedCells = {};                        // LoS livre — isola o gate de range
+  auth._stepDt = 1000;                           // um call = friendHealAcc cheio
+  const h = auth.players.find((e) => String(e.id) === "1");
+  h._pvpCtrl = { chase: false, mode: "heal" };   // habilita todas as sio (hpBelow 92)
+  eng.healPlayers(auth, now);
+  ok((auth.events || []).some((e) => e.t === "heal-friend" && e.targetId === "3"),
+    "sio cura aliado a 10sqm");
+  // 11 sqm: fora do gate novo — antes cruzava o mapa inteiro.
+  const dru2 = mkChar(4, 100, 1, 10, 10, { voc: "elder druid" });
+  const allyFar = mkChar(5, 100, 1, 21, 10);     // 11 sqm
+  allyFar.p.hp = 50;
+  const auth2 = makeAuth([dru2, allyFar]);
+  auth2.blockedCells = {};
+  auth2._stepDt = 1000;
+  const h2 = auth2.players.find((e) => String(e.id) === "4");
+  h2._pvpCtrl = { chase: false, mode: "heal" };
+  eng.healPlayers(auth2, now);
+  ok(!(auth2.events || []).some((e) => e.t === "heal-friend"),
+    "sio NÃO cura aliado a 11sqm");
 }
 
 if (failures) { console.error(`${failures} FALHA(S)`); process.exit(1); }

@@ -4,6 +4,19 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — PvP: alcance unificado em 10 SQM
+
+- Pedido de balance: na guerra de guilds, tudo passa a alcançar **10 SQM
+  em cada direção** — Sudden Death, paralyze, magias de paladino
+  (exori con/gran con…), bow/crossbow (ataque à distância) e exura sio.
+- Antes: runas até 7sqm, paladino até 8sqm, e a exura sio **não tinha
+  limite** — curava aliado do outro lado do mapa.
+- Implementado no servidor autoritativo (o cliente não faz gate): as
+  três checagens de alcance passam a usar o novo cap, e o heal-friend
+  ganha a checagem que faltava (junto da linha de visão existente).
+
+---
+
 ## 2026-11-29 — Instância quebrada: reload de volta pro mapa
 
 - Antes: instância quebrada (create nunca confirmado → watchdog 45s, ou
