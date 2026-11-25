@@ -1466,6 +1466,8 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   padding: 8px;
 }
 .forge-client-further.transfer { grid-template-columns: 100px 1fr 122px; gap: 8px; }
+.forge-client-further.convfusion { grid-template-columns: 168px 60px 150px 36px 1fr; gap: 8px; }
+.forge-client-item-list.conv-partners { max-height: 94px; }
 .forge-client-need-icons {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   border-right: 1px solid #1d1d1d;
@@ -1604,7 +1606,8 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 @media (max-width: 540px) {
   .forge-client { width: calc(100vw - 26px); }
   .forge-client-select-row, .forge-client-select-row.transfer { grid-template-columns: 1fr; gap: 6px; }
-  .forge-client-further, .forge-client-further.transfer { grid-template-columns: 1fr; gap: 6px; }
+  .forge-client-further, .forge-client-further.transfer,
+  .forge-client-further.convfusion { grid-template-columns: 1fr; gap: 6px; }
   .forge-client-footer { flex-wrap: wrap; }
   .forge-client-wallet { min-width: 70px; }
 }

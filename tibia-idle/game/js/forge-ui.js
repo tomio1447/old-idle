@@ -269,12 +269,19 @@ function renderForgeConvFusionPanel(p) {
     info = FORGE_UI.slug ? forgeItemSummary(p, FORGE_UI.slug) : null;
   }
   var partners = info ? forgeConvergenceFusionPartners(p, FORGE_UI.slug) : [];
-  if (!FORGE_UI.convPartner || !partners.some(function(t) { return t.ref === FORGE_UI.convPartner; })) {
-    FORGE_UI.convPartner = partners.length ? partners[0].ref : null;
+  /* O item a queimar é escolha MANUAL — nunca auto-seleciona; só mantém
+   * uma escolha anterior enquanto ela continuar válida pro item base. */
+  if (FORGE_UI.convPartner && !partners.some(function(t) { return t.ref === FORGE_UI.convPartner; })) {
+    FORGE_UI.convPartner = null;
   }
   var partnerInfo = FORGE_UI.convPartner ? forgeItemSummary(p, FORGE_UI.convPartner) : null;
   var chk = info ? forgeCanConvergeFuse(p, FORGE_UI.slug, FORGE_UI.convPartner)
                  : { ok: false, msg: 'Select a classification 4 item.' };
+  if (info && !FORGE_UI.convPartner) {
+    chk = { ok: false, msg: partners.length
+      ? 'Selecione abaixo o item a ser consumido.'
+      : 'A Convergence Fusion precisa de outro item classificação 4 do mesmo slot e mesmo tier na mochila.' };
+  }
   var gold = info ? forgeConvergenceFusionGoldCost(info.slug, info.tier) : 0;
   var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
   var dustOk = (p.dust || 0) >= FORGE_CONVERGENCE_FUSION.dustCost;
@@ -282,20 +289,21 @@ function renderForgeConvFusionPanel(p) {
   var effect = info && canUpgrade ? forgeEffectForSlot(info.slot, info.tier + 1, p) : null;
 
   return ''
-    + '<div class="forge-client-section-title">Select Items For Convergence Fusion</div>'
-    + '<div class="forge-client-select-row transfer">'
+    + '<div class="forge-client-section-title">Select Item For Convergence Fusion</div>'
+    + '<div class="forge-client-select-row">'
     +   '<div class="forge-client-item-list">'
     +     forgeClientItemGridHtml(bag4, FORGE_UI.slug, 'data-forge-ref', 'No classification 4 items in backpack.')
     +   '</div>'
     +   '<div class="forge-client-arrows"><span></span><span></span><span></span></div>'
-    +   '<div class="forge-client-item-list targets">'
-    +     forgeClientItemGridHtml(partners, FORGE_UI.convPartner, 'data-conv-partner', 'No partner: needs another class 4 item, same slot + same tier.')
-    +   '</div>'
+    +   forgeClientTierPreview(info)
     + '</div>'
-    + '<div class="forge-client-section-title">Further Items Needed For Convergence Fusion</div>'
-    + '<div class="forge-client-further">'
+    + '<div class="forge-client-section-title">Select Item To Consume For Convergence Fusion</div>'
+    + '<div class="forge-client-further convfusion">'
+    +   '<div class="forge-client-item-list conv-partners">'
+    +     forgeClientItemGridHtml(partners, FORGE_UI.convPartner, 'data-conv-partner',
+    +       info ? 'No item available: needs another class 4 item, same slot + same tier.' : 'Select an item above first.')
+    +   '</div>'
     +   '<div class="forge-client-need-icons">'
-    +     forgeClientItemTile(partnerInfo ? partnerInfo.slug : null, partnerInfo ? '1' : '0/1', partnerInfo ? 'ok' : 'bad', '', 38, partnerInfo ? partnerInfo.tier : 0)
     +     forgeClientResourceTile('dust', (p.dust || 0) + '/' + FORGE_CONVERGENCE_FUSION.dustCost, dustOk ? 'ok' : 'bad', 34)
     +   '</div>'
     +   '<div class="forge-client-rates">'
@@ -623,6 +631,10 @@ function bindForgeModal() {
 
   var convFuseBtn = body.querySelector('#forge-convfuse-apply');
   if (convFuseBtn) convFuseBtn.addEventListener('click', function() {
+    if (!FORGE_UI.convPartner) {
+      if (typeof toast === 'function') toast('Selecione o item a ser consumido.', 'err');
+      return;
+    }
     var chk = forgeCanConvergeFuse(G.p, FORGE_UI.slug, FORGE_UI.convPartner);
     if (!chk.ok) {
       if (typeof toast === 'function') toast(chk.msg, 'err');

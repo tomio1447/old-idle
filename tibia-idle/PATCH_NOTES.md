@@ -4,6 +4,21 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-29 — Forja: seleção manual do item a queimar (Convergence Fusion)
+
+- O item consumido na Convergence Fusion agora é **escolha manual** —
+  não há mais auto-seleção do primeiro parceiro elegível.
+- Fluxo: (1) selecione o item que **recebe** o bônus na grade superior
+  (com preview de tier); (2) a seção **"Select Item To Consume"** lista
+  os itens elegíveis a queimar (class 4, mesmo slot + mesmo tier) —
+  clique para escolher; (3) o Fuse só habilita com parceiro escolhido.
+- Trocar o item base invalida a seleção anterior (sem re-pick oculto).
+- A linha "Consumed:" mostra o item selecionado; o fallback por API
+  (primeiro parceiro quando `partner_inst_id` não é enviado) segue
+  válido no servidor.
+
+---
+
 ## 2026-11-29 — Fix: sprites animadas Crypt Bile/Jaw (404) + stats oficiais
 
 - `crypt-bile_anim.png` / `crypt-jaw_anim.png` gerados a partir do cid
