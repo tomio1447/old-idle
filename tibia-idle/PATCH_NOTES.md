@@ -4,6 +4,18 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-25 — RMT exige verificação 18+ (CPF + PIX do próprio titular)
+
+- **Gate de venda de TC**: `POST /api/rmt/requests` só aceita `verification_status='verified'` — pendente/reprovado/não verificado recebe erro dedicado (`KYC_PENDING`/`KYC_REJECTED`/`KYC_REQUIRED`).
+- **Verificação no Payment Information** (`server/kyc.js`): CPF com dígito verificador real + data de nascimento (recusa menor de 18 já no servidor, status `rejected`/`UNDERAGE`) + consentimento LGPD registrado (versão, data, IP) + adapter de provedor (`KYC_PROVIDER`: `none` → análise manual do admin, `mock` → só TEST_SERVER).
+- **Saque travado no próprio CPF**: com o gate ativo, a chave PIX precisa ser do tipo `cpf` e idêntica ao documento verificado — menor não consegue sacar para PIX de terceiro.
+- **1 CPF = 1 conta**: unicidade por HMAC-SHA256 (`cpf_hmac` UNIQUE) — o CPF nunca é indexado em claro.
+- Novos campos em `rmt_payment_profiles`: `birth_date_enc`, `cpf_hmac`, `kyc_checked_at`, `kyc_fail_reason`, `kyc_provider`, `consent_*` (todos sensíveis criptografados AES-256-GCM, sempre mascarados na API).
+- **Admin**: fila "Verificação 18+ (KYC)" no painel RMT — lista perfis por status, aprova (`RMT_REVIEW`) ou reprova com motivo (`RMT_REJECT`), log auditado em `rmt_admin_logs`.
+- UI do jogador: formulário com máscara CPF/nascimento, checkbox LGPD, badge de status e banner de bloqueio de venda. Rate limit extra `rmt-kyc` (8/h por IP — cada submissão custará uma consulta quando houver provedor).
+
+---
+
 ## 2026-11-25 — Recuperar senha com OTP + cards translúcidos de login/2FA
 
 - **Recuperar senha** ganhou o mesmo tratamento da verificação de e-mail: código em 6 caixas (colar inteiro, backspace, setas, Enter confirma), botão "Enviar código" com cooldown de 60s ("Aguarde (Ns)" → "Reenviar código"), status tipado (erro/sucesso/info) com shake nas caixas e ajuda anti-spam. Helpers `_otpHtml`/`_otpWire` compartilhados com a verificação de e-mail.

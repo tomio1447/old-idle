@@ -54,13 +54,24 @@ function renderAdminRmt(p, el) {
           </div>
           <div id="rmt-adm-queue"></div>
         </div>
+        <div class="admin-card" style="margin-top:8px">
+          <div class="admin-card-t">Verificação 18+ (KYC)
+            <select id="rmt-adm-kyc-filter" class="tiny" style="margin-left:8px">
+              <option value="pending">em análise</option><option value="">todos</option>
+              <option value="verified">verificados</option><option value="rejected">reprovados</option>
+            </select>
+          </div>
+          <div id="rmt-adm-kyc"><div class="tiny dim">Carregando…</div></div>
+        </div>
         <div id="rmt-adm-ticket" style="margin-top:8px"></div>`;
       renderRmtAdmSettings(el, d.settings || {});
       renderRmtAdmQueue(el, (l && l.requests) || []);
+      renderRmtAdmKyc(el, "pending");
       el.querySelector("#rmt-adm-filter").addEventListener("change", async (e) => {
         const r = await rmtAdmApi("GET", "/api/admin/rmt/requests" + (e.target.value ? "?status=" + e.target.value : ""));
         if (r.ok) renderRmtAdmQueue(el, r.requests);
       });
+      el.querySelector("#rmt-adm-kyc-filter").addEventListener("change", (e) => renderRmtAdmKyc(el, e.target.value));
     });
 }
 
@@ -99,6 +110,42 @@ function renderRmtAdmQueue(el, rows) {
       <td><button class="sm" data-rmt-open="${r.id}">abrir</button></td></tr>`).join("")}</table>`;
   box.querySelectorAll("[data-rmt-open]").forEach((b) =>
     b.addEventListener("click", () => renderRmtAdmTicket(el, Number(b.dataset.rmtOpen))));
+}
+
+/* ── Fila de verificação 18+ (KYC manual enquanto não há provedor) ────── */
+const RMT_KYC_ST = { unverified: "Não verificado", pending: "Em análise", verified: "Verificado", rejected: "Reprovado" };
+async function renderRmtAdmKyc(el, status) {
+  const box = el.querySelector("#rmt-adm-kyc");
+  if (!box) return;
+  box.innerHTML = '<div class="tiny dim">Carregando…</div>';
+  const r = await rmtAdmApi("GET", "/api/admin/rmt/profiles" + (status ? "?status=" + status : ""));
+  if (!r.ok) { box.innerHTML = `<div class="tiny" style="color:#ff9a6a">${r.msg || "Falha"}</div>`; return; }
+  if (!r.profiles.length) { box.innerHTML = '<div class="tiny dim">Nenhum perfil neste filtro.</div>'; return; }
+  box.innerHTML = `<table class="rmt-table">
+    <tr><th>Conta</th><th>Titular</th><th>Doc</th><th>Nasc.</th><th>PIX</th><th>Status</th><th></th></tr>
+    ${r.profiles.map((p) => `<tr>
+      <td class="tiny">#${p.accountId} ${p.login || ""}</td>
+      <td class="tiny">${p.holderName}</td>
+      <td class="tiny">${p.document || ""}</td>
+      <td class="tiny">${p.birthDate || "-"}</td>
+      <td class="tiny">${p.pixKeyType}: ${p.pixKey || "-"}</td>
+      <td class="tiny ${p.verificationStatus === "verified" ? "rmt-st-paid" : p.verificationStatus === "rejected" ? "rmt-st-bad" : "rmt-st-warn"}">${RMT_KYC_ST[p.verificationStatus] || p.verificationStatus}${p.kyc && p.kyc.provider ? " · " + p.kyc.provider : ""}</td>
+      <td>${p.verificationStatus !== "verified" ? `<button class="sm" data-kyc-v="${p.accountId}">aprovar</button>` : ""}
+          ${p.verificationStatus !== "rejected" ? `<button class="sm" data-kyc-r="${p.accountId}">reprovar</button>` : ""}</td>
+    </tr>`).join("")}</table>`;
+  box.querySelectorAll("[data-kyc-v]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Aprovar a verificação 18+ da conta #" + b.dataset.kycV + "?\nConfira manualmente que nome+CPF+nascimento batem (ex.: comprovante/consulta CPF).")) return;
+    const rr = await rmtAdmApi("POST", "/api/admin/rmt/profiles/" + b.dataset.kycV + "/verify", {});
+    toast && toast(rr.msg || (rr.ok ? "Aprovado." : "Falha."), rr.ok ? "good" : "bad");
+    renderRmtAdmKyc(el, el.querySelector("#rmt-adm-kyc-filter").value);
+  }));
+  box.querySelectorAll("[data-kyc-r]").forEach((b) => b.addEventListener("click", async () => {
+    const reason = prompt("Motivo da reprovação (visível ao jogador):");
+    if (reason == null) return;
+    const rr = await rmtAdmApi("POST", "/api/admin/rmt/profiles/" + b.dataset.kycR + "/reject", { reason });
+    toast && toast(rr.msg || (rr.ok ? "Reprovado." : "Falha."), rr.ok ? "good" : "bad");
+    renderRmtAdmKyc(el, el.querySelector("#rmt-adm-kyc-filter").value);
+  }));
 }
 
 async function renderRmtAdmTicket(el, id) {

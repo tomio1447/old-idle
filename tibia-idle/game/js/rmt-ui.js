@@ -82,6 +82,10 @@ function renderRmtHome(body, d) {
       <div class="rmt-card"><div class="tiny dim">RESERVADAS / PENDENTES</div><div class="rmt-big">${fmtTc(sum.reservedTc)} · ${fmtBrl(sum.pendingCents)}</div></div>
     </div>
     ${!d.enabled ? '<div class="tiny" style="color:#ff9a6a;margin:6px 0">O módulo RMT está temporariamente desativado.</div>' : ""}
+    ${d.kycRequired && (!d.profile || d.profile.verificationStatus !== "verified") ? `
+      <div class="tiny" style="margin:6px 0;padding:8px 10px;border:1px solid rgba(234,179,8,.4);border-radius:4px;background:rgba(234,179,8,.1);color:#fde68a">
+        🔒 <b>Vendas bloqueadas:</b> complete a verificação 18+ em "Payment Information" abaixo — exigimos CPF do titular,
+        data de nascimento e recebimento via PIX no próprio CPF.</div>` : ""}
     <div class="rmt-cols">
       <div>
         <div class="rmt-sec-title">VENDER TIBIA COINS</div>
@@ -99,7 +103,7 @@ function renderRmtHome(body, d) {
         <div id="rmt-history"><div class="tiny dim">Carregando…</div></div>
       </div>
     </div>`;
-  renderRmtProfile(body, d.profile);
+  renderRmtProfile(body, d.profile, d);
   renderRmtHistory(body);
   rmtWireSell(body, d);
 }
@@ -130,6 +134,13 @@ function rmtWireSell(body, d) {
     const tc = Math.floor(Number(input.value) || 0);
     if (!tc) { toast && toast("Informe a quantidade de TC.", "bad"); return; }
     if (!d.profile || !d.profile.pixKey) { toast && toast("Cadastre seus dados PIX abaixo antes de vender.", "bad"); return; }
+    if (d.kycRequired && d.profile.verificationStatus !== "verified") {
+      const st = d.profile.verificationStatus;
+      toast && toast(st === "pending" ? "Verificação 18+ em análise — aguarde a liberação."
+        : st === "rejected" ? "Verificação reprovada — corrija os dados abaixo."
+        : "Complete a verificação 18+ antes de vender.", "bad");
+      return;
+    }
     const r = await rmtApi("POST", "/api/rmt/rate", { tc });
     if (!r.ok || !r.quote) { toast && toast((r && r.msg) || "Falha na simulação.", "bad"); return; }
     rmtConfirmBox(body, d, tc, r.quote);
@@ -170,39 +181,73 @@ function rmtConfirmBox(body, d, tc, q) {
   });
 }
 
-/* ── Payment information ─────────────────────────────────────────────── */
-function renderRmtProfile(body, profile) {
+/* ── Payment information + verificação 18+ ───────────────────────────── */
+const RMT_KYC_ST = { unverified: "Não verificado", pending: "Em análise", verified: "Verificado ✓", rejected: "Reprovado" };
+function rmtMaskDigits(el, max, fmt) {
+  el.addEventListener("input", () => {
+    const d = el.value.replace(/\D/g, "").slice(0, max);
+    el.value = fmt ? fmt(d) : d;
+  });
+}
+const fmtCpf = (d) => d.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+const fmtDob = (d) => d.replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})\/(\d{2})(\d)/, "$1/$2/$3");
+
+function renderRmtProfile(body, profile, dash) {
   const el = body.querySelector("#rmt-profile");
   const p = profile || {};
+  const kycOn = !!(dash && dash.kycRequired);
+  const st = p.verificationStatus || "unverified";
+  const stCls = st === "verified" ? "rmt-st-paid" : st === "rejected" ? "rmt-st-bad" : "rmt-st-warn";
   el.innerHTML = `
     <div class="rmt-sell-box">
-      ${p.holderName ? `<div class="tiny">Titular: <b>${p.holderName}</b> · ${p.document || ""}
+      ${p.holderName ? `<div class="tiny">Titular: <b>${p.holderName}</b> · ${p.document || ""}${p.birthDate ? " · nasc. " + p.birthDate : ""}
         · ${p.pixKeyType}: <b>${p.pixKey}</b>
-        <span class="${p.verificationStatus === "verified" ? "rmt-st-paid" : "rmt-st-warn"}">(${p.verificationStatus})</span></div>
-        <div class="tiny dim">Os dados devem ser do titular da conta. Alterações entram em nova análise.</div>` :
-        '<div class="tiny dim">Cadastre os dados PIX do titular da conta para receber pagamentos.</div>'}
+        <span class="${stCls}">(${RMT_KYC_ST[st] || st})</span></div>` : ""}
+      ${st === "pending" ? '<div class="tiny" style="color:#fde68a">⏳ Verificação 18+ em análise pela equipe — a venda libera quando aprovada.</div>' : ""}
+      ${st === "rejected" ? `<div class="tiny" style="color:#ff9a6a">✖ Verificação reprovada${p.kyc && p.kyc.failReason ? " (" + p.kyc.failReason + ")" : ""} — corrija e reenvie.</div>` : ""}
+      ${st === "verified" ? '<div class="tiny" style="color:#9ce84a">✔ Identidade 18+ verificada — RMT liberado.</div>' : ""}
+      ${kycOn ? '<div class="tiny dim">Verificação 18+ obrigatória: o RMT só paga <b>pessoa física</b>, via PIX no <b>próprio CPF</b> do titular.</div>'
+        : '<div class="tiny dim">Cadastre os dados PIX do titular da conta para receber pagamentos.</div>'}
       <div class="rmt-pf-grid" style="margin-top:6px">
         <input id="rmt-pf-name" class="tiny" placeholder="Nome completo do titular" value="">
-        <input id="rmt-pf-doc" class="tiny" placeholder="CPF ou CNPJ do titular" maxlength="14">
-        <select id="rmt-pf-type" class="tiny">
-          <option value="cpf">CPF</option><option value="cnpj">CNPJ</option>
-          <option value="email">E-mail</option><option value="phone">Telefone</option>
-          <option value="random">Chave aleatória</option>
-        </select>
-        <input id="rmt-pf-key" class="tiny" placeholder="Chave PIX">
+        <input id="rmt-pf-doc" class="tiny" placeholder="${kycOn ? "CPF do titular (somente números)" : "CPF ou CNPJ do titular"}" maxlength="14">
+        ${kycOn ? '<input id="rmt-pf-dob" class="tiny" placeholder="Nascimento (DD/MM/AAAA)" maxlength="10" inputmode="numeric">' : ""}
+        ${kycOn
+          ? '<input id="rmt-pf-key" class="tiny" placeholder="Chave PIX = o próprio CPF" maxlength="14">'
+          : `<select id="rmt-pf-type" class="tiny">
+              <option value="cpf">CPF</option><option value="cnpj">CNPJ</option>
+              <option value="email">E-mail</option><option value="phone">Telefone</option>
+              <option value="random">Chave aleatória</option>
+            </select>
+            <input id="rmt-pf-key" class="tiny" placeholder="Chave PIX">`}
       </div>
-      <button class="sm" id="rmt-pf-save" style="margin-top:6px">${p.holderName ? "ATUALIZAR DADOS" : "SALVAR DADOS PIX"}</button>
+      ${kycOn ? `<label class="tiny" style="display:flex;gap:6px;align-items:flex-start;margin-top:6px;line-height:1.4">
+        <input type="checkbox" id="rmt-pf-consent" style="margin-top:2px">
+        <span>Declaro ser o titular dos dados, ter 18 anos ou mais e autorizo o tratamento do CPF e data de nascimento
+          exclusivamente para verificação de identidade e pagamentos (LGPD).</span></label>` : ""}
+      <button class="sm" id="rmt-pf-save" style="margin-top:6px">${p.holderName ? "ATUALIZAR / REVERIFICAR" : "ENVIAR PARA VERIFICAÇÃO"}</button>
     </div>`;
+  const doc = el.querySelector("#rmt-pf-doc");
+  const key = el.querySelector("#rmt-pf-key");
+  const dob = el.querySelector("#rmt-pf-dob");
+  rmtMaskDigits(doc, 14, (d) => (kycOn || d.length <= 11) ? fmtCpf(d) : d);
+  if (dob) rmtMaskDigits(dob, 8, fmtDob);
+  if (kycOn) rmtMaskDigits(key, 11, fmtCpf);
   el.querySelector("#rmt-pf-save").addEventListener("click", async () => {
-    const r = await rmtApi("PUT", "/api/rmt/payment-profile", {
+    const payload = {
       token: sessionToken(),
       holder_name: el.querySelector("#rmt-pf-name").value,
-      holder_document: el.querySelector("#rmt-pf-doc").value,
-      pix_key_type: el.querySelector("#rmt-pf-type").value,
-      pix_key: el.querySelector("#rmt-pf-key").value,
-    });
+      holder_document: doc.value,
+      pix_key_type: kycOn ? "cpf" : el.querySelector("#rmt-pf-type").value,
+      pix_key: key.value,
+    };
+    if (kycOn) {
+      payload.birth_date = dob.value;
+      payload.consent = el.querySelector("#rmt-pf-consent").checked ? 1 : 0;
+    }
+    const r = await rmtApi("PUT", "/api/rmt/payment-profile", payload);
     toast && toast(r.msg || (r.ok ? "Dados salvos." : "Falha ao salvar."), r.ok ? "good" : "bad");
-    if (r.ok) renderRmt(body);
+    if (r.ok || r.profile) renderRmt(body);
   });
 }
 

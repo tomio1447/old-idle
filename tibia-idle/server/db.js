@@ -6063,13 +6063,49 @@ async function MysqlStore() {
       return rows[0] || null;
     },
     async rmtProfileUpsert(accountId, f) {
+      const status = f.verification_status || "pending";
       await this.run(
-        `INSERT INTO rmt_payment_profiles (account_id, holder_name, holder_document_enc, pix_key_type, pix_key_enc, verification_status)
-         VALUES (?, ?, ?, ?, ?, 'pending')
+        `INSERT INTO rmt_payment_profiles (account_id, holder_name, holder_document_enc, birth_date_enc, cpf_hmac,
+           pix_key_type, pix_key_enc, verification_status, verified_at, kyc_checked_at, kyc_fail_reason, kyc_provider,
+           consent_version, consent_at, consent_ip)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, NOW(), ?)
          ON DUPLICATE KEY UPDATE holder_name=VALUES(holder_name), holder_document_enc=VALUES(holder_document_enc),
-           pix_key_type=VALUES(pix_key_type), pix_key_enc=VALUES(pix_key_enc), verification_status='pending', verified_at=NULL`,
+           birth_date_enc=VALUES(birth_date_enc), cpf_hmac=VALUES(cpf_hmac),
+           pix_key_type=VALUES(pix_key_type), pix_key_enc=VALUES(pix_key_enc),
+           verification_status=VALUES(verification_status), verified_at=VALUES(verified_at),
+           kyc_checked_at=VALUES(kyc_checked_at), kyc_fail_reason=VALUES(kyc_fail_reason),
+           kyc_provider=VALUES(kyc_provider), consent_version=VALUES(consent_version),
+           consent_at=VALUES(consent_at), consent_ip=VALUES(consent_ip)`,
         [Number(accountId), String(f.holder_name || ""), f.holder_document_enc || null,
-         f.pix_key_type || null, f.pix_key_enc || null]);
+         f.birth_date_enc || null, f.cpf_hmac || null,
+         f.pix_key_type || null, f.pix_key_enc || null, status,
+         status === "verified" ? new Date() : null,
+         f.kyc_fail_reason || null, f.kyc_provider || null,
+         f.consent_version || null, f.consent_ip || ""]);
+      return this.rmtProfileGet(accountId);
+    },
+    async rmtProfileByCpfHmac(hmac, excludeAccountId) {
+      const rows = await this.query(
+        "SELECT account_id FROM rmt_payment_profiles WHERE cpf_hmac=?" +
+        (excludeAccountId ? " AND account_id<>?" : "") + " LIMIT 1",
+        excludeAccountId ? [String(hmac), Number(excludeAccountId)] : [String(hmac)]);
+      return rows[0] || null;
+    },
+    async rmtProfileList(f = {}) {
+      const w = [], p = [];
+      if (f.status) { w.push("verification_status=?"); p.push(String(f.status)); }
+      if (f.accountId) { w.push("account_id=?"); p.push(Number(f.accountId)); }
+      return this.query(
+        "SELECT * FROM rmt_payment_profiles" + (w.length ? " WHERE " + w.join(" AND ") : "") +
+        " ORDER BY updated_at DESC LIMIT ?",
+        [...p, Math.min(500, Number(f.limit) || 200)]);
+    },
+    async rmtProfileSetStatus(accountId, status, f = {}) {
+      await this.run(
+        `UPDATE rmt_payment_profiles SET verification_status=?, verified_at=?,
+           kyc_fail_reason=?, kyc_provider=?, kyc_checked_at=NOW() WHERE account_id=?`,
+        [String(status), status === "verified" ? new Date() : null,
+         f.reason || null, f.provider || "admin", Number(accountId)]);
       return this.rmtProfileGet(accountId);
     },
     /* Reserva atômica: trava a conta, debita coins, insere request + ledger.
@@ -6800,6 +6836,20 @@ async function ensureSchema(pool) {
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_rmt_profile_acc (account_id)
   ) ENGINE=InnoDB`);
+  /* KYC 18+ do RMT: DOB criptografada, unicidade por HMAC (CPF nunca indexado
+   * em claro), trilha de provedor e consentimento LGPD. */
+  for (const col of [
+    "ADD COLUMN birth_date_enc TEXT",
+    "ADD COLUMN cpf_hmac CHAR(64) DEFAULT NULL",
+    "ADD COLUMN kyc_checked_at TIMESTAMP NULL",
+    "ADD COLUMN kyc_fail_reason VARCHAR(200) DEFAULT NULL",
+    "ADD COLUMN kyc_provider VARCHAR(32) DEFAULT NULL",
+    "ADD COLUMN consent_version VARCHAR(16) DEFAULT NULL",
+    "ADD COLUMN consent_at TIMESTAMP NULL",
+    "ADD COLUMN consent_ip VARCHAR(64) DEFAULT NULL",
+  ]) { try { await pool.query("ALTER TABLE rmt_payment_profiles " + col); } catch (e) { /* já existe */ } }
+  try { await pool.query("ALTER TABLE rmt_payment_profiles ADD UNIQUE KEY uq_rmt_cpf_hmac (cpf_hmac)"); }
+  catch (e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS rmt_requests (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     ticket_number VARCHAR(24) NOT NULL UNIQUE,

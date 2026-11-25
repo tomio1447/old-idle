@@ -7441,8 +7441,9 @@ async function main() {
       }
       if (req.method === "PUT" && url === "/api/rmt/payment-profile") {
         const limited = rateLimit(req, "rmt-profile", 10, 60000); if (limited) return send(res, limited.code, limited.body);
+        const limitedKyc = rateLimit(req, "rmt-kyc", 8, 3600000); if (limitedKyc) return send(res, limitedKyc.code, limitedKyc.body);
         const body = bodyWithSessionToken(req, await readBody(req));
-        const r = await rmt.playerProfilePut(db, body);
+        const r = await rmt.playerProfilePut(db, body, rmtCtx);
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/rmt/requests") {
@@ -7469,6 +7470,18 @@ async function main() {
       if (req.method === "GET" && url === "/api/admin/rmt/requests") {
         const q = Object.fromEntries(new URL(req.url, "http://x").searchParams);
         const r = await rmt.adminList(db, bearerToken(req), q);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/admin/rmt/profiles") {
+        const q = Object.fromEntries(new URL(req.url, "http://x").searchParams);
+        const r = await rmt.adminProfileList(db, bearerToken(req), q);
+        return send(res, r.code, r.body);
+      }
+      const rmtProfMatch = url.match(/^\/api\/admin\/rmt\/profiles\/(\d+)\/(verify|reject)$/);
+      if (rmtProfMatch && req.method === "POST") {
+        const limited = rateLimit(req, "rmt-admin", 30, 60000); if (limited) return send(res, limited.code, limited.body);
+        const body = await readBody(req);
+        const r = await rmt.adminProfileSetStatus(db, bearerToken(req), Number(rmtProfMatch[1]), rmtProfMatch[2], body || {}, rmtCtx);
         return send(res, r.code, r.body);
       }
       const rmtAdmMatch = url.match(/^\/api\/admin\/rmt\/requests\/(\d+)(?:\/(review|approve|reject|payment|confirm-payment|receipt))?$/);

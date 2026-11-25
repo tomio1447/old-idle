@@ -20,6 +20,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const kyc = require("./kyc");
 
 const RECEIPT_DIR = process.env.RMT_RECEIPT_DIR ||
   path.join(__dirname, "data", "rmt_receipts");
@@ -53,6 +54,8 @@ async function rmtSettings(db) {
 }
 
 function rmtSupported(db) { return typeof db.rmtTransact === "function"; }
+/* Gate 18+/KYC no RMT — RMT_KYC_REQUIRED=0 desliga (legado/dev). */
+function kycRequired() { return String(process.env.RMT_KYC_REQUIRED ?? "1") !== "0"; }
 function unsupported() {
   return { code: 503, body: { ok: false, error: "RMT_UNSUPPORTED", msg: "RMT indisponível neste backend de dados." } };
 }
@@ -205,12 +208,8 @@ async function playerDashboard(db, body) {
     minSell: s.MINIMUM_SELL_AMOUNT, maxSell: s.MAXIMUM_SELL_AMOUNT,
     processingHours: s.PROCESSING_ESTIMATED_HOURS,
     summary: sum,
-    profile: profile ? {
-      holderName: profile.holder_name, pixKeyType: profile.pix_key_type,
-      pixKey: maskPix(dec(profile.pix_key_enc), profile.pix_key_type),
-      document: maskDocument(dec(profile.holder_document_enc)),
-      verificationStatus: profile.verification_status,
-    } : null,
+    profile: profile ? publicProfile(profile) : null,
+    kycRequired: kycRequired(),
     lastRequest: last ? publicRequest(last) : null,
   } };
 }
@@ -244,43 +243,114 @@ async function playerRequestGet(db, body, id) {
   return { code: 200, body: { ok: true, request: publicRequest(r), timeline } };
 }
 
+/* Serialização do perfil de recebimento — sempre mascarado, nunca sai CPF/DOB cru. */
+function publicProfile(p) {
+  return {
+    holderName: p.holder_name, pixKeyType: p.pix_key_type,
+    pixKey: maskPix(dec(p.pix_key_enc), p.pix_key_type),
+    document: maskDocument(dec(p.holder_document_enc)),
+    birthDate: kyc.maskBirthDate(dec(p.birth_date_enc)),
+    verificationStatus: p.verification_status,
+    kyc: {
+      failReason: p.kyc_fail_reason || null,
+      provider: p.kyc_provider || null,
+      checkedAt: p.kyc_checked_at || null,
+      verifiedAt: p.verified_at || null,
+    },
+  };
+}
+
 async function playerProfileGet(db, body) {
   if (!rmtSupported(db)) return unsupported();
   const acc = await authAcc(db, body); if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const p = await db.rmtProfileGet(acc.id);
-  return { code: 200, body: { ok: true, profile: p ? {
-    holderName: p.holder_name, pixKeyType: p.pix_key_type,
-    pixKey: maskPix(dec(p.pix_key_enc), p.pix_key_type),
-    document: maskDocument(dec(p.holder_document_enc)),
-    verificationStatus: p.verification_status } : null } };
+  return { code: 200, body: { ok: true, kycRequired: kycRequired(),
+    profile: p ? publicProfile(p) : null } };
 }
 
 const PIX_TYPES = ["cpf", "cnpj", "email", "phone", "random"];
-async function playerProfilePut(db, body) {
+async function playerProfilePut(db, body, ctx) {
   if (!rmtSupported(db)) return unsupported();
   const acc = await authAcc(db, body); if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const holder = String(body.holder_name || "").trim().slice(0, 120);
   const doc = String(body.holder_document || "").replace(/\D/g, "");
   const keyType = String(body.pix_key_type || "").toLowerCase();
   const key = String(body.pix_key || "").trim().slice(0, 120);
-  if (holder.length < 5) return { code: 400, body: { ok: false, msg: "Nome do titular inválido" } };
-  if (doc.length !== 11 && doc.length !== 14) return { code: 400, body: { ok: false, msg: "CPF/CNPJ do titular inválido" } };
+  const kycOn = kycRequired();
+  if (holder.length < 5) return { code: 400, body: { ok: false, msg: "Nome completo do titular inválido" } };
   if (!PIX_TYPES.includes(keyType)) return { code: 400, body: { ok: false, msg: "Tipo de chave PIX inválido" } };
   if (!key) return { code: 400, body: { ok: false, msg: "Chave PIX obrigatória" } };
-  if (keyType === "cpf" && key.replace(/\D/g, "") !== doc) return { code: 400, body: { ok: false, msg: "A chave CPF deve ser do próprio titular" } };
-  // Chave CPF/CNPJ/telefone passa por validação básica de formato.
-  if (keyType === "cpf" && key.replace(/\D/g, "").length !== 11) return { code: 400, body: { ok: false, msg: "Chave CPF inválida" } };
-  if (keyType === "cnpj" && key.replace(/\D/g, "").length !== 14) return { code: 400, body: { ok: false, msg: "Chave CNPJ inválida" } };
-  if (keyType === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)) return { code: 400, body: { ok: false, msg: "Chave e-mail inválida" } };
+
+  if (kycOn) {
+    /* Regra dura do RMT: pessoa física 18+ com PIX no PRÓPRIO CPF — a chave
+     * só pode ser cpf e tem que ser igual ao documento verificado. Sem isso
+     * qualquer menor poderia sacar para um PIX de terceiro. */
+    if (doc.length !== 11)
+      return { code: 400, body: { ok: false, error: "CPF_ONLY", msg: "Informe o CPF do titular — o RMT só paga pessoa física." } };
+    if (!kyc.cpfCheckDigits(doc))
+      return { code: 400, body: { ok: false, error: "CPF_INVALID", msg: "CPF inválido — confira os dígitos." } };
+    if (keyType !== "cpf")
+      return { code: 400, body: { ok: false, error: "PIX_CPF_ONLY", msg: "A chave PIX de recebimento precisa ser o próprio CPF do titular." } };
+    if (key.replace(/\D/g, "") !== doc)
+      return { code: 400, body: { ok: false, error: "PIX_DOC_MISMATCH", msg: "A chave PIX (CPF) deve ser a mesma do titular." } };
+  } else {
+    if (doc.length !== 11 && doc.length !== 14) return { code: 400, body: { ok: false, msg: "CPF/CNPJ do titular inválido" } };
+    if (keyType === "cpf" && key.replace(/\D/g, "") !== doc) return { code: 400, body: { ok: false, msg: "A chave CPF deve ser do próprio titular" } };
+    if (keyType === "cpf" && key.replace(/\D/g, "").length !== 11) return { code: 400, body: { ok: false, msg: "Chave CPF inválida" } };
+    if (keyType === "cnpj" && key.replace(/\D/g, "").length !== 14) return { code: 400, body: { ok: false, msg: "Chave CNPJ inválida" } };
+    if (keyType === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)) return { code: 400, body: { ok: false, msg: "Chave e-mail inválida" } };
+  }
+
+  /* ── Verificação 18+ (LGPD: consentimento explícito registrado) ── */
+  let kycFields = { verification_status: "pending", kyc_provider: "none" };
+  if (kycOn) {
+    const dob = kyc.parseBirthDate(body.birth_date);
+    if (!dob) return { code: 400, body: { ok: false, error: "DOB_INVALID", msg: "Data de nascimento inválida (DD/MM/AAAA)." } };
+    if (!body.consent)
+      return { code: 400, body: { ok: false, error: "CONSENT_REQUIRED", msg: "É preciso autorizar o tratamento dos dados (LGPD) para a verificação." } };
+
+    const fields = {
+      holder_name: holder, holder_document_enc: enc(doc),
+      birth_date_enc: enc(dob.iso), cpf_hmac: kyc.cpfHmac(doc),
+      pix_key_type: keyType, pix_key_enc: enc(key),
+      kyc_provider: kyc.provider(),
+      consent_version: kyc.CONSENT_VERSION, consent_ip: (ctx && ctx.ip) || "",
+    };
+    const save = async (extra) => db.rmtProfileUpsert(acc.id, Object.assign(fields, extra));
+
+    /* Idade declarada — rejeita antes de qualquer consulta externa. */
+    if (kyc.ageOn(dob.iso) < kyc.MIN_AGE) {
+      await save({ verification_status: "rejected", kyc_fail_reason: "UNDERAGE" });
+      return { code: 403, body: { ok: false, error: "UNDERAGE",
+        msg: "O RMT exige titular maior de 18 anos.", profile: publicProfile(await db.rmtProfileGet(acc.id)) } };
+    }
+    /* Unicidade: um CPF só pode estar verificado em uma conta. */
+    const dup = await db.rmtProfileByCpfHmac(kyc.cpfHmac(doc), acc.id);
+    if (dup)
+      return { code: 409, body: { ok: false, error: "CPF_IN_USE", msg: "Este CPF já está vinculado a outra conta." } };
+
+    const chk = await kyc.checkIdentity({ cpf: doc, name: holder, birthDateIso: dob.iso, accountId: acc.id });
+    kycFields = { verification_status: chk.status, kyc_provider: chk.provider,
+      kyc_fail_reason: chk.status === "rejected" ? (chk.reason || "CHECK_FAILED") : null };
+    const p = await save(kycFields);
+    await notify(ctx, acc.id, { action: "profile-updated", kycStatus: p.verification_status });
+    const msgs = {
+      verified: "Identidade verificada — RMT liberado para venda.",
+      pending: "Dados salvos e em análise — a venda libera após a verificação 18+.",
+      rejected: "Verificação reprovada: " + (chk.reason || "os dados não conferem") + ".",
+    };
+    return { code: 200, body: { ok: chk.status !== "rejected", kycStatus: p.verification_status,
+      msg: msgs[p.verification_status] || msgs.pending, profile: publicProfile(p) } };
+  }
+
   const p = await db.rmtProfileUpsert(acc.id, {
     holder_name: holder, holder_document_enc: enc(doc),
     pix_key_type: keyType, pix_key_enc: enc(key),
+    verification_status: "pending", kyc_provider: "legacy",
   });
-  await notify(null, acc.id, { action: "profile-updated" });
+  await notify(ctx, acc.id, { action: "profile-updated" });
   return { code: 200, body: { ok: true, msg: "Dados de recebimento salvos. Entrarão em análise na próxima solicitação.",
-    profile: { holderName: p.holder_name, pixKeyType: p.pix_key_type,
-      pixKey: maskPix(key, keyType), document: maskDocument(doc),
-      verificationStatus: p.verification_status } } };
+    profile: publicProfile(p) } };
 }
 
 async function playerCreate(db, body, ctx) {
@@ -305,6 +375,19 @@ async function playerCreate(db, body, ctx) {
   const profile = await db.rmtProfileGet(acc.id);
   if (!profile || !profile.pix_key_enc || !profile.holder_name)
     return { code: 400, body: { ok: false, error: "NO_PIX_PROFILE", msg: "Cadastre seus dados PIX (Payment Information) antes de vender" } };
+  if (kycRequired() && profile.verification_status !== "verified") {
+    const st = profile.verification_status;
+    if (st === "pending")
+      return { code: 403, body: { ok: false, error: "KYC_PENDING",
+        msg: "Sua identidade está em análise — a venda libera após a verificação 18+." } };
+    if (st === "rejected")
+      return { code: 403, body: { ok: false, error: "KYC_REJECTED",
+        msg: profile.kyc_fail_reason === "UNDERAGE"
+          ? "O RMT exige titular maior de 18 anos."
+          : "Verificação reprovada — corrija os dados de recebimento e tente novamente." } };
+    return { code: 403, body: { ok: false, error: "KYC_REQUIRED",
+      msg: "Complete a verificação 18+ nos dados de recebimento antes de vender." } };
+  }
   const q = quote(tc, s);
   if (q.net <= 0) return { code: 400, body: { ok: false, msg: "Valor líquido inválido para a quantidade informada" } };
   // Conta flagada entra direto em UNDER_REVIEW (não é rejeitada por indicador isolado).
@@ -600,11 +683,54 @@ async function adminAudit(db, token, q) {
   return { code: 200, body: { ok: true, logs } };
 }
 
+/* ── Fila de verificação 18+/KYC (manual enquanto não há provedor) ────── */
+async function adminProfileList(db, token, q) {
+  const auth = await adminAuth(db, token, "RMT_VIEW"); if (auth.error) return auth.error;
+  if (!rmtSupported(db)) return unsupported();
+  const rows = await db.rmtProfileList({ status: q.status || undefined, limit: q.limit });
+  const out = [];
+  for (const p of rows) {
+    const acc = await db.findAccountById(p.account_id).catch(() => null);
+    const v = publicProfile(p);
+    v.accountId = Number(p.account_id);
+    v.login = acc ? acc.login : null;
+    v.updatedAt = p.updated_at;
+    out.push(v);
+  }
+  return { code: 200, body: { ok: true, profiles: out } };
+}
+
+async function adminProfileSetStatus(db, token, accountId, action, body, ctx) {
+  const perm = action === "reject" ? "RMT_REJECT" : "RMT_REVIEW";
+  const auth = await adminAuth(db, token, perm); if (auth.error) return auth.error;
+  if (!rmtSupported(db)) return unsupported();
+  if (action !== "verify" && action !== "reject")
+    return { code: 400, body: { ok: false, msg: "Ação inválida" } };
+  const status = action === "verify" ? "verified" : "rejected";
+  const reason = action === "reject"
+    ? String((body && body.reason) || "MANUAL_REJECT").slice(0, 200) : null;
+  if (action === "reject" && !reason)
+    return { code: 400, body: { ok: false, msg: "Informe o motivo da reprovação" } };
+  const cur = await db.rmtProfileGet(accountId);
+  if (!cur) return { code: 404, body: { ok: false, msg: "Perfil não encontrado" } };
+  const p = await db.rmtProfileSetStatus(accountId, status,
+    { reason, provider: "admin:" + auth.acc.login });
+  await db.rmtAdminLog(null, { admin_id: auth.acc.id, admin_login: auth.acc.login,
+    request_id: null, action: "kyc-" + action,
+    description: "KYC acc#" + accountId + " → " + status + (reason ? " (" + reason + ")" : ""),
+    ip: ctx && ctx.ip });
+  const v = publicProfile(p);
+  v.accountId = Number(p.account_id);
+  return { code: 200, body: { ok: true, profile: v,
+    msg: status === "verified" ? "KYC aprovado — conta liberada para vender." : "KYC reprovado." } };
+}
+
 module.exports = {
-  rmtSupported, rmtSettings, RMT_DEFAULTS, RMT_PERMS, adminHasPerm,
+  rmtSupported, rmtSettings, RMT_DEFAULTS, RMT_PERMS, adminHasPerm, kycRequired,
   playerDashboard, playerRate, playerHistory, playerRequestGet,
   playerProfileGet, playerProfilePut, playerCreate, playerCancel,
   adminDashboard, adminList, adminGet, adminTransition,
   adminReceiptUpload, adminReceiptGet, adminSettingsGet, adminSettingsPut, adminAudit,
+  adminProfileList, adminProfileSetStatus,
   maskDocument, maskPix, enc, dec, quote,
 };
