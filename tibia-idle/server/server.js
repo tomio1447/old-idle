@@ -5260,13 +5260,43 @@ async function setVip(db, body) {
  * confirma para autenticar a conta. `EMAIL_VERIFY_REQUIRED=1` passa a exigir
  * e-mail confirmado antes de criar personagem. Em TEST_SERVER o código é
  * devolvido como `devCode` — exceto com MAIL_REAL=1, onde o mailer envia de
- * verdade e o devCode não é exposto. */
+ * verdade e o devCode não é exposto.
+ *
+ * Limites por conta (protegem a cota diária do provedor de e-mail):
+ * cooldown de reenvio + teto de envios/dia, compartilhados entre e-mail,
+ * telefone e recuperação de senha. Desligados quando o mailer está em mock
+ * (dev local não gasta cota). O instante do último envio é derivado de
+ * `*_code_expires - TTL` — sem coluna nova. */
+const MAIL_SEND_COOLDOWN_MS = parseInt(process.env.MAIL_SEND_COOLDOWN_MS || "60000", 10);
+const ACCOUNT_MAIL_DAILY_MAX = parseInt(process.env.ACCOUNT_MAIL_DAILY_MAX || "6", 10);
+const MAIL_MOCKED = TEST_SERVER && process.env.MAIL_REAL !== "1";
+const _mailDaily = new Map(); // accId -> { day, count }
+function mailQuotaCheck(acc, lastCodeExpires, codeTtlMs) {
+  if (MAIL_MOCKED) return null;
+  const now = Date.now();
+  const sentAt = (Number(lastCodeExpires) || 0) - codeTtlMs;
+  const waitMs = MAIL_SEND_COOLDOWN_MS - (now - sentAt);
+  if (waitMs > 0) return { code: 429, body: { ok: false,
+    msg: "Aguarde " + Math.ceil(waitMs / 1000) + "s para reenviar o código.",
+    retryAfterSec: Math.ceil(waitMs / 1000) } };
+  const day = Math.floor(now / 86400000);
+  let row = _mailDaily.get(acc.id);
+  if (!row || row.day !== day) row = { day, count: 0 };
+  if (row.count >= ACCOUNT_MAIL_DAILY_MAX) return { code: 429, body: { ok: false,
+    msg: "Limite diário de envios atingido. Tente novamente amanhã." } };
+  row.count++; _mailDaily.set(acc.id, row);
+  if (_mailDaily.size > 20000)
+    for (const [k, v] of _mailDaily) if (v.day !== day) _mailDaily.delete(k);
+  return null;
+}
 async function requestEmailCode(db, body) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   if (acc.email_verified) return { code: 200, body: { ok: true, alreadyVerified: true, emailVerified: true } };
   const email = String(body.email || acc.email || "").trim().slice(0, 120);
   if (!EMAIL_RE.test(email)) return { code: 400, body: { ok: false, msg: "Informe um e-mail válido." } };
+  const quota = mailQuotaCheck(acc, acc.email_code_expires, EMAIL_CODE_TTL_MS);
+  if (quota) return quota;
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = Date.now() + EMAIL_CODE_TTL_MS;
   if (typeof db.setAccountEmail === "function") await db.setAccountEmail(acc.id, email);
@@ -5312,6 +5342,8 @@ async function requestPhoneCode(db, body) {
   const phone = String(body.phone || "").trim().slice(0, 24);
   if (!PHONE_RE.test(phone))
     return { code: 400, body: { ok: false, msg: "Informe um telefone válido (ex.: +55 47 99999-9999)." } };
+  const quota = mailQuotaCheck(acc, acc.phone_code_expires, PHONE_CODE_TTL_MS);
+  if (quota) return quota;
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = Date.now() + PHONE_CODE_TTL_MS;
   if (typeof db.setAccountPhone === "function") await db.setAccountPhone(acc.id, phone);
@@ -5381,6 +5413,8 @@ async function requestPasswordRecovery(db, body) {
   if (!acc && EMAIL_RE.test(ident) && typeof db.findAccountByEmail === "function")
     acc = await db.findAccountByEmail(ident);
   if (!acc || !EMAIL_RE.test(String(acc.email || ""))) return generic;
+  /* Throttle por conta sem vazar informação: resposta continua genérica. */
+  if (mailQuotaCheck(acc, acc.recovery_code_expires, RECOVERY_CODE_TTL_MS)) return generic;
   const code = String(Math.floor(100000 + Math.random() * 900000));
   if (typeof db.setAccountRecoveryCode === "function")
     await db.setAccountRecoveryCode(acc.id, code, Date.now() + RECOVERY_CODE_TTL_MS);

@@ -30,6 +30,20 @@ const SMTP_FROM = String(process.env.SMTP_FROM || "no-reply@global-idle.com").tr
 const TEST_SERVER = process.env.TEST_SERVER === "1";
 const MAIL_REAL = process.env.MAIL_REAL === "1";
 
+/* Cota global diária (em memória): protege o plano do provedor (ex.: Brevo
+ * Free = 300/dia). Atingida, TODOS os canais param de enviar até virar o
+ * dia — 0 desativa. Conta por dia UTC; reiniciar o processo zera o contador,
+ * o que é aceitável: o throttle por conta continua no server.js. */
+const EMAIL_DAILY_CAP = parseInt(process.env.EMAIL_DAILY_CAP || "250", 10);
+let _mailDay = 0, _mailCount = 0;
+function _dailyQuotaOk() {
+  const day = Math.floor(Date.now() / 86400000);
+  if (day !== _mailDay) { _mailDay = day; _mailCount = 0; }
+  if (EMAIL_DAILY_CAP > 0 && _mailCount >= EMAIL_DAILY_CAP) return false;
+  _mailCount++;
+  return true;
+}
+
 /* Fundo do e-mail: pergaminho/selo de cera embutido como CID (o cliente de
  * e-mail não precisa buscar URL externa). Se o arquivo sumir do deploy, o
  * template cai pro marrom escuro e o e-mail sai mesmo assim. */
@@ -106,6 +120,10 @@ async function send(to, subject, text, html) {
   }
   if (!configured()) {
     return { ok: false, reason: "smtp-unconfigured" };
+  }
+  if (!_dailyQuotaOk()) {
+    console.error("[mailer] cota diária de e-mails atingida (" + EMAIL_DAILY_CAP + ") — envios suspensos até virar o dia");
+    return { ok: false, reason: "daily-cap" };
   }
   try {
     const nodemailer = require("nodemailer");
