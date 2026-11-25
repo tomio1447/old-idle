@@ -341,7 +341,7 @@ function renderMarket() {
         <button class="sm ${_mTab === "sell" ? "primary" : ""}" data-mtab="sell">💰 Vender</button>
         <button class="sm ${_mTab === "mine" ? "primary" : ""}" data-mtab="mine">📋 Minhas ofertas</button>
         <button class="sm ${_mTab === "history" ? "primary" : ""}" data-mtab="history">🧾 Histórico</button>
-        ${typeof renderRmt === "function" ? `<button class="sm ${_mTab === "rmt" ? "primary" : ""}" data-mtab="rmt">💵 RMT</button>` : ""}
+        ${typeof renderRmt === "function" ? `<button class="sm ${_mTab === "rmt" ? "primary" : ""}" data-mtab="rmt"><svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:3px" aria-hidden="true"><path fill="#32BCAD" d="M17.3 9.1c.8 0 1.6.3 2.1.9L22 12l-2.6 2a2.9 2.9 0 0 1-2.1.9h-1.4c-.5 0-1 .2-1.4.6L12 17.6l-2.5-2.5a1.9 1.9 0 0 0-1.4-.6H6.7a2.9 2.9 0 0 1-2.1-.9L2 12l2.6-2a2.9 2.9 0 0 1 2.1-.9h1.4c.5 0 1-.2 1.4-.6L12 4l2.5 2.5c.4.4.9.6 1.4.6h1.4z"/></svg>RMT</button>` : ""}
       </div>
       <div id="market-body" style="height:520px;overflow:auto"></div>
     </div>`;
