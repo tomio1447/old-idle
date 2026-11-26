@@ -102,7 +102,16 @@
  M['druid-s-apparition']=apparition("Druid's Apparition",'ice',iceHoly([756,910],[770,875]));
  M['monk-s-apparition']=apparition("Monk's Apparition",'ice',iceHoly([756,910],[770,875]));
  M['many-faces']={name:'Many Faces',hp:30000,exp:18870,damage:910,armor:105,defense:105,mitigation:3.34,element:'ice',attackSpeed:2000,resist:{physical:0,energy:0,earth:0,fire:-5,ice:30,holy:50,death:-30},skills:[{el:'ice',min:854,max:980,int:4000,ch:33,range:7,fx:'ice-attack',miss:'ice'},{el:'ice',min:700,max:1015,int:5000,ch:44,range:7,radius:5,fx:'ice-area',miss:'ice'},{el:'holy',min:735,max:910,int:9500,ch:59,radius:4,fx:'holy-area'},{el:'holy',min:805,max:910,int:10000,ch:59,range:7,chain:4,fx:'holy-damage',miss:'holy'}],loot:loot.slice()};
- GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',otbm:'mirrored_nightmare_sw',otbmFloor:7,otbmFovBounds:{x:1014,y:1013,w:19,h:15,z:7},otbmFovWidth:20,otbmFovHeight:12,otbmRuntimeWidth:30,otbmRuntimeHeight:30,otbmSpawn:{x:1018,y:1020,z:7},otbmMobBounds:{x:1016,y:1019,w:8,h:8,z:7},monsters:['many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition','distorted-phantom'],avgHp:26857,avgExp:21553,avgDamage:695,avgArmor:87,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e',soulWarZone:true,soulWarZoneMonster:'many-faces'};
+ // Dark Thais — Mirrored Nightmare: beta-maps/dark_thais.otbm →
+ // maps/dark_thais.otbm (o mirrored_nightmare_sw.otbm antigo continua
+ // publicado, só não é mais referenciado pela hunt). OTBM z=7
+ // (1007,1015)..(1061,1063) 55×49 → mundo runtime 60×55. Câmera no padrão
+ // Soul War (FOV 20×12 sobre o retângulo caminhável 32×31). Spawn
+ // (1029,1041); zona de monstros = bbox caminhável (1018,1023)..(1049,1053)
+ // — células bloqueadas do retângulo são puladas pelo seletor de respawn.
+ // 11 pontos fixos (otbmFixedSpawns): cada célula mantém 1 monstro extra
+ // com id "fixed-"+i → onda = pack 8–10 + 11 fixos = até 21 mobs.
+ GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',otbm:'dark_thais',otbmFloor:7,otbmFovBounds:{x:1018,y:1023,w:32,h:31,z:7},otbmFovWidth:20,otbmFovHeight:12,otbmRuntimeWidth:60,otbmRuntimeHeight:55,otbmSpawn:{x:1029,y:1041,z:7},otbmMobBounds:{x:1018,y:1023,w:32,h:31,z:7},otbmFixedSpawns:[{x:1025,y:1041,z:7},{x:1028,y:1036,z:7},{x:1032,y:1038,z:7},{x:1035,y:1036,z:7},{x:1035,y:1041,z:7},{x:1034,y:1044,z:7},{x:1035,y:1048,z:7},{x:1040,y:1046,z:7},{x:1024,y:1047,z:7},{x:1026,y:1051,z:7},{x:1019,y:1037,z:7}],monsters:['many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition','distorted-phantom'],avgHp:26857,avgExp:21553,avgDamage:695,avgArmor:87,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e',soulWarZone:true,soulWarZoneMonster:'many-faces'};
 
  // Os dados gerados já vêm dos mesmos monster.lua do Canary. Estes ajustes
  // preservam detalhes dos spells nomeados que o import genérico não infere:

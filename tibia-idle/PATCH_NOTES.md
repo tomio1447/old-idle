@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Dark Thais (Mirrored Nightmare) com mapa novo + 11 pontos fixos
+
+- **Dark Thais — Mirrored Nightmare** (SOULWAR 400+) migra para o mapa `dark_thais.otbm` (55×49, z=7, bounds 1007..1061 × 1015..1063) — publicado byte-igual em `game/maps/`. O `mirrored_nightmare_sw.otbm` antigo continua no disco, só não é mais usado pela hunt.
+- Playerspawn {1029,1041,7}; zona de respawn e câmera = bbox caminhável {1018,1023}→{1049,1053} (32×31; células bloqueadas do retângulo são puladas pelo seletor). Mundo runtime 60×55, FOV 20×12 (padrão Soul War).
+- **11 pontos fixos de respawn** (`otbmFixedSpawns`, mesmo mecanismo da Asura Palace): cada célula mantém 1 monstro extra com id `fixed-0..10` que respawna na mesma célula — onda = pack 8–10 + 11 fixos = até 21 mobs. Os 7 monstros, packs, taints e missão não mudam.
+- `tools/import_dark_thais_assets.py`: 45 sprites de tile novos (todos renderizados do DAT, nenhum PNG manual), 26 patterns, 0 flags novas, catálogo RME atualizado.
+- Fixes de testes pré-existentes descobertos no caminho: `test_mirrored_nightmare.js` (fiação nova + asserts antigos de mapa/missão/cache-bust, slice CRLF do game.js), `test_rotten_wasteland.js` (slices CRLF, contagem de células livres 69→81, enforced do boss, seção em hunt-sections.js), `test_goshnars_greed.js` (acesso Greed via Ebb and Flow, cooldown 16h, cache-busts genéricos). Teste novo: `tools/test_dark_thais.js`.
+
+---
+
 ## 2026-11-26 — Nova hunt 400+: Nimmersatt's Breeding Ground
 
 - **Nimmersatt's Breeding Ground** entra no fim da seção HUNTS 400+: Dragolisk, Mega Dragon e Wardragon (pesos 34/33/33), pack 8–10. Mapa `Nimmersatt's Breeding Ground.otbm` publicado byte-igual em `game/maps/nimmersatt_breeding_ground.otbm` (46×32, z=7, bounds 1010..1055 × 1016..1047). Playerspawn {1030,1030,7}; zona de respawn {1023,1024}→{1037,1037} (15×14 = 210 sqm, todas caminháveis e conectadas ao componente de 299).

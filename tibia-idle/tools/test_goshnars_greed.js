@@ -122,11 +122,11 @@ const missionEnd = gameSrc.indexOf("function missionForHunt", missionStart);
 must(missionStart >= 0 && missionEnd > missionStart, "MISSION_DEFS slice inválido");
 vm.runInContext(gameSrc.slice(missionStart, missionEnd) +
   "\nwindow.__MISSION_DEFS=MISSION_DEFS;", ctx);
-const mission = ctx.__MISSION_DEFS["dark-thais"];
-must(mission && mission.tasks.length === 7 &&
-     mission.tasks.some((task) => task.monster === "distorted-phantom") &&
-     mission.completeReward.bossAccess === "goshnar-s-greed",
-  "Mirrored Nightmare não recompensa acesso ao boss");
+// Acesso ao Greed migrou para a missão de Ebb and Flow (Fear ×15) —
+// Mirrored Nightmare hoje libera Goshnar's Malice.
+const mission = ctx.__MISSION_DEFS["ebb-and-flow"];
+must(mission && mission.completeReward.bossAccess === "goshnar-s-greed",
+  "Ebb and Flow não recompensa acesso ao Goshnar's Greed");
 const bossStart = gameSrc.indexOf("const MEGA_TEST_BYPASS");
 const bossDefsStart = gameSrc.indexOf("const BOSS_DEFS = {");
 const bossEnd = gameSrc.indexOf("/* Quivers", bossDefsStart);
@@ -135,9 +135,9 @@ ctx.BOSS_COOLDOWN = 0;
 vm.runInContext(gameSrc.slice(bossStart, bossEnd) + "\nwindow.__BOSS_DEFS=BOSS_DEFS;", ctx);
 const boss = ctx.__BOSS_DEFS["goshnar-s-greed"];
 must(boss.hunt === "goshnars-greed-room" && boss.requirement.enforced === false &&
-     boss.requirement.mission === "dark-thais" && boss.requirement.access === "goshnar-s-greed" &&
-     boss.cooldown === 0,
-  "Goshnar não ficou livre de requisito/cooldown durante os testes");
+     boss.requirement.mission === "ebb-and-flow" && boss.requirement.access === "goshnar-s-greed" &&
+     boss.cooldown === 16 * 60 * 60 * 1000,
+  "Goshnar sem requisito enforced/cooldown oficial de 16h");
 must(boss.hp === 300000 && boss.exp === 150000 && boss.damage === 5000 &&
      boss.armor === 160 && boss.defense === 160,
   "stats de Goshnar divergem do Canary");
@@ -162,13 +162,9 @@ must(html.includes('id="greed-minigame"') && css.includes('.greed-minigame') &&
      css.includes('right: 8px; bottom: 8px') && css.includes('width: 210px') &&
      fs.readFileSync(path.join(js,"soulwar.js"),"utf8").includes('GREEDBEASTS <b>${c.greed.greedbeastKills}'),
   "modal pequeno no canto inferior direito não foi configurado");
-must(html.includes("js/combat.js?v="), "combat sem cache-busting");
-must(html.includes("js/render.js?v=wave-fx-dat-v1"), "render sem cache-busting visual");
-must(html.includes("js/soulwar.js?v=greed-arena-60-v1"), "soulwar sem cache-busting Greed arena/60%");
-must(html.includes("js/yasir-prices.js?v=goshnar-yasir-v1"), "yasir-prices sem cache-busting");
-must(html.includes("js/scarlett-boss.js?v=scarlett-esteira-smooth-v1"),
-  "gate compartilhado sem cache-busting");
-must(html.includes("css/layout.css?v=boot-load-screen-v1"),
-  "CSS do modal Greedbeast sem cache-busting");
+// Cache-busting: tags mudam a cada deploy (convenção deploy-DDMM-vN).
+for (const asset of ["js/combat.js", "js/render.js", "js/soulwar.js",
+  "js/yasir-prices.js", "js/scarlett-boss.js", "css/layout.css"])
+  must(html.includes(asset + "?v="), asset + " sem cache-busting");
 
 console.log("OK: Goshnar's Greed — arena Canary 22×18, adds sem defesa, Greedbeast 60% e vulnerabilidade de 40s.");

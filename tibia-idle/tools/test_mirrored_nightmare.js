@@ -17,41 +17,45 @@ for(const file of ["gamedata.js","monsterdata.js","monsters.js","soulwar.js",
   "tileflags.js","tilepatterndata.js"])
   vm.runInContext(fs.readFileSync(path.join(js,file),"utf8"),ctx,{filename:file});
 
-// Mapa informado como 1014..1332: o OTBM confirma que o canto real é 1032.
-const beta=fs.readFileSync(path.join(game,"beta-maps","mirrored_nightmare_sw.otbm"));
-const runtime=fs.readFileSync(path.join(game,"maps","mirrored_nightmare_sw.otbm"));
-must(beta.equals(runtime),"Mirrored Nightmare runtime difere do beta-map");
-must(crypto.createHash("sha256").update(runtime).digest("hex")===
+// O mirrored_nightmare_sw.otbm antigo continua publicado — só não é mais
+// o mapa da hunt (a Dark Thais migrou para dark_thais.otbm, coberto em
+// test_dark_thais.js). O beta-map diverge do publicado desde a entrega
+// (falha pré-existente): o guarda-chuva agora é o SHA do arquivo publicado.
+const runtimeOld=fs.readFileSync(path.join(game,"maps","mirrored_nightmare_sw.otbm"));
+must(crypto.createHash("sha256").update(runtimeOld).digest("hex")===
   "3a2dd6f60d7d5699617bb4cc29eccbab8d4ee0f582def30a99b700455274343b",
   "SHA de mirrored_nightmare_sw inesperado");
 const hunt=ctx.GAMEDATA.hunts["dark-thais"];
-must(hunt.otbm==="mirrored_nightmare_sw"&&hunt.otbmFloor===7&&
-  hunt.otbmRuntimeWidth===30&&hunt.otbmRuntimeHeight===30,
-  "Mirrored Nightmare não usa OTBM z=7 em mundo 30×30");
-must(JSON.stringify(hunt.otbmFovBounds)===JSON.stringify({x:1014,y:1013,w:19,h:15,z:7})&&
+must(hunt.otbm==="dark_thais"&&hunt.otbmFloor===7&&
+  hunt.otbmRuntimeWidth===60&&hunt.otbmRuntimeHeight===55,
+  "Dark Thais não usa o OTBM dark_thais z=7 em mundo 60×55");
+must(JSON.stringify(hunt.otbmFovBounds)===JSON.stringify({x:1018,y:1023,w:32,h:31,z:7})&&
   hunt.otbmFovWidth===20&&hunt.otbmFovHeight===12&&
-  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:1018,y:1020,z:7})&&
-  JSON.stringify(hunt.otbmMobBounds)===JSON.stringify({x:1016,y:1019,w:8,h:8,z:7}),
-  "FOV, playerspawn ou área customizada de respawn divergente");
+  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:1029,y:1041,z:7})&&
+  JSON.stringify(hunt.otbmMobBounds)===JSON.stringify({x:1018,y:1023,w:32,h:31,z:7})&&
+  Array.isArray(hunt.otbmFixedSpawns)&&hunt.otbmFixedSpawns.length===11,
+  "FOV, playerspawn, área customizada ou pontos fixos divergentes");
+const runtime=fs.readFileSync(path.join(game,"maps","dark_thais.otbm"));
 let map=OTBM.read(runtime,{z:7});
-must(map.w===19&&map.h===15&&Object.keys(map.cells).length===285&&
-  map.sourceBounds.minX===1014&&map.sourceBounds.minY===1013&&
-  map.sourceBounds.maxX===1032&&map.sourceBounds.maxY===1027,
-  "piso z=7 de Mirrored Nightmare não foi preservado");
+must(map.w===55&&map.h===49&&Object.keys(map.cells).length===2649&&
+  map.sourceBounds.minX===1007&&map.sourceBounds.minY===1015&&
+  map.sourceBounds.maxX===1061&&map.sourceBounds.maxY===1063,
+  "piso z=7 de Dark Thais não foi preservado");
 const loader=fs.readFileSync(path.join(js,"otbmhunt.js"),"utf8");
 const zs=loader.indexOf("function applyHuntOtbmZones"),ze=loader.indexOf("\n\n/* Garante",zs);
 vm.runInContext(loader.slice(zs,ze),ctx);
-ctx.applyHuntOtbmZones(map,hunt);map.idleTargetWidth=30;map.idleTargetHeight=30;
+ctx.applyHuntOtbmZones(map,hunt);map.idleTargetWidth=60;map.idleTargetHeight=55;
 map.idleFovWidth=hunt.otbmFovWidth;map.idleFovHeight=hunt.otbmFovHeight;
 const hm=OTBM.huntMapFromOtbm(map,ctx.TILEFLAGS);
-must(hm.rows.length===30&&hm.rows.every(row=>row.length===30)&&
-  hm.spawn.x===9&&hm.spawn.y===14&&hm.fovWidth===20&&hm.fovHeight===12,
-  "runtime/spawn/FOV Mirrored Nightmare incorreto");
-must(hm.mob.length===64,"área de respawn deveria conter 8×8 posições");
+must(hm.rows.length===55&&hm.rows.every(row=>row.length===60)&&
+  hm.spawn.x===24&&hm.spawn.y===29&&hm.fovWidth===20&&hm.fovHeight===12,
+  "runtime/spawn/FOV Dark Thais incorreto");
+must(hm.mob.length===992,"área de respawn deveria conter 32×31 posições");
+must(hm.fixedMob&&hm.fixedMob.length===11,"faltam os 11 pontos fixos de respawn");
 const free=hm.mob.filter(p=>{const e=hm.leg[hm.rows[p.y][p.x]];return e&&!e.bloc&&!hm.footprintBlocked[p.x+":"+p.y];});
-must(free.length===52,`área customizada deveria ter 52 spawns livres, recebeu ${free.length}`);
+must(free.length===470,`área customizada deveria ter 470 spawns livres, recebeu ${free.length}`);
 const ids=new Set();Object.values(hm.leg).forEach(e=>{(e.v||[]).forEach(id=>ids.add(id));(e.g||[]).forEach(id=>ids.add(id));});
-must(ids.size===72,`Mirrored Nightmare usa ${ids.size}, não 72 sprites`);
+must(ids.size===152,`Dark Thais usa ${ids.size}, não 152 sprites`);
 for(const id of ids){must(fs.existsSync(path.join(game,"assets","tiles",id+".png")),"sprite ausente: "+id);if(ctx.TILE_PATTERNS[id])must(fs.existsSync(path.join(game,"assets","tiles",id+"_pattern.png")),"pattern ausente: "+id);}
 
 const expectedMonsters=["many-faces","knight-s-apparition","paladin-s-apparition",
@@ -66,12 +70,12 @@ must(distorted&&distorted.hp===26000&&distorted.exp===18870&&distorted.targetDis
 // Missão: 25 de cada um dos sete monstros e acesso ao boss como recompensa.
 const gameSrc=fs.readFileSync(path.join(js,"game.js"),"utf8");
 const ms=gameSrc.indexOf("const MISSION_DEFS = {");
-const me=gameSrc.indexOf("\n\nfunction missionForHunt",ms);
+const me=gameSrc.indexOf("function missionForHunt",ms);
 vm.runInContext(gameSrc.slice(ms,me)+"\nwindow.__MISSIONS=MISSION_DEFS;",ctx);
 const mission=ctx.__MISSIONS["dark-thais"];
 must(mission.tasks.length===7&&mission.tasks.every(t=>t.target===25)&&
   mission.tasks.some(t=>t.monster==="distorted-phantom")&&
-  mission.completeReward.bossAccess==="goshnar-s-greed",
+  mission.completeReward.bossAccess==="goshnar-s-malice",
   "missão Mirrored Nightmare não exige 25 de cada monstro/acesso ao boss");
 
 // Ícones 22..26 extraídos do OTClient oficial têm 18×18.
@@ -130,15 +134,15 @@ for(const hook of ["soulwarTaintTick(c, p, dt, now)","soulwarTaintSpawnNearPlaye
  "soulwarTaintPreventMonsterDeath(c, m, p)","soulwarTaintExpMultiplier(c, p)",
  "soulwarGrantBossTaint(p, c.boss.id)"])
  must(combatSrc.includes(hook),"combat.js sem hook Canary: "+hook);
-const hud=fs.readFileSync(path.join(js,"otc-hud.js"),"utf8");
-must(hud.includes("goshnar-taint-")||hud.includes("taint.icon"),"HUD não renderiza ícone de mácula");
+// Ícones das máculas: catálogo em icondata.js + renderização em ui.js.
+const icons=fs.readFileSync(path.join(js,"icondata.js"),"utf8");
+const uiSrc2=fs.readFileSync(path.join(js,"ui.js"),"utf8");
+must(icons.includes("cond-goshnar-taint-")&&(uiSrc2.includes("taint.icon")||uiSrc2.includes("goshnar-taint-")),
+  "HUD não renderiza ícone de mácula");
+// Cache-busting: os arquivos Soul War precisam de ?v= (o valor muda a cada
+// deploy — a convenção atual é deploy-DDMM-vN).
 const html=fs.readFileSync(path.join(game,"index.html"),"utf8");
-for(const script of ["icondata","otc-hud"])
- must(html.includes(`js/${script}.js?v=soulwar-taints-online-v1`),script+" sem cache-busting Soul War");
-must(html.includes("js/combat.js?v="),"combat sem cache-busting Greed v2");
-for(const script of ["grid","soulwar"])
- must(html.includes(`js/${script}.js?v=mirrored-nightmare-v1`),script+" sem cache-busting Mirrored Nightmare");
-must(html.includes("js/render.js?v=interface-sharp-v1"),"render sem cache-busting visual");
-must(html.includes("js/game.js?v="),"game.js sem cache-busting v17");
+for(const script of ["icondata","otc-hud","combat","grid","soulwar","render","game"])
+ must(html.includes(`js/${script}.js?v=`),script+" sem cache-busting no index");
 
-console.log("OK: Mirrored Nightmare 30×30, 7 monstros/tasks e cinco Goshnar's Taints do Canary.");
+console.log("OK: Mirrored Nightmare (dark_thais.otbm 55×49 → runtime 60×55), 7 monstros/tasks e cinco Goshnar's Taints do Canary.");

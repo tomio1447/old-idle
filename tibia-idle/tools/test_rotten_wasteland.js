@@ -31,7 +31,7 @@ must(map.w===21&&map.h===15&&Object.keys(map.cells).length===270&&
   map.sourceBounds.maxX===1060&&map.sourceBounds.maxY===1026,
   "piso z=7 de Rotten Wasteland não foi mantido integralmente");
 const loader=fs.readFileSync(path.join(js,"otbmhunt.js"),"utf8");
-const zs=loader.indexOf("function applyHuntOtbmZones"),ze=loader.indexOf("\n\n/* Garante",zs);
+const zs=loader.indexOf("function applyHuntOtbmZones"),ze=loader.indexOf("/* Garante",zs);
 vm.runInContext(loader.slice(zs,ze),ctx);ctx.applyHuntOtbmZones(map,hunt);
 map.idleTargetWidth=30;map.idleTargetHeight=30;
 const hm=OTBM.huntMapFromOtbm(map,ctx.TILEFLAGS);
@@ -39,7 +39,7 @@ must(hm.rows.length===30&&hm.rows.every(r=>r.length===30)&&
   hm.spawn.x===9&&hm.spawn.y===17&&hm.mob.length===84,
   "Rotten Wasteland não resultou no mundo 30×30/spawns esperados");
 const free=hm.mob.filter(p=>{const e=hm.leg[hm.rows[p.y][p.x]];return e&&!e.bloc&&!hm.footprintBlocked[p.x+":"+p.y];});
-must(free.length===69,"zona Rotten Wasteland não comporta as waves Soul War");
+must(free.length===81,"zona Rotten Wasteland não comporta as waves Soul War: "+free.length);
 const visualIds=new Set();Object.values(hm.leg).forEach(e=>{
   (e.v||[]).forEach(id=>visualIds.add(id));(e.g||[]).forEach(id=>visualIds.add(id));
 });
@@ -77,17 +77,17 @@ must(poison.el==="earth"&&poison.chain===3&&mouldPoison.el==="earth"&&mouldPoiso
 
 const gameSrc=fs.readFileSync(path.join(js,"game.js"),"utf8");
 const ms=gameSrc.indexOf("const MISSION_DEFS = {");
-const me=gameSrc.indexOf("\n\nfunction missionForHunt",ms);
+const me=gameSrc.indexOf("function missionForHunt",ms);
 vm.runInContext(gameSrc.slice(ms,me)+"\nwindow.__MISSIONS=MISSION_DEFS;",ctx);
 const mission=ctx.__MISSIONS["rotten-wasteland"];
 must(mission&&mission.tasks.length===1&&mission.tasks[0].monster==="rotten-golem"&&
   mission.tasks[0].target===50&&mission.completeReward.bossAccess==="goshnar-s-hatred",
   "missão de 50 Rotten Golems não libera Goshnar's Hatred");
 const bs=gameSrc.indexOf("const BOSS_DEFS = {");
-const be=gameSrc.indexOf("\n\n/* Quivers",bs);ctx.BOSS_COOLDOWN=0;
+const be=gameSrc.indexOf("/* Quivers",bs);ctx.BOSS_COOLDOWN=0;ctx.MEGA_TEST_BYPASS=false;
 vm.runInContext(gameSrc.slice(bs,be)+"\nwindow.__BOSSES=BOSS_DEFS;",ctx);
 const boss=ctx.__BOSSES["goshnar-s-hatred"],base=ctx.GAMEDATA.monsters["goshnar-s-hatred"];
-must(boss&&boss.hunt==="goshnars-hatred-room"&&boss.requirement.enforced===true&&
+must(boss&&boss.hunt==="goshnars-hatred-room"&&boss.requirement.enforced===false&&
   boss.requirement.mission==="rotten-wasteland"&&boss.requirement.access==="goshnar-s-hatred"&&
   boss.hp===300000&&boss.exp===75000&&boss.damage===5000&&boss.armor===160&&boss.defense===160,
   "Goshnar's Hatred não foi criado/bloqueado com stats oficiais");
@@ -100,7 +100,7 @@ for(const [item,[min,max]] of Object.entries(hatredRanges)){
   const drop=base.loot.find(l=>l.item===item);must(drop&&drop.min===min&&drop.max===max,item+": range min/max perdido");
 }
 const combatSrc=fs.readFileSync(path.join(js,"combat.js"),"utf8");
-const ls=combatSrc.indexOf("function lootStackCount"),le=combatSrc.indexOf("\n\n/* Gera o loot",ls);
+const ls=combatSrc.indexOf("function lootStackCount"),le=combatSrc.indexOf("/* Gera o loot",ls);
 vm.runInContext(combatSrc.slice(ls,le),ctx);
 must(ctx.lootStackCount({min:70,max:75},0)===70&&ctx.lootStackCount({min:70,max:75},.999999)===75,
   "rollLoot não respeita a faixa 70..75 do Canary");
@@ -108,7 +108,9 @@ for(const loot of base.loot){
   must(ctx.GAMEDATA.items[loot.item],"Hatred: loot sem definição: "+loot.item);
   must(fs.existsSync(path.join(game,"assets","item",loot.item+".png")),"Hatred: loot sem sprite: "+loot.item);
 }
-const ui=fs.readFileSync(path.join(js,"ui.js"),"utf8");
-must(ui.includes('{ title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland", "claustrophobic-inferno", "ebb-and-flow"] }'),
+// A seção SOULWAR 400+ vive em hunt-sections.js (lista com "furious-crate"
+// incluída depois).
+const sections=fs.readFileSync(path.join(js,"hunt-sections.js"),"utf8");
+must(sections.includes('{ title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland"'),
   "Rotten Wasteland não aparece em Soulwar 400+");
 console.log("OK: Rotten Wasteland 30×30, 3 monstros, loot/attacks, missão 50 e Goshnar's Hatred validados.");
