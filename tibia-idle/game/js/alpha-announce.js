@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "26/11/2026 às 14:54";
+const ALPHA_UPDATE_AT = "26/11/2026 às 16:30";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Warzone 9 (400+): Cave Chimera, Tremendous Tyrant e Varnished Diremaw na Dwelling of the Forgotten",
   "NOVO — Sala da Timira redesenhada: arena maior e nova decoração",
   "NOVO — Asura Palace com mapa novo e maior: 8 Asuras aleatórias + 5 respawns fixos espalhados pelo palácio",
   "FIX — Dança da Scarlett Etzel: toques no timing certo não se perdem mais entre ticks do servidor (morte injusta por 'tecla perdida')",
