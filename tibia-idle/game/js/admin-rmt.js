@@ -113,7 +113,7 @@ function renderRmtAdmQueue(el, rows) {
 }
 
 /* ── Fila de verificação 18+ (KYC manual enquanto não há provedor) ────── */
-const RMT_KYC_ST = { unverified: "Não verificado", pending: "Em análise", verified: "Verificado", rejected: "Reprovado" };
+const ADMIN_RMT_KYC_ST = { unverified: "Não verificado", pending: "Em análise", verified: "Verificado", rejected: "Reprovado" };
 async function renderRmtAdmKyc(el, status) {
   const box = el.querySelector("#rmt-adm-kyc");
   if (!box) return;
@@ -129,7 +129,7 @@ async function renderRmtAdmKyc(el, status) {
       <td class="tiny">${p.document || ""}</td>
       <td class="tiny">${p.birthDate || "-"}</td>
       <td class="tiny">${p.pixKeyType}: ${p.pixKey || "-"}</td>
-      <td class="tiny ${p.verificationStatus === "verified" ? "rmt-st-paid" : p.verificationStatus === "rejected" ? "rmt-st-bad" : "rmt-st-warn"}">${RMT_KYC_ST[p.verificationStatus] || p.verificationStatus}${p.kyc && p.kyc.provider ? " · " + p.kyc.provider : ""}</td>
+      <td class="tiny ${p.verificationStatus === "verified" ? "rmt-st-paid" : p.verificationStatus === "rejected" ? "rmt-st-bad" : "rmt-st-warn"}">${ADMIN_RMT_KYC_ST[p.verificationStatus] || p.verificationStatus}${p.kyc && p.kyc.provider ? " · " + p.kyc.provider : ""}</td>
       <td>${p.verificationStatus !== "verified" ? `<button class="sm" data-kyc-v="${p.accountId}">aprovar</button>` : ""}
           ${p.verificationStatus !== "rejected" ? `<button class="sm" data-kyc-r="${p.accountId}">reprovar</button>` : ""}</td>
     </tr>`).join("")}</table>`;
