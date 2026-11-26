@@ -197,7 +197,7 @@ async function renderStorePreys(main) {
   const acc = sessionAccount();
   const cards = Math.max(0, Number(acc && acc.cosmetics && acc.cosmetics.preyCards) || 0);
   const slotOwned = !!(acc && acc.cosmetics && acc.cosmetics.preySlot);
-  const slotCost = Math.max(1, Number(cat.preySlotCards) || 50);
+  const slotCost = Math.max(1, Number(cat.preySlotCoins) || 350);
   main.innerHTML = `<div class="tiny mb8">Prey Cards da conta: <b>${cards}</b>.
     Saldo compartilhado entre todos os personagens. Cada utilização de Wildcard, Bonus Reroll ou
     seleção de criatura fora da lista consome 1 card. O 3º slot desbloqueado vale para a conta inteira.
@@ -207,7 +207,7 @@ async function renderStorePreys(main) {
         <img src="assets/ui/prey/prey_perm_test.png" width="32" height="32" alt="3º Prey Slot">
         <div class="store-pack-label">3º Slot de Prey</div>
         <div class="tiny dim">permanente · toda a conta</div>
-        <div class="store-pack-price"><img src="assets/ui/prey/prey_wildcard.png" width="16" height="16" alt="" style="vertical-align:-3px"> ${slotCost} cards</div>
+        <div class="store-pack-price">${storeCoinIcon()} ${slotCost} TC</div>
         <button type="button" class="sm primary full" id="store-prey-slot" ${slotOwned ? "disabled" : ""}>
           ${slotOwned ? "Desbloqueado" : "Desbloquear"}</button>
       </div>
@@ -240,7 +240,7 @@ async function renderStorePreys(main) {
   if (slotBtn) slotBtn.addEventListener("click", async () => {
     if (slotBtn.dataset.confirm !== "yes") {
       slotBtn.dataset.confirm = "yes";
-      slotBtn.textContent = `Confirmar (${slotCost} cards)`;
+      slotBtn.textContent = `Confirmar (${slotCost} TC)`;
       return;
     }
     slotBtn.disabled = true;

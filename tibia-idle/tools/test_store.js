@@ -97,27 +97,31 @@ must(cat.cardSurcharge === 1.1, "cartão +10%");
   must(adminOk.code === 200 && adminOk.body.totals.revenueBrl === 10, "faturamento R$ 10 do pacote 100");
   must(adminOk.body.totals.coinsSold === 100 && adminOk.body.totals.coinsSpent === 25, "totais sold/spent");
 
-  // 3º slot de prey: débito atômico de cards + grant por conta
+  // 3º slot de prey: débito atômico de Tibia Coins (NT primeiro) + grant por conta
   const slotDb = {
     findAccountByToken: async (t) => t === "tok" ? slotAcc : null,
     findAccountById: async () => slotAcc,
     buyPreySlot: async (id, cost) => {
       const cos = slotAcc.cosmetics;
-      if (cos.preySlot || cos.preyCards < cost) return false;
-      cos.preyCards -= cost; cos.preySlot = 1;
+      const total = (slotAcc.coins || 0) + (slotAcc.coins_nt || 0);
+      if (cos.preySlot || total < cost) return false;
+      const nt = Math.min(slotAcc.coins_nt || 0, cost);
+      slotAcc.coins_nt -= nt;
+      slotAcc.coins -= cost - nt;
+      cos.preySlot = 1;
       return true;
     },
     coinLedgerAdd: async (row) => row,
   };
-  const slotAcc = { id: 7, login: "p", coins: 0, cosmetics: { preyCards: 60 } };
+  const slotAcc = { id: 7, login: "p", coins: 300, coins_nt: 100, cosmetics: {} };
   const slotR = await store.buyPreySlot(slotDb, { token: "tok" });
   must(slotR.code === 200 && slotR.body.ok, "buyPreySlot falhou: " + JSON.stringify(slotR.body));
   must(slotAcc.cosmetics.preySlot === 1, "slot não marcado na conta");
-  must(slotAcc.cosmetics.preyCards === 60 - store.PREY_SLOT_CARDS, "débito de cards errado");
+  must(slotAcc.coins_nt === 0 && slotAcc.coins === 300 - (store.PREY_SLOT_COINS - 100), "débito de coins errado (NT primeiro)");
   must(slotR.body.cosmetics && slotR.body.cosmetics.preySlot === 1, "resposta sem cosmetics");
   const dup = await store.buyPreySlot(slotDb, { token: "tok" });
   must(dup.code === 409 && !dup.body.ok, "recompra do slot deveria falhar");
-  const poorAcc = { id: 8, login: "p", coins: 0, cosmetics: { preyCards: 1 } };
+  const poorAcc = { id: 8, login: "p", coins: 100, cosmetics: {} };
   const poorDb = Object.assign({}, slotDb, {
     findAccountByToken: async (t) => t === "tok" ? poorAcc : null,
     findAccountById: async () => poorAcc,
@@ -128,7 +132,7 @@ must(cat.cardSurcharge === 1.1, "cartão +10%");
   const guest = await store.buyPreySlot(slotDb, { token: "bad" });
   must(guest.code === 401, "token inválido deveria dar 401");
   const cat2 = store.catalog();
-  must(cat2.preySlotCards === store.PREY_SLOT_CARDS, "catalog sem preySlotCards");
+  must(cat2.preySlotCoins === store.PREY_SLOT_COINS, "catalog sem preySlotCoins");
 
   const hook = await store.webhook(db, {}, { get: () => null });
   must(hook.code === 200 && hook.body.ignored, "webhook sem id é ignorado");
@@ -152,8 +156,8 @@ must(cat.cardSurcharge === 1.1, "cartão +10%");
   must(dbjs.includes("CREATE TABLE IF NOT EXISTS store_orders") &&
     dbjs.includes("CREATE TABLE IF NOT EXISTS coin_ledger"), "schema MySQL da STORE ausente");
   must(html.includes('id="btn-store"') && html.includes("store-ui.js"), "botão/script STORE ausente");
-  must(ui.includes('id: "sell"') && ui.includes("BETA") && ui.includes("openStoreModal"),
-    "UI sem aba vender coins / beta");
+  must(ui.includes('id: "vouchers"') && ui.includes("BETA") && ui.includes("openStoreModal"),
+    "UI sem aba vouchers / beta");
   must(client.includes("/api/store/checkout") && client.includes("storeAdminSummary"),
     "account-client sem wrappers da STORE");
   must(env.includes("MP_ACCESS_TOKEN") && env.includes("PUBLIC_BASE_URL"),

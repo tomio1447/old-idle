@@ -931,18 +931,23 @@ JsonStore.prototype.debitCoins = function (accountId, amount) {
   this._save();
   return true;
 };
-/* 3º slot de prey por conta: débito de cards + grant atômicos (não
- * consome card se a checagem de posse falhar entre as duas escritas). */
-JsonStore.prototype.buyPreySlot = function (accountId, cardCost) {
+/* 3º slot de prey por conta: débito de Tibia Coins (coins_nt primeiro,
+ * como toda compra de STORE) + grant atômicos — não consome coin se a
+ * checagem de posse falhar entre as duas escritas. */
+JsonStore.prototype.buyPreySlot = function (accountId, coinCost) {
   const a = this.findAccountById(accountId);
-  const cost = Math.max(0, Math.floor(Number(cardCost) || 0));
+  const cost = Math.max(0, Math.floor(Number(coinCost) || 0));
   if (!a) return false;
   let cos = a.cosmetics;
-  if (typeof cos === "string") cos = JSON.parse(cos);
+  if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch (e) { cos = null; } }
   cos = cos && typeof cos === "object" ? cos : {};
-  const cards = Math.max(0, Math.floor(Number(cos.preyCards) || 0));
-  if (cos.preySlot || cards < cost) return false;
-  a.cosmetics = Object.assign({}, cos, { preyCards: cards - cost, preySlot: 1 });
+  const haveNt = Math.max(0, Number(a.coins_nt) || 0);
+  const have = Math.max(0, Number(a.coins) || 0);
+  if (cos.preySlot || haveNt + have < cost) return false;
+  const ntSpent = Math.min(haveNt, cost);
+  a.coins_nt = haveNt - ntSpent;
+  a.coins = have - (cost - ntSpent);
+  a.cosmetics = Object.assign({}, cos, { preySlot: 1 });
   this._save();
   return true;
 };
@@ -3435,16 +3440,20 @@ async function MysqlStore() {
         [cost, cost, cost, delta, Number(id), cost, delta]);
       return !!(r && r.affectedRows > 0);
     },
-    /* 3º slot de prey por conta: um único UPDATE atômico — debita os
-     * cards e marca preySlot só se ainda não tiver e houver saldo. */
-    async buyPreySlot(id, cardCost) {
-      const cost = Math.max(0, Math.floor(Number(cardCost) || 0));
+    /* 3º slot de prey por conta: um único UPDATE atômico — debita coins
+     * (coins_nt primeiro, como toda compra de STORE) e marca preySlot
+     * só se ainda não tiver e houver saldo. */
+    async buyPreySlot(id, coinCost) {
+      const cost = Math.max(0, Math.floor(Number(coinCost) || 0));
       const json = "CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END";
-      const count = `GREATEST(0, COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.preyCards')) AS SIGNED), 0))`;
       const r = await this.run(
-        `UPDATE accounts SET cosmetics = JSON_SET(${json}, '$.preyCards', ${count} - ?, '$.preySlot', 1)
-         WHERE id = ? AND ${count} >= ? AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.preySlot')), '0') IN ('0','false','null')`,
-        [cost, Number(id), cost]);
+        `UPDATE accounts SET
+           coins = coins - (? - LEAST(coins_nt, ?)),
+           coins_nt = coins_nt - LEAST(coins_nt, ?),
+           cosmetics = JSON_SET(${json}, '$.preySlot', 1)
+         WHERE id = ? AND coins + coins_nt >= ?
+           AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.preySlot')), '0') IN ('0','false','null')`,
+        [cost, cost, cost, Number(id), cost]);
       return !!(r && r.affectedRows > 0);
     },
     async debitCoins(id, amount) {

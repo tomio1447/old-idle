@@ -338,31 +338,32 @@ test("JSON persistence migrates all characters, rejects combat trades and retain
   }
 });
 
-test("buyPreySlot debits cards and grants the account slot atomically", async () => {
+test("buyPreySlot debits Tibia Coins (NT first) and grants the account slot atomically", async () => {
   // getDb é cacheado no processo; stub do _save isola o teste do disco.
   const db = await require("../server/db").getDb();
   const saveOriginal = db._save, previousAccounts = db.accounts;
   db._save = () => {};
   try {
-    db.accounts = [{ id: 902, cosmetics: { preyCards: 50 } }];
-    assert.equal(db.buyPreySlot(902, 50), true);
-    const cos = db.findAccountById(902).cosmetics;
-    assert.equal(cos.preyCards, 0);
-    assert.equal(cos.preySlot, 1);
+    db.accounts = [{ id: 902, coins: 300, coins_nt: 100, cosmetics: {} }];
+    assert.equal(db.buyPreySlot(902, 350), true);
+    const acc902 = db.findAccountById(902);
+    assert.equal(acc902.coins_nt, 0);
+    assert.equal(acc902.coins, 50);
+    assert.equal(acc902.cosmetics.preySlot, 1);
     // já desbloqueado → recusa sem gastar nada
-    assert.equal(db.buyPreySlot(902, 50), false);
-    assert.equal(db.findAccountById(902).cosmetics.preyCards, 0);
-    // saldo insuficiente → recusa sem mexer nos cards
-    db.accounts = [{ id: 903, cosmetics: { preyCards: 49 } }];
-    assert.equal(db.buyPreySlot(903, 50), false);
-    assert.equal(db.findAccountById(903).cosmetics.preyCards, 49);
+    assert.equal(db.buyPreySlot(902, 350), false);
+    assert.equal(db.findAccountById(902).coins, 50);
+    // saldo insuficiente → recusa sem mexer nos coins
+    db.accounts = [{ id: 903, coins: 349, cosmetics: {} }];
+    assert.equal(db.buyPreySlot(903, 350), false);
+    assert.equal(db.findAccountById(903).coins, 349);
     assert.equal(db.findAccountById(903).cosmetics.preySlot, undefined);
     // cosmetics em string JSON (formato linha MySQL) também funciona —
     // após a compra o campo vira objeto com o slot marcado.
-    db.accounts = [{ id: 904, cosmetics: JSON.stringify({ preyCards: 50 }) }];
-    assert.equal(db.buyPreySlot(904, 50), true);
+    db.accounts = [{ id: 904, coins: 350, cosmetics: JSON.stringify({}) }];
+    assert.equal(db.buyPreySlot(904, 350), true);
     assert.equal(db.findAccountById(904).cosmetics.preySlot, 1);
-    assert.equal(db.findAccountById(904).cosmetics.preyCards, 0);
+    assert.equal(db.findAccountById(904).coins, 0);
   } finally {
     db.accounts = previousAccounts;
     db._save = saveOriginal;

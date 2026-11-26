@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — 3º slot de Prey por Tibia Coins: o botão do slot bloqueado leva direto à STORE → Preys, onde a liberação permanente custa 350 TC (vale para toda a conta)",
   "NOVO — The Rise of Podzilla Quest (400+): elimine 1500 monstros em Podzilla Bottom, enfrente The Rootkraken e ganhe a outfit Rootwalker com addons",
   "NOVO — Boss The Rootkraken (400+): mecânica Root Deep — seu contador cresce na luta e aumenta o dano sofrido; até 9 Plant Things invadem a sala e evoluem de Rotten → Angry → Frenzied",
   "NOVO — Podzilla Bottom (400+): Quara Looter, Quara Plunderer e Quara Raider na fossa submarina de Podzilla",

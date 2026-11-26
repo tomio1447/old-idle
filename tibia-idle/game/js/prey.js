@@ -1,7 +1,7 @@
 /* prey.js — Sistema de Prey (TibiaWiki/Prey_System + Canary)
  *
  * Bônus ao caçar uma criatura específica por até 2 horas:
- *   - 3 slots (2 desbloqueados + 1 permanente comprável);
+ *   - 3 slots (2 desbloqueados + 1 permanente comprável na Store por 350 TC);
  *   - cada slot mostra 9 criaturas aleatórias (sempre low/mid/high);
  *   - você escolhe 1 criatura + ganha 1 bônus rolado (dano/defesa/exp/loot);
  *   - timer de 2h (decrementa enquanto caça);
@@ -445,20 +445,9 @@ function preyDefenseTickOnHit(p, slug) {
   if (s) s.until = Math.max(Date.now(), s.until - PREY_DEFENSE_TICK_MS);
 }
 
-/* Custo para desbloquear o slot permanente (regra da casa: gold alto). */
-const PREY_PERMANENT_SLOT_COST = 250000;
-
-function preyBuyPermanentSlot(p) {
-  ensurePrey(p);
-  const slot = p.prey.slots[2];
-  if (!slot || slot.unlocked) return { ok: false, msg: "Já desbloqueado." };
-  if ((p.gold || 0) < PREY_PERMANENT_SLOT_COST)
-    return { ok: false, msg: "Gold insuficiente." };
-  p.gold -= PREY_PERMANENT_SLOT_COST;
-  slot.unlocked = true;
-  slot.creatures = preyRerollList(p, 2);
-  return { ok: true };
-}
+/* O 3º slot permanente NÃO é comprado aqui: a liberação oficial é pela
+ * Store → Preys (350 Tibia Coins), gravada em cosmetics.preySlot da
+ * conta — ver preyAccountSlot()/ensurePrey. */
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {

@@ -141,7 +141,7 @@ function preyCardSelectBoxHtml(i, cards) {
 /* Botões de loja Perm / Temp (slot bloqueado) — replicam o LockedPreyPanel. */
 function preyStoreBtnHtml(i) {
   return `<div class="prey-store-buttons">
-      <div class="prey-store-btn" id="prey-buy-${i}" title="Desbloquear slot permanente">
+      <div class="prey-store-btn" id="prey-buy-${i}" title="Comprar o slot permanente na Store (350 Tibia Coins)">
         <img class="prey-store-img" src="assets/ui/prey/prey_perm_test.png" alt="Desbloquear permanentemente">
       </div>
       <div class="prey-store-btn" id="prey-buy-temp-${i}" title="Usar um slot temporário (gratuito)">
@@ -210,7 +210,7 @@ function renderPreyModal(p) {
         </div>
         ${preyStoreBtnHtml(i)}
         <div class="prey-locked-msg tiny dim">Desbloqueie permanentemente (ou use um slot temporário) para caçar com bônus.
-          Na Store → Preys dá pra liberar o slot para a conta inteira com Prey Cards.</div>
+          Na Store → Preys dá pra liberar o slot para a conta inteira por 350 Tibia Coins.</div>
       </div>`;
       continue;
     }
@@ -334,14 +334,12 @@ function renderPreyModal(p) {
     // Selecionar qualquer criatura (1 Prey Card): abre o picker completo
     const cs = $("#prey-cardselect-" + i);
     if (cs) cs.addEventListener("click", () => renderPreyCardPicker(p, i));
-    // Store Perm (prey_perm_test) -> compra o slot permanente
+    // Store Perm (prey_perm_test) -> leva pra Store → Preys, onde o slot
+    // permanente é comprado por 350 Tibia Coins (vale pra conta inteira).
     const buy = $("#prey-buy-" + i);
     if (buy) buy.addEventListener("click", () => {
-      const r = preyBuyPermanentSlot(p);
-      if (!r.ok) { toast(r.msg, "bad"); return; }
-      toast("Slot permanente desbloqueado!");
-      renderPreyModal(p);
-      renderAll();
+      closePreyModal();
+      if (typeof openStoreModal === "function") openStoreModal("preys");
     });
     // Store Temp (prey_temp_test) -> desbloqueia temporariamente (grátis)
     const buyTemp = $("#prey-buy-temp-" + i);

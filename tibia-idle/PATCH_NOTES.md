@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — 3º slot de Prey por 350 Tibia Coins
+
+- **Custo do 3º slot permanente mudou de 50 Prey Cards para 350 Tibia Coins**: `store.buyPreySlot` e `db.buyPreySlot` (JsonStore + MySQL) agora debitam coins em vez de `cosmetics.preyCards` — um único UPDATE atômico que gasta `coins_nt` primeiro e completa com `coins` (mesma regra de toda compra de STORE), marcando `preySlot` só se a conta ainda não tiver. Catálogo expõe `preySlotCoins: 350` e a aba Preys mostra o preço em TC.
+- **Botão do slot bloqueado leva à Store**: no modal de Prey, o botão permanente (prey_perm_test) não compra mais localmente — fecha o modal e abre a STORE direto na aba Preys. A compra local de 250k gold (`preyBuyPermanentSlot`, regra da casa) foi removida; a liberação oficial é exclusivamente por TC e vale para a conta inteira (`cosmetics.preySlot` → `ensurePrey` destrava o slot em todo char). O slot temporário gratuito segue igual.
+- Testes: `test_store` e `test_account_wardrobe` cobrem o débito NT-first (coins_nt 100 + coins 300 → compra por 350, restam 50 coins), recompra recusada, saldo insuficiente e cosmetics serializado em string. Fix pré-existente: `test_store` ainda procurava a aba "sell" (renomeada para "vouchers").
+
+---
+
 ## 2026-11-26 — Fixes: Sell All online, sprites Stag Bastion e admin RMT
 
 - **Sell All / auto sell online ignorava loot de 7 conteúdos antigos**: `brain-head-boss`, `tentugly-boss`, `dream-courts-bosses`, `ratmiral-boss`, `pirat-lower`, `the-void` e `umbral-creation` registravam itens em `GAMEDATA.items` no cliente mas nunca entraram no merge do `authoritative_engine` — a pouch acumulava drops "vendáveis" sem preço no servidor (maxxenius-head 500k, plagueroot-offshoot 280k, alptramun's-toothbrush 270k, ratmiral's-hat 150k, crunor-idol 30k, ornate-locket 18k, golden-skull, energy-vein, umbral items etc.). Os 7 arquivos entraram no merge e o Sell All passa a precificá-los.

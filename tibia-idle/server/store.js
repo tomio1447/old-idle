@@ -35,8 +35,8 @@ const PREY_PACKS = [
   { id: "prey50", cards: 50, coins: 60 },
   { id: "prey100", cards: 100, coins: 100 },
 ];
-/* 3º slot de prey permanente, por CONTA — pago com Prey Cards. */
-const PREY_SLOT_CARDS = 50;
+/* 3º slot de prey permanente, por CONTA — pago com Tibia Coins. */
+const PREY_SLOT_COINS = 350;
 
 async function changePreys(db, body, consume) {
   const acc = await db.findAccountByToken(body && body.token);
@@ -54,9 +54,9 @@ async function changePreys(db, body, consume) {
     msg: consume ? "Prey Card utilizado." : pack.cards + " Prey Cards adicionados à conta!" } };
 }
 
-/* 3º slot de prey permanente (conta inteira): débito atômico de cards +
- * grant no mesmo UPDATE via db.buyPreySlot — sem janela entre consumir
- * o card e marcar a posse. */
+/* 3º slot de prey permanente (conta inteira): débito atômico de Tibia
+ * Coins (coins_nt primeiro) + grant no mesmo UPDATE via db.buyPreySlot —
+ * sem janela entre consumir o coin e marcar a posse. */
 async function buyPreySlot(db, body) {
   const acc = await db.findAccountByToken(body && body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
@@ -66,13 +66,13 @@ async function buyPreySlot(db, body) {
   if (cos.preySlot) return { code: 409, body: { ok: false, msg: "3º slot de prey já desbloqueado." } };
   if (typeof db.buyPreySlot !== "function")
     return { code: 500, body: { ok: false, msg: "Indisponível neste storage." } };
-  if (!await db.buyPreySlot(acc.id, PREY_SLOT_CARDS))
-    return { code: 409, body: { ok: false, msg: "Prey Cards insuficientes (precisa de " + PREY_SLOT_CARDS + ")." } };
+  if (!await db.buyPreySlot(acc.id, PREY_SLOT_COINS))
+    return { code: 409, body: { ok: false, msg: "Tibia Coins insuficientes (precisa de " + PREY_SLOT_COINS + ")." } };
   const fresh = await db.findAccountById(acc.id);
   await addLedger(db, { accountId: acc.id, login: acc.login, kind: "purchase",
-    delta: 0, coinsAfter: fresh.coins, brlCents: 0, ref: "prey-slot",
-    note: "3º Prey Slot permanente (" + PREY_SLOT_CARDS + " cards)" });
-  return { code: 200, body: { ok: true, coins: fresh.coins, cosmetics: fresh.cosmetics,
+    delta: -PREY_SLOT_COINS, coinsAfter: fresh.coins, brlCents: 0, ref: "prey-slot",
+    note: "3º Prey Slot permanente (" + PREY_SLOT_COINS + " TC)" });
+  return { code: 200, body: { ok: true, coins: fresh.coins, coinsNt: fresh.coins_nt || 0, cosmetics: fresh.cosmetics,
     msg: "3º slot de prey desbloqueado para toda a conta!" } };
 }
 
@@ -90,7 +90,7 @@ function catalog() {
     packs: COIN_PACKS.map((p) => Object.assign({}, p, { total: packTotalCoins(p) })),
     vip: VIP_PACKS.slice(),
     preys: PREY_PACKS.map((p) => Object.assign({}, p)),
-    preySlotCards: PREY_SLOT_CARDS,
+    preySlotCoins: PREY_SLOT_COINS,
   };
 }
 
@@ -852,7 +852,7 @@ async function recordGrant(db, acc, amount, after) {
 
 module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
-  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, buyPreySlot, PREY_PACKS, PREY_SLOT_CARDS,
+  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, buyPreySlot, PREY_PACKS, PREY_SLOT_COINS,
   COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE, BLESS_PRICE,
   buyImbuement, IMBUEMENT_TIER_COINS,
 };
