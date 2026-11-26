@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Asura Palace: mapa novo 63×41 + respawns fixos
+
+- **Mapa**: `beta-maps/asura_palace.otbm` publicado byte-igual em `game/maps/` (63×41, z=7, bounds 1010..1072 × 1016..1056). Playerspawn {1044,1034,7}; zona de respawn {1040,1030}→{1049,1040} (10×11, 110 sqm caminháveis e conectados). `walkFloors` removido (o piso 8230 do mapa antigo não existe mais e o novo é caminhável sem ele). `tools/import_asura_palace_assets.py`: 53 sprites de tile + 26 patterns + catálogo RME; 6493/6497 renderizam vazios no DAT → PNG transparente.
+- **Respawns fixos (novo, genérico)**: `hunt.otbmFixedSpawns` — cada ponto mantém **1 monstro extra** além do pack (slug pelos spawnWeights), id `fixed-N` no cliente e na autoridade; ao morrer volta na próxima onda no mesmo SQM. Asura Palace: 8 aleatórios + 5 fixos em {1030,1041} {1030,1034} {1030,1028} {1036,1041} {1054,1042}. Os fixos nascem antes do pack (paridade cliente×servidor) e não contam no pack/spawnIds da autoridade.
+- Teste: `tools/test_asura_palace.js` (mapa, zonas, tiles, loot, paridade de spawn e hidratação).
+
+---
+
 ## 2026-11-26 — Fix: dança da Scarlett Etzel falhava com toque no timing certo
 
 - **Causa**: o merge do snapshot online (`applyOnlineAuthorityState`, `game.js`) copiava toda chave do `state` do servidor para o combate local — e esse `state` é o combate do último checkpoint (autosave 20s), com `_scarlettPendingDirs`. Cada resposta de tick sobrescrevia a fila local: toque feito com o tick em voo sumia (servidor matava por "tecla perdida") e, se o checkpoint pegou a fila cheia, intents velhos eram reenviados e julgados contra a nota seguinte (morte por "sequência incorreta").

@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "26/11/2026 às 14:54";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Asura Palace com mapa novo e maior: 8 Asuras aleatórias + 5 respawns fixos espalhados pelo palácio",
   "FIX — Dança da Scarlett Etzel: toques no timing certo não se perdem mais entre ticks do servidor (morte injusta por 'tecla perdida')",
   "NOVO — WhatsApp como canal de verificação: vincule seu telefone recebendo o código no WhatsApp e use como alternativa ao e-mail no login com 2FA",
   "FIX — Login com 2FA não travava mais em 'Entrando...': a tela de código abre corretamente para senha e login social",

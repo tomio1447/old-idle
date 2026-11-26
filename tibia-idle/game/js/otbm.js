@@ -601,6 +601,11 @@
       for (var i = 0; i < out.mob.length; i++)
         out.mobSet[out.mob[i].x + ":" + out.mob[i].y] = true;
     }
+    if (map.fixedMob && map.fixedMob.length) {
+      out.fixedMob = map.fixedMob.map(function (c) {
+        return { x: c.x + padX, y: c.y + padY, i: c.i };
+      });
+    }
     return out;
   }
 

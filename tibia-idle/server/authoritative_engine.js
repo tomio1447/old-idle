@@ -8799,13 +8799,16 @@ function tryFerumbrasSummon(auth,mob,now,stepTs){
 function ensureSpawnIds(auth){
   const pack=Math.max(1,auth.pack||3);
   if(!Array.isArray(auth.spawnIds))auth.spawnIds=[];
+  // Ids "fixed-N" são dos pontos fixos: ficam fora do spawnIds do pack
+  // regular — se entrassem, o loop regular pularia o slot ocupado e a onda
+  // nasceria com menos monstros que auth.pack.
   for(const m of auth.mobs||[]){
     const id=String(m&&m.id||"");
-    if(id&&!auth.spawnIds.includes(id))auth.spawnIds.push(id);
+    if(id&&!id.startsWith("fixed-")&&!auth.spawnIds.includes(id))auth.spawnIds.push(id);
   }
   for(const sp of auth.pendingSpawns||[]){
     const id=String(sp&&sp.mob&&sp.mob.id||"");
-    if(id&&!auth.spawnIds.includes(id))auth.spawnIds.push(id);
+    if(id&&!id.startsWith("fixed-")&&!auth.spawnIds.includes(id))auth.spawnIds.push(id);
   }
   while(auth.spawnIds.length<pack)auth.spawnIds.push("srv-slot-"+auth.spawnIds.length);
 }
@@ -8907,6 +8910,20 @@ function pickHuntSpawnSlug(auth){
   if(!pool.length)return null;
   return pool[roll(auth,0,pool.length-1)];
 }
+function sanitizeFixedSpawnCells(raw,gw,gh){
+  if(!Array.isArray(raw))return null;
+  const w=Math.max(1,Number(gw)||30),h=Math.max(1,Number(gh)||30),out=[];
+  for(const cell of raw){
+    if(out.length>=32)break;
+    if(!cell||typeof cell!=="object")continue;
+    const x=Number(cell.x),y=Number(cell.y),i=Number(cell.i);
+    if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+    const cx=Math.floor(x),cy=Math.floor(y);
+    if(cx<0||cy<0||cx>=w||cy>=h)continue;
+    out.push({x:cx,y:cy,i:Number.isFinite(i)?Math.floor(i):out.length});
+  }
+  return out.length?out:null;
+}
 function spawnHuntWave(auth,now,opts){
   opts=opts||{};
   if(!auth||auth.kind==="boss"||auth.ended||auth.greed)return;
@@ -8940,6 +8957,33 @@ function spawnHuntWave(auth,now,opts){
   for(const sp of auth.pendingSpawns)if(sp&&sp.mob&&sp.mob.id)occupied.add(String(sp.mob.id));
   const count=Math.max(1,auth.pack||3);
   now=now||auth.clock;
+  /* Pontos de respawn fixos (otbmFixedSpawns → combat.fixedSpawnCells):
+   * cada célula mantém 1 monstro EXTRA além do pack, id "fixed-"+i (mesmo
+   * esquema do cliente). Quem está vivo/em pendingSpawns já está em
+   * `occupied` e não é duplicado; ao morrer volta na próxima onda, na mesma
+   * célula. Roda ANTES do pack regular — igual ao cliente (spawnWave drena
+   * a fila de fixos primeiro) — para um mob regular não roubar a célula
+   * designada. */
+  const fixedCells=Array.isArray(auth.fixedSpawnCells)?auth.fixedSpawnCells:[];
+  if(fixedCells.length){
+    const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+    fixedCells.forEach((cell,idx)=>{
+      const id="fixed-"+cell.i;
+      if(occupied.has(id))return;
+      const slug=pickHuntSpawnSlug(auth);if(!slug)return;
+      const isMiniBoss=!!(hunt&&Array.isArray(hunt.bossMobs)&&hunt.bossMobs.indexOf(slug)!==-1);
+      const m=makeMob(auth,slug,isMiniBoss,id,null,count+1+idx);
+      if(!m)return;
+      // makeMob posiciona por spawnPoints; o ponto fixo manda (claimSpawnCell
+      // é puro — só lê mobs/pendingSpawns, não deixa claim resíduo).
+      const c2=claimSpawnCell(auth,cell.x,cell.y);
+      m.cx=c2.cx;m.cy=c2.cy;m.x=(m.cx+.5)/gw;m.y=(m.cy+.5)/gh;m.sx=m.x;m.sy=m.y;
+      if(hunt&&hunt.gnomprona&&!isMiniBoss&&Number(auth.hazardLevel)>0)
+        m.hazard=Math.max(0,Math.min(12,Number(auth.hazardLevel)));
+      occupied.add(id);
+      auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
+    });
+  }
   for(let i=0;i<count;i++){
     const id=auth.spawnIds[i];if(occupied.has(id)||!auth.spawnPool.length)continue;
     const slug=pickHuntSpawnSlug(auth);if(!slug)break;
@@ -10601,7 +10645,15 @@ function initializeAuthority(descriptor,instanceId,now){
       (FIENDISH_BASE_CHANCE+(descriptor.instanceMode==="pvp"?FIENDISH_PVP_BONUS:0))),
     gridW:Number(combat.gridW)||30,gridH:Number(combat.gridH)||30,
     blockedCells:combat.blockedCells||null,
-    pack:Math.max(1,visual.length||pendingIn.length||Number((HUNTS[descriptor.huntId]||{}).pack)||3),
+    fixedSpawnCells:sanitizeFixedSpawnCells(combat.fixedSpawnCells,
+      Number(combat.gridW)||30,Number(combat.gridH)||30),
+    // Conta só ids não-"fixed-": os pontos fixos são EXTRAS ao pack —
+    // hidratar a 1ª onda com fixed-0..4 inflaria o pack (8+5 viraria 13
+    // regulares + 5 fixos no keepPack).
+    pack:Math.max(1,
+      visual.filter((m)=>!String(m&&m.id||"").startsWith("fixed-")).length||
+      pendingIn.filter((sp)=>!String(sp&&sp.mob&&sp.mob.id||"").startsWith("fixed-")).length||
+      Number((HUNTS[descriptor.huntId]||{}).pack)||3),
     wave:visual.length||pendingIn.length?1:0,
     stats:{startedAt:Number(now)||Date.now(),time:0,kills:0,exp:0,rawExp:0,rawHp:0,gold:0,loot:{},monsters:{},
       supplyUsed:{},supplyCost:0,supplyBought:{},deaths:0,blessCost:0,
@@ -10757,6 +10809,11 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   // Checkpoints trazem state.hunt fresco do cliente: reidrata a def de
   // hunts OTBM em instâncias criadas antes do auth.hunt* existir.
   captureAuthHuntDef(auth,descriptor.state&&descriptor.state.hunt);
+  // Backfill: instâncias criadas antes do deploy do fixedSpawnCells ganham
+  // os pontos fixos no primeiro checkpoint que trouxer state.fixedSpawnCells.
+  if(!Array.isArray(auth.fixedSpawnCells)&&descriptor.state&&descriptor.state.fixedSpawnCells)
+    auth.fixedSpawnCells=sanitizeFixedSpawnCells(descriptor.state.fixedSpawnCells,
+      auth.gridW,auth.gridH);
   /* Guerra (~40 chars × ~47KB de p): clonar p a cada 200ms custava ~100ms
    * por tick. members[].p só precisa estar razoavelmente fresco para o
    * resume/roster — refresh a cada 5s de auth.clock; hp/mp seguem por tick
@@ -11003,7 +11060,11 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState,opts)
         mob.cx=cell.cx;mob.cy=cell.cy;mob.x=(mob.cx+.5)/auth.gridW;mob.y=(mob.cy+.5)/auth.gridH;mob.sx=mob.x;mob.sy=mob.y;
         auth.pendingSpawns.push({mob,cx:mob.cx,cy:mob.cy,startedAt:Number(sp.startedAt)||auth.clock,blink:Number(sp.blink)||0,done:false});}}
     }
-    descriptor.state.pendingSpawns=[];auth.pack=Math.max(auth.pack||0,auth.mobs.length||auth.pendingSpawns.length||auth.spawnPool.length||1);
+    descriptor.state.pendingSpawns=[];
+    // Migração HARD: pack conta só mobs não-"fixed-" — os fixos são extras.
+    const regularAlive=(auth.mobs||[]).filter((m)=>!String(m&&m.id||"").startsWith("fixed-")).length,
+      regularPend=(auth.pendingSpawns||[]).filter((sp)=>!String(sp&&sp.mob&&sp.mob.id||"").startsWith("fixed-")).length;
+    auth.pack=Math.max(auth.pack||0,regularAlive||regularPend||auth.spawnPool.length||1);
     ensureSpawnIds(auth);
   }
   // Sincroniza a predição visual antes do step. Ela alinha efeitos e a vítima
@@ -11064,7 +11125,7 @@ function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.author
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
   annihilatorTick,claimAnnihilatorReward,annihilatorRewardOffer,claimAnnihilatorCart,bloodrottenTick,
   normalizeVisualState,sanitizeHelperPresets,sanitizeWheelState,sanitizeImbuementState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
-  spawnHuntWave,pickHuntSpawnSlug,openAuthBagYouDesire,openAuthPrimalBag,
+  spawnHuntWave,pickHuntSpawnSlug,sanitizeFixedSpawnCells,openAuthBagYouDesire,openAuthPrimalBag,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   skillWaveCells,
   bresenhamCells,spellChainPathCells,spellChainVisualPath,

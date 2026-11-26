@@ -265,6 +265,10 @@ function newCombat(player, huntId, instanceMode, opts) {
     huntId: huntId,
     hunt: hunt,
     huntMap: huntMap,
+    // Pontos de respawn fixos (otbmFixedSpawns da hunt): cada célula mantém
+    // 1 monstro extra além do pack, com id "fixed-"+i em cliente e servidor.
+    fixedSpawnCells: huntMap && huntMap.fixedMob
+      ? huntMap.fixedMob.map((c) => ({ x: c.x, y: c.y, i: c.i })) : null,
     // Dimensões imutáveis desta instância para o renderer/câmera. O grid
     // global acompanha estes valores enquanto este combate estiver ativo.
     gridW: GRID_W,
@@ -582,10 +586,21 @@ function spawnWave(c, p) {
   const extraSlug = (c.hunt && c.hunt.extraSpawn && c.hunt.extraSpawn.slug &&
       Math.random() < Math.max(0, Math.min(1, Number(c.hunt.extraSpawn.chance) || 0)))
     ? String(c.hunt.extraSpawn.slug) : null;
-  const wantTotal = pack + (extraSlug ? 1 : 0);
+  // Pontos fixos (fixedSpawnCells): cada célula vazia entra na fila com id
+  // "fixed-"+i — quem já está vivo/em pendingSpawns não é duplicado e já
+  // conta no wantTotal por estar em c.mobs/pendingSpawns.
+  const fixedCells = Array.isArray(c.fixedSpawnCells) ? c.fixedSpawnCells : [];
+  const aliveIds = new Set();
+  for (const m2 of c.mobs || []) if (m2 && m2.id !== undefined) aliveIds.add(String(m2.id));
+  for (const sp of c.pendingSpawns || [])
+    if (sp && sp.mob && sp.mob.id !== undefined) aliveIds.add(String(sp.mob.id));
+  const fixedQueue = fixedCells.filter((cell) =>
+    cell && !aliveIds.has("fixed-" + cell.i));
+  const wantTotal = pack + (extraSlug ? 1 : 0) + fixedCells.length;
   while (c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0) < wantTotal) {
     const filled = c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0);
-    const slug = (extraSlug && filled === wantTotal - 1)
+    const slot = fixedQueue.length ? fixedQueue.shift() : null;
+    const slug = (!slot && extraSlug && filled === wantTotal - 1)
       ? extraSlug
       : pickHuntMonsterSlug(c.hunt);
     const base = GAMEDATA.monsters[slug] || (typeof MONSTERDATA !== "undefined" && MONSTERDATA[slug]);
@@ -623,6 +638,10 @@ function spawnWave(c, p) {
       speed: 0.000045 + Math.random() * 0.000025,
       spawnAt: spawnNow,
     };
+    if (slot) {
+      mob.id = "fixed-" + slot.i;
+      mob.fixedSlot = slot.i;
+    }
     // --- ponto de respawn (posicao designada no RME) ---
     // A zona G do .otbm marca EXATAMENTE onde o editor quer os monstros.
     // Cada spawn sorteia uma celula G LIVRE e nasce nela (sem desviar),
@@ -631,7 +650,18 @@ function spawnWave(c, p) {
     // proxima / canto da arena).
     let cx, cy;
     if (occ) {
-      if (zona && zona.length) {
+      if (slot) {
+        // Ponto fixo: nasce exatamente na célula designada (sem zona nem
+        // alcance do líder); se estiver ocupada, cai na livre mais próxima.
+        if (cellFree(occ, slot.x, slot.y)) {
+          cx = slot.x; cy = slot.y;
+        } else {
+          const ent = { cx: undefined, cy: undefined };
+          placeFree(ent, occ, slot.x, slot.y);
+          cx = ent.cx; cy = ent.cy;
+        }
+        if (cx !== undefined && cy !== undefined) c._spawnTaken[cx + ":" + cy] = true;
+      } else if (zona && zona.length) {
         // células G livres (respeita a posicao designada + ocupacao atual
         // + celulas ja escolhidas nesta wave)
         const livres = zona.filter((z) =>

@@ -58,6 +58,19 @@ function applyHuntOtbmZones(map, hunt) {
         map.mob.push({ x: px, y: py });
     }
   }
+
+  // Pontos de respawn fixos (RME): cada célula mantém 1 monstro extra além
+  // do pack. Guarda o índice original para a identidade "fixed-"+i ser a
+  // mesma no cliente e na autoridade.
+  if (Array.isArray(hunt.otbmFixedSpawns)) {
+    map.fixedMob = [];
+    hunt.otbmFixedSpawns.forEach((point, i) => {
+      const cell = local(point);
+      if (cell && cell.x >= 0 && cell.y >= 0 && cell.x < map.w && cell.y < map.h)
+        map.fixedMob.push({ x: cell.x, y: cell.y, i: i });
+    });
+    if (!map.fixedMob.length) delete map.fixedMob;
+  }
   return map;
 }
 

@@ -1,10 +1,11 @@
 /* asura-palace.js — HUNT Asura Palace (nível 250+).
- * Mapa: game/maps/asura_palace.otbm (12×11, z=7 — sala do palácio).
+ * Mapa: game/maps/asura_palace.otbm (63×41, z=7 — palácio completo).
  * Criaturas: Dawnfire Asura 40%, Midnight Asura 40%, Frost Flower
- * Asura 20% — sempre 8 monstros por onda (respawn fixo).
- * Coordenadas RME informadas:
- *   centerroom {1019,1024,7}
- *   mobbounds  {1015,1020,7} → {1023,1028,7}
+ * Asura 20% — 8 aleatórios + 5 fixos por onda (respawn fixo).
+ * Coordenadas RME:
+ *   centerroom {1044,1034,7}
+ *   mobbounds  {1040,1030,7} → {1049,1040,7} (10×11)
+ *   fixos      {1030,1041} {1030,1034} {1030,1028} {1036,1041} {1054,1042}
  */
 "use strict";
 
@@ -26,10 +27,16 @@
     otbm: "asura_palace",
     otbmFloor: 7,
     // Sem otbmBounds: o .otbm já é o recorte da área.
-    otbmSpawn: { x: 1019, y: 1024, z: 7 },
-    otbmMobBounds: { x: 1015, y: 1020, w: 9, h: 9, z: 7 },
-    // Pisos do mapa: 8230 mármore do palácio, 925/927/928 areia.
-    walkFloors: [8230, 925, 927, 928],
+    otbmSpawn: { x: 1044, y: 1034, z: 7 },
+    otbmMobBounds: { x: 1040, y: 1030, w: 10, h: 11, z: 7 },
+    // Pontos fixos: cada célula mantém 1 monstro extra (slug via spawnWeights).
+    otbmFixedSpawns: [
+      { x: 1030, y: 1041, z: 7 },
+      { x: 1030, y: 1034, z: 7 },
+      { x: 1030, y: 1028, z: 7 },
+      { x: 1036, y: 1041, z: 7 },
+      { x: 1054, y: 1042, z: 7 },
+    ],
     avgHp: 3100,
     avgExp: 4130,
     avgDamage: 380,
