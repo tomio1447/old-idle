@@ -4,6 +4,13 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Fix: dança da Scarlett Etzel falhava com toque no timing certo
+
+- **Causa**: o merge do snapshot online (`applyOnlineAuthorityState`, `game.js`) copiava toda chave do `state` do servidor para o combate local — e esse `state` é o combate do último checkpoint (autosave 20s), com `_scarlettPendingDirs`. Cada resposta de tick sobrescrevia a fila local: toque feito com o tick em voo sumia (servidor matava por "tecla perdida") e, se o checkpoint pegou a fila cheia, intents velhos eram reenviados e julgados contra a nota seguinte (morte por "sequência incorreta").
+- **Fix**: o merge ignora chaves `_` (runtime/intents só do cliente — mesma proteção cobre Malice/PvP push) e o checkpoint não serializa mais a fila da Scarlett. Regressão em `tools/test_scarlett_qte.js`. Simulação de 200 danças no engine (tick 200–450ms, erro humano ±300ms) confirmou que o julgamento do servidor estava correto.
+
+---
+
 ## 2026-11-25 — WhatsApp como canal de verificação (Cloud API oficial Meta)
 
 - **`server/whatsapper.js`**: envio via `graph.facebook.com/{ver}/{phone_number_id}/messages` — template aprovado com `{{1}}` = código (fora da janela 24h só template entrega), `WHATSAPP_OTP_BUTTON` para botão "copiar código", fallback texto livre quando não há template, cota `WHATSAPP_DAILY_CAP` (cada msg cobra da Meta), `WHATSAPP_REAL=1` igual ao `MAIL_REAL`. Phone normalizado p/ E.164 (BR +55 default).

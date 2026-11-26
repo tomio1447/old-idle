@@ -231,6 +231,8 @@ function persistActiveInstance() {
       if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf"||
          key==="_authorityDescriptor"||key==="_formationReservations"||
          key==="_mapBlockKeys"||key==="_mapBlockMap"||
+         key==="_scarlettPendingDirs"||key==="_scarlettPendingDir"||
+         key==="_scarlettPendingAt"||key==="_scarlettPendingPressAuth"||
          key==="damageTrack"||key==="takenTrack")return undefined;
       if(key==="target")return value&&value.id?{__targetId:String(value.id)}:null;
       return typeof value==="function"?undefined:value;
@@ -5675,10 +5677,14 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     lastBlockFx:Number(previous.scarlett.lastBlockFx)||0,
     qteStartedAt:Number(previous.scarlett.qteStartedAt)||0
   }:null;
+  // Chaves "_" são runtime/intents só do cliente (fila da dança Scarlett,
+  // passos da Malice, push PvP...). O state do servidor carrega a cópia do
+  // último checkpoint: copiá-la apagava toques feitos com o tick em voo e
+  // reenviava intents velhos (morte "no timing certo").
   for(const key of Object.keys(incoming))
     if(key!=="players"&&key!=="player"&&key!=="mobs"&&key!=="events"&&
        key!=="hunt"&&key!=="huntMap"&&key!=="boss"&&key!=="stats"&&
-       key!=="pendingSpawns"&&key!=="_heldAuthorityMobs")previous[key]=incoming[key];
+       key!=="pendingSpawns"&&key.charAt(0)!=="_")previous[key]=incoming[key];
   // Maze QTE: não sobrescreva a posição otimista enquanto há passos enfileirados.
   if(keepMalicePx&&previous.malice&&previous.malice.qtePhase==="active"){
     previous.malice.px=keepMalicePx.px;previous.malice.py=keepMalicePx.py;

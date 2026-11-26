@@ -68,6 +68,25 @@ must(/G\.combat\.scarlett && G\.combat\.scarlett\.phase === "qte"/.test(gameSrc)
 must(clientSrc.includes("scarlettIntents"), "cliente não envia fila scarlettIntents");
 must(scarlettSrc.includes("_scarlettPendingDirs"), "cliente sem fila de intents");
 
+// --- 1b) Snapshot do servidor não pode sobrescrever a fila local ----------
+// O state do tick carrega o combate do último checkpoint (autosave 20s), com
+// _scarlettPendingDirs ([] ou intents velhos). Copiá-lo no merge apagava
+// toques feitos com o tick em voo ("tecla perdida") e reenviava intents
+// antigos (julgados contra a nota seguinte = morte no timing certo).
+must(gameSrc.includes('key.charAt(0)!=="_")previous[key]=incoming[key]'),
+  "merge do snapshot online ainda copia chaves _ (fila de intents do cliente)");
+must(/key==="_scarlettPendingDirs"\|\|key==="_scarlettPendingDir"/.test(gameSrc),
+  "checkpoint da instância ainda serializa a fila de intents da Scarlett");
+{
+  // Reproduz o merge: fila local com toque em voo + incoming do checkpoint.
+  const previous = { _scarlettPendingDirs: [{ dir: "up", pressAuth: 5000 }], wave: 1 };
+  const incoming = { _scarlettPendingDirs: [], wave: 2, _pvpPAt: 1 };
+  for (const key of Object.keys(incoming))
+    if (key !== "players" && key.charAt(0) !== "_") previous[key] = incoming[key];
+  must(previous._scarlettPendingDirs.length === 1 && previous.wave === 2,
+    "merge descartou o toque pendente da dança");
+}
+
 // --- 2) Fila: 5 pressos num único visual → sequência completa ---------------
 {
   const auth = waitArenaBoss(engine.initializeAuthority(

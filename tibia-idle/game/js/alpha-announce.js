@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "25/11/2026 às 06:27";
+const ALPHA_UPDATE_AT = "26/11/2026 às 14:54";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Dança da Scarlett Etzel: toques no timing certo não se perdem mais entre ticks do servidor (morte injusta por 'tecla perdida')",
   "NOVO — WhatsApp como canal de verificação: vincule seu telefone recebendo o código no WhatsApp e use como alternativa ao e-mail no login com 2FA",
   "FIX — Login com 2FA não travava mais em 'Entrando...': a tela de código abre corretamente para senha e login social",
   "NOVO — RMT agora exige verificação 18+: CPF do titular + data de nascimento + consentimento, com saque PIX travado no próprio CPF — vendas de TC só liberam após a verificação",
