@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Nova hunt 400+: Warzone 9
+
+- **Warzone 9** entra no fim da seção HUNTS 400+ (Dwelling of the Forgotten): Cave Chimera, Tremendous Tyrant e Varnished Diremaw (pesos 34/33/33), pack 8–10. Mapa `game/beta-maps/warzone_9.otbm` publicado byte-igual em `game/maps/` (32×25, z=7, bounds 1011..1042 × 1017..1041). Playerspawn {1027,1029,7}; zona de respawn {1022,1024}→{1028,1033} (7×10 = 70 sqm, todas caminháveis e conectadas ao componente de 149).
+- Stats/skills/resistências do dump Canary — **atenção**: a exp oficial do dump é Tyrant 6.100 e Diremaw 5.900 (wiki diz 6.950/6.300; mantido o dump, como nas outras hunts).
+- Loot: 52 itens com sprite+preço. 6 creature products novos (Yasir oficial): cave-chimera-leg 650, cave-chimera-head 1200, tremendous-tyrant-shell 740, tremendous-tyrant-head 930, varnished-diremaw-brainpan 750, varnished-diremaw-legs 670 (ícones 32×32 renderizados do DAT, cids 36781–36788).
+- **Fix client×engine**: `warrior-s-shield` vendia a 0 no cliente (patch de deathlings) mas a 9.000 no servidor — restaurado o oficial 9.000 (Rock in a Hard Place) nos dois lados. Mesmo bug identificado em `warrior-s-axe` (0 no cliente / 11.000 no servidor) — ainda não corrigido.
+- `tools/import_warzone9_assets.py`: 14 sprites de tile (36282–36293/36491/36497) + 37 patterns + catálogo RME, nenhum PNG feito à mão. Teste: `tools/test_warzone9.js`.
+
+---
+
 ## 2026-11-26 — Timira: sala do boss nova (38×34)
 
 - `beta-maps/bossesroom/timiraroom.otbm` publicado byte-igual em `game/maps/timiraroom.otbm` (38×34, z=7, bounds 1012..1049 × 1016..1049 — antes 18×16 em z=2). Bossspawn {1033,1029,7}, playerspawn {1033,1035,7}: ambos caminháveis e conectados (159 sqm alcançáveis). `otbmRoomBounds` removido (nenhum código o lia).

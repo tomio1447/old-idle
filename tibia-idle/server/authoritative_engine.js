@@ -563,7 +563,7 @@ try{
     "urmahlullu.js","bashmuul-issavi.js","true-asuras.js","mimar-haffar.js",
     "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
     "book-world.js","sir-leonard.js","norcferatus-fortress.js",
-    "unhallowed-crypt.js","roost-graveborn.js","court-warlock.js"]){
+    "unhallowed-crypt.js","roost-graveborn.js","court-warlock.js","warzone9.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -699,6 +699,8 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "true-asuras":{monsters:["true-dawnfire-asura","true-midnight-asura","true-frost-flower-asura","true-feverbloom-asura"],
     cat:"hard",pack:10,packMin:8,packMax:10,
     spawnWeights:{"true-dawnfire-asura":25,"true-midnight-asura":25,"true-frost-flower-asura":25,"true-feverbloom-asura":25}},
+  "warzone-9":{monsters:["cave-chimera","tremendous-tyrant","varnished-diremaw"],cat:"hard",pack:10,packMin:8,packMax:10,
+    spawnWeights:{"cave-chimera":34,"tremendous-tyrant":33,"varnished-diremaw":33}},
   "timira-room":{monsters:["timira-the-many-headed"]},
   "library-fire":{monsters:["burning-book","rage-squid","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-energy":{monsters:["energetic-book","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
