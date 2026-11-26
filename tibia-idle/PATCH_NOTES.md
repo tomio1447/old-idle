@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Sala do Ratmiral Blackwhiskers remodelada
+
+- **Ratmiral Blackwhiskers** (BOSSES 250+): `ratmiralroom.otbm` (21×13) substituído por `ratmiral_room.otbm` (52×38, z=7, bounds 1013..1064 × 1017..1054) — publicado byte-igual de `beta-maps/bossesroom/`; o arquivo antigo fica no disco sem uso.
+- Playerspawn {1038,1037,7}, bossspawn {1038,1031,7} — ambos caminháveis e conectados (componente de 203 sqm; área caminhável total 272 sqm em 1024..1052 × 1028..1040).
+- `otbmBounds` removido da hunt def (o `.otbm` novo já é o recorte da sala — o campo cropparia o mapa). Mecânica de adds intacta: a cada ~12s até 4 Elite Pirat + 1 Mister Catkiller (`ratmiralBossTick`).
+- Todos os 89 tile ids do mapa novo já tinham sprite + catálogo RME — nenhum asset importado. Teste novo: `tools/test_ratmiral_room.js`.
+
+---
+
 ## 2026-11-26 — Novo boss 400+: Dragon Pack
 
 - **Dragon Pack** entra no fim da seção BOSSES 400+: nome do Bosstiary do boss final da "20 Years a Cook Quest" (Nimmersatt's Breeding Ground, update 13.30, Archfoe) — 50.000 hp, 600.000 exp (tibiadb; a wiki.br diz 0 com disclaimer de dados imprecisos), cooldown 20h. Ausente do dump Canary: ficha oficial em `game/js/dragon-pack-boss.js` (looktype 1712 = mesmo outfit do Mega Dragon — sheet copiada; fire imune, earth 25; kit de fogo no molde do Mega Dragon). A mecânica oficial de 7 levers NÃO é implementada — boss-room simples como o Brainstealer/Magmaoid.

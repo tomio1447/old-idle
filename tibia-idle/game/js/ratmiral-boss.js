@@ -1,16 +1,18 @@
 /* ratmiral-boss.js — Ratmiral Blackwhiskers (nível 250+).
- * Sala: game/maps/ratmiralroom.otbm.
+ * Sala: game/maps/ratmiral_room.otbm (52×38, z=7, bounds
+ * 1013..1064 × 1017..1054 — area caminhavel 272 sqm em
+ * 1024..1052 × 1028..1040).
  * Mecânica: a cada ~12s spawna até 4 Elite Pirat e 1 Mister Catkiller.
  */
 "use strict";
 
 const RATMIRAL_ID = "ratmiral-blackwhiskers";
 const RATMIRAL_ROOM = {
-  otbm: "ratmiralroom",
+  otbm: "ratmiral_room",
   name: "Ratmiral's Room",
-  center: { x: 1030, y: 1021, z: 7 },
-  spawn: { x: 1030, y: 1025, z: 7 },
-  boss: { x: 1026, y: 1018, z: 7 },
+  center: { x: 1038, y: 1034, z: 7 },
+  spawn: { x: 1038, y: 1037, z: 7 },
+  boss: { x: 1038, y: 1031, z: 7 },
 };
 
 (function registerRatmiral() {
@@ -46,7 +48,7 @@ const RATMIRAL_ROOM = {
     scene: "palace",
     otbm: RATMIRAL_ROOM.otbm,
     otbmFloor: 7,
-    otbmBounds: { x: 1018, y: 1016, w: 21, h: 13, z: 7 },
+    // Sem otbmBounds: o .otbm novo já é o recorte da sala.
     otbmSpawn: RATMIRAL_ROOM.spawn,
     otbmMobBounds: Object.assign({ w: 1, h: 1 }, RATMIRAL_ROOM.boss),
     avgHp: 100000,
