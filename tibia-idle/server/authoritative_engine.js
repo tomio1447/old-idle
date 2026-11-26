@@ -2496,6 +2496,7 @@ function stanceSkill(p,which){
   const t=stanceTotals(p);
   if(t.meleePct&&["sword","axe","club","fist"].includes(which))v=Math.floor(v*(1+t.meleePct/100));
   if(t.distPct&&which==="dist")v=Math.floor(v*(1+t.distPct/100));
+  if(t.shieldPct&&which==="shield")v=Math.floor(v*(1+t.shieldPct/100));
   return v;
 }
 function stanceHealAmount(p,amount){
@@ -2959,7 +2960,10 @@ function spellValues(auth,p,s){
       const level=Number(p.level)||1;
       const lvlMul=CanaryVocation.knightSpellLevelMul?CanaryVocation.knightSpellLevelMul(p&&p.voc,s):1;
       let lo,hi;
-      if(f.modo==="magic"){const ml=stanceMLBonus(p,s,(Number(p.ml)||0)+gearSkillBonus(p,"mag"));
+      if(f.modo==="magic"){let ml=stanceMLBonus(p,s,(Number(p.ml)||0)+gearSkillBonus(p,"mag"));
+        // 15.25: curas de knight escalam com Shielding (mesmo shield/4 do
+        // cliente) — com Protector ativo o stanceSkill ja inclui o +30%.
+        if(s&&s.type==="heal"&&p&&p.voc==="knight")ml+=Math.floor(stanceSkill(p,"shield")/4);
         lo=(f.lvlMin||0)*level*lvlMul+(f.mlMin||0)*ml+(f.flatMin||0);
         hi=(f.lvlMax||0)*level*lvlMul+(f.mlMax||0)*ml+(f.flatMax||0);
       }else{const skill=stanceSkill(p,spellSkillFor(p,s));const atk=spellAttackValue(p,s);const sa=skill*atk;
@@ -3893,7 +3897,6 @@ function playerMitigationPct(p){
   const st=stanceTotals(p);
   if(st.noBlock)return Math.min(50,Math.max(0,defEquip*0.2));
   let sh=st.noBlock?0:stanceSkill(p,"shield");
-  if(st.shieldPct)sh=Math.floor(sh*(1+st.shieldPct/100));
   let wheelMit=0;
   if(WHEEL_FN){
     const wt=WHEEL_FN.wheelTotals(p);
@@ -4826,7 +4829,6 @@ function playerMeleeDefense(p){
   }else if(weapon)defense+=Number(weapon.def||weapon.defense)||0;
   const st=stanceTotals(p);
   let shielding=st.noBlock?0:stanceSkill(p,"shield");
-  if(st.shieldPct)shielding=Math.floor(shielding*(1+st.shieldPct/100));
   return {armor,defense,shielding,protection};
 }
 function mitigateIncoming(auth,raw,p){
@@ -11261,7 +11263,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   authorityStepDuration,advanceAuthorityMovement,
   applyCondition,applyResist,applyMonsterMitigation,applyOutgoingDamage,playerWeaponProfile,CONDITIONS,
   mobSkillRangeSQM,
-  stanceTotals,stanceConvert,monkSpellElement,mantraAbsorve,mantraTotal,elementalBond,sanitizeStances,
+  stanceTotals,stanceConvert,stanceSkill,monkSpellElement,mantraAbsorve,mantraTotal,elementalBond,sanitizeStances,
   imbAllowedCats,imbCombatTotals,tryChallenge,playerAttackInterval,addExp,syncPlayerProgress,
   consumeDistanceAmmo,tryUseRune,RUNEDATA,
   meleeDamage,distanceDamage,addSkillTries,addManaSpent,advanceTrainingPlayer,staminaRegenPlayer,FULL_STAMINA,playerDamage,playerSkill,attackSkillName,
@@ -11297,7 +11299,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   isAutoSupplyStash,addSupplyStash,ensureSupplyStash,isSupplyStashableItem,moveItemToSupplyStash,
   moveItemFromSupplyStash,equipFromSupplyStash,removeSupplyStashCount,creditHuntLoot,
   equipFromContainerAuth,unequipFromContainerAuth,depotActionAuth,stashEquippedAuth,authCanAddToBag,autoAmmoForWeaponAuth,
-  nextComboSpell,playerSpellList,spellValues,spellVisual,absorbIncomingDamage,authorityPlayerTarget,
+  nextComboSpell,playerSpellList,spellValues,playerMeleeDefense,spellVisual,absorbIncomingDamage,authorityPlayerTarget,
   authorityMobTarget,authorityMobHasFollowPath,authorityFindPathStep,authorityCellBlocked,
   densestPackTarget,mobClusterDensity,packOpportunity,spellIsMultiHit,runeIsMultiHit,
   spellAreaFromCaster,spellAreaName,knightSpellFx,KNIGHT_EXORI,isMagicWeapon,

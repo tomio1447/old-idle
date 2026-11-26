@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Fix: Protector não aumentava o Shielding
+
+- **`effSkill`/`stanceSkill` ignoravam `shieldPct`**: as stances 15.25 aplicavam `meleePct` (Blood Rage) e `distPct` (Sharpshooter) na skill efetiva, mas o `shieldPct` do Protector (+30% sobre o total, oficial) nunca entrava — a "Escudo" do painel, a mitigação local (`playerMitigationPct`) e o boost de cura de knight (`shielding/4` como ML) ficavam sem o bônus. `playerDefense`/`gearTotals` aplicava o percentual à parte, o que dobraria o bônus após o fix — a aplicação manual foi removida (mantido o `shieldPercent` de buffs como Virtue of Harmony).
+- **Paridade no engine**: `stanceSkill` passou a aplicar `shieldPct` internamente (espelhando o `effSkill`) e os dois consumidores (`playerMitigationPct`, `playerMeleeDefense`) deixaram de aplicar à mão — mesma matemática, sem double-count.
+- **Cura de knight com Shielding no servidor**: `spellValues` (modo "magic") agora soma `floor(stanceSkill(p,"shield")/4)` no ML de heals de knight — paridade com o cliente (spells.js) e com o boletim 15.25 ("curas escalam com Magic Level e Shielding"); com Protector ativo a cura sobe junto.
+- `stanceSkill` e `playerMeleeDefense` exportados para teste; `test_server_stances_monk` ganhou asserts (60 → 78 com Protector, defesa autoritativa e cura), `test_changes` cobre `effSkill`/`playerDefense` no jsdom.
+
+---
+
 ## 2026-11-26 — Mini bosses nas hunts + Ugly Monster na Cobra Bastion
 
 - **Ugly Monster na Cobra Bastion**: spawn raro de 0,01% por slot (peso 1/10001 — mesma convenção do Mawhawk), nasce com `boss:true` e o loot vai pro Reward Chest. Ficha do dump Canary (10.000 hp, 1.000 exp) com os 8 equipamentos Cobra.

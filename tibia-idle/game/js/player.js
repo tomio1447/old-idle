@@ -471,6 +471,7 @@ function effSkill(p, which) {
   // Stances do 15.25, tambem percentuais sobre o TOTAL da skill:
   //   Blood Rage   -> +25% melee (fist/axe/club/sword)
   //   Sharpshooter -> +32% distance (conta equipamentos e buffs)
+  //   Protector    -> +30% shielding (conta equipamentos e buffs)
   if (typeof stanceTotals === "function") {
     const st = stanceTotals(p);
     if (st.meleePct &&
@@ -480,6 +481,9 @@ function effSkill(p, which) {
     }
     if (st.distPct && which === "dist") {
       v = Math.floor(v * (1 + st.distPct / 100));
+    }
+    if (st.shieldPct && which === "shield") {
+      v = Math.floor(v * (1 + st.shieldPct / 100));
     }
   }
   return v;
@@ -631,14 +635,13 @@ function playerDefense(p) {
       if (typeof stanceTotals === "function" && stanceTotals(p).noBlock)
         return 0;
       let sh = effSkill(p, "shield");
-      // Protector e Virtue of Harmony aumentam o shielding em %
+      // Virtue of Harmony aumenta o shielding em % (o Protector ja entra
+      // no effSkill, que aplica shieldPct sobre o total)
       let pc = 0;
       if (typeof buffTotals === "function") {
         const b = buffTotals(p);
         pc += b.shieldPercent || 0;
       }
-      // stance Protector: +30% Shielding (15.25)
-      if (typeof stanceTotals === "function") pc += stanceTotals(p).shieldPct;
       if (pc) sh = Math.floor(sh * (1 + pc / 100));
       return sh;
     })(),

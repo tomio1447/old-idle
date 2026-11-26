@@ -114,6 +114,22 @@ try {
   // o jogo preenche skills na criacao do personagem (login) — o teste faz o
   // mesmo para as funcoes que dependem de effSkill
   if (!p.skills) p.skills = { sword: 10, club: 10, axe: 10, dist: 10, shield: 10, fist: 10, magic: 3 };
+  // Protector (15.25): +30% shielding sobre o TOTAL — o effSkill ignorava
+  // shieldPct, entao o "Escudo" do painel e a mitigacao local nao subiam.
+  if (typeof window.effSkill === "function") {
+    const shBare = window.effSkill(p, "shield");
+    p.stances = { "utamo-tempo": true };
+    if (window.effSkill(p, "shield") !== Math.floor(shBare * 1.3))
+      errors.push("Protector: effSkill não aplicou +30% de shielding");
+    p.stances = {};
+  }
+  if (typeof window.playerDefense === "function") {
+    const gBare = window.playerDefense(p).shielding;
+    p.stances = { "utamo-tempo": true };
+    if (window.playerDefense(p).shielding !== Math.floor(gBare * 1.3))
+      errors.push("Protector: playerDefense não refletiu +30% (ou dobrou o bônus)");
+    p.stances = {};
+  }
   if (window.GAMEDATA && window.GAMEDATA.hunts) {
     // spawn com teleporte
     const c = window.newCombat(p, "rats", "non-pvp");

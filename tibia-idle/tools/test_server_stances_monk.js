@@ -63,6 +63,17 @@ must(dmgOf(rageState)>dmgOf(bareState),"Blood Rage não aumentou o dano melee");
 must(dmgOf(protState)<dmgOf(bareState),"Protector não reduziu o dano causado");
 must(rageState.authority.mobs[0].sapStrUntil===undefined,"Blood Rage aplicou debuff de sorcerer");
 
+// Protector: +30% shielding sobre o total (skill+equipamento) — antes o
+// stanceSkill ignorava shieldPct e o bônus nunca aparecia na defesa/cura.
+must(engine.stanceSkill(bare,"shield")===60,"shielding base sem stance errado");
+must(engine.stanceSkill(prot,"shield")===Math.floor(60*1.3),
+  "Protector não aplicou +30% no shielding");
+must(engine.playerMeleeDefense(prot).shielding===Math.floor(60*1.3),
+  "defesa autoritativa sem o shielding do Protector");
+const healS=engine.ALL_SPELLS["exura-ico"];
+must(engine.spellValues(null,prot,healS).min>engine.spellValues(null,bare,healS).min,
+  "cura de knight não escala com o shielding buffado pelo Protector");
+
 const ms=player({voc:"sorcerer",equip:{weapon:{item:"wand-of-cosmic-energy"}},
   stances:{"uteta-flam":true,"exori-moe-tempo":true},config:{spellAttack:true}});
 const msState=stepOnce(ms,"rat",{players:[{id:"1",x:10.5/30,y:10.5/30,cx:10,cy:10,
