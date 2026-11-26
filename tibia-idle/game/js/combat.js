@@ -120,6 +120,8 @@ function arenaBossBindMechanics(c, now) {
     boneOverlordBossInit(c, player);
   if (id === "court-warlock" && typeof courtWarlockBossInit === "function" && !c.cw)
     courtWarlockBossInit(c, player);
+  if (id === "the-rootkraken" && typeof rootkrakenBossInit === "function" && !c.rootkraken)
+    rootkrakenBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -4220,6 +4222,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     raw *= greedBossOutgoingDamageMultiplier(c, mob);
   if (typeof hatredBossOutgoingDamageMultiplier === "function")
     raw *= hatredBossOutgoingDamageMultiplier(c, mob, p);
+  if (typeof rootkrakenBossOutgoingDamageMultiplier === "function")
+    raw *= rootkrakenBossOutgoingDamageMultiplier(c, mob, p);
   if (typeof soulwarTaintDamageMultiplier === "function")
     raw *= soulwarTaintDamageMultiplier(c, p);
   // Tipos especiais de dano (TibiaWiki/Damage):
@@ -4651,6 +4655,8 @@ function mobAttack(c, p, mob) {
     raw *= greedBossOutgoingDamageMultiplier(c, mob);
   if (typeof hatredBossOutgoingDamageMultiplier === "function")
     raw *= hatredBossOutgoingDamageMultiplier(c, mob, p);
+  if (typeof rootkrakenBossOutgoingDamageMultiplier === "function")
+    raw *= rootkrakenBossOutgoingDamageMultiplier(c, mob, p);
   if (typeof soulwarTaintDamageMultiplier === "function")
     raw *= soulwarTaintDamageMultiplier(c, p);
   if (mob.critAll) raw *= 1.3;
@@ -5399,6 +5405,7 @@ function combatTick(c, p, dt, now) {
   if (typeof gravediggerBossTick === "function" && gravediggerBossTick(c, now) === false) return;
   if (typeof boneOverlordBossTick === "function" && boneOverlordBossTick(c, now) === false) return;
   if (typeof courtWarlockBossTick === "function" && courtWarlockBossTick(c, now) === false) return;
+  if (typeof rootkrakenBossTick === "function" && rootkrakenBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof echoRaidTick === "function") echoRaidTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);

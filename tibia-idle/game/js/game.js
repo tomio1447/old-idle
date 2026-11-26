@@ -3462,6 +3462,7 @@ function stopHunt(skipMapLoading, opts) {
   if (typeof maliceBossCleanup === "function" && G.combat) maliceBossCleanup(G.combat);
   if (typeof crueltyBossCleanup === "function" && G.combat) crueltyBossCleanup(G.combat);
   if (typeof megaBossCleanup === "function" && G.combat) megaBossCleanup(G.combat);
+  if (typeof rootkrakenBossCleanup === "function" && G.combat) rootkrakenBossCleanup(G.combat);
   G.combat = null;
   // Limpa cap compartilhada da party ao voltar para a cidade.
   if (G.p && G.p._sharedCap) { try { delete G.p._sharedCap; } catch(e) { G.p._sharedCap = undefined; } }
@@ -4650,6 +4651,7 @@ function cleanupEncounterState(c){
   if(typeof gravediggerBossCleanup==="function")gravediggerBossCleanup(c);
   if(typeof boneOverlordBossCleanup==="function")boneOverlordBossCleanup(c);
   if(typeof courtWarlockBossCleanup==="function")courtWarlockBossCleanup(c);
+  if(typeof rootkrakenBossCleanup==="function")rootkrakenBossCleanup(c);
 }
 
 /* Compra automaticamente a bless de todos e recria a mesma instância.

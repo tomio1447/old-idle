@@ -32,7 +32,7 @@ const DAILY_BOSS_POOL = [
   "the-mega-magmaoid",
   "the-dread-maiden", "the-fear-feaster", "the-unwelcome", "brain-head",
   "goshnar-s-malice", "goshnar-s-spite", "goshnar-s-greed", "goshnar-s-hatred", "goshnar-s-cruelty",
-  "mimar-haffar", "maior-domus", "dragon-pack",
+  "mimar-haffar", "maior-domus", "dragon-pack", "the-rootkraken",
 ].filter((slug) => MONSTERS[slug] && MONSTERS[slug].boss);
 
 const DAILY_MONSTER_POOL = (() => {

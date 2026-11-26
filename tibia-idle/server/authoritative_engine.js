@@ -88,6 +88,10 @@ require("../game/js/mega-magmaoid-boss.js").registerMonsters(MONSTERS);
 /* Dragon Pack (20 Years a Cook Quest / Nimmersatt, 400+): boss oficial do
  * update 13.30 ausente do dump Canary — ficha oficial no patch. */
 require("../game/js/dragon-pack-boss.js").registerMonsters(MONSTERS);
+/* The Rootkraken (The Rise of Podzilla, 400+): o boss já está no dump
+ * Canary; o patch registra os 3 plant things (adds do Root Deep) no
+ * MONSTERS. */
+require("../game/js/rootkraken-boss.js").registerMonsters(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -584,7 +588,11 @@ try{
     // Podzilla Bottom (400+): creature products/sementes novos + fix do
     // necklace-of-the-deep (sell/npcSell 3000 Rashid) — DEPOIS do
     // deathlings-sunken-temple.js que registra o preço como 0.
-    "podzilla-bottom.js"]){
+    "podzilla-bottom.js",
+    // The Rootkraken (400+): itens novos (amber/root-tentacle/fish-eye/
+    // strange-inedible-fruit) + cid/sell 0 das 8 armas amber — DEPOIS do
+    // merge do weapondata, igual dragon-pack.
+    "rootkraken-boss.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -729,6 +737,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "timira-room":{monsters:["timira-the-many-headed"]},
   "mega-magmaoid-room":{monsters:["the-mega-magmaoid"],cat:"boss-room",pack:1},
   "dragon-pack-room":{monsters:["dragon-pack"],cat:"boss-room",pack:1},
+  "the-rootkraken-room":{monsters:["the-rootkraken"],cat:"boss-room",pack:1},
   "library-fire":{monsters:["burning-book","rage-squid","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-energy":{monsters:["energetic-book","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-ice":{monsters:["icecold-book","squid-warden","ink-blob"],cat:"hardcore",pack:12,packMin:10,packMax:12},
@@ -4413,6 +4422,18 @@ function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
     const n=Number(auth.hatred.counters&&auth.hatred.counters[String(item.id)])||0;
     if(n>0)dmg=Math.max(0,Math.floor(dmg*(1+n*0.10)));
   }
+  /* Root Deep (Rootkraken): dano SOFRIDO escala counter/100 para
+   * qualquer fonte; golpe da Frenzied Plant Thing ainda soma +25 ao
+   * contador do alvo (oficial). */
+  if(auth.rootkraken&&mob){
+    const k=String(item.id);
+    const n=Number(auth.rootkraken.counters&&auth.rootkraken.counters[k])||0;
+    if(n>0){
+      dmg=Math.max(0,Math.floor(dmg*n/RK_COUNTER_START));
+      if(mob.slug==="frenzied-plant-thing")
+        auth.rootkraken.counters[k]=n+RK_COUNTER_HIT_STEP;
+    }
+  }
   if(auth.greed&&auth.greed.immune&&mob&&mob.boss)dmg=Math.max(0,Math.floor(dmg*0.7));
   {
     const taintMul=soulwarTaintDamageMultiplier(auth,p);
@@ -7235,6 +7256,61 @@ function fillPrimalAdds(auth){
     auth.events.push({t:"spawn",slug,x:pos.x,y:pos.y,targetId:String(mob.id),screen:true,ts:auth.clock});
   }
 }
+/* The Rootkraken — "Root Deep" (The Rise of Podzilla, update 13.40).
+ * Contador por jogador: começa em 100, +25 a cada 8s (passivo) e +25 por
+ * golpe recebido de Frenzied Plant Thing (oficial: a frenzied "faz seu
+ * contador aumentar"); sem teto. Dano sofrido escala counter/100 —
+ * aplicado em absorbIncomingDamage. A sala mantém até 9 Rotten Plant
+ * Thing vivas; não mortas transformam em Angry (20s) e depois Frenzied
+ * (+20s). DESIGN CALLs: taxas de crescimento/spawn/transformação (as
+ * fontes oficiais só descrevem o comportamento, não as taxas). Espelho
+ * do cliente (rootkrakenBossTick em rootkraken-boss.js). */
+const RK_COUNTER_START=100,RK_COUNTER_STEP=25,RK_COUNTER_GROWTH_MS=8000,
+  RK_COUNTER_HIT_STEP=25,RK_PLANT_CAP=9,RK_PLANT_SPAWN_MS=9000,
+  RK_TRANSFORM_MS=20000,RK_COUNTER_MARKS=[250,500,750,1000];
+const RK_PLANT_CHAIN={"rotten-plant-thing":"angry-plant-thing",
+  "angry-plant-thing":"frenzied-plant-thing"};
+function tickRootkraken(auth,now){
+  if(!auth.rootkraken)return;
+  const st=auth.rootkraken,boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+  // Durante BOSS_SPAWN_DELAY_MS o boss fica em arenaBossSpawn.pending.
+  if(!boss){if(arenaBossSpawnPending(auth))return;auth.rootkraken=null;return;}
+  st.counters=st.counters||{};
+  for(const item of auth.players||[])if(st.counters[String(item.id)]===undefined)st.counters[String(item.id)]=RK_COUNTER_START;
+  while(now>=st.nextCounterAt){st.nextCounterAt+=RK_COUNTER_GROWTH_MS;
+    for(const item of auth.players||[]){const k=String(item.id);
+      if(item.p&&item.p.hp>0)st.counters[k]=(Number(st.counters[k])||RK_COUNTER_START)+RK_COUNTER_STEP;}}
+  // Thresholds → floater "say" na tela (UI minimal viable, mesmo
+  // caminho das palavras de spell).
+  st.marks=st.marks||{};
+  for(const item of auth.players||[]){const k=String(item.id);
+    const n=Number(st.counters[k])||RK_COUNTER_START;
+    let mark=0;for(const m of RK_COUNTER_MARKS)if(n>=m)mark=m;
+    if(n>1000)mark=Math.floor(n/250)*250;
+    if(mark>(st.marks[k]||0)){st.marks[k]=mark;
+      const pos=entityPosition(item,.5,.5);
+      auth.events.push({t:"say",text:"ROOT DEEP "+n,whoId:k,x:pos.x,y:pos.y,screen:true,ts:now});}}
+  // Transformação rotten → angry → frenzied (20s por estágio).
+  for(const m of auth.mobs||[]){
+    if(!m||!m.rkPlant||m.hp<=0)continue;
+    const next=RK_PLANT_CHAIN[m.slug];
+    if(!next||now-(Number(m.rkSpawnedAt)||now)<RK_TRANSFORM_MS)continue;
+    const def=MONSTERS[next];if(!def)continue;
+    m.slug=next;m.def=Object.assign({},def);
+    m.maxHp=Math.max(m.hp,Number(def.hp)||m.hp);m.rkSpawnedAt=now;
+    const pos=entityPosition(m,.5,.5);
+    auth.events.push({t:"transform",slug:next,x:pos.x,y:pos.y,targetId:String(m.id),screen:true,ts:now});
+  }
+  // Spawn: até 9 plant things vivas (oficial: a sala invoca até 9).
+  while(now>=st.nextPlantAt){st.nextPlantAt+=RK_PLANT_SPAWN_MS;
+    if(auth.mobs.filter((m)=>m.rkPlant&&m.hp>0).length>=RK_PLANT_CAP)break;
+    const mob=makeMob(auth,"rotten-plant-thing",false);if(!mob)break;
+    mob.rkPlant=true;mob.rkSpawnedAt=now;
+    auth.mobs.unshift(mob);
+    const pos=entityPosition(mob,.5,.5);
+    auth.events.push({t:"spawn",slug:mob.slug,x:pos.x,y:pos.y,targetId:String(mob.id),screen:true,ts:auth.clock});
+  }
+}
 function tickHatred(auth,now){
   if(!auth.hatred)return;
   const st=auth.hatred,boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
@@ -7563,6 +7639,14 @@ function arenaBossBindMechanics(auth,now){
     auth.hatred={active:false,nextActivationAt:now+delay,nextCounterAt:0,counters:{}};
     for(const item of players)auth.hatred.counters[String(item.id)]=0;
     boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
+  }
+  if(auth.bossId==="the-rootkraken"&&!auth.rootkraken){
+    /* Root Deep (The Rise of Podzilla): contador por jogador começa em
+     * 100 e cresce durante a luta; dano sofrido escala counter/100.
+     * Espelho do cliente (rootkrakenBossInit em rootkraken-boss.js). */
+    auth.rootkraken={counters:{},nextCounterAt:now+RK_COUNTER_GROWTH_MS,
+      nextPlantAt:now+RK_PLANT_SPAWN_MS,marks:{}};
+    for(const item of players)auth.rootkraken.counters[String(item.id)]=RK_COUNTER_START;
   }
   if(auth.bossId==="goshnar-s-spite"&&!auth.spite){
     auth.spite={defenseStacks:0,qtePenalty:false,qtePhase:"idle",
@@ -9995,7 +10079,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
-  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);tickBoneOverlord(auth,now);tickCourtWarlock(auth,now);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);tickBoneOverlord(auth,now);tickCourtWarlock(auth,now);tickRootkraken(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);
@@ -10940,6 +11024,9 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   descriptor.state.hatred=auth.hatred?{active:!!auth.hatred.active,counters:Object.assign({},auth.hatred.counters||{}),
     nextActivationAt:Number(auth.hatred.nextActivationAt)||0,
     nextCounterAt:Number(auth.hatred.nextCounterAt)||0}:null;
+  descriptor.state.rootkraken=auth.rootkraken?{counters:Object.assign({},auth.rootkraken.counters||{}),
+    nextCounterAt:Number(auth.rootkraken.nextCounterAt)||0,
+    nextPlantAt:Number(auth.rootkraken.nextPlantAt)||0}:null;
   descriptor.state.scarlett=auth.scarlett?{immune:!!auth.scarlett.immune,phase:auth.scarlett.phase||"waiting",
     nextAt:Number(auth.scarlett.nextAt)||0,qteUntil:Number(auth.scarlett.qteUntil)||0,
     qteStartedAt:Number(auth.scarlett.qteStartedAt)||0,

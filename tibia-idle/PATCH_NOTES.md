@@ -4,6 +4,18 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Novo boss 400+: The Rootkraken + quest The Rise of Podzilla
+
+- **The Rootkraken** entra no fim da seção BOSSES 400+ (depois do Dragon Pack): boss final da "The Rise of Podzilla" (update 13.40, Archfoe) — ficha completa do dump Canary verbatim (360.000 hp, 600.000 exp, looktype 1765, cooldown 20h, loot oficial de 29 drops). Requisito enforced: nível 400 + kill do **Doctor Marrow** + concluir a **Missão 1** (1500 kills em Podzilla Bottom).
+- **Mecânica oficial "Root Deep"**: cada jogador tem um contador que começa em **100** e cresce sem teto — o dano SOFRIDO escala `contador/100` (aplicado em qualquer fonte de dano, cliente e servidor). A sala mantém até **9 Rotten Plant Thing** vivas; não mortas transformam **Rotten → Angry → Frenzied**, e golpe recebido de Frenzied aumenta o contador do alvo. Rampas/Writhing Mass da luta real não implementadas (simplificação documentada — o idle não explora a sala). **DESIGN CALLs** (fontes oficiais descrevem o comportamento, não as taxas): +25/8s passivo, +25 por golpe de frenzied, spawn 1/9s, transformação 20s por estágio, stats das plants (24k/34k/45k hp — adds de boss 400+).
+- **3 criaturas novas** ausentes do dump: `rotten/angry/frenzied-plant-thing` com fichas em `game/js/rootkraken-boss.js` (`registerMonsters` no servidor) e sheets 9×4 @64px geradas dos looktypes **1767/1768/1769** do DAT (carniphila verde/amarela/azul — pixel-diff vs o guia oficial).
+- Sala `rootkraken.otbm` 44×37 z=7 (publicada byte-igual de `beta-maps/`): playerspawn {1030,1038,7}, bossspawn {1030,1029,7}, centermap {1030,1034,7} — componente de 378 sqm conectados. `tools/import_rootkraken_assets.py`: tile 48104 (ground walkável), ícones de item, catálogo RME.
+- **Quest "The Rise of Podzilla"** (QUEST_DEFS, worldQuest, `renderDetail` próprio — padrão Make Believe): M1 = `MISSION_DEFS["podzilla-bottom"]` counter kills ×1500 → `completeReward.bossAccess` libera o boss; M2 = kill do Rootkraken → **outfit Rootwalker addon 1+2** (wardrobe rootwalker-m 1774 / rootwalker-f 1775 + cosmetics da conta, claim 1x/conta em `missionsDone["rise-of-podzilla:outfit"]`).
+- **Itens novos** (todos com sprite + cid + preço oficial): fish-eye Yasir **500.000**, root-tentacle Yasir **300.000**, amber **20.000** (NPC value), strange-inedible-fruit (item de quest do outfit) → sell 0. **Fix**: as 8 armas amber (slayer/greataxe/bludgeon/sabre/axe/cudgel/crossbow/kusarigama) ganham cid e sell/npcSell **0** — NPC value oficial 0, sem comprador (padrão Moonsilver/dragon-scale). Poções/gems compartilhadas não reprecificadas (paridade com mimar-haffar).
+- The Rootkraken entra no **DAILY_BOSS_POOL**. Teste: `tools/test_rootkraken.js`.
+
+---
+
 ## 2026-11-26 — Nova hunt 400+: Podzilla Bottom
 
 - **Podzilla Bottom** entra na seção HUNTS 400+ (última da seção, depois de Nimmersatt's Breeding Ground): a fossa submarina das quaras com **Quara Looter** (11.500 hp), **Quara Plunderer** (13.500 hp) e **Quara Raider** (12.500 hp) — respawn de **8 a 12** por onda (34/33/33).

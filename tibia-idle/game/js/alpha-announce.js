@@ -6,10 +6,12 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "26/11/2026 às 21:45";
+const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — The Rise of Podzilla Quest (400+): elimine 1500 monstros em Podzilla Bottom, enfrente The Rootkraken e ganhe a outfit Rootwalker com addons",
+  "NOVO — Boss The Rootkraken (400+): mecânica Root Deep — seu contador cresce na luta e aumenta o dano sofrido; até 9 Plant Things invadem a sala e evoluem de Rotten → Angry → Frenzied",
   "NOVO — Podzilla Bottom (400+): Quara Looter, Quara Plunderer e Quara Raider na fossa submarina de Podzilla",
   "NOVO — Party quest Hat of The Mad (30+): sobreviva às 5 waves da sala do mago louco com seus 4 personagens e ganhe Hat of the Mad + Devil Helmet + 5.000 gold",
   "NOVO — Sala do Ratmiral Blackwhiskers remodelada: arena muito maior, mesma luta com Elite Pirats e Mister Catkiller",
