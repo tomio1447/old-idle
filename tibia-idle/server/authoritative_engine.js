@@ -567,6 +567,7 @@ try{
     "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
     "book-world.js","sir-leonard.js","norcferatus-fortress.js",
     "unhallowed-crypt.js","roost-graveborn.js","court-warlock.js","warzone9.js",
+    "nimmersatt.js",
     // The Brainstealer + The Mega Magmaoid (250+): o loot do magmaoid é a
     // tabela do Brainstealer — brainstealer-boss.js registra os itens
     // eldritch/brainstealer-s-* com os preços oficiais (sem o arquivo o
@@ -710,6 +711,8 @@ const HUNTS=Object.assign(read("hunts.json"),{
     spawnWeights:{"true-dawnfire-asura":25,"true-midnight-asura":25,"true-frost-flower-asura":25,"true-feverbloom-asura":25}},
   "warzone-9":{monsters:["cave-chimera","tremendous-tyrant","varnished-diremaw"],cat:"hard",pack:10,packMin:8,packMax:10,
     spawnWeights:{"cave-chimera":34,"tremendous-tyrant":33,"varnished-diremaw":33}},
+  "nimmersatt-breeding-ground":{monsters:["dragolisk","mega-dragon","wardragon"],cat:"hard",pack:10,packMin:8,packMax:10,
+    spawnWeights:{"dragolisk":34,"mega-dragon":33,"wardragon":33}},
   "timira-room":{monsters:["timira-the-many-headed"]},
   "mega-magmaoid-room":{monsters:["the-mega-magmaoid"],cat:"boss-room",pack:1},
   "library-fire":{monsters:["burning-book","rage-squid","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},

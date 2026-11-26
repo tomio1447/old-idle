@@ -84,13 +84,13 @@ for (const c of parsed.mob) if (reached.has(c.x + "," + c.y)) available++;
 must(available >= 14 * 2, "respawn sem área conectada para o pack máximo");
 
 // Categoria HUNTS 400+: moonstone-castle está na seção; norcferatus-fortress
-// é a última hunt (adicionada depois — update 15.10).
+// entrou depois, seguida de warzone-9 e nimmersatt-breeding-ground.
 const s400 = ctx.HUNT_MODAL_SECTIONS.find((s) => s.title === "HUNTS 400+");
 must(s400, "seção HUNTS 400+ ausente");
 must(s400.ids.indexOf("moonstone-castle") !== -1,
   "moonstone-castle ausente do HUNTS 400+");
-must(s400.ids[s400.ids.length - 1] === "norcferatus-fortress",
-  "norcferatus-fortress deve ser a última hunt do HUNTS 400+");
+must(s400.ids.indexOf("norcferatus-fortress") !== -1,
+  "norcferatus-fortress ausente do HUNTS 400+");
 const ui = fs.readFileSync(path.join(js, "ui.js"), "utf8"), huntList = {};
 Object.assign(ctx, { $: () => huntList, $$: () => [], HUNT_UI: { busca: "" },
   huntRisk: () => ({ cls: "hard", txt: "400+" }), fmt: String,

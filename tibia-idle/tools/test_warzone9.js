@@ -86,10 +86,13 @@ for (const c of parsed.mob) {
 }
 must(available === 70, "zona de respawn não é toda conectada: " + available + "/70");
 
-// Card no modal HUNTS 400+ (último da seção).
+// Card no modal HUNTS 400+: warzone-9 está na seção;
+// nimmersatt-breeding-ground é o último id (a seção cresce por append).
 const s400 = ctx.HUNT_MODAL_SECTIONS.find((s) => s.title === "HUNTS 400+");
-must(s400 && s400.ids[s400.ids.length - 1] === "warzone-9",
-  "warzone-9 deve ser o último id da categoria HUNTS 400+");
+must(s400 && s400.ids.indexOf("warzone-9") !== -1,
+  "warzone-9 ausente da categoria HUNTS 400+");
+must(s400.ids[s400.ids.length - 1] === "nimmersatt-breeding-ground",
+  "nimmersatt-breeding-ground deve ser o último id da categoria HUNTS 400+");
 const ui = fs.readFileSync(path.join(js, "ui.js"), "utf8"), huntList = {};
 Object.assign(ctx, { $: () => huntList, $$: () => [], HUNT_UI: { busca: "" },
   huntRisk: () => ({ cls: "hard", txt: "400+" }), fmt: String,

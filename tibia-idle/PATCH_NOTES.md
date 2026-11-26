@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Nova hunt 400+: Nimmersatt's Breeding Ground
+
+- **Nimmersatt's Breeding Ground** entra no fim da seção HUNTS 400+: Dragolisk, Mega Dragon e Wardragon (pesos 34/33/33), pack 8–10. Mapa `Nimmersatt's Breeding Ground.otbm` publicado byte-igual em `game/maps/nimmersatt_breeding_ground.otbm` (46×32, z=7, bounds 1010..1055 × 1016..1047). Playerspawn {1030,1030,7}; zona de respawn {1023,1024}→{1037,1037} (15×14 = 210 sqm, todas caminháveis e conectadas ao componente de 299).
+- Stats/skills do dump Canary — exp oficial do dump: Dragolisk 5.050, Mega Dragon 7.810, Wardragon 5.810 (wiki diz 4.650/7.180/5.340 — mantido o dump). O wiki também lista ultimate potions e dragon-blood que o dump não traz — tabela do dump usada.
+- Loot: 24 itens com sprite+preço. **7 creature products novos** com Yasir oficial: nimmersatt-s-seal 520, molten-dragon-essence 840, mega-dragon-heart 1.100, dragolisk-eye 690, dragolisk-poison-gland 475, wardragon-claw 550, wardragon-tooth 730 (cids 44743–44749, ícones 32×32 do DAT). dragon-tongue/prismatic-quartz/white-gem já existiam.
+- `tools/import_nimmersatt_assets.py`: 10 sprites de tile (11016–11026/25112/25113, todos renderizados) + 13 patterns + catálogo RME. Teste: `tools/test_nimmersatt.js` (+asserts de "última da seção" atualizados em test_warzone9/test_moonstone_castle).
+
+---
+
 ## 2026-11-26 — Novo boss 250+: The Mega Magmaoid + sala do Brainstealer remodelada
 
 - **The Mega Magmaoid** entra no fim da seção BOSSES 250+: boss oficial do update 12.70 ("Too Hot to Handle", Dwelling of the Forgotten) — 104.000 hp, 80.000 exp, Archfoe, cooldown 20h, looktype 1413 (mesmo outfit do Magma Bubble — sheet reutilizada). Ausente do dump Canary: ficha oficial em `game/js/mega-magmaoid-boss.js` (earth imune, fire aproximado como imune — oficialmente ele se cura com fogo; energy 10, death −10; kit de fogo no molde do Magma Bubble). Loot **idêntico ao do The Brainstealer** (35 entradas, inclusive eldritch + gilded). Sala `mega_magmaoid.otbm` 31×29 z=7 (byte-igual do beta-maps), bossspawn {1025,1027,7}, playerspawn {1026,1032,7}, componente de 240 sqm conectados. Também no Daily Boss pool.
