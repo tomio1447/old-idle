@@ -28,7 +28,7 @@ const section250 = /title:\s*"HUNTS 250\+",\s*ids:\s*\[([^\]]*)\]/.exec(sections
 must(section250 && section250[1].includes('"cobra-bastion"') &&
      uiSource.includes('${packLabel}</b> criaturas'),
   'Cobra/range HARD não aparece na sessão 250+ do modal');
-must(indexSource.includes('<script src="js/hard-hunts.js?v=catacombs-align-v1"></script>'),
+must(/<script src="js\/hard-hunts\.js\?v=[^"]+"><\/script>/.test(indexSource),
   'Patch HARD versionado não é carregado pelo jogo');
 
 // No test server, um personagem nível 1 ainda deve conseguir clicar na
@@ -74,6 +74,38 @@ must(!cobraHunt.otbmBounds &&
      JSON.stringify(cobraHunt.otbmMobBounds) === JSON.stringify({ x:154,y:160,w:10,h:12,z:2 }) &&
      JSON.stringify(cobraHunt.otbmSpawn) === JSON.stringify({ x:157,y:165,z:2 }),
   'FOV ou coordenadas RME da Cobra Bastion incorretos');
+
+// Miniboss: Ugly Monster — 0,01% por slot de spawn (1/10001, padrão mawhawk)
+must(JSON.stringify(cobraHunt.bossMobs) === JSON.stringify(['ugly-monster']),
+  'cobra-bastion: ugly-monster ausente dos bossMobs');
+must(cobraHunt.spawnWeights && cobraHunt.spawnWeights['ugly-monster'] === 1,
+  'cobra-bastion: peso do ugly-monster deve ser 1');
+const cobraTotal = ['cobra-vizier','cobra-scout','cobra-assassin','ugly-monster']
+  .reduce((s, k) => s + (cobraHunt.spawnWeights[k] || 0), 0);
+must(cobraTotal === 10001, 'cobra-bastion: pesos devem somar 10001 (0,01% por slot)');
+{
+  const E = require(path.join(__dirname, '..', 'server', 'authoritative_engine'));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server', 'authoritative_engine.js'), 'utf8');
+  must(/"cobra-bastion":\{[\s\S]*?bossMobs:\["ugly-monster"\]/.test(src) &&
+       /"cobra-bastion":\{[\s\S]*?"ugly-monster":1\}/.test(src),
+    'engine: cobra-bastion sem bossMobs/peso do ugly-monster');
+  const m = E.MONSTERS['ugly-monster'];
+  must(m && m.hp === 10000 && m.exp === 1000, 'ugly-monster diverge do dump Canary');
+  const loot = (m.loot || []).map(l => l.item || l.i);
+  for (const slug of ['cobra-crossbow','cobra-hood','cobra-axe','cobra-boots',
+    'cobra-sword','cobra-wand','cobra-rod','cobra-club']) {
+    must(loot.includes(slug), 'ugly-monster sem loot ' + slug);
+    must(E.ITEMS[slug] && Number(E.ITEMS[slug].sell || E.ITEMS[slug].npcSell) > 0,
+      slug + ' sem ficha/preço no catálogo do servidor');
+    must(fs.existsSync(path.join(game, 'assets', 'item', slug + '.png')),
+      slug + ' sem ícone');
+  }
+  must(fs.existsSync(path.join(game, 'assets', 'mob', 'ugly-monster.png')),
+    'ugly-monster sem sheet');
+  const ui = fs.readFileSync(path.join(js, 'ui.js'), 'utf8');
+  must(ui.includes('MINI BOSSES') && ui.includes('bossMobs'),
+    'modal de hunt não exibe a seção MINI BOSSES');
+}
 
 const expected = {
   'cobra-vizier': {
@@ -322,8 +354,8 @@ must([6,7,8,9,10].every(n => seen.has(n)), 'Faixa HARD não alcança todos os ta
 // v4: Cobra Bastion pré-compilado — elimina fetch/parse em runtime
 const prePath = path.join(js, 'cobra-bastion-map.js');
 must(fs.existsSync(prePath), 'cobra-bastion-map.js pré-compilado ausente (gerador não executado)');
-must(indexSource.includes('<script src="js/cobra-bastion-map.js?v=cobra-loading-v17"></script>'),
-  'Mapa pré-compilado não é carregado pelo index (cache bust v17)');
+must(/<script src="js\/cobra-bastion-map\.js\?v=[^"]+"><\/script>/.test(indexSource),
+  'Mapa pré-compilado não é carregado pelo index (cache bust)');
 const preSource = fs.readFileSync(prePath, 'utf8');
 must(preSource.includes('otbm:cobra_bastion') && preSource.includes('"rows":'),
   'Pré-compilado não registra HUNTMAPS["otbm:cobra_bastion"]');

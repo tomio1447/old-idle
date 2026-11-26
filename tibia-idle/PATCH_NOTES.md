@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Mini bosses nas hunts + Ugly Monster na Cobra Bastion
+
+- **Ugly Monster na Cobra Bastion**: spawn raro de 0,01% por slot (peso 1/10001 — mesma convenção do Mawhawk), nasce com `boss:true` e o loot vai pro Reward Chest. Ficha do dump Canary (10.000 hp, 1.000 exp) com os 8 equipamentos Cobra.
+- **Modal de hunt exibe "MINI BOSSES"**: hunts com `bossMobs` mostram os cards dos mini bosses (HP/Exp/resistências/loot) numa seção própria abaixo dos monstros — Cobra Bastion (Ugly Monster), Falcon Bastion (4), Roshamuul (Mawhawk) e as 3 Gnomprona (Plunder Patriarch).
+- Reparos pré-existentes em `test_hard_hunts_cobra`: cache-busts hardcoded (`catacombs-align-v1`, `cobra-loading-v17`) generalizados — já falhavam no HEAD.
+
+---
+
 ## 2026-11-26 — Fix: timer da sessão "quebrando" em saltos de ~4s
 
 - **Sessão pulava de 4 em 4 segundos online**: o analyser exibia `stats.time` — o relógio autoritativo do servidor, que só refresca quando um tick roundtrip completa (`ONLINE_AUTH_TICK_MS` 200ms em rede saudável; segundos sob carga). Entre merges o timer congelava e saltava o intervalo inteiro de uma vez — parecia a sessão travando.

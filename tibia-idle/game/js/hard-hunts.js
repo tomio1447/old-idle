@@ -208,6 +208,13 @@
     level: 250,
     minLevel: 250,
     monsters: ["cobra-vizier", "cobra-scout", "cobra-assassin"],
+    bossMobs: ["ugly-monster"],
+    /* Pesos para o roll inteiro do engine: ugly-monster 1/10001 ≈ 0,01%
+     * por slot — mesma convenção do mawhawk (roshamuul.js). */
+    spawnWeights: {
+      "cobra-vizier": 3334, "cobra-scout": 3333, "cobra-assassin": 3333,
+      "ugly-monster": 1,
+    },
     color: "#b99a52",
     scene: "palace",
     otbm: "cobra_bastion",

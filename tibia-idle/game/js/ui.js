@@ -1241,6 +1241,8 @@ function openHuntInfoModal(id) {
         })() : ""}
         ${hazardBox}
         <div class="hunt-monsters">${hu.monsters.map(monsterCard).join("")}</div>
+        ${(hu.bossMobs || []).length ? `<div class="hunt-cat-title">MINI BOSSES</div>
+          <div class="hunt-monsters">${(hu.bossMobs || []).map(monsterCard).join("")}</div>` : ""}
       </div>
       <div class="row mt8 huntinfo-actions" style="gap:6px;justify-content:flex-end">
         <button class="sm" id="huntinfo-cancel">Cancelar</button>

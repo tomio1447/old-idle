@@ -653,7 +653,9 @@ for(const slug of Object.keys(QAMMO)){
 }
 const HUNTS=Object.assign(read("hunts.json"),{
   "mota-extension":{monsters:["floating-savant","retching-horror","fury","hellhound","demon"],cat:"hard",pack:10,packMin:6,packMax:10},
-  "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"],cat:"hard",pack:10,packMin:6,packMax:10,
+    bossMobs:["ugly-monster"],
+    spawnWeights:{"cobra-vizier":3334,"cobra-scout":3333,"cobra-assassin":3333,"ugly-monster":1}},
   "buried-cathedral":{monsters:["ripper-spectre","gazer-spectre","burster-spectre","arachnophobica"],cat:"hard",pack:10,packMin:6,packMax:10},
   "ingol-terrain":{monsters:["harpy","crape-man","liodile","boar-man","carnivostrich"],cat:"hard",pack:10,packMin:6,packMax:10},
   "roshamuul":{monsters:["guzzlemaw","frazzlemaw","silencer"],cat:"hard",pack:10,packMin:6,packMax:10,
