@@ -29,6 +29,7 @@ const DAILY_BOSS_POOL = [
   "malofur-mangrinder", "maxxenius",
   "timira-the-many-headed", "scarlett-etzel", "faceless-bane", "doctor-marrow",
   "grand-master-oberon", "ratmiral-blackwhiskers", "the-brainstealer", "drume",
+  "the-mega-magmaoid",
   "the-dread-maiden", "the-fear-feaster", "the-unwelcome", "brain-head",
   "goshnar-s-malice", "goshnar-s-spite", "goshnar-s-greed", "goshnar-s-hatred", "goshnar-s-cruelty",
   "mimar-haffar", "maior-domus",

@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Novo boss 250+: The Mega Magmaoid + sala do Brainstealer remodelada
+
+- **The Mega Magmaoid** entra no fim da seção BOSSES 250+: boss oficial do update 12.70 ("Too Hot to Handle", Dwelling of the Forgotten) — 104.000 hp, 80.000 exp, Archfoe, cooldown 20h, looktype 1413 (mesmo outfit do Magma Bubble — sheet reutilizada). Ausente do dump Canary: ficha oficial em `game/js/mega-magmaoid-boss.js` (earth imune, fire aproximado como imune — oficialmente ele se cura com fogo; energy 10, death −10; kit de fogo no molde do Magma Bubble). Loot **idêntico ao do The Brainstealer** (35 entradas, inclusive eldritch + gilded). Sala `mega_magmaoid.otbm` 31×29 z=7 (byte-igual do beta-maps), bossspawn {1025,1027,7}, playerspawn {1026,1032,7}, componente de 240 sqm conectados. Também no Daily Boss pool.
+- **Sala do Brainstealer remodelada**: `the_brainstealer_room.otbm` (30×27 z=7) publicada por cima do `brainstealer.otbm` antigo; bossspawn {1025,1026,7}, playerspawn {1025,1033,7}, centermap {1025,1030,7}; `otbmBounds` removido (a sala nova já é o recorte).
+- **Fixes de catálogo achados no processo**: `violet-gem` vendia a 1.000 no servidor (brainstealer-boss.js zerava por cima do Yasir 10.000 oficial) — corrigido; `gilded-eldritch-bow` e `gilded-eldritch-crescent-moon-spade` ganharam `cid` (36665/50170 — eram itens do loot sem registro).
+- Importers: `tools/import_mega_magmaoid_assets.py` (4 sprites) + `tools/import_brainstealer_room_assets.py` (1 sprite, 36589 transparente — renderiza vazio no DAT). Teste: `tools/test_mega_magmaoid.js`.
+
+---
+
 ## 2026-11-26 — Nova hunt 400+: Warzone 9
 
 - **Warzone 9** entra no fim da seção HUNTS 400+ (Dwelling of the Forgotten): Cave Chimera, Tremendous Tyrant e Varnished Diremaw (pesos 34/33/33), pack 8–10. Mapa `game/beta-maps/warzone_9.otbm` publicado byte-igual em `game/maps/` (32×25, z=7, bounds 1011..1042 × 1017..1041). Playerspawn {1027,1029,7}; zona de respawn {1022,1024}→{1028,1033} (7×10 = 70 sqm, todas caminháveis e conectadas ao componente de 149).

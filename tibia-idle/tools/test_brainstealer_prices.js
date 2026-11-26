@@ -14,7 +14,10 @@ for (const file of [
 ]) vm.runInContext(fs.readFileSync(path.join(game, file), "utf8"), context, { filename: file });
 
 const expected = {
-  "violet-gem": 1000,
+  /* violet-gem: preço oficial Yasir 10.000 — paridade com
+   * yasir-prices.js / the-void.js / bloodrotten.js (um valor menor aqui
+   * sobrescrevia o oficial no engine e divergia o Sell All online). */
+  "violet-gem": 10000,
   "white-gem": 12000,
   "moonstone": 13000,
   "brainstealer-s-tissue": 240000,

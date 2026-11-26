@@ -82,6 +82,9 @@ require("../game/js/roost-graveborn.js").registerMonsters(MONSTERS);
 /* Court Warlock (Order of the Stag, update 15.20): boss + Raubritters
  * — fichas oficiais registradas no MONSTERS. */
 require("../game/js/court-warlock.js").registerMonsters(MONSTERS);
+/* The Mega Magmaoid (Dwelling of the Forgotten, 250+): boss oficial do
+ * update 12.70 ausente do dump Canary — ficha oficial no patch. */
+require("../game/js/mega-magmaoid-boss.js").registerMonsters(MONSTERS);
 const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
@@ -563,7 +566,13 @@ try{
     "urmahlullu.js","bashmuul-issavi.js","true-asuras.js","mimar-haffar.js",
     "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
     "book-world.js","sir-leonard.js","norcferatus-fortress.js",
-    "unhallowed-crypt.js","roost-graveborn.js","court-warlock.js","warzone9.js"]){
+    "unhallowed-crypt.js","roost-graveborn.js","court-warlock.js","warzone9.js",
+    // The Brainstealer + The Mega Magmaoid (250+): o loot do magmaoid é a
+    // tabela do Brainstealer — brainstealer-boss.js registra os itens
+    // eldritch/brainstealer-s-* com os preços oficiais (sem o arquivo o
+    // Sell All online usaria o preço calculado do Canary em vez do
+    // sell/npcSell oficiais, divergindo do cliente).
+    "brainstealer-boss.js","mega-magmaoid-boss.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -702,6 +711,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "warzone-9":{monsters:["cave-chimera","tremendous-tyrant","varnished-diremaw"],cat:"hard",pack:10,packMin:8,packMax:10,
     spawnWeights:{"cave-chimera":34,"tremendous-tyrant":33,"varnished-diremaw":33}},
   "timira-room":{monsters:["timira-the-many-headed"]},
+  "mega-magmaoid-room":{monsters:["the-mega-magmaoid"],cat:"boss-room",pack:1},
   "library-fire":{monsters:["burning-book","rage-squid","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-energy":{monsters:["energetic-book","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-ice":{monsters:["icecold-book","squid-warden","ink-blob"],cat:"hardcore",pack:12,packMin:10,packMax:12},

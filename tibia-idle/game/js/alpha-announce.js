@@ -6,10 +6,12 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "26/11/2026 às 16:30";
+const ALPHA_UPDATE_AT = "26/11/2026 às 17:15";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Boss The Mega Magmaoid (250+): mesmo loot do The Brainstealer, sala própria na Dwelling of the Forgotten",
+  "NOVO — Sala do The Brainstealer remodelada: arena maior e nova decoração",
   "NOVO — Warzone 9 (400+): Cave Chimera, Tremendous Tyrant e Varnished Diremaw na Dwelling of the Forgotten",
   "NOVO — Sala da Timira redesenhada: arena maior e nova decoração",
   "NOVO — Asura Palace com mapa novo e maior: 8 Asuras aleatórias + 5 respawns fixos espalhados pelo palácio",

@@ -1,8 +1,12 @@
 /* brainstealer-boss.js — Boss The Brainstealer (nível 250+).
- * Sala: game/maps/brainstealer.otbm
- * centeroom {x: 1023, y: 1026, z: 7}
- * bossspawn {x: 1020, y: 1021, z: 7}
- * playerspawn {x: 1026, y: 1029, z: 7}
+ * Sala remodelada: game/maps/brainstealer.otbm (30×27, z=7 — publicada
+ * byte-igual de beta-maps/bossesroom/the_brainstealer_room.otbm;
+ * bounds 1011..1040 × 1017..1043, 810 cells / 64 ids, componente de 173
+ * sqm caminháveis todos conectados).
+ * centeroom {x: 1025, y: 1030, z: 7} — caminhável mais próxima do centro
+ * geométrico dos bounds (1025.5, 1030).
+ * bossspawn {x: 1025, y: 1026, z: 7} → local (14,9)
+ * playerspawn {x: 1025, y: 1033, z: 7} → local (14,16)
  */
 "use strict";
 
@@ -10,9 +14,9 @@ const BRAINSTEALER_ID = "the-brainstealer";
 const BRAINSTEALER_ROOM = {
   otbm: "brainstealer",
   name: "The Brainstealer's Room",
-  center: { x: 1023, y: 1026, z: 7 },
-  spawn: { x: 1026, y: 1029, z: 7 },
-  boss: { x: 1020, y: 1021, z: 7 },
+  center: { x: 1025, y: 1030, z: 7 },
+  spawn: { x: 1025, y: 1033, z: 7 },
+  boss: { x: 1025, y: 1026, z: 7 },
 };
 
 (function registerBrainstealer() {
@@ -24,7 +28,7 @@ const BRAINSTEALER_ROOM = {
 
   if (!GAMEDATA.items) GAMEDATA.items = {};
   const lootItems = {
-    "violet-gem": { n: "violet gem", s: null, t: "loot", cid: 3036, w: 0.30, sell: 1000, npcSell: 1000 },
+    "violet-gem": { n: "violet gem", s: null, t: "loot", cid: 3036, w: 0.30, sell: 10000, npcSell: 10000 },
     "white-gem": { n: "white gem", s: null, t: "loot", cid: 32769, w: 0.30, sell: 12000, npcSell: 12000 },
     "moonstone": { n: "moonstone", s: null, t: "loot", cid: 32771, w: 0.10, sell: 13000, npcSell: 13000 },
     "ultimate-spirit-potion": { n: "ultimate spirit potion", s: null, t: "loot", cid: 23374, w: 3.10, sell: 0, npcSell: 0 },
@@ -40,6 +44,7 @@ const BRAINSTEALER_ROOM = {
     "gilded-eldritch-greataxe": { n: "gilded eldritch greataxe", s: "weapon", t: "axe", cid: 36662, w: 66.00, sell: 0, npcSell: 0, atk: 54, def: 23 },
     "eldritch-cuirass": { n: "eldritch cuirass", s: "armor", t: "armor", cid: 36663, w: 110.00, sell: 0, npcSell: 0, arm: 18 },
     "eldritch-bow": { n: "eldritch bow", s: "weapon", t: "distance", cid: 36664, w: 58.00, sell: 0, npcSell: 0, atk: 6, hit: 3 },
+    "gilded-eldritch-bow": { n: "gilded eldritch bow", s: "weapon", t: "distance", cid: 36665, w: 59.00, sell: 0, npcSell: 0, atk: 6, hit: 6 },
     "eldritch-quiver": { n: "eldritch quiver", s: "ammo", t: "quiver", cid: 36666, w: 22.00, sell: 0, npcSell: 0 },
     "eldritch-breeches": { n: "eldritch breeches", s: "legs", t: "legs", cid: 36667, w: 69.00, sell: 0, npcSell: 0, arm: 9 },
     "eldritch-wand": { n: "eldritch wand", s: "weapon", t: "wand", cid: 36668, w: 36.00, sell: 0, npcSell: 0, mdmg: 100 },
@@ -51,6 +56,7 @@ const BRAINSTEALER_ROOM = {
     "eldritch-rod": { n: "eldritch rod", s: "weapon", t: "rod", cid: 36674, w: 35.00, sell: 0, npcSell: 0, mdmg: 100 },
     "gilded-eldritch-rod": { n: "gilded eldritch rod", s: "weapon", t: "rod", cid: 36675, w: 36.00, sell: 0, npcSell: 0, mdmg: 105 },
     "eldritch-crescent-moon-spade": { n: "eldritch crescent moon spade", s: "weapon", t: "sword", cid: 50169, w: 88.00, sell: 0, npcSell: 0, atk: 50, def: 24 },
+    "gilded-eldritch-crescent-moon-spade": { n: "gilded eldritch crescent moon spade", s: "weapon", t: "fist", cid: 50170, w: 88.00, sell: 0, npcSell: 0, atk: 52, def: 24 },
     "eldritch-monk-boots": { n: "eldritch monk boots", s: "boots", t: "boots", cid: 50266, w: 13.00, sell: 0, npcSell: 0, arm: 3 },
     "eldritch-crystal": { n: "eldritch crystal", s: null, t: "loot", cid: 36835, w: 0.30, sell: 48000, npcSell: 48000 },
   };
@@ -76,7 +82,7 @@ const BRAINSTEALER_ROOM = {
     scene: "palace",
     otbm: BRAINSTEALER_ROOM.otbm,
     otbmFloor: 7,
-    otbmBounds: { x: 1013, y: 1020, w: 21, h: 13, z: 7 },
+    // Sem otbmBounds: o .otbm novo já é o recorte da sala.
     otbmSpawn: BRAINSTEALER_ROOM.spawn,
     otbmMobBounds: Object.assign({ w: 1, h: 1 }, BRAINSTEALER_ROOM.boss),
     avgHp: 300000,
