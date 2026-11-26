@@ -179,9 +179,9 @@
     respawn: 1.1,
   });
 
-  // Bossroom nova da Timira publicada em beta-maps. O OTBM ocupa
-  // (175,160,2)..(192,175,2); `otbmRoomBounds` preserva a arena lógica
-  // global definida para combate, sem recortar paredes/objetos do arquivo.
+  // Bossroom da Timira (beta-maps/bossesroom): OTBM 38×34 z=7, bounds
+  // (1012,1016)..(1049,1049). playerspawn {1033,1035,7} → local (21,19);
+  // bossspawn {1033,1029,7} → local (21,13).
   GAMEDATA.hunts["timira-room"] = {
     name: "Timira's Room",
     hidden: true,
@@ -191,9 +191,8 @@
     color: "#78bfa8",
     scene: "palace",
     otbm: "timiraroom",
-    otbmRoomBounds: { x:175, y:159, w:19, h:17, z:2 },
-    otbmMobBounds: { x:184, y:162, w:1, h:1, z:2 },
-    otbmSpawn: { x:182, y:170, z:2 },
+    otbmMobBounds: { x:1033, y:1029, w:1, h:1, z:7 },
+    otbmSpawn: { x:1033, y:1035, z:7 },
     avgHp: 75000,
     avgExp: 45500,
     avgDamage: 600,

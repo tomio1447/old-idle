@@ -4,6 +4,13 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Timira: sala do boss nova (38×34)
+
+- `beta-maps/bossesroom/timiraroom.otbm` publicado byte-igual em `game/maps/timiraroom.otbm` (38×34, z=7, bounds 1012..1049 × 1016..1049 — antes 18×16 em z=2). Bossspawn {1033,1029,7}, playerspawn {1033,1035,7}: ambos caminháveis e conectados (159 sqm alcançáveis). `otbmRoomBounds` removido (nenhum código o lia).
+- `tools/import_timira_room_assets.py`: 19 sprites de tile novos + 28 patterns + catálogo RME. `tools/test_timira_room_return_critical.js` reescrito para a sala nova (+ BFS spawn→boss) — o teste estava quebrado desde que o mapa saiu de `beta-maps/` para `bossesroom/`.
+
+---
+
 ## 2026-11-26 — Asura Palace: mapa novo 63×41 + respawns fixos
 
 - **Mapa**: `beta-maps/asura_palace.otbm` publicado byte-igual em `game/maps/` (63×41, z=7, bounds 1010..1072 × 1016..1056). Playerspawn {1044,1034,7}; zona de respawn {1040,1030}→{1049,1040} (10×11, 110 sqm caminháveis e conectados). `walkFloors` removido (o piso 8230 do mapa antigo não existe mais e o novo é caminhável sem ele). `tools/import_asura_palace_assets.py`: 53 sprites de tile + 26 patterns + catálogo RME; 6493/6497 renderizam vazios no DAT → PNG transparente.
