@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Nova hunt 400+: Podzilla Bottom
+
+- **Podzilla Bottom** entra na seção HUNTS 400+ (última da seção, depois de Nimmersatt's Breeding Ground): a fossa submarina das quaras com **Quara Looter** (11.500 hp), **Quara Plunderer** (13.500 hp) e **Quara Raider** (12.500 hp) — respawn de **8 a 12** por onda (34/33/33).
+- Mapa `podzilla_bottom.otbm` 48×50 z=7 (publicado byte-igual de `beta-maps/bossesroom/`): spawn do jogador no centróide caminhável {1031,1038,7} e zona de respawn {1022,1032}–{1040,1043} (19×12, 197 sqm caminháveis, todas conectadas — componente de 312 sqm).
+- Loot: tabela do dump Canary mantida verbatim (19 itens). Creature products novos com preço oficial Yasir: amber souvenir 850, resinous fish fin 1.250, mantassin tail 280, quara pincers 410; as três sementes preserved (light blue/violet/purple) são itens de quest sem comprador NPC → sell 0. A wiki lista drops que o dump não tem (ring of orange plasma, spellbook of mind control, quara eye, demon shield, demonrage sword) — não incluídos, documentado.
+- **Fix de preço**: necklace of the deep agora vende por **3.000** (Rashid) — o registro antigo da hunt Deathlings zerava o valor.
+- `tools/import_podzilla_assets.py`: 41 sprites de tile + 32 patterns + 6 ícones de item novos. Teste: `tools/test_podzilla.js`.
+
+---
+
 ## 2026-11-26 — Nova party quest 30+: Hat of The Mad
 
 - **Hat of The Mad** entra na seção PARTY QUESTS (level 30+ — design call próprio, quest no molde das party quests clássicas): entre na sala do mago louco com os seus **4 personagens da conta** e sobreviva às 5 waves. Sem boss — a quest completa quando a última wave é limpa.

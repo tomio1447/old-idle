@@ -580,7 +580,11 @@ try{
     // Dragon Pack (400+): creature products novos (Yasir) + sell 0 das
     // dragon scale armors/herald's — DEPOIS do merge do weapondata para
     // o sell 0 não ser substituído pelo preço calculado do Canary.
-    "dragon-pack-boss.js"]){
+    "dragon-pack-boss.js",
+    // Podzilla Bottom (400+): creature products/sementes novos + fix do
+    // necklace-of-the-deep (sell/npcSell 3000 Rashid) — DEPOIS do
+    // deathlings-sunken-temple.js que registra o preço como 0.
+    "podzilla-bottom.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
@@ -720,6 +724,8 @@ const HUNTS=Object.assign(read("hunts.json"),{
     spawnWeights:{"cave-chimera":34,"tremendous-tyrant":33,"varnished-diremaw":33}},
   "nimmersatt-breeding-ground":{monsters:["dragolisk","mega-dragon","wardragon"],cat:"hard",pack:10,packMin:8,packMax:10,
     spawnWeights:{"dragolisk":34,"mega-dragon":33,"wardragon":33}},
+  "podzilla-bottom":{monsters:["quara-looter","quara-plunderer","quara-raider"],cat:"hard",pack:12,packMin:8,packMax:12,
+    spawnWeights:{"quara-looter":34,"quara-plunderer":33,"quara-raider":33}},
   "timira-room":{monsters:["timira-the-many-headed"]},
   "mega-magmaoid-room":{monsters:["the-mega-magmaoid"],cat:"boss-room",pack:1},
   "dragon-pack-room":{monsters:["dragon-pack"],cat:"boss-room",pack:1},

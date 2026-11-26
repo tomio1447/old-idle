@@ -89,10 +89,13 @@ for (const c of parsed.mob) {
 }
 must(available === 210, "zona de respawn não é toda conectada: " + available + "/210");
 
-// Card no modal HUNTS 400+ (último da seção).
+// Card no modal HUNTS 400+ (podzilla-bottom entrou depois — a seção
+// cresce por append; nimmersatt-breeding-ground só precisa constar).
 const s400 = ctx.HUNT_MODAL_SECTIONS.find((s) => s.title === "HUNTS 400+");
-must(s400 && s400.ids[s400.ids.length - 1] === "nimmersatt-breeding-ground",
-  "nimmersatt-breeding-ground deve ser o último id da categoria HUNTS 400+");
+must(s400 && s400.ids.indexOf("nimmersatt-breeding-ground") !== -1,
+  "nimmersatt-breeding-ground ausente da categoria HUNTS 400+");
+must(s400.ids[s400.ids.length - 1] === "podzilla-bottom",
+  "podzilla-bottom deve ser o último id da categoria HUNTS 400+");
 const ui = fs.readFileSync(path.join(js, "ui.js"), "utf8"), huntList = {};
 Object.assign(ctx, { $: () => huntList, $$: () => [], HUNT_UI: { busca: "" },
   huntRisk: () => ({ cls: "hard", txt: "400+" }), fmt: String,
@@ -135,7 +138,8 @@ for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js
   "mimar-haffar.js", "moonstone-castle.js", "radiant-skyhold.js", "book-world.js",
   "sir-leonard.js", "norcferatus-fortress.js", "unhallowed-crypt.js",
   "roost-graveborn.js", "court-warlock.js", "warzone9.js", "nimmersatt.js",
-  "brainstealer-boss.js", "mega-magmaoid-boss.js"]) {
+  "brainstealer-boss.js", "mega-magmaoid-boss.js", "dragon-pack-boss.js",
+  "podzilla-bottom.js"]) {
   vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), catalog, { filename: file });
   if (file === "weapons.js") vm.runInContext("fundirWeaponData()", catalog);
 }
