@@ -144,18 +144,28 @@ must(sect && sect.ids.indexOf("the-rootkraken") === sect.ids.indexOf("dragon-pac
 
 /* ---------------- loot audit (28 slugs do dump) ---------------- */
 const catalog = { console }; catalog.window = catalog; vm.createContext(catalog);
+/* Mesma ordem do loop do authoritative_engine (ordem do index.html —
+ * último escritor vence; ex.: the-void marca potions sell 1 e bashmuul/
+ * mimar zeram depois). */
 for (const file of ["gamedata.js", "weapondata.js", "weapons.js", "quiverdata.js",
   "core.js", "accessorydata.js", "supply-stash-data.js", "supplydata.js", "supplies.js",
-  "yasir-prices.js", "hardcore-library.js", "hard-hunts.js", "magma-bubble.js", "gnomprona.js",
-  "falcon-bastion.js", "deathlings-sunken-temple.js",
-  "azzilon-castle.js", "bloodrotten.js", "glooth-cave.js", "buried-cathedral.js",
-  "buster-darashia.js", "urmahlullu.js", "bashmuul-issavi.js", "true-asuras.js",
-  "mimar-haffar.js", "moonstone-castle.js", "radiant-skyhold.js", "book-world.js",
+  "yasir-prices.js", "hardcore-library.js", "hard-hunts.js",
+  "falcon-bastion.js", "deathlings-sunken-temple.js", "buried-cathedral.js",
+  "scarlett-boss.js", "brain-head-boss.js", "feast-of-souls.js",
+  "tentugly-boss.js", "brainstealer-boss.js", "mega-magmaoid-boss.js",
+  "dragon-pack-boss.js", "dream-courts-bosses.js", "ratmiral-boss.js",
+  "pirat-lower.js", "the-void.js", "glooth-cave.js", "buster-darashia.js",
+  "bashmuul-issavi.js", "true-asuras.js", "mimar-haffar.js",
+  "moonstone-castle.js", "radiant-skyhold.js", "book-world.js",
   "sir-leonard.js", "norcferatus-fortress.js", "unhallowed-crypt.js",
-  "roost-graveborn.js", "court-warlock.js", "warzone9.js", "nimmersatt.js",
-  "brainstealer-boss.js", "mega-magmaoid-boss.js", "dragon-pack-boss.js",
-  "podzilla-bottom.js", "rootkraken-boss.js"]) {
-  vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), catalog, { filename: file });
+  "roost-graveborn.js", "court-warlock.js", "jade-roots.js", "putrefactory.js",
+  "darklight-core.js", "gloom-pillars.js", "asura-palace.js", "magma-bubble.js",
+  "gnomprona.js", "azzilon-castle.js", "warzone9.js", "nimmersatt.js",
+  "podzilla-bottom.js", "rootkraken-boss.js", "umbral-creation.js",
+  "urmahlullu.js", "bloodrotten.js"]) {
+  try {
+    vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), catalog, { filename: file });
+  } catch (_e) { /* patch opcional: mesmo comportamento do sandbox do engine */ }
   if (file === "weapons.js") vm.runInContext("fundirWeaponData()", catalog);
 }
 const E = require(path.join(__dirname, "..", "server", "authoritative_engine.js"));

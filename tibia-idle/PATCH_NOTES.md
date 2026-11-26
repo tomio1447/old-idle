@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Fixes: Sell All online, sprites Stag Bastion e admin RMT
+
+- **Sell All / auto sell online ignorava loot de 7 conteúdos antigos**: `brain-head-boss`, `tentugly-boss`, `dream-courts-bosses`, `ratmiral-boss`, `pirat-lower`, `the-void` e `umbral-creation` registravam itens em `GAMEDATA.items` no cliente mas nunca entraram no merge do `authoritative_engine` — a pouch acumulava drops "vendáveis" sem preço no servidor (maxxenius-head 500k, plagueroot-offshoot 280k, alptramun's-toothbrush 270k, ratmiral's-hat 150k, crunor-idol 30k, ornate-locket 18k, golden-skull, energy-vein, umbral items etc.). Os 7 arquivos entraram no merge e o Sell All passa a precificá-los.
+- **Ordem do merge reordenada para a sequência de `<script>` do index.html** ("último escritor vence"): carregar os 7 no fim fez o servidor divergir do cliente em slugs compartilhados — potions (sell 1→0 via bashmuul/mimar), onyx-chip (500→0 via azzilon), death-toll (1000→0 via feast-of-souls). `feast-of-souls.js` saiu do bloco sequencial (estava duplicado com o loop — `const` top-level quebrava a 2ª execução no sandbox e deixava o death-toll do brain-head valendo). Auditoria client×engine: **0 divergências novas** e 8 itens dream-courts antes divergentes (living-armor, phantasmal-axe, ring-of-souls...) agora batem com o cliente.
+- **Sprites Stag Bastion coloridas**: as sheets dos 3 Raubritters renderizavam como silhueta branca — as outfits 15.x (looktypes 1900/1901/1902) têm camada base grayscale que o cliente oficial recoloriza pela máscara. `tools/colorize_raubritters.py` recompos as sheets com as cores oficiais do staticdata 15.x (skirmisher h94/b19/l3/f19, marksman h94/b19/l118/f2, chastener h94/b19/l21/f78) — geometria byte-idêntica, `ASSET_VERSION` bump. Night-harpy e court-warlock auditados: camada única pintada, já corretos.
+- **Broken Mitmah Chestplate** sell/npcSell 0 → **85.000** (Yasir oficial); necklace 210 / crystal 280 / splintered-gem 225k já estavam certos.
+- **admin-rmt.js não executava**: `RMT_KYC_ST` declarado `const` em dois scripts (rmt-ui.js + admin-rmt.js) — SyntaxError derrubava o arquivo inteiro no carregamento. Renomeado para `ADMIN_RMT_KYC_ST`.
+- Testes: `test_rootkraken` ganha a lista de catálogo na ordem do engine + try/catch por patch; `test_dark_thais` deixava de ser flaky (pack 8–10 re-sorteado podia repor regulares junto do fixed-2 — pack fixado em 10 no trecho do respawn).
+
+---
+
 ## 2026-11-26 — Novo boss 400+: The Rootkraken + quest The Rise of Podzilla
 
 - **The Rootkraken** entra no fim da seção BOSSES 400+ (depois do Dragon Pack): boss final da "The Rise of Podzilla" (update 13.40, Archfoe) — ficha completa do dump Canary verbatim (360.000 hp, 600.000 exp, looktype 1765, cooldown 20h, loot oficial de 29 drops). Requisito enforced: nível 400 + kill do **Doctor Marrow** + concluir a **Missão 1** (1500 kills em Podzilla Bottom).

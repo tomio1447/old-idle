@@ -503,9 +503,8 @@ try{
   // Secret Library: itens de loot (silken bookmark, book page, glowing rune
   // etc.) — sem isso o Sell All online não precifica e pula esses drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"hardcore-library.js"),"utf8"),sandbox);}catch(_hl){/* opcional */}
-  // The Dread Maiden (Feast of Souls): itens do loot oficial + hunt da
-  // bossroom — sem isso o Sell All online não precifica esses drops.
-  try{vm.runInNewContext(fs.readFileSync(path.join(js,"feast-of-souls.js"),"utf8"),sandbox);}catch(_dm){/* opcional */}
+  // The Dread Maiden (Feast of Souls): carregado no loop "Conteúdo novo"
+  // abaixo (const top-level quebraria numa segunda execução no sandbox).
   // Deeplings World Change: itens de loot (broccoli, true book of death) +
   // hunt da bossroom — sem isso o Sell All online não precifica os drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"deepling-bosses.js"),"utf8"),sandbox);}catch(_dp){/* opcional */}
@@ -559,40 +558,27 @@ try{
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"mitmah-vanguard.js"),"utf8"),sandbox);}catch(_mv){/* opcional */}
   // Conteúdo novo: cada arquivo registra itens de loot em GAMEDATA.items —
   // sem carregar aqui o servidor não conhece os slugs e o Sell All ignora.
-  for(const f of ["lion-sanctum.js","rotworm-darashia.js","elder-wyrm-darashia.js",
-    "lions-rock-darashia.js","dl-darashia.js","feast-of-souls.js","scarlett-boss.js",
-    "hyaena-lairs.js","wyrm-lb.js","medusa-tower-ph.js","carniphilas-ph.js",
-    "glooth-cave.js","buster-darashia.js","jade-roots.js","putrefactory.js",
-    "darklight-core.js","gloom-pillars.js",
-    "asura-palace.js","azzilon-castle.js","arbaziloth.js","magma-bubble.js",
-    "sugar-daddy.js","sugar-mommy.js","gnomprona.js","bloodrotten.js",
-    // Urmahlullu the Weakened (Kilmaresh, 150+): depois dos merges de
-    // weapondata/accessorydata para os sell 0 de itens sem comprador NPC
-    // (tagralt blade, winged boots...) e os fixes de preço não serem
-    // sobrescritos pelo valor calculado do Canary.
-    "urmahlullu.js","bashmuul-issavi.js","true-asuras.js","mimar-haffar.js",
-    "moonstone-castle.js","radiant-skyhold.js","final-radiant.js",
-    "book-world.js","sir-leonard.js","norcferatus-fortress.js",
-    "unhallowed-crypt.js","roost-graveborn.js","court-warlock.js","warzone9.js",
-    "nimmersatt.js",
-    // The Brainstealer + The Mega Magmaoid (250+): o loot do magmaoid é a
-    // tabela do Brainstealer — brainstealer-boss.js registra os itens
-    // eldritch/brainstealer-s-* com os preços oficiais (sem o arquivo o
-    // Sell All online usaria o preço calculado do Canary em vez do
-    // sell/npcSell oficiais, divergindo do cliente).
-    "brainstealer-boss.js","mega-magmaoid-boss.js",
-    // Dragon Pack (400+): creature products novos (Yasir) + sell 0 das
-    // dragon scale armors/herald's — DEPOIS do merge do weapondata para
-    // o sell 0 não ser substituído pelo preço calculado do Canary.
-    "dragon-pack-boss.js",
-    // Podzilla Bottom (400+): creature products/sementes novos + fix do
-    // necklace-of-the-deep (sell/npcSell 3000 Rashid) — DEPOIS do
-    // deathlings-sunken-temple.js que registra o preço como 0.
-    "podzilla-bottom.js",
-    // The Rootkraken (400+): itens novos (amber/root-tentacle/fish-eye/
-    // strange-inedible-fruit) + cid/sell 0 das 8 armas amber — DEPOIS do
-    // merge do weapondata, igual dragon-pack.
-    "rootkraken-boss.js"]){
+  // A ORDEM replica a sequência de <script> do index.html ("último escritor
+  // vence"): quando dois arquivos reprecificam o mesmo slug o resultado
+  // final tem que ser o mesmo do cliente (ex.: potions sell 1 de
+  // pirat-lower/the-void são zeradas depois por bashmuul/mimar; death-toll
+  // 1000 do brain-head é zerado por feast-of-souls; onyx-chip 500 do
+  // pirat-lower é zerado por azzilon-castle).
+  for(const f of ["scarlett-boss.js","brain-head-boss.js","feast-of-souls.js",
+    "tentugly-boss.js","brainstealer-boss.js","mega-magmaoid-boss.js",
+    "dragon-pack-boss.js","dream-courts-bosses.js","ratmiral-boss.js",
+    "pirat-lower.js","the-void.js","rotworm-darashia.js","lions-rock-darashia.js",
+    "hyaena-lairs.js","dl-darashia.js","wyrm-lb.js","medusa-tower-ph.js",
+    "glooth-cave.js","buster-darashia.js","bashmuul-issavi.js","true-asuras.js",
+    "mimar-haffar.js","moonstone-castle.js","radiant-skyhold.js",
+    "final-radiant.js","book-world.js","sir-leonard.js",
+    "norcferatus-fortress.js","unhallowed-crypt.js","roost-graveborn.js",
+    "court-warlock.js","jade-roots.js","putrefactory.js","darklight-core.js",
+    "gloom-pillars.js","carniphilas-ph.js","asura-palace.js","arbaziloth.js",
+    "magma-bubble.js","sugar-daddy.js","sugar-mommy.js","gnomprona.js",
+    "azzilon-castle.js","lion-sanctum.js","elder-wyrm-darashia.js",
+    "warzone9.js","nimmersatt.js","podzilla-bottom.js","rootkraken-boss.js",
+    "umbral-creation.js","urmahlullu.js","bloodrotten.js"]){
     try{vm.runInNewContext(fs.readFileSync(path.join(js,f),"utf8"),sandbox);}catch(_f){/* opcional */}
   }
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};

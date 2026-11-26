@@ -294,6 +294,9 @@ must(auth.mobs.filter((m) => /^fixed-\d+$/.test(String(m.id))).length === 10,
   must(JSON.stringify(c.fixedSpawnCells.map((x) => ({ x: x.x, y: x.y, i: x.i }))) ===
     JSON.stringify(FIXED_RT),
     "fixedSpawnCells do combate diverge");
+  // O pack é re-sorteado a cada onda (8–10): fixar em 10 senão uma 2ª onda
+  // com alvo maior repõe regulares além do fixed-2 e o teste fica flaky.
+  c.hunt = Object.assign({}, c.hunt, { packMin: 10, packMax: 10 });
   w.spawnWave(c, p);
   const cpend = c.pendingSpawns || [];
   must(cpend.length >= 19 && cpend.length <= 21,

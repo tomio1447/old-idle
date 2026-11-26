@@ -13,14 +13,13 @@
   window.BOSS_DEFS = window.BOSS_DEFS || {};
   const BOSS_DEFS = window.BOSS_DEFS;
 
-  /* Itens do loot do Mitmah Vanguard. Preços: confirmados só onde há
-   * comprador oficial (splintered-mitmah-gem = 225k no Yasir); o resto
-   * fica sell:0 até confirmar valor de NPC. */
+  /* Itens do loot do Mitmah Vanguard. Preços oficiais Yasir (wiki):
+   * chestplate 85k, splintered-gem 225k, crystal 280, necklace 210. */
   const NEW_ITEMS = {
     "broken-mitmah-necklace":   { n: "broken mitmah necklace",   s: null, t: "loot", w: 1.0,  cid: 44438, sell: 210, npcSell: 210 },
     "crystal-of-the-mitmah":    { n: "crystal of the mitmah",    s: null, t: "loot", w: 1.5,  cid: 44439, sell: 280, npcSell: 280 },
     "white-gem":                { n: "white gem",                s: null, t: "loot", w: 0.3,  cid: 32769, sell: 0,      npcSell: 0 },
-    "broken-mitmah-chestplate": { n: "broken mitmah chestplate", s: null, t: "loot", w: 2.5,  cid: 44727, sell: 0,      npcSell: 0 },
+    "broken-mitmah-chestplate": { n: "broken mitmah chestplate", s: null, t: "loot", w: 2.5,  cid: 44727, sell: 85000,  npcSell: 85000 },
     "splintered-mitmah-gem":    { n: "splintered mitmah gem",    s: null, t: "loot", w: 1.0,  cid: 44728, sell: 225000, npcSell: 225000 },
     "amber-with-a-bug":         { n: "amber with a bug",         s: null, t: "loot", w: 1.0,  cid: 32624, sell: 41000, npcSell: 41000 },
     "amber":                    { n: "amber",                    s: null, t: "loot", w: 1.0,  cid: 32626, sell: 20000, npcSell: 20000 },
