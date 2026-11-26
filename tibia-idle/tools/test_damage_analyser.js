@@ -15,6 +15,8 @@ const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 
 must(html.includes("js/analyzers.js?v=taken-session-total-v1") ||
   html.includes("js/analyzers.js?v=hunt-analyser-death-v1") ||
+  html.includes("js/analyzers.js?v=echo-analyser-v1") ||
+  html.includes("js/analyzers.js?v=session-clock-v1") ||
   html.includes("js/analyzers.js?v=analyser-header-reset-v1"), "analyzers.js sem cache-bust session total");
 must(html.includes("js/game.js?v=taken-session-total-v1") ||
   html.includes("js/game.js?v=phys-hit-fx-v1") ||
@@ -23,10 +25,7 @@ must(html.includes("js/game.js?v=taken-session-total-v1") ||
   html.includes("js/game.js?v=goshnar-enter-v1") ||
   html.includes("js/game.js?v=hatred-defer-v1") ||
   html.includes("js/game.js?v="), "game.js sem cache-bust session total");
-must(html.includes("css/layout.css?v=taken-session-total-v1") ||
-  html.includes("css/layout.css?v=hunt-analyser-death-v1") ||
-  html.includes("css/layout.css?v=analyser-header-reset-v1") ||
-  html.includes("css/layout.css?v=world-boss-lobby-v2"), "layout.css sem cache-bust");
+must(html.includes("css/layout.css?v="), "layout.css sem cache-bust");
 must(html.includes('data-otc-session-reset'), "botão reset no header do painel");
 must(/otc-live-badge[\s\S]*?data-otc-session-reset[\s\S]*?data-collapse="analysers"/.test(html) ||
   /otc-live-badge[\s\S]*?otc-analyser-session-reset/.test(html),

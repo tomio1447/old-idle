@@ -5728,6 +5728,9 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
     const keepForgeTrack=previous.stats&&previous.stats.forgeTrack;
     const keepCharmTrack=previous.stats&&previous.stats.charmTrack;
     previous.stats=Object.assign({},previous.stats||{},incoming.stats);
+    // Âncora local do relógio da sessão: stats.time só chega por sync; o
+    // analyser interpola a partir deste carimbo para não saltar em blocos.
+    previous.stats._timeAt=Date.now();
     if(keepDamageTrack&&typeof keepDamageTrack==="object")previous.stats.damageTrack=keepDamageTrack;
     if(keepTakenTrack&&typeof keepTakenTrack==="object")previous.stats.takenTrack=keepTakenTrack;
     if(keepForgeTrack&&typeof keepForgeTrack==="object")previous.stats.forgeTrack=keepForgeTrack;

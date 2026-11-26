@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Fix: timer da sessão "quebrando" em saltos de ~4s
+
+- **Sessão pulava de 4 em 4 segundos online**: o analyser exibia `stats.time` — o relógio autoritativo do servidor, que só refresca quando um tick roundtrip completa (`ONLINE_AUTH_TICK_MS` 200ms em rede saudável; segundos sob carga). Entre merges o timer congelava e saltava o intervalo inteiro de uma vez — parecia a sessão travando.
+- **Fix**: o merge de `incoming.stats` carimba `stats._timeAt` (game.js) e `otcAnalyserDuration` interpola `stats.time + (agora − _timeAt)` enquanto o combate autoritativo roda (analyzers.js). Clamp de 60s + guarda `instanceFinished`/`bossDefeated`/`ended`/`onlineAuthorityCombat()` evitam contar a mais quando a instância realmente parou ou outra aba assumiu o lease. Taxas (XP/h, kills/h) suavizam junto.
+- Reparos de testes pré-existentes: `test_damage_analyser`, `test_online_supplies_analyser` e `test_loot_coins_analyser` travavam em cache-busts hardcoded (`?v=` antigos — já falhavam no HEAD); asserts generalizados. **Pendente**: `test_online_supplies_analyser` expõe falha real pré-existente — "EK com potion de vocação errada precisa cair no fallback de mana" (drift de supply no engine, não investigada aqui).
+
+---
+
 ## 2026-11-26 — 3º slot de Prey por 350 Tibia Coins
 
 - **Custo do 3º slot permanente mudou de 50 Prey Cards para 350 Tibia Coins**: `store.buyPreySlot` e `db.buyPreySlot` (JsonStore + MySQL) agora debitam coins em vez de `cosmetics.preyCards` — um único UPDATE atômico que gasta `coins_nt` primeiro e completa com `coins` (mesma regra de toda compra de STORE), marcando `preySlot` só se a conta ainda não tiver. Catálogo expõe `preySlotCoins: 350` e a aba Preys mostra o preço em TC.

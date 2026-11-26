@@ -72,7 +72,20 @@ function otcAnalyserEscape(value) {
 function otcAnalyserDuration(c) {
   if (!c || !c.stats) return 0;
   const simulated = Math.max(0, Number(c.stats.time) || 0);
-  if (simulated) return simulated;
+  if (simulated) {
+    /* Online: stats.time é o relógio autoritativo do servidor — mas só
+     * refresca quando um tick roundtrip completa (a cada ~200ms em rede
+     * saudável, vários segundos sob carga). Entre merges o timer parecia
+     * "quebrar" e saltar em blocos; interpola a partir do carimbo do
+     * último merge (_timeAt). Clamp de 60s evita contar a mais se a
+     * instância realmente parou (fim de combate, queda de sync). */
+    const syncAt = Number(c.stats._timeAt) || 0;
+    const running = !c.instanceFinished && !c.bossDefeated && !c.ended;
+    if (syncAt && running &&
+        typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat())
+      return simulated + Math.max(0, Math.min(60000, Date.now() - syncAt));
+    return simulated;
+  }
   const startedAt = Number(c.stats.startedAt) || 0;
   return startedAt ? Math.max(0, Date.now() - startedAt) : 0;
 }

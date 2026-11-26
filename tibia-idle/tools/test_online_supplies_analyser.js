@@ -24,7 +24,7 @@ function advance(auth,ms,clock){
 
 const html=fs.readFileSync(path.join(game,"index.html"),"utf8");
 const analyzers=fs.readFileSync(path.join(game,"js","analyzers.js"),"utf8");
-must(html.includes("js/analyzers.js?v=hunt-analyser-death-v1")||html.includes("js/analyzers.js?v=analyser-header-reset-v1")||html.includes("js/analyzers.js?v=loot-coins-analyser-v1")||html.includes("js/analyzers.js?v=dmg-analyser-v1")||html.includes("js/analyzers.js?v=dmg-analyser-v2"),"analyzers.js sem cache-bust");
+must(html.includes("js/analyzers.js?v="),"analyzers.js sem cache-bust");
 must(/js\/game\.js\?v=/.test(html),"game.js sem cache-bust");
 must(analyzers.includes('dust: "assets/item/dust.gif"')&&analyzers.includes('slivers: "assets/item/sliver.gif"'),
   "loot analyser não mapeia Dust/Slivers para os gifs oficiais");
