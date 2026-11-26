@@ -445,10 +445,15 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
        order.some((id,index)=>id!==meta.member_ids[index]))return {ok:false,error:"INSTANCE_PARTY_CONFLICT"};
   }
   this.instances=this.instances||[];let row=this.instanceGet(accountId);
+  let cursorAt=meta.saved_at;
   if(row&&row.status==="active"){
     if(Number(row.version)!==Number(expectedVersion)||String(row.instance_id)!==String(instanceId||""))
       return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
     row.version=Number(row.version)+1;
+    // Checkpoint que reaproveita a authority do servidor: ela só foi simulada
+    // até o cursor atual. Mover o cursor para "agora" descartava o intervalo
+    // desde o último tick (tempo/kills/XP nunca simulados).
+    if(meta.keep_worker_cursor)cursorAt=row.worker_cursor_at||row.saved_at||meta.saved_at;
   }else{
     if(Number(expectedVersion)!==0)return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
     if(!row){row={account_id:Number(accountId)};this.instances.push(row);}
@@ -458,8 +463,9 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
   }
   if(typeof this._syncBlessWallets==="function")state=this._syncBlessWallets(state);
   Object.assign(row,meta,{state,status:"active",ended_at:null,terminal_reason:null,
-    worker_cursor_at:new Date(meta.saved_at).toISOString(),worker_total_ms:Number(row.worker_total_ms)||0,
+    worker_cursor_at:new Date(cursorAt).toISOString(),worker_total_ms:Number(row.worker_total_ms)||0,
     updated_at:new Date(lease.now).toISOString()});
+  delete row.keep_worker_cursor;
   this._saveRuntime(false);return {ok:true,instance:row};
 };
 JsonStore.prototype.instancePatchState = function(ownerAccountId,requesterAccountId,instanceId,expectedVersion,patchState,lease){
@@ -4192,7 +4198,11 @@ async function MysqlStore() {
              party_id=?,party_version=?,active_character_id=?,state=?,saved_at=?,worker_cursor_at=?,status='active',
              ended_at=NULL,terminal_reason=NULL WHERE account_id=?`,
             [meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,meta.party_id,meta.party_version,
-             meta.active_character_id,state,meta.saved_at,meta.saved_at,Number(accountId)]);
+             meta.active_character_id,state,meta.saved_at,
+             // Checkpoint com a authority do servidor: preserva o cursor da
+             // simulação (ver JsonStore.instanceSave).
+             meta.keep_worker_cursor?(current.worker_cursor_at||current.saved_at||meta.saved_at):meta.saved_at,
+             Number(accountId)]);
         }else{
           if(Number(expectedVersion)!==0){
             await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};

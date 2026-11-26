@@ -3635,7 +3635,10 @@ async function saveInstance(db,body){
     if(!/^[a-f0-9]{64}$/.test(instanceId))return {code:400,body:{ok:false,error:"INVALID_INSTANCE_ID",msg:"Instância inválida"}};
     const current=await db.instanceGet(acc.id);let currentState=null;
     try{currentState=current&&current.state?(typeof current.state==="string"?JSON.parse(current.state):current.state):null;}catch(e){}
-    if(currentState&&currentState.authority){prepared.state.authority=currentState.authority;prepared.state=materializeAuthority(prepared.state);}
+    if(currentState&&currentState.authority){prepared.state.authority=currentState.authority;prepared.state=materializeAuthority(prepared.state);
+      // A authority copiada só foi simulada até o cursor da linha: o save
+      // não pode adiantá-lo, senão o intervalo até o próximo tick some.
+      prepared.meta.keep_worker_cursor=true;}
   }
   const result=await db.instanceSave(acc.id,instanceId,expected,prepared.meta,JSON.stringify(prepared.state),lease);
   if(!result.ok){
