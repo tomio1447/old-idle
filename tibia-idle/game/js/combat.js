@@ -3876,34 +3876,47 @@ function tryMana(c, p, now) {
   // "NÃO USAR POTIONS MANA" (helper) — noManaPotions / noPotions true = OFF
   if (p.config.noManaPotions || p.config.noPotions) return false;
   // Só 1 tipo ativo: sem seleção explícita, não bebe (sem fallback auto).
-  const slug = p.config.manaSupply;
-  if (!slug) return false;
-  const s = SUPPLIES[slug];
-  if (!s || !s.mana) return false;
-  if (typeof supplyAllowed === "function" && !supplyAllowed(p, slug)) return false;
-  if (!Object.prototype.hasOwnProperty.call(p.supplies || {}, slug))
-    p.supplies = Object.assign({}, p.supplies, { [slug]: 0 });
-  if (!(canRechargeSupply(p, slug) && consumeSupplyCharge(c, p, slug))) return false;
-  const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
-  p.mp = Math.min(max.mp, p.mp + amount);
-  // spirit tambem cura HP no mesmo gole
-  let healAmount = 0;
-  if (s.both && s.heal) {
-    healAmount = Math.floor(s.heal[0] + Math.random() * (s.heal[1] - s.heal[0]));
-    p.hp = Math.min(max.hp, p.hp + healAmount);
+  const slug0 = p.config.manaSupply;
+  if (!slug0) return false;
+  // Seleção vedada pela vocação/nível (config antiga/bugada): cai na
+  // melhor potion de mana que o char pode beber — paridade com o
+  // authoritative engine (EK com ultimate-mana-potion não pode secar).
+  let cands = [slug0];
+  if (typeof suppliesOf === "function") {
+    const alts = suppliesOf(p, "mana", true)
+      .sort((a, b) => supplyRefPower(b[1]) - supplyRefPower(a[1]))
+      .map((x) => x[0]);
+    cands = (typeof supplyAllowed === "function" && !supplyAllowed(p, slug0))
+      ? alts : [slug0].concat(alts);
   }
-  entCdSet(c, p, "potionCd", now + 1000);   // cooldown por personagem (party combat)
-  if (typeof cdItemStart === "function") cdItemStart(p, slug, 1000, now);
-  if (typeof forgeTryMomentum === "function") {
-    const momentum = forgeTryMomentum(p, now);
-    if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
+  for (const slug of cands) {
+    const s = SUPPLIES[slug];
+    if (!s || !s.mana) continue;
+    if (!Object.prototype.hasOwnProperty.call(p.supplies || {}, slug))
+      p.supplies = Object.assign({}, p.supplies, { [slug]: 0 });
+    if (!(canRechargeSupply(p, slug) && consumeSupplyCharge(c, p, slug))) continue;
+    const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
+    p.mp = Math.min(max.mp, p.mp + amount);
+    // spirit tambem cura HP no mesmo gole
+    let healAmount = 0;
+    if (s.both && s.heal) {
+      healAmount = Math.floor(s.heal[0] + Math.random() * (s.heal[1] - s.heal[0]));
+      p.hp = Math.min(max.hp, p.hp + healAmount);
+    }
+    entCdSet(c, p, "potionCd", now + 1000);   // cooldown por personagem (party combat)
+    if (typeof cdItemStart === "function") cdItemStart(p, slug, 1000, now);
+    if (typeof forgeTryMomentum === "function") {
+      const momentum = forgeTryMomentum(p, now);
+      if (momentum) c.events.push({ t: "buff", nome: "Momentum", whoId: String(p.id || "") });
+    }
+    c.events.push({ t: "mana", amount: amount, supply: slug,
+                    heal: healAmount, drunk: 1 });
+    // o gole do Tibia: "Aahhh..." — nunca o nome da potion
+    c.events.push({ t: "say", text: s.kind === "food" ? "Munch." : "Aahhh...",
+                    supply: true, drunk: 1, icon: s.kind === "food" ? null : slug });
+    return true;
   }
-  c.events.push({ t: "mana", amount: amount, supply: slug,
-                  heal: healAmount, drunk: 1 });
-  // o gole do Tibia: "Aahhh..." — nunca o nome da potion
-  c.events.push({ t: "say", text: s.kind === "food" ? "Munch." : "Aahhh...",
-                  supply: true, drunk: 1, icon: s.kind === "food" ? null : slug });
-  return true;
+  return false;
 }
 
 /* Monstro ataca o jogador */

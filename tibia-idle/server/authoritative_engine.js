@@ -7078,7 +7078,16 @@ function usePotion(auth,p){
     const selected=cfg.manaSupply||(_aiCfg&&_aiCfg.manaSupply);
     if(selected){
       if(!Object.prototype.hasOwnProperty.call(p.supplies,selected))p.supplies[selected]=0;
-      if(potionAllowed(p,selected,POTIONS[selected]||{}))drink(selected);
+      if(!drink(selected)){
+        // Seleção vedada (vocação/nível) ou indisponível: cai na melhor
+        // potion de mana permitida pela MANA_POTION_ORDER — sem isso um
+        // EK configurado com ultimate-mana-potion nunca bebe mana.
+        for(const slug of MANA_POTION_ORDER){
+          if(slug===selected||!potionAllowed(p,slug,POTIONS[slug]||{}))continue;
+          if(!Object.prototype.hasOwnProperty.call(p.supplies,slug))p.supplies[slug]=0;
+          if(drink(slug))break;
+        }
+      }
     }
   }
   return false;
