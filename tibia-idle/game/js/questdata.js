@@ -109,6 +109,71 @@ var QUEST_DEFS = {
     bossSprite:   "demon",
     rewards:      ["demon-armor", "magic-sword", "stonecutter-axe", "demonbone"],
   },
+  /* Hat of The Mad — party quest de waves fixas (fluxo GENÉRICO de
+   * questWaves; não usa server/annihilator.js). Sem boss: a quest completa
+   * quando a wave 5 é limpa. Recompensa automática por conta viva
+   * (fixedRewards + goldReward), 1x por personagem. Level 30 = design call
+   * (quest clássica low-level no molde das party quests de legado). */
+  "hat-of-the-mad": {
+    id:           "hat-of-the-mad",
+    name:         "Hat of The Mad",
+    level:        30,
+    maxPlayers:   4,
+    maxPerAccount: 4,
+    playable:     true,
+    questType:    "party",
+    icon:         "hat-of-the-mad",
+    description:  "Entre na sala do mago louco e sobreviva às 5 waves de monstros. Recompensa por conta viva: Hat of the Mad + Devil Helmet + 5.000 gold.",
+    /* Mapa — sourceBounds: {minX:1010, minY:1014, maxX:1058, maxY:1052}, 49×39 z=7 */
+    otbm:         "hat_of_the_mad",
+    otbmFloor:    7,
+    otbmFovBounds:     { x: 1010, y: 1014, w: 49, h: 39, z: 7 },
+    otbmFovWidth:      21,
+    otbmFovHeight:     13,
+    otbmRuntimeWidth:  49,
+    otbmRuntimeHeight: 39,
+    otbmSpawn:         { x: 1032, y: 1027, z: 7 },   // centro da sala (abs)
+    /* Spawn dos players: 3×3 em volta do playerspawn
+     * (abs {1031..1033, 1026..1028} → local {21..23, 12..14}) */
+    spawnRange:   { minX: 21, maxX: 23, minY: 12, maxY: 14, z: 7 },
+    /* Spawn dos mobs: raio ao redor do centro da sala
+     * (abs {1025..1041, 1022..1031} → local {15..31, 8..17}, 165 sqm livres) */
+    mobSpawnRange: { minX: 15, maxX: 31, minY: 8, maxY: 17, z: 7 },
+    countdownSec: 0,
+    /* Waves FIXAS — composições exatas, sem random pool. A engine usa
+     * `waves[current-1]` quando o campo existe (uma entrada = 1 monstro). */
+    baseWaves:          5,
+    wavesPerPlayers:    999,
+    baseMonstersPerWave: 8,
+    monstersPerPlayers:  999,
+    waves: [
+      ["orc-spearman","orc-spearman","orc-spearman","orc-spearman","orc-spearman",
+       "orc-warrior","orc-warrior","orc-warrior"],
+      ["rotworm","rotworm","bonelord","bonelord",
+       "minotaur-archer","minotaur-archer","minotaur-archer",
+       "minotaur-mage","minotaur-mage","minotaur-mage"],
+      ["minotaur","minotaur","minotaur","minotaur",
+       "minotaur-guard","minotaur-guard","minotaur-archer","minotaur-archer"],
+      ["minotaur-guard","minotaur-guard","minotaur-mage","minotaur-mage",
+       "dragon","fire-devil"],
+      ["giant-spider","dragon","fire-devil","fire-devil","fire-devil","fire-elemental"],
+    ],
+    waveMonsters: [
+      "orc-spearman", "orc-warrior", "rotworm", "bonelord",
+      "minotaur-archer", "minotaur-mage", "minotaur", "minotaur-guard",
+      "dragon", "fire-devil", "giant-spider", "fire-elemental",
+    ],
+    /* Sem boss — completa ao limpar a wave 5 */
+    boss:         null,
+    /* Recompensa automática por conta viva (sem modal de escolha):
+     * itens no Reward Chest + gold direto no saldo da conta. */
+    fixedRewards: ["hat-of-the-mad", "devil-helmet"],
+    goldReward:   5000,
+    rewards:      ["hat-of-the-mad", "devil-helmet"],
+    rewardDescription: "1× Hat of the Mad + 1× Devil Helmet (Reward Chest) + 5.000 gold — por conta viva, uma vez por personagem.",
+    kickOnDeath:  false,
+    oneTimePerChar: true,
+  },
 };
 
 Object.assign(QUEST_DEFS, {

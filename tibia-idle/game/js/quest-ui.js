@@ -147,7 +147,7 @@ function questCard(q) {
   const pending = questHasPendingReward(window.G && window.G.p, q);
   return `<div class="hunt-card hunt-modal-card hunt-canary-card quest-modal-card${pending ? " quest-pending" : ""}" data-quest="${q.id}">
     <button type="button" class="mobs quest-open" data-quest="${q.id}" title="Ver ${q.name}" aria-label="Ver ${q.name}">
-      ${questBossImg(q.bossSprite || q.boss, 48)}
+      ${(q.bossSprite || q.boss) ? questBossImg(q.bossSprite || q.boss, 48) : questRewardImg(q.icon, 48)}
       ${pending ? `<span class="quest-pending-badge" title="Recompensa a coletar">!</span>` : ""}
     </button>
     <span class="info"><span class="nm">${q.name}</span><span class="meta">Level ${q.level}+</span>
@@ -358,14 +358,14 @@ function openQuestDetail(questId) {
              <span>Encontro: <b>6 Demons + alavanca</b></span>`
           : `<span>Lobby: <b style="color:#9ce84a">1–${q.maxPlayers} jogadores</b></span>
              <span>Conclusão: <b>1x por personagem</b></span>
-             <span>Waves: <b>${q.baseWaves}+ (dinâmico)</b></span>`}
+             <span>Waves: <b>${Array.isArray(q.waves) ? q.waves.length + " fixas" : q.baseWaves + "+ (dinâmico)"}</b></span>`}
       </div>
       <div class="quest-detail-row">
         <section class="quest-detail-panel quest-boss-col">
-          <div class="hunt-best-title">BOSS</div>
+          <div class="hunt-best-title">${q.boss ? "BOSS" : "RECOMPENSA"}</div>
           <div class="quest-boss-preview">
-            ${questBossImg(q.bossSprite || q.boss, 36)}
-            <span>${(q.boss || "").replace(/-/g, " ")}</span>
+            ${q.boss ? questBossImg(q.bossSprite || q.boss, 36) : questRewardImg(q.icon, 36)}
+            <span>${q.boss ? String(q.boss).replace(/-/g, " ") : (q.rewardDescription || "")}</span>
           </div>
         </section>
         <section class="quest-detail-panel quest-monsters-col">
@@ -386,7 +386,7 @@ function openQuestDetail(questId) {
         ${q.playable === false
           ? `<span class="tiny dim" style="margin-left:auto">EM BREVE — mecânica dedicada em implementação</span>`
           : q.questType === "party"
-            ? `<button type="button" class="danger sm quest-action" id="quest-detail-start">INICIAR — 4 personagens</button>`
+            ? `<button type="button" class="danger sm quest-action" id="quest-detail-start">INICIAR — ${q.maxPlayers} personagens</button>`
             : `<button type="button" class="sm primary quest-action" id="quest-detail-auto">AUTO JOIN</button>
                <button type="button" class="danger sm quest-action" id="quest-detail-create">CREATE LOBBY</button>`}
       </div>
@@ -1017,6 +1017,17 @@ function handleQuestEvent(data) {
     case "reward-collected":
       if (typeof toast === "function") toast("Reward da quest coletada!", "ok");
       break;
+    case "reward-granted": {
+      // Recompensa fixa (sem escolha): itens no Reward Chest + gold na conta.
+      const names = (data.rewards || []).map((slug) => {
+        const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items ? GAMEDATA.items[slug] : null;
+        return it && it.n ? it.n : String(slug).replace(/-/g, " ");
+      }).join(" + ");
+      const gold = Number(data.gold) || 0;
+      const msg = "Recompensa: " + (names || "itens") + (gold ? " + " + gold.toLocaleString("pt-BR") + " gold" : "") + "!";
+      if (typeof toast === "function") toast(msg, "ok"); else questToast(msg, "ok");
+      break;
+    }
     case "cancelled":
       questCloseLobbyPanel();
       questToast("O lobby foi cancelado.", "bad");

@@ -417,6 +417,43 @@ function createQuestController(opts) {
         if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { p = {}; } }
         p = p && typeof p === "object" ? p : {};
 
+        // Quests de recompensa fixa (ex.: Hat of The Mad): sem modal de
+        // escolha — os itens caem direto no Reward Chest e o gold vai para
+        // o saldo da conta; a quest já nasce completada no storage.
+        if (Array.isArray(quest.fixedRewards) && quest.fixedRewards.length) {
+          for (const slug of quest.fixedRewards) {
+            rewardChestAdd(p, slug, 1, {
+              bundleId: "quest-" + quest.id + "-" + target.id + "-" + slug,
+              bossId: quest.boss || quest.id,
+              name: quest.name,
+              sprite: quest.bossSprite || quest.icon || quest.boss,
+            });
+          }
+          const gold = Math.max(0, Math.floor(Number(quest.goldReward) || 0));
+          if (gold > 0 && typeof db.addAccountMarketGold === "function")
+            await db.addAccountMarketGold(Number(accountId), gold);
+          p.quests = p.quests || {};
+          p.quests[quest.id] = {
+            completed: true,
+            completedAt: Date.now(),
+            reward: quest.fixedRewards.join("+"),
+            gold: gold || 0,
+          };
+          const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
+          const voc = String(p.voc || character.voc || "none");
+          await db.updateCharacter(character.id, voc, level, p, {});
+          publishAccount(accountId, "quest", {
+            action: "reward-granted",
+            lobbyId: lobby.id,
+            questId: lobby.questId,
+            questName: quest.name,
+            rewards: quest.fixedRewards,
+            gold: gold,
+            charId: target.id,
+          });
+          continue;
+        }
+
         // Marcar reward como pendente (jogador escolhe no modal)
         join.rewardPending = true;
 

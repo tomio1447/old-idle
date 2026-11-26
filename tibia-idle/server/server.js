@@ -6612,6 +6612,25 @@ async function main() {
       for(let y=spawnMinY;y<=spawnMaxY;y++)for(let x=spawnMinX;x<=spawnMaxX;x++)
         if(!blockedSpawn.has(x+":"+y))spawnCells.push({x,y});
     if(!spawnCells.length)return {ok:false,error:"NO_QUEST_SPAWN_CELLS"};
+    // mobSpawnRange (opcional): retângulo local separado para os mobs das
+    // waves — sem ele os monstros nasceriam em cima dos jogadores.
+    let mobSpawnCells=null;
+    const mr=quest.mobSpawnRange;
+    if(mr){
+      const mobMinX=Math.max(0,Math.min(gridW-1,mr.minX));
+      const mobMaxX=Math.max(mobMinX,Math.min(gridW-1,mr.maxX));
+      const mobMinY=Math.max(0,Math.min(gridH-1,mr.minY));
+      const mobMaxY=Math.max(mobMinY,Math.min(gridH-1,mr.maxY));
+      mobSpawnCells=[];
+      for(let y=mobMinY;y<=mobMaxY;y++)for(let x=mobMinX;x<=mobMaxX;x++)
+        if(!(blockedCells&&blockedCells[x+":"+y]))mobSpawnCells.push({x,y});
+      // Fallback: ignora a colisão do OTBM (mesma regra do fallback de players).
+      if(!mobSpawnCells.length)
+        for(let y=mobMinY;y<=mobMaxY;y++)for(let x=mobMinX;x<=mobMaxX;x++)
+          if(!blockedSpawn.has(x+":"+y))mobSpawnCells.push({x,y});
+      if(!mobSpawnCells.length)mobSpawnCells=null;
+    }
+    if(!mobSpawnCells)mobSpawnCells=spawnCells;
     const spawnOffset=Math.floor(Math.random()*spawnCells.length);
     const members=[],players=[];
     let index=0;
@@ -6654,8 +6673,10 @@ async function main() {
         questWaves:customFlow?null:{
           total:totalWaves,current:0,monstersPerWave,
           monsterPool:quest.waveMonsters||[],
+          waves:quest.waves||null,
           bossSlug:quest.boss,bossSpawned:false,
           spawnCells,
+          mobSpawnCells,
           kickOnDeath:!!quest.kickOnDeath,
           countdownUntil:Date.now()+(quest.countdownSec||30)*1000,
         },

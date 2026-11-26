@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "26/11/2026 às 19:45";
+const ALPHA_UPDATE_AT = "26/11/2026 às 20:30";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Party quest Hat of The Mad (30+): sobreviva às 5 waves da sala do mago louco com seus 4 personagens e ganhe Hat of the Mad + Devil Helmet + 5.000 gold",
   "NOVO — Sala do Ratmiral Blackwhiskers remodelada: arena muito maior, mesma luta com Elite Pirats e Mister Catkiller",
   "NOVO — Boss Dragon Pack (400+): o Dragon Hoard da 20 Years a Cook Quest em sala própria na Nimmersatt's Breeding Ground",
   "NOVO — Dark Thais (Mirrored Nightmare) com mapa novo e maior: 11 pontos de respawn fixo espalhados pela cidade",

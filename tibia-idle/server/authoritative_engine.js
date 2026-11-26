@@ -9041,22 +9041,28 @@ function spawnHuntWave(auth,now,opts){
 /* ---- Quest wave spawners ---- */
 function spawnQuestWave(auth,now,qw){
   if(!auth||!qw)return;
+  /* Waves com composição fixa (qw.waves[current-1] = lista exata de slugs,
+   * uma entrada por monstro) — quests como a Hat of The Mad. Sem a lista,
+   * cai no pool aleatório de sempre. */
+  const fixed=Array.isArray(qw.waves)?qw.waves[qw.current-1]:null;
   const pool=qw.monsterPool||[];
-  if(!pool.length)return;
-  const count=Math.max(1,qw.monstersPerWave||8);
+  if(!fixed&&!pool.length)return;
+  const slugs=fixed&&fixed.length?fixed.slice():null;
+  const count=slugs?slugs.length:Math.max(1,qw.monstersPerWave||8);
   auth.pendingSpawns=auth.pendingSpawns||[];
   ensureSpawnIds(auth);
   const occupied=new Set((auth.mobs||[]).map((m)=>String(m.id)));
   for(const sp of auth.pendingSpawns)if(sp&&sp.mob&&sp.mob.id)occupied.add(String(sp.mob.id));
   const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
   for(let i=0;i<count;i++){
-    const slug=pool[Math.floor(Math.random()*pool.length)];
+    const slug=slugs?slugs[i]:pool[Math.floor(Math.random()*pool.length)];
     if(!slug||!monsterDef(slug))continue;
     const id="qw-"+qw.current+"-"+i;
     if(occupied.has(id))continue;
     const m=makeMob(auth,slug,false,id,null,i);
     if(!m)continue;
-    const cells=Array.isArray(qw.spawnCells)?qw.spawnCells:[];
+    const cells=Array.isArray(qw.mobSpawnCells)&&qw.mobSpawnCells.length?qw.mobSpawnCells
+      :(Array.isArray(qw.spawnCells)?qw.spawnCells:[]);
     if(cells.length){
       const cell=cells[Math.floor(random(auth)*cells.length)];
       m.cx=cell.x;m.cy=cell.y;m.x=(m.cx+.5)/gw;m.y=(m.cy+.5)/gh;m.sx=m.x;m.sy=m.y;
@@ -9073,7 +9079,8 @@ function spawnQuestBoss(auth,now,qw){
   if(!monsterDef(slug))return;
   auth.pendingSpawns=auth.pendingSpawns||[];
   const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
-  const cells=Array.isArray(qw.spawnCells)?qw.spawnCells:[];
+  const cells=Array.isArray(qw.mobSpawnCells)&&qw.mobSpawnCells.length?qw.mobSpawnCells
+    :(Array.isArray(qw.spawnCells)?qw.spawnCells:[]);
   const cell=cells.length?cells[Math.floor(random(auth)*cells.length)]:{x:Math.floor(gw/2),y:Math.floor(gh/2)};
   const cx=cell.x,cy=cell.y;
   const m=makeMob(auth,slug,true,"quest-boss",null,0);
@@ -10559,8 +10566,11 @@ function step(auth,now,opts){if(auth.ended)return;
         spawnQuestWave(auth,stepTs,qw);
       }
     }else if(empty&&qw.current>=qw.total&&!qw.bossSpawned){
+      // Quest sem boss (waves fixas, ex.: Hat of The Mad): a última wave
+      // limpa já completa a quest — não há estágio de boss.
+      if(!qw.bossSlug){auth.ended=true;auth.terminalReason="quest-completed";}
       // Spawn do boss após última wave
-      if(!qw._bossSpawnAt)qw._bossSpawnAt=stepTs+AUTH_WAVE_CLEAR_RESPAWN_MS;
+      else if(!qw._bossSpawnAt)qw._bossSpawnAt=stepTs+AUTH_WAVE_CLEAR_RESPAWN_MS;
       else if(stepTs>=qw._bossSpawnAt-AUTH_WAVE_TELEPORT_LEAD_MS){
         qw.bossSpawned=true;qw._bossSpawnAt=0;
         spawnQuestBoss(auth,stepTs,qw);
@@ -10808,6 +10818,12 @@ function initializeAuthority(descriptor,instanceId,now){
     for(const slug of auth.questWaves.monsterPool||[]){
       if(monsterDef(slug)&&!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);
     }
+    // Waves de composição fixa: os slugs explícitos também entram no pool
+    // (bestiário/charm/procs usam spawnPool como catálogo da instância).
+    if(Array.isArray(auth.questWaves.waves))
+      for(const list of auth.questWaves.waves)for(const slug of list||[]){
+        if(monsterDef(slug)&&!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);
+      }
     if(auth.questWaves.bossSlug&&monsterDef(auth.questWaves.bossSlug)&&!auth.spawnPool.includes(auth.questWaves.bossSlug))
       auth.spawnPool.push(auth.questWaves.bossSlug);
   }

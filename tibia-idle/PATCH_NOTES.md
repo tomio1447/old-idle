@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Nova party quest 30+: Hat of The Mad
+
+- **Hat of The Mad** entra na seção PARTY QUESTS (level 30+ — design call próprio, quest no molde das party quests clássicas): entre na sala do mago louco com os seus **4 personagens da conta** e sobreviva às 5 waves. Sem boss — a quest completa quando a última wave é limpa.
+- **5 waves de composição fixa** (novo campo `waves` no genérico de questWaves — listas exatas de slugs, sem sorteio do pool): (1) 5 orc-spearman + 3 orc-warrior; (2) 2 rotworm + 2 bonelord + 3 minotaur-archer + 3 minotaur-mage; (3) 4 minotaur + 2 minotaur-guard + 2 minotaur-archer; (4) 2 minotaur-guard + 2 minotaur-mage + 1 dragon + 1 fire-devil; (5) 1 giant-spider + 1 dragon + 3 fire-devil + 1 fire-elemental.
+- Novo campo `mobSpawnRange` (local {15..31, 8..17} — 165 sqm livres ao redor do centro): os mobs nascem na arena, não em cima dos jogadores (spawnRange dos players = 3×3 em volta do playerspawn {1032,1027,7}).
+- **Recompensa automática por conta viva** (novo `fixedRewards` + `goldReward`, sem modal de escolha): 1× Hat of the Mad + 1× Devil Helmet no Reward Chest + 5.000 gold direto no saldo da conta. Uma vez por personagem.
+- Sala `hat_of_the_mad.otbm` 49×39 z=7 (byte-igual de `beta-maps/quests/`, bounds 1010..1058 × 1014..1052, componente de 197 sqm conectados). `tools/import_hat_of_the_mad_assets.py`: 6 sprites de tile novos (2119/2122/2127/2814/2821/2927), 10 patterns, catálogo RME atualizado. Teste: `tools/test_hat_of_the_mad.js`.
+
+---
+
 ## 2026-11-26 — Sala do Ratmiral Blackwhiskers remodelada
 
 - **Ratmiral Blackwhiskers** (BOSSES 250+): `ratmiralroom.otbm` (21×13) substituído por `ratmiral_room.otbm` (52×38, z=7, bounds 1013..1064 × 1017..1054) — publicado byte-igual de `beta-maps/bossesroom/`; o arquivo antigo fica no disco sem uso.
