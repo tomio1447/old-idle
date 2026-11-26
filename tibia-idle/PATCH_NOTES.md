@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-26 — Novo boss 400+: Dragon Pack
+
+- **Dragon Pack** entra no fim da seção BOSSES 400+: nome do Bosstiary do boss final da "20 Years a Cook Quest" (Nimmersatt's Breeding Ground, update 13.30, Archfoe) — 50.000 hp, 600.000 exp (tibiadb; a wiki.br diz 0 com disclaimer de dados imprecisos), cooldown 20h. Ausente do dump Canary: ficha oficial em `game/js/dragon-pack-boss.js` (looktype 1712 = mesmo outfit do Mega Dragon — sheet copiada; fire imune, earth 25; kit de fogo no molde do Mega Dragon). A mecânica oficial de 7 levers NÃO é implementada — boss-room simples como o Brainstealer/Magmaoid.
+- Sala `dragon_pack_room.otbm` 49×38 z=7 (byte-igual de `beta-maps/bossesroom/`), playerspawn {1034,1037,7}, bossspawn {1032,1029,7}, componente de 326 sqm conectados.
+- Loot oficial completo (40 drops, mesma tabela do Dragon Hoard). **10 itens novos**: creature products Yasir — crystallized-blood 270k, exalted-seal 190k, gold-scaled-sentinel 380k; herald-s-insignia/wings (addons do outfit Draccoon Herald) → sem comprador, sell 0; 5 dragon scale armors ganham cid + sell 0 (NPC value oficial 0). Fix: broadsword agora vende por 500 (Nah'bob — era item clássico sem preço).
+- `tools/import_dragon_pack_assets.py`: 1 sprite de tile novo (7739), 10 patterns, 5 ícones de item, catálogo RME atualizado. Teste: `tools/test_dragon_pack.js`. Também no Daily Boss pool.
+
+---
+
 ## 2026-11-26 — Dark Thais (Mirrored Nightmare) com mapa novo + 11 pontos fixos
 
 - **Dark Thais — Mirrored Nightmare** (SOULWAR 400+) migra para o mapa `dark_thais.otbm` (55×49, z=7, bounds 1007..1061 × 1015..1063) — publicado byte-igual em `game/maps/`. O `mirrored_nightmare_sw.otbm` antigo continua no disco, só não é mais usado pela hunt.

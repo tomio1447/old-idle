@@ -39,7 +39,7 @@ const COOLDOWN_20H = 20 * 60 * 60 * 1000;
 /* ---------------- Maior Domus (BOSS_DEFS + monstro + hunt) ---------------- */
 const b = ctx.BOSS_DEFS["maior-domus"];
 must(b, "maior-domus sem BOSS_DEFS");
-must(b.hp === 10000, "hp de teste deve ser 10000");
+must(b.hp === 460000, "hp oficial deve ser 460.000");
 must(b.exp === 3500000, "exp oficial deve ser 3.5M");
 must(b.baseMonster === "maior-domus" && b.sprite === "maior-domus", "sem baseMonster/sprite");
 must(b.cooldown === COOLDOWN_20H, "cooldown deve ser 20h");
@@ -72,7 +72,7 @@ must(hu.minLevel === 800 && hu.monsters[0] === "maior-domus", "hunt com nível/m
 /* ---------------- Phosphorus (monstro + warzone) ---------------- */
 const pho = M["phosphorus"];
 must(pho && pho.boss && pho.looktype === 1963, "phosphorus sem looktype 1963");
-must(pho.hp === 10000 && pho.exp === 16000000, "phosphorus: hp teste 10k / exp oficial 16M");
+must(pho.hp === 1500000 && pho.exp === 16000000, "phosphorus: hp oficial 1.5M / exp oficial 16M");
 must(pho.resist && pho.resist.earth === 20 && pho.resist.fire === 10 &&
      pho.resist.energy === 5, "resists oficiais (earth20/fire10/energy5)");
 must(Array.isArray(pho.loot) && pho.loot.length >= 30,
@@ -121,9 +121,11 @@ must(fs.existsSync(path.join(game, "assets", "missile", "small-stone_e.png")) &&
 const frSrc = fs.readFileSync(path.join(js, "final-radiant.js"), "utf8");
 must(!frSrc.includes('miss: "physical"'), 'final-radiant.js ainda tem miss:"physical"');
 const engSrc = fs.readFileSync(path.join(__dirname, "..", "server", "authoritative_engine.js"), "utf8");
-must(engSrc.includes("chLock"), "engine sem suporte a chLock");
-const combatSrc = fs.readFileSync(path.join(js, "combat.js"), "utf8");
-must(combatSrc.includes("chLock"), "combat.js sem suporte a chLock (paridade)");
+/* chLock foi generalizado: o engine rola a chance uma vez por intervalo
+ * para TODAS as skills via skillAccs (commit "Skills de monstro no timer
+ * próprio") — a flag só resta na declaração do agony. O cliente não rola
+ * skills (servidor autoritativo), então não há paridade a checar. */
+must(engSrc.includes("skillAccs"), "engine sem rolagem por intervalo (skillAccs)");
 
 /* Arena cliente + BOSS_DEFS reais (o placeholder "EM BREVE" fazia o world
  * boss cair no mapa genérico 40×40 — "mapa não carregado"). */
@@ -343,4 +345,4 @@ must(walk(20, 16), "playerspawn local {20,16} bloqueado");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
 must(html.includes("js/final-radiant.js?v="), "final-radiant.js não carregado no index");
 
-console.log("ok: Final Radiant — Maior Domus (BOSSES 800+, 10k HP teste, 20h, arena Mimar) + Phosphorus (world boss 800+, 10k HP teste, gate Maior Domus+Mimar), WBs com HP oficial, loot oficial completo");
+console.log("ok: Final Radiant — Maior Domus (BOSSES 800+, 460k HP oficial, 20h, arena Mimar) + Phosphorus (world boss 800+, 1.5M HP oficial, gate Maior Domus+Mimar), WBs com HP oficial, loot oficial completo");

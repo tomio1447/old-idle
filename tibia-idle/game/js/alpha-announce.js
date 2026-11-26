@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "26/11/2026 às 18:45";
+const ALPHA_UPDATE_AT = "26/11/2026 às 19:20";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Boss Dragon Pack (400+): o Dragon Hoard da 20 Years a Cook Quest em sala própria na Nimmersatt's Breeding Ground",
   "NOVO — Dark Thais (Mirrored Nightmare) com mapa novo e maior: 11 pontos de respawn fixo espalhados pela cidade",
   "NOVO — Nimmersatt's Breeding Ground (400+): Dragolisk, Mega Dragon e Wardragon",
   "NOVO — Boss The Mega Magmaoid (250+): mesmo loot do The Brainstealer, sala própria na Dwelling of the Forgotten",

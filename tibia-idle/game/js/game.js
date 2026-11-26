@@ -2166,6 +2166,9 @@ const BOSS_DEFS = {
   /* "the-mega-magmaoid": def completa em mega-magmaoid-boss.js (boss real
    * da Dwelling of the Forgotten, 250+ — esta entrada é só o catálogo). */
   "the-mega-magmaoid": { id: "the-mega-magmaoid", name: "The Mega Magmaoid", title: "Boss da Dwelling of the Forgotten", sprite: "the-mega-magmaoid" },
+  /* "dragon-pack": def completa em dragon-pack-boss.js (boss real da
+   * 20 Years a Cook Quest, 400+ — esta entrada é só o catálogo). */
+  "dragon-pack": { id: "dragon-pack", name: "Dragon Pack", title: "Boss da 20 Years a Cook Quest", sprite: "dragon-pack" },
   /* "court-warlock": definido em court-warlock.js (boss real da Order of
    * the Stag Quest — antes era placeholder "EM BREVE"). */
   "maior-domus":       { id: "maior-domus", name: "Maior Domus", title: "EM BREVE", unavailable: true, sprite: "maior-domus", portraitImage: "assets/mob/maior-domus-preview.gif" },
@@ -2495,7 +2498,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 400+",
     minLevel: 400,
-    ids: ["arbaziloth", "magma-bubble", "the-primal-menace", "vladrukh"],
+    ids: ["arbaziloth", "magma-bubble", "the-primal-menace", "vladrukh", "dragon-pack"],
   },
   {
     title: "SOULWAR 400+",
