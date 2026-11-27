@@ -24,8 +24,10 @@ const WARZONES = [
     description: "A Megalomania de Goshnar é a culminância da Soul War. Cinco guerreiros devem enfrentar a encarnação do orgulho absoluto." },
   { id: "bakragore", name: "Bakragore", title: "Rotten Blood", sprite: "bakragore", dataMonster: "bakragore", hp: 660000, maxChars: 5,
     description: "Bakragore, a fusão suprema da Rotten Blood. Lobby de até 5 jogadores (nível 600+): cada membro contribui suas taints pelo modal Bakragore's Burden — mais taints, mais Elder Bloodjaws e mais HP. Derrotá-lo conclui a The Blood Rotten Quest (recompensa 1x por personagem)." },
-  { id: "phosphorus", name: "Phosphorus", title: "Final Radiant", sprite: "phosphorus", dataMonster: "phosphorus", hp: 10000, maxChars: 5,
+  { id: "phosphorus", name: "Phosphorus", title: "Final Radiant", sprite: "phosphorus", dataMonster: "phosphorus", hp: 10000, maxChars: 5, cooldownHrs: 0,
     description: "Phosphorus, a entidade radiante do clímax da Make Believe. Lobby de até 5 jogadores (nível 800+): acesso liberado pela Missão 3 da Make Believe Quest — 5000 kills em Radiant Skyhold (além dos kills de Maior Domus e Mimar Haffar)." },
+  { id: "phylactery", name: "Bonelord's Phylactery", title: "Roost of the Graveborn", sprite: "bonelords-phylactery", dataMonster: "bonelords-phylactery", hp: 850000, maxChars: 5, cooldownHrs: 20,
+    description: "O receptáculo da alma do Necromancer — boss final da Roost of the Graveborn. Lobby de até 5 jogadores (nível 450+): acesso liberado derrotando a cadeia sequencial — Adventurer Group, Eldritch Dragon Lord, Ice Horror e The Gravedigger. F1: 4 Soulcages de HP compartilhado + dragon spirits que curam o pool; F2: Phylactery + 4 Enthralled Dragons sob os gazes do Bone Overlord." },
 ];
 window.WORLD_BOSS_DEFS = WARZONES;
 
@@ -157,7 +159,7 @@ function openWorldBossDetail(warzoneId) {
   ui.body.innerHTML = `<div class="panel-title">${worldBossPortrait(wz.sprite, 24)} ${wz.name} — <span class="dim" style="font-weight:normal">${wz.title}</span>
     <span style="flex:1"></span><button class="sm" id="wb-detail-close">✕</button></div>
     <div class="panel-body boss-detail-body wb-detail-body">
-      <div class="boss-detail-summary"><span>Lobby: <b style="color:#9ce84a">1–${wz.maxChars || 20} personagens</b></span><span>Cooldown: <b>${wz.id === "phosphorus" ? "sem cooldown" : "16 horas por personagem"}</b></span></div>
+      <div class="boss-detail-summary"><span>Lobby: <b style="color:#9ce84a">1–${wz.maxChars || 20} personagens</b></span><span>Cooldown: <b>${wz.cooldownHrs === 0 ? "sem cooldown" : (wz.cooldownHrs || 16) + " horas por personagem"}</b></span></div>
       <div class="wb-detail-description">${wz.description || ""}</div>
       <div class="wb-detail-grid">
         <section class="wb-detail-identity">
@@ -194,7 +196,7 @@ async function worldBossPickCharacter(warzoneId, action) {
     worldBossToast("Seletor de personagens indisponível. Recarregue a página.");
     return null;
   }
-  const selected = await megaLobbyConfirmCharModal(worldBossActiveChar(), `${action} — ${wz.name}`, wz.id === "phosphorus" ? "Escolha um personagem da sua conta." : "Escolha um personagem da sua conta. O cooldown de 16 horas é individual por personagem.");
+  const selected = await megaLobbyConfirmCharModal(worldBossActiveChar(), `${action} — ${wz.name}`, wz.cooldownHrs === 0 ? "Escolha um personagem da sua conta." : `Escolha um personagem da sua conta. O cooldown de ${wz.cooldownHrs || 16} horas é individual por personagem.`);
   if (!selected) openWorldBossDetail(warzoneId);
   return selected;
 }

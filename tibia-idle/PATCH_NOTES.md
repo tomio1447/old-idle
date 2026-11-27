@@ -4,6 +4,19 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Bonelord's Phylactery agora é World Boss (lobby até 5 jogadores)
+
+- **World Boss "Roost of the Graveborn"**: a Phylactery saiu do modal de bosses e virou card no modal WORLD BOSSES (`warzoneId "phylactery"`, sprite/dataMonster próprios). Entrada exclusiva por lobby — AUTO JOIN (espera lobby aberto) ou CREATE LOBBY (open/closed), 1 char por conta, até 5 jogadores, como Bakragore/Phosphorus.
+- **Gates oficiais por personagem no join**: nível 450+ e kill registrada da cadeia sequencial inteira (Adventurer Group, Eldritch Dragon Lord, Ice Horror, The Gravedigger) — `requiresBossKills` validado no `join`, com mensagens nomeando os bosses faltantes.
+- **Cooldown de 20h por personagem**: `wz.cooldownMs` (novo, sobrescreve o padrão de 16h; `0` = sem cooldown — Phosphorus passou a usar a flag). Além do cooldown em memória, o join checa o `p.bosses["bonelords-phylactery"].lastFight` persistido — o cooldown sobrevive a restart do servidor.
+- **Instância compartilhada com a sala real**: `createWorldBossSharedInstance` já era genérico — o `blockedCells` sai do crop `bonelords_phylactery.otbm` z=7 (1010,1016 → 1038,1040 = grid 29×25, mesma origem do mapa do cliente → coords idênticas). Spawn dos 5 membros na fileira oficial (x 14–18, y 19) e boss em (16,9) — todos walkable e conectados.
+- **Mecânica intacta em modo compartilhado**: `tickBoneOverlord` roda por `auth.bossId` — F1 abre com 4 Soulcages de HP compartilhado + 4 dragon spirits invulneráveis (boss retido em `auth.bo.pendingBoss`), F2 devolve a Phylactery + 4 Enthralled Dragons + gazes. `syncWorldBossShared` agora mostra o **cage pool (120k) como HP do boss** na fase 1 (antes a barra ficava parada em 850k).
+- **Kill credit para TODOS os participantes**: `grantSuccessRewards` marca `p.bosses["bonelords-phylactery"].kills+1` e `lastFight` em cada char do lobby (antes só o líder recebia pelo kill in-engine) — a Missão 3 da Roost Quest completa para todo mundo que lutou, e as 5 Crypt Runes seguem auto-resgatáveis na quest.
+- **Seção GRAVEBORN 450+** do modal de bosses passa a listar só os 4 bosses da cadeia; `BOSS_DEFS["bonelords-phylactery"]` ganha `worldBoss:true` (necessário pro `newBossCombat` montar a sala OTBM no resume da instância compartilhada) e a quest detail/textos mencionam a entrada pelo lobby.
+- **Testes**: `test_world_boss_shared.js` — E2E do controller real (gates BOSS_KILLS_REQUIRED/LEVEL_REQUIRED/CHAR_COOLDOWN persistido, descriptor com 850k, kill credit + lastFight no save) + sim do descriptor (authority.worldBoss, bo/cagePool, 4 cages, boss retido). `test_roost_graveborn.js` — asserts do wz/grid/bounds/spawn alinhados ao OTBM. Falha pré-existente fora do escopo: `crypt-spine` cid 51313 (weapondata) × 52332 (roost) — divergência de item já existente no HEAD.
+
+---
+
 ## 2026-11-27 — Reward Shrine na cidade + ícones oficiais + Charm Expansion na Store
 
 - **Reward Shrine no modal CIDADE**: novo card entre Reward Chest e Forje (ícone oficial da Reward Shrine) que abre o modal de recompensa semanal a qualquer momento — inclusive quando já coletado, pra consultar o cronograma. Enquanto houver recompensa disponível no server save, o "!" aparece no card, no botão CIDADE da topbar e na linha do dia dentro do modal.

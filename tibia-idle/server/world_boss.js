@@ -83,9 +83,28 @@ const WARZONES = [
      * o acesso ao Phosphorus (progress.kills da missão ou missionsDone). */
     requiresMission: "radiant-skyhold",
     requiresMissionTarget: 5000,
+    /* Sem cooldown por personagem (a pedido) — explicitado via cooldownMs 0. */
+    cooldownMs: 0,
     gridW: 39, gridH: 27, playerSpawn: { x: 20, y: 16 }, bossSpawn: { x: 20, y: 8 },
     otbm: "final_radiant", otbmFloor: 7,
     otbmBounds: { x: 1008, y: 1015, w: 39, h: 27, z: 7 },
+  },
+  {
+    /* Bonelord's Phylactery — final da Roost of the Graveborn (15.20),
+     * agora World Boss com lobby de até 5 jogadores (1 char por conta).
+     * Gate oficial: level 450+ e kill das 4 bosses da cadeia sequencial.
+     * Grid local = sourceBounds do bonelords_phylactery.otbm z=7
+     * (1010,1016 → 1038,1040; mesmo crop da hunt-room do cliente — coords
+     * locais idênticas). Spawn/boss absolutos 1026,1035 / 1026,1025 →
+     * locais 16,19 / 16,9. Cooldown oficial 20h por personagem. */
+    id: "phylactery", name: "Roost of the Graveborn", bossName: "Bonelord's Phylactery",
+    bossHp: 850000, bossSprite: "bonelords-phylactery", baseMonster: "bonelords-phylactery",
+    maxChars: 5, minLevel: 450,
+    requiresBossKills: ["adventurer-group", "eldritch-dragon-lord", "ice-horror", "the-gravedigger"],
+    cooldownMs: 20 * 3600 * 1000,
+    gridW: 29, gridH: 25, playerSpawn: { x: 16, y: 19 }, bossSpawn: { x: 16, y: 9 },
+    otbm: "bonelords_phylactery", otbmFloor: 7,
+    otbmBounds: { x: 1010, y: 1016, w: 29, h: 25, z: 7 },
   },
 ];
 
@@ -93,6 +112,10 @@ const WARZONES = [
 const REQUIRED_BOSS_LABELS = {
   "maior-domus": "Maior Domus",
   "mimar-haffar": "Mimar Haffar",
+  "adventurer-group": "Adventurer Group",
+  "eldritch-dragon-lord": "Eldritch Dragon Lord",
+  "ice-horror": "Ice Horror",
+  "the-gravedigger": "The Gravedigger",
 };
 
 /* Taints contribuídas no lobby do Bakragore (Bakragore's Burden). Só vale
@@ -150,10 +173,11 @@ function bossIdForWarzone(warzoneId) {
   if (id === "megalomania") return "goshnar-s-megalomania";
   if (id === "bakragore") return "bakragore";
   if (id === "phosphorus") return "phosphorus";
+  if (id === "phylactery") return "bonelords-phylactery";
   return /^wz[1-6]$/.test(id) ? "world-boss-" + id : "world-boss-wz1";
 }
 function isWorldBossBossId(id) {
-  return /^world-boss-wz[1-6]$/.test(String(id || "")) || ["world-devourer", "the-pale-worm", "goshnar-s-megalomania", "bakragore", "phosphorus"].includes(String(id || ""));
+  return /^world-boss-wz[1-6]$/.test(String(id || "")) || ["world-devourer", "the-pale-worm", "goshnar-s-megalomania", "bakragore", "phosphorus", "bonelords-phylactery"].includes(String(id || ""));
 }
 function warzoneIdFromBossId(bossId) {
   const id = String(bossId || "");
@@ -162,6 +186,7 @@ function warzoneIdFromBossId(bossId) {
   if (id === "goshnar-s-megalomania") return "megalomania";
   if (id === "bakragore") return "bakragore";
   if (id === "phosphorus") return "phosphorus";
+  if (id === "bonelords-phylactery") return "phylactery";
   const m = id.match(/^world-boss-(wz[1-6])$/);
   return m ? m[1] : null;
 }
@@ -636,6 +661,17 @@ function createWorldBossController(opts) {
               p.quests["bloodrotten-quest"] = { completed: true, completedAt: Date.now(), rewardClaimed: true };
             }
           }
+          /* Bonelord's Phylactery — Roost of the Graveborn: cada char
+           * participante registra a kill (Missão 3 da quest: 1 de cada
+           * Crypt Rune via rewardReady) + lastFight pro cooldown de 20h. */
+          if (current.warzoneId === "phylactery") {
+            p.bosses = p.bosses && typeof p.bosses === "object" && !Array.isArray(p.bosses) ? p.bosses : {};
+            p.bosses["bonelords-phylactery"] = p.bosses["bonelords-phylactery"] &&
+              typeof p.bosses["bonelords-phylactery"] === "object" ? p.bosses["bonelords-phylactery"] : {};
+            p.bosses["bonelords-phylactery"].kills =
+              (Number(p.bosses["bonelords-phylactery"].kills) || 0) + 1;
+            p.bosses["bonelords-phylactery"].lastFight = Date.now();
+          }
           const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
           const voc = String(p.voc || character.voc || "none");
           await db.updateCharacter(character.id, voc, level, p, {});
@@ -660,14 +696,17 @@ function createWorldBossController(opts) {
     }
   }
 
-  /* Cooldown de 16h POR BOSS: quem lutou a Warzone 1 continua liberado para
-   * a Warzone 2 na mesma rotação — o cooldown só bloqueia repetir o mesmo
-   * boss/warzone. */
+  /* Cooldown POR BOSS (padrão 16h; wz.cooldownMs sobrescreve — 0 = sem
+   * cooldown, 20h na Phylactery): quem lutou a Warzone 1 continua liberado
+   * para a Warzone 2 na mesma rotação — o cooldown só bloqueia repetir o
+   * mesmo boss/warzone. */
   function applyCharCooldown() {
-    const cd = now() + 16 * 3600 * 1000;
+    const wzDef = event ? warzoneById(event.warzoneId) : null;
+    const cdMs = wzDef && Number.isFinite(Number(wzDef.cooldownMs))
+      ? Number(wzDef.cooldownMs) : 16 * 3600 * 1000;
+    if (cdMs <= 0) return;
+    const cd = now() + cdMs;
     const wz = event ? String(event.warzoneId || "") : "";
-    // Phosphorus: sem cooldown por personagem (a pedido).
-    if (wz === "phosphorus") return;
     for (const join of (event && event.joins ? event.joins.values() : [])) {
       for (const c of (join.chars || [])) charCooldownUntil.set(Number(c.id) + ":" + wz, cd);
     }
@@ -842,6 +881,20 @@ function createWorldBossController(opts) {
           msg: `${character.name || "?"} precisa ser nível ${wz.minLevel}+.` } };
       }
       const charBosses = data && data.bosses && typeof data.bosses === "object" ? data.bosses : {};
+      /* Cooldown persistido: o map charCooldownUntil morre no restart —
+       * wz.cooldownMs>0 também trava pelo lastFight gravado no save do
+       * personagem (a Phylactery marca 20h no sucesso do grant). */
+      const cdMs = Number.isFinite(Number(wz.cooldownMs)) ? Number(wz.cooldownMs) : 16 * 3600 * 1000;
+      if (cdMs > 0) {
+        const lf = Number(charBosses[bossIdForWarzone(wz.id)] &&
+          charBosses[bossIdForWarzone(wz.id)].lastFight) || 0;
+        const left = lf ? lf + cdMs - now() : 0;
+        if (left > 0) {
+          const min = Math.ceil(left / 60000);
+          return { code: 429, body: { ok: false, error: "CHAR_COOLDOWN",
+            msg: `${character.name || "?"} em cooldown do ${wz.bossName} (${Math.floor(min/60)}h ${min%60}m restantes).` } };
+        }
+      }
       /* Gate oficial (Phosphorus): o personagem precisa ter kill
        * registrada de cada boss exigido pela warzone. */
       if (Array.isArray(wz.requiresBossKills) && wz.requiresBossKills.length) {

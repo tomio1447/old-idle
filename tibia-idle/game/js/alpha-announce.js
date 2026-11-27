@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "27/11/2026 às 16:00";
+const ALPHA_UPDATE_AT = "27/11/2026 às 18:30";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Bonelord's Phylactery agora é WORLD BOSS: o boss final da Roost of the Graveborn entra pelo lobby do World Bosses (até 5 jogadores, 1 char por conta) — kill credita a Missão 3 da quest para todos os participantes",
   "NOVO — Reward Shrine na cidade: o modal CIDADE ganhou um botão com o ícone oficial da Reward Shrine que abre o cronograma de recompensa semanal a qualquer momento — um '!' aparece no card e no botão CIDADE enquanto houver recompensa para coletar",
   "NOVO — Charm Expansion na STORE → Extras (450 TC, por conta): remove o limite de charms ativos — conta free associa em até 2 criaturas, VIP em até 6, a expansão libera ilimitado (modelo oficial)",
   "NOVO — Ícones oficiais na Store e recompensas: packs de VIP usam as coroas oficiais de Premium Time, o 3º slot de prey usa o ícone oficial de Permanent Prey Slot e o XP Boost ganhou o ícone oficial nos dias de bônus de EXP",

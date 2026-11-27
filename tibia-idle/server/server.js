@@ -3095,15 +3095,19 @@ async function prepareInstanceState(db,acc,input){
   let ids=members.map((member)=>Number(member&&member.id));
   if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros duplicados ou inválidos"}}};
-  /* Bakragore é exclusivo do lobby de World Boss (Rotten Blood): um PUT
-   * direto de instância boss fora do roster compartilhado não cria a sala. */
-  if(bossId==="bakragore"){
+  /* Bosses exclusivos do lobby de World Boss (controller world_boss.js):
+   * um PUT direto de instância boss fora do roster compartilhado não cria a
+   * sala. Pale Worm/Megalomania ficam DE FORA — entram por lobby dedicado
+   * (expansão de roster acima), não pelo wb controller. */
+  const WB_LOBBY_ONLY_BOSSES=/^world-boss-wz[1-6]$/.test(String(bossId||""))||
+    ["world-devourer","bakragore","phosphorus","bonelords-phylactery"].includes(String(bossId||""));
+  if(WB_LOBBY_ONLY_BOSSES){
     const wbCtrlB=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
     const wbShareB=wbCtrlB&&typeof wbCtrlB.sharedForAccount==="function"?wbCtrlB.sharedForAccount(acc.id):null;
     const wbIdsB=wbCtrlB&&typeof wbCtrlB.joinedCharIds==="function"?new Set(wbCtrlB.joinedCharIds().map(Number)):null;
-    const bakragoreOk=!!(wbShareB&&wbIdsB&&wbIdsB.size&&ids.every((id)=>wbIdsB.has(Number(id))));
-    if(!bakragoreOk)return {error:{code:403,body:{ok:false,error:"WORLD_BOSS_LOBBY_REQUIRED",
-      msg:"Bakragore só pode ser enfrentado pelo lobby de World Boss."}}};
+    const wbLobbyOk=!!(wbShareB&&wbIdsB&&wbIdsB.size&&ids.every((id)=>wbIdsB.has(Number(id))));
+    if(!wbLobbyOk)return {error:{code:403,body:{ok:false,error:"WORLD_BOSS_LOBBY_REQUIRED",
+      msg:"Este World Boss só pode ser enfrentado pelo lobby de World Boss."}}};
   }
   const activeId=Number(input.activeCharacterId);
   if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
@@ -3628,6 +3632,12 @@ async function syncWorldBossShared(db,event){
   const pending=auth&&auth.arenaBossSpawn&&auth.arenaBossSpawn.pending;
   if(boss)event.bossHp=Math.max(0,Math.floor(Number(boss.hp)||0));
   else if(pending)event.bossHp=Math.max(0,Math.floor(Number(pending.hp||pending.maxHp)||event.bossHp||0));
+  /* Bonelord's Phylactery: na fase 1 o boss fica retido em auth.bo.pendingBoss
+   * — a barra mostra o pool compartilhado das Soulcages (120k). O tick que
+   * zera o pool devolve o boss aos mobs no mesmo passo, então pool=0 com
+   * pendingBoss vivo não persiste em estado serializado. */
+  else if(auth&&auth.bo&&auth.bo.pendingBoss&&auth.bo.cagePool!=null)
+    event.bossHp=Math.max(0,Math.floor(Number(auth.bo.cagePool)||0));
   if(row.status!=="active"){
     const reason=String(row.terminal_reason||"");
     const ctrl=global.__WORLD_BOSS;

@@ -65,7 +65,15 @@ for (const id of BOSSES) {
     id + ": BOSS_DEFS hunt/baseMonster/sprite divergentes");
   must(b.requirement && b.requirement.level === 450 && b.requirement.enforced,
     id + ": requirement level 450 enforced ausente");
-  must(b.cooldown === 20 * 60 * 60 * 1000, id + ": cooldown deve ser 20h");
+  /* A Phylactery virou World Boss (lobby até 5 jogadores): cooldown de 20h
+   * vive no servidor (wz.cooldownMs) — no cliente o def marca worldBoss e
+   * cooldown 0, como bakragore/phosphorus. */
+  if (id === "bonelords-phylactery") {
+    must(b.worldBoss === true, id + ": deve ser worldBoss (entrada pelo lobby)");
+    must(b.cooldown === 0, id + ": worldBoss não usa cooldown local");
+  } else {
+    must(b.cooldown === 20 * 60 * 60 * 1000, id + ": cooldown deve ser 20h");
+  }
   const room = ctx.GAMEDATA.hunts[id + "-room"];
   must(room && room.hidden && room.pack === 1 && room.cat === "boss-room",
     id + "-room: hunt técnica ausente");
@@ -98,14 +106,55 @@ must(ctx.QUEST_DEFS["roost-of-the-graveborn-quest"] &&
   typeof ctx.QUEST_DEFS["roost-of-the-graveborn-quest"].renderDetail === "function",
   "QUEST_DEFS da Roost ausente");
 const sect = ctx.BOSS_MODAL_SECTIONS.find((s) => /GRAVEBORN/.test(s.title));
+/* A Phylactery migrou para o modal de World Bosses — a seção GRAVEBORN
+ * lista só os 4 bosses da cadeia (entrada direta por instância). */
 must(sect && sect.minLevel === 450 &&
-  JSON.stringify(sect.ids) === JSON.stringify(BOSSES),
-  "seção GRAVEBORN 450+ ausente/ordenada errada");
+  JSON.stringify(sect.ids) === JSON.stringify(
+    ["adventurer-group", "eldritch-dragon-lord", "ice-horror", "the-gravedigger"]),
+  "seção GRAVEBORN 450+ deve listar só os 4 bosses da cadeia");
 /* Ordem por nível: GRAVEBORN 450+ logo abaixo de SOULWAR 400+,
  * antes de BLOODROTTEN 600+ e BOSSES 800+. */
 must(ctx.BOSS_MODAL_SECTIONS.findIndex((s) => /GRAVEBORN/.test(s.title)) ===
   ctx.BOSS_MODAL_SECTIONS.findIndex((s) => /SOULWAR/.test(s.title)) + 1,
   "GRAVEBORN 450+ não ficou abaixo de SOULWAR");
+
+/* -------- Phylactery como World Boss (servidor) -------- */
+{
+  const wb = require("../server/world_boss.js");
+  const wz = wb.WARZONES.find((w) => w.id === "phylactery");
+  must(wz, "warzone phylactery ausente no controller do world boss");
+  must(wz.bossName === "Bonelord's Phylactery" && wz.bossHp === 850000,
+    "warzone phylactery: nome/HP divergentes");
+  must(wz.bossSprite === "bonelords-phylactery" && wz.baseMonster === "bonelords-phylactery",
+    "warzone phylactery: sprite/baseMonster divergentes");
+  must(wz.maxChars === 5 && wz.minLevel === 450,
+    "warzone phylactery: deve ser lobby de até 5 jogadores, level 450+");
+  must(JSON.stringify(wz.requiresBossKills) ===
+    '["adventurer-group","eldritch-dragon-lord","ice-horror","the-gravedigger"]',
+    "warzone phylactery: requiresBossKills deve ser a cadeia de 4");
+  must(wz.cooldownMs === 20 * 3600 * 1000, "warzone phylactery: cooldown deve ser 20h");
+  /* Grid + crop devem bater com o sourceBounds do OTBM (mesma origem do
+   * mapa do cliente → coords locais idênticas servidor×cliente). */
+  const bmap = OTBM.read(fs.readFileSync(
+    path.join(game, "maps", "bonelords_phylactery.otbm")).buffer.slice(0), { z: 7 });
+  const sb = bmap.sourceBounds;
+  must(wz.otbm === "bonelords_phylactery" && wz.otbmFloor === 7,
+    "warzone phylactery: otbm/floor divergentes");
+  must(wz.otbmBounds.x === sb.minX && wz.otbmBounds.y === sb.minY &&
+    wz.otbmBounds.w === wz.gridW && wz.otbmBounds.h === wz.gridH &&
+    wz.gridW === sb.maxX - sb.minX + 1 && wz.gridH === sb.maxY - sb.minY + 1,
+    "warzone phylactery: grid/otbmBounds não batem com o sourceBounds do OTBM");
+  /* Spawn oficial 1026,1035 / boss 1026,1025 → locais (16,19) / (16,9). */
+  must(wz.playerSpawn.x === 1026 - sb.minX && wz.playerSpawn.y === 1035 - sb.minY &&
+    wz.bossSpawn.x === 1026 - sb.minX && wz.bossSpawn.y === 1025 - sb.minY,
+    "warzone phylactery: playerSpawn/bossSpawn divergentes dos pontos oficiais");
+  must(wb.bossIdForWarzone("phylactery") === "bonelords-phylactery",
+    "bossIdForWarzone(phylactery) divergente");
+  must(wb.isWorldBossBossId("bonelords-phylactery"),
+    "isWorldBossBossId deve incluir bonelords-phylactery (senão membros de outra conta não acessam a instância)");
+  must(wb.warzoneIdFromBossId("bonelords-phylactery") === "phylactery",
+    "warzoneIdFromBossId divergente");
+}
 
 /* ---------------- NPC Dragon Ancestor Spirit ---------------- */
 must(ctx.NPCS["dragon-ancestor-spirit"] &&
