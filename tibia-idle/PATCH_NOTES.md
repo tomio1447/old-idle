@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Warzones 4, 5 e 6 com salas e bosses próprios
+
+- **Arenas reais**: `warzone4/5/6.otbm` (já publicados em `game/maps/`) agora alimentam a instância — WZ4 The Baron from Below (28×16), WZ5 The Count of the Core (24×24) e WZ6 The Duke of the Depths (26×25), todas em z=7. Antes elas rodavam num grid default 40×40 sem colisão e sem o mapa da sala.
+- **Colisão no servidor**: `wz4–6` ganham `otbm`/`otbmFloor` no `world_boss.js` (mesmo padrão do Bakragore) — `blockedCells` sai do mapa real, ninguém atravessa parede.
+- **Spawns validados no mapa real**: player spawn ao sul (entrada estreita), boss ao norte com espaço visual; os 20 offsets de membro (ox ±2 / oy 0–2) foram testados — todos pisáveis nos três mapas.
+- **Cliente**: `BOSS_DEFS["world-boss-wz4/5/6"]` + hunt-rooms em `GAMEDATA.hunts` (stats reais do Canary — 350k HP, dano 550/900/800, armor/defense 160). A luta renderiza a sala verdadeira em vez da arena placeholder.
+- **Paridade de timing**: o delay de nascimento do boss (10s prod / 5s test) e a detecção de snapshot de world boss agora cobrem `wz1–6` (antes só `wz1–3`).
+- Loot: sai da tabela oficial do monstro (39–42 drops cada). Major Crystalline Token segue exclusivo de WZ1–3 (oficial).
+
+---
+
 ## 2026-11-27 — Fix: ícone de exercise 404 + ruído 409 do checkpoint de treino
 
 - **Ícone de Exercise Weapon 404**: `dailyRewardIcon` montava `lasting-exercise-sword.gif` — o arquivo real é `lasting-sword.gif` (o card da recompensa de domingo/quinta mostrava imagem quebrada).

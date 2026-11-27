@@ -1994,6 +1994,35 @@ GAMEDATA.hunts["abyssador-room"] = {
   otbmFovWidth: 23, otbmFovHeight: 17,
   otbmRuntimeWidth: 26, otbmRuntimeHeight: 26,
 };
+/* Warzones 4–6 — salas próprias em z=7, origem local 0,0 (o .otbm já é o
+ * recorte: sem otbmBounds). Entrada estreita ao sul; boss ao norte. */
+GAMEDATA.hunts["the-baron-from-below-room"] = {
+  name: "Warzone 4 — The Baron from Below", level: 100, minLevel: 100, cat: "boss",
+  pack: 1, monsters: ["the-baron-from-below"], color: "#4a3d33", scene: "cave",
+  otbm: "warzone4", otbmFloor: 7,
+  otbmSpawn: { x: 14, y: 10, z: 7 },
+  otbmMobBounds: { x: 14, y: 6, w: 1, h: 1, z: 7 },
+  otbmFovWidth: 21, otbmFovHeight: 15,
+  otbmRuntimeWidth: 28, otbmRuntimeHeight: 16,
+};
+GAMEDATA.hunts["the-count-of-the-core-room"] = {
+  name: "Warzone 5 — The Count of the Core", level: 100, minLevel: 100, cat: "boss",
+  pack: 1, monsters: ["the-count-of-the-core"], color: "#503a2e", scene: "cave",
+  otbm: "warzone5", otbmFloor: 7,
+  otbmSpawn: { x: 14, y: 18, z: 7 },
+  otbmMobBounds: { x: 13, y: 8, w: 1, h: 1, z: 7 },
+  otbmFovWidth: 21, otbmFovHeight: 17,
+  otbmRuntimeWidth: 24, otbmRuntimeHeight: 24,
+};
+GAMEDATA.hunts["the-duke-of-the-depths-room"] = {
+  name: "Warzone 6 — The Duke of the Depths", level: 100, minLevel: 100, cat: "boss",
+  pack: 1, monsters: ["the-duke-of-the-depths"], color: "#333f4a", scene: "cave",
+  otbm: "warzone6", otbmFloor: 7,
+  otbmSpawn: { x: 14, y: 19, z: 7 },
+  otbmMobBounds: { x: 14, y: 6, w: 1, h: 1, z: 7 },
+  otbmFovWidth: 21, otbmFovHeight: 17,
+  otbmRuntimeWidth: 26, otbmRuntimeHeight: 25,
+};
 /* A sala "bakragore-room" (world boss Rotten Blood) é registrada por
  * bloodrotten.js junto das demais rooms — spawns/bounds vêm de B.rooms. */
 const BOSS_DEFS = {
@@ -2162,6 +2191,26 @@ const BOSS_DEFS = {
     id: "world-boss-wz3", name: "The Abyssador", title: "World Boss — Warzone 3",
     hunt: "abyssador-room", worldBoss: true, baseMonster: "abyssador", sprite: "abyssador",
     hp: 2500, exp: 0, damage: 750, armor: 80, defense: 80, cooldown: 0, loot: [],
+    requirement: { text: "Entra pelo lobby da Warzone" },
+  },
+  /* Warzones 4–6: hp/dano reais do Canary (a instância compartilhada sobrescreve
+   * o hp pelo bossHp do servidor — 350k oficial). */
+  "world-boss-wz4": {
+    id: "world-boss-wz4", name: "The Baron from Below", title: "World Boss — Warzone 4",
+    hunt: "the-baron-from-below-room", worldBoss: true, baseMonster: "the-baron-from-below", sprite: "the-baron-from-below",
+    hp: 350000, exp: 0, damage: 550, armor: 160, defense: 160, cooldown: 0, loot: [],
+    requirement: { text: "Entra pelo lobby da Warzone" },
+  },
+  "world-boss-wz5": {
+    id: "world-boss-wz5", name: "The Count of the Core", title: "World Boss — Warzone 5",
+    hunt: "the-count-of-the-core-room", worldBoss: true, baseMonster: "the-count-of-the-core", sprite: "the-count-of-the-core",
+    hp: 350000, exp: 0, damage: 900, armor: 160, defense: 160, cooldown: 0, loot: [],
+    requirement: { text: "Entra pelo lobby da Warzone" },
+  },
+  "world-boss-wz6": {
+    id: "world-boss-wz6", name: "The Duke of the Depths", title: "World Boss — Warzone 6",
+    hunt: "the-duke-of-the-depths-room", worldBoss: true, baseMonster: "the-duke-of-the-depths", sprite: "the-duke-of-the-depths",
+    hp: 350000, exp: 0, damage: 800, armor: 160, defense: 160, cooldown: 0, loot: [],
     requirement: { text: "Entra pelo lobby da Warzone" },
   },
 
@@ -5436,7 +5485,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
   const incomingProbe=(descriptor.state&&(descriptor.state.players||descriptor.state.mobs||
     descriptor.state.events))?descriptor.state:descriptor;
   const incomingWb=!!(descriptor.worldBoss||incomingProbe&&incomingProbe.worldBoss||
-    /^world-boss-wz[123]$/.test(String(descriptor.bossId||incomingProbe&&incomingProbe.bossId||"")));
+    /^world-boss-wz[1-6]$/.test(String(descriptor.bossId||incomingProbe&&incomingProbe.bossId||"")));
   const localWb=!!(previous.worldBoss||(previous.boss&&previous.boss.worldBoss));
   if(incomingWb&&!localWb)return false;
   if(localWb&&!incomingWb&&!terminalReason)return false;

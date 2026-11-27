@@ -32,16 +32,26 @@ const WARZONES = [
     gridW: 26, gridH: 26, playerSpawn: { x: 13, y: 3 }, bossSpawn: { x: 13, y: 14 },
   },
   {
+    /* Warzone 4 — The Baron from Below. Grid local = mapa warzone4.otbm
+     * inteiro (28×16, z=7, origem 0,0 — a sala já é o recorte). */
     id: "wz4", name: "Warzone 4", bossName: "The Baron from Below", bossHp: 350000,
     bossSprite: "the-baron-from-below", baseMonster: "the-baron-from-below",
+    gridW: 28, gridH: 16, playerSpawn: { x: 14, y: 10 }, bossSpawn: { x: 14, y: 6 },
+    otbm: "warzone4", otbmFloor: 7,
   },
   {
+    /* Warzone 5 — The Count of the Core. warzone5.otbm (24×24, z=7, origem 0,0). */
     id: "wz5", name: "Warzone 5", bossName: "The Count of the Core", bossHp: 350000,
     bossSprite: "the-count-of-the-core", baseMonster: "the-count-of-the-core",
+    gridW: 24, gridH: 24, playerSpawn: { x: 14, y: 18 }, bossSpawn: { x: 13, y: 8 },
+    otbm: "warzone5", otbmFloor: 7,
   },
   {
+    /* Warzone 6 — The Duke of the Depths. warzone6.otbm (26×25, z=7, origem 0,0). */
     id: "wz6", name: "Warzone 6", bossName: "The Duke of the Depths", bossHp: 350000,
     bossSprite: "the-duke-of-the-depths", baseMonster: "the-duke-of-the-depths",
+    gridW: 26, gridH: 25, playerSpawn: { x: 14, y: 19 }, bossSpawn: { x: 14, y: 6 },
+    otbm: "warzone6", otbmFloor: 7,
   },
   {
     id: "devourer", name: "Heart of Destruction", bossName: "The World Devourer", bossHp: 25000,

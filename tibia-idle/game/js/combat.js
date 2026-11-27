@@ -24,7 +24,7 @@ function bossArenaSpawnDelayMs(bossId) {
     return (typeof MEGA_BOSS_SPAWN_MS === "number" && MEGA_BOSS_SPAWN_MS > 0)
       ? MEGA_BOSS_SPAWN_MS : 15000;
   }
-  if (/^world-boss-wz[123]$/.test(String(bossId || ""))) {
+  if (/^world-boss-wz[1-6]$/.test(String(bossId || ""))) {
     const cfg = (typeof window !== "undefined" && window.GLOBAL_IDLE_SERVER_CONFIG) || {};
     return cfg.testServer ? 5000 : 10000;
   }

@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 21:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Warzones 4, 5 e 6 com salas próprias: The Baron from Below, The Count of the Core e The Duke of the Depths agora lutam nas arenas reais (mapas da warzone com colisão de verdade) em vez da sala genérica — boss nasce ao norte, time entra pelo corredor sul",
   "NOVO — Painel BÔNUS ATIVOS acima do Daily Boost: com o mesmo visual, aparece enquanto houver bônus temporário no char e mostra multiplicador + tempo restante de cada um — EXP ×N (min de caça), Skill ×N (min de treino)",
   "NOVO — Recompensa semanal com cara de Tibia Global: trilhas chanfradas, dia atual em dourado com tag HOJE bem definida (COLETADO quando pega), card da recompensa com slot chanfrado e aviso em caixa escura com ícone azul",
   "NOVO — Boss Slots na Cyclopedia (funcional no servidor): 2 slots para associar bosses já desbloqueados no Bosstiário (o 2º pede 1.500 boss points) + o slot fixo do Boss do Dia — abater o boss slotted dá chance extra de loot (bônus dos seus pontos +25% no nível 3) e o daily boss conta 3× kills; remover do slot é grátis nas 2 primeiras vezes e cobra gold crescente depois",

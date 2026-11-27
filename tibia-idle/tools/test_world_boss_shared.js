@@ -197,5 +197,54 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     p.bosses["bonelords-phylactery"].kills === 1 &&
     p.bosses["bonelords-phylactery"].lastFight > 0,
     "kill da phylactery não creditada: " + JSON.stringify(p.bosses || {}));
-  console.log("ok: world boss shared instance contract");
+
+  // ---- Warzones 4–6: salas OTBM próprias + spawns caminháveis ----
+  const WZ456 = {
+    wz4: { otbm: "warzone4", w: 28, h: 16, ps: { x: 14, y: 10 }, bs: { x: 14, y: 6 },
+      slug: "the-baron-from-below", room: "the-baron-from-below-room", bossId: "world-boss-wz4" },
+    wz5: { otbm: "warzone5", w: 24, h: 24, ps: { x: 14, y: 18 }, bs: { x: 13, y: 8 },
+      slug: "the-count-of-the-core", room: "the-count-of-the-core-room", bossId: "world-boss-wz5" },
+    wz6: { otbm: "warzone6", w: 26, h: 25, ps: { x: 14, y: 19 }, bs: { x: 14, y: 6 },
+      slug: "the-duke-of-the-depths", room: "the-duke-of-the-depths-room", bossId: "world-boss-wz6" },
+  };
+  const OTBM = require(path.join(root, "game", "js", "otbm.js"));
+  const flagBox = { window: {} }; flagBox.window = flagBox;
+  require("vm").createContext(flagBox);
+  require("vm").runInContext(fs.readFileSync(path.join(root, "game", "js", "tileflags.js"), "utf8"), flagBox);
+  const TILEFLAGS = flagBox.TILEFLAGS || {};
+  for (const [wzId, d] of Object.entries(WZ456)) {
+    const wz = wb.WARZONES.find((w) => w.id === wzId);
+    must(wz && wz.otbm === d.otbm && wz.otbmFloor === 7, wzId + " sem otbm/floor");
+    must(wz.gridW === d.w && wz.gridH === d.h, wzId + " grid diverge do mapa");
+    must(wz.playerSpawn.x === d.ps.x && wz.playerSpawn.y === d.ps.y &&
+      wz.bossSpawn.x === d.bs.x && wz.bossSpawn.y === d.bs.y, wzId + " spawns divergem");
+    must(wb.bossIdForWarzone(wzId) === d.bossId, wzId + " bossId errado");
+    // Defs do cliente: BOSS_DEFS + hunt-room com o mesmo otbm/spawn.
+    must(gameSrc.includes('"' + d.bossId + '"') && gameSrc.includes(d.room),
+      "cliente sem BOSS_DEFS/hunt-room de " + wzId);
+    must(gameSrc.includes('otbm: "' + d.otbm + '"'), "hunt-room sem otbm " + d.otbm);
+    // Spawns + todos os offsets de membro (ox±2, oy 0..2) caminháveis no mapa real.
+    const bytes = fs.readFileSync(path.join(root, "game", "maps", d.otbm + ".otbm"));
+    const parsed = OTBM.read(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), { z: 7 });
+    const map = OTBM.huntMapFromOtbm(parsed, TILEFLAGS);
+    const blk = (x, y) => {
+      const L = map.leg[map.rows[y][x]];
+      return !L || L.bloc || (map.footprintBlocked && map.footprintBlocked[x + ":" + y]);
+    };
+    must(!blk(d.bs.x, d.bs.y), wzId + " bossSpawn bloqueado");
+    for (let i = 0; i < 20; i++) {
+      const cx = Math.max(1, Math.min(d.w - 2, d.ps.x + ((i % 5) - 2)));
+      const cy = Math.max(1, Math.min(d.h - 2, d.ps.y + (Math.floor(i / 5) % 3)));
+      must(!blk(cx, cy), wzId + " spawn do membro " + i + " bloqueado em " + cx + "," + cy);
+    }
+    // Monstro existe no dump com loot e a sheet do mob existe.
+    const mons = require(path.join(root, "game", "data", "canarymonsters.json"));
+    must(mons[d.slug] && !!mons[d.slug].boss && (mons[d.slug].loot || []).length > 0,
+      wzId + " monstro/boss loot ausente: " + d.slug);
+    must(fs.existsSync(path.join(root, "game", "assets", "mob", d.slug + ".png")),
+      wzId + " sheet do mob ausente: " + d.slug + ".png");
+  }
+  must(combatSrc.includes("world-boss-wz[1-6]") && gameSrc.includes("world-boss-wz[1-6]"),
+    "regex world-boss-wz não cobre wz4-6");
+  console.log("ok: world boss shared instance contract + warzones 4-6 rooms");
 })().catch((e) => { console.error(e); process.exit(1); });
