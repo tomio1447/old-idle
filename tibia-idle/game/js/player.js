@@ -963,6 +963,13 @@ function ensureItemInstances(p) {
   p.exaltationBox = Array.isArray(p.exaltationBox) ? p.exaltationBox : [];
   p.equip = p.equip || {};
 
+  /* Resume de instância: o snapshot do servidor já traz itemInstances
+   * populados (e equip.instId), mas _itemInstancesVersion é marcador do
+   * cliente e não viaja. Sem este gate o rebuild legado rodava de novo e
+   * o findItemInstance abaixo reentrava aqui — recursão infinita. */
+  if (p._itemInstancesVersion !== 2 && p.itemInstances.length)
+    p._itemInstancesVersion = 2;
+
   if (p._itemInstancesVersion === 2) {
     for (const inst of p.itemInstances) {
       if (!inst.id) inst.id = nextItemInstanceId(p);
@@ -1102,7 +1109,14 @@ function ensureItemInstances(p) {
   for (const slot in p.equip) {
     const e = p.equip[slot];
     if (!e || !e.item || !itemUsesInstances(e.item)) continue;
-    if (e.instId && findItemInstance(p, e.instId)) continue;
+    /* Lookup inline — findItemInstance chama ensureItemInstances e
+     * reentraria aqui (recursão infinita em save legado com instId). */
+    if (e.instId) {
+      let found = false;
+      for (const cand of p.itemInstances)
+        if (cand && cand.id === e.instId) { found = true; break; }
+      if (found) continue;
+    }
     const inst = createInst(e.item, "equip:" + slot, claimLegacyTier(e.item));
     e.instId = inst.id;
   }
