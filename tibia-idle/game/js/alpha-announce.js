@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 21:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Mini bosses da Falcon Bastion na taxa real: o sorteio dava 4% de chance por slot (1% a cada um dos 4) e chovia Grand Commander Soeren / Preceptor Lazare / Grand Chaplain Gaunder / Grand Canon Dominus — agora 0,01% combinado por spawn, raridade de verdade",
   "NOVO — Warzones 4, 5 e 6 com salas próprias: The Baron from Below, The Count of the Core e The Duke of the Depths agora lutam nas arenas reais (mapas da warzone com colisão de verdade) em vez da sala genérica — boss nasce ao norte, time entra pelo corredor sul",
   "NOVO — Painel BÔNUS ATIVOS acima do Daily Boost: com o mesmo visual, aparece enquanto houver bônus temporário no char e mostra multiplicador + tempo restante de cada um — EXP ×N (min de caça), Skill ×N (min de treino)",
   "NOVO — Recompensa semanal com cara de Tibia Global: trilhas chanfradas, dia atual em dourado com tag HOJE bem definida (COLETADO quando pega), card da recompensa com slot chanfrado e aviso em caixa escura com ícone azul",

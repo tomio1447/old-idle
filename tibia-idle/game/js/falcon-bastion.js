@@ -2,7 +2,7 @@
  *
  * Criaturas diretas do Canary:
  *   - Falcon Knight / Falcon Paladin (looktype 1071)
- *   - Mini bosses raros (0.1% por slot de spawn):
+ *   - Mini bosses raros (0.01% por slot de spawn, sorteia 1 dos 4):
  *       Grand Commander Soeren, Preceptor Lazare,
  *       Grand Chaplain Gaunder, Grand Canon Dominus
  *
@@ -94,8 +94,8 @@ const FALCON_BASTION_AVG = { hp: 8750, exp: 6600, damage: 325, armor: 57, gold: 
       "grand-canon-dominus",
     ],
     spawnWeights: {
-      "falcon-knight": 48,
-      "falcon-paladin": 48,
+      "falcon-knight": 20000,
+      "falcon-paladin": 20000,
       "grand-commander-soeren": 1,
       "preceptor-lazare": 1,
       "grand-chaplain-gaunder": 1,

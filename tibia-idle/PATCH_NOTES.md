@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Mini bosses da Falcon Bastion com a taxa real de 0,01%
+
+- **O bug**: os `spawnWeights` davam peso `1` a cada um dos 4 mini bosses contra `48`/`48` de Falcon Knight/Paladin — **1% por mini boss, 4% combinado por slot de spawn**. Com pack 6–8 e respawn ~1s isso gerava centenas de mini bosses por hora.
+- **A correção**: pesos agora `20000`/`20000` nos falcons contra `1` em cada mini boss — **0,009999% combinado por slot** (sorteia 1 dos 4 quando proc). No ritmo de uma caçada normal, ~1 mini boss a cada hora e pouco — como no oficial.
+- Vale nos dois lados: simulação local (`falcon-bastion.js`) e engine autoritativo (`authoritative_engine.js`) com os mesmos pesos.
+
+---
+
 ## 2026-11-27 — Echo Raids no Hunt Session Analyser
 
 - **Nova parte "Echo Raids"** (sempre visível, com o ícone do portal): **Echo Raids** = quantas vezes o portal apareceu na sessão; **Actived Echo Raids** = quantas vezes a raid foi ativada (pisou no portal).

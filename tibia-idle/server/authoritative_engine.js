@@ -697,7 +697,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
     spawnWeights:{"converter":25,"darklight-construct":25,"darklight-emitter":25,"wandering-pillar":25}},
   "falcon-bastion":{monsters:["falcon-knight","falcon-paladin"],cat:"hard",pack:7,packMin:6,packMax:8,
     bossMobs:["grand-commander-soeren","preceptor-lazare","grand-chaplain-gaunder","grand-canon-dominus"],
-    spawnWeights:{"falcon-knight":48,"falcon-paladin":48,
+    spawnWeights:{"falcon-knight":20000,"falcon-paladin":20000,
       "grand-commander-soeren":1,"preceptor-lazare":1,"grand-chaplain-gaunder":1,"grand-canon-dominus":1}},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
