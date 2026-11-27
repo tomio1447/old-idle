@@ -177,5 +177,23 @@ check(approx(st(60), [1, 35 / 75, 0]), "entre u1 e u2 → barra 2 parcial", st(6
 check(approx(st(200), [1, 1, 100 / 150]), "entre u2 e total → barra 3 parcial", st(200));
 check(approx(st(250), [1, 1, 1]), "completo → 3 barras cheias", st(250));
 
+/* ---------- bosstiário reestruturado ---------- */
+console.log("\n[7] bosstiário (lista + detalhe)");
+check(uiSrc.includes("cyc-toolbar") && uiSrc.includes('id="cyclo-boss-busca"'),
+  "lista do bosstiário usa toolbar + busca");
+check(uiSrc.includes("mini-bar-track") && uiSrc.includes("mini-bar-fill"),
+  "cards de boss com mini-bar colorida por categoria");
+check(uiSrc.includes("boss-topbar") && uiSrc.includes("boss-heading")
+  && uiSrc.includes("boss-tier-badge") && uiSrc.includes("boss-meta-kills"),
+  "detalhe: topbar com voltar + nome + categoria + contador");
+check(uiSrc.includes("boss-columns") && uiSrc.includes("boss-detail-card")
+  && uiSrc.includes("boss-sprite-box") && uiSrc.includes("boss-loot-list"),
+  "detalhe: 2 colunas (atributos+progresso × resistências+loot)");
+check(uiSrc.includes("CYCLO.bossBusca"), "busca de boss filtra a lista");
+check(cssSrc.includes(".boss-topbar") && cssSrc.includes(".mini-bar-track")
+  && cssSrc.includes(".boss-sprite-box") && cssSrc.includes(".boss-columns")
+  && cssSrc.includes(".boss-detail-card"),
+  "estilos do detalhe no layout.css");
+
 console.log(`\n${passed} ok, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

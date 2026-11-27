@@ -71,6 +71,7 @@ function renderCycloTabs() {
     b.addEventListener("click", () => {
       CYCLO.aba = b.dataset.cycloTab;
       CYCLO.sel = null;
+      CYCLO.bossSel = null;
       CYCLO.busca = "";
       CYCLO.pag = 0;
       CYCLO.filtro = "all";
@@ -678,7 +679,10 @@ function renderCycloBosstiary(p, el) {
     return cycloBossDetail(p, el, CYCLO.bossSel);
   }
   const cat = CYCLO.bossFiltro || "todos";
-  const ls = bosstiaryList(cat);
+  const busca = (CYCLO.bossBusca || "").toLowerCase();
+  let ls = bosstiaryList(cat);
+  if (busca) ls = ls.filter((s) =>
+    (GAMEDATA.monsters[s].name || "").toLowerCase().indexOf(busca) !== -1);
   const rs = bosstiarySummary(p);
 
   // mesma paginacao do bestiario: 353 bosses de uma vez travam a aba
@@ -690,27 +694,26 @@ function renderCycloBosstiary(p, el) {
                           (CYCLO.bossPag + 1) * POR_PAGINA);
 
   el.innerHTML = `
-    <div class="best-head">
-      <div>
-        <div class="small">Nível do Bosstiário
-          <b class="gold-txt">${rs.nivel}</b></div>
-        <div class="tiny dim">${fmtFull(rs.pontos)} pontos ·
-          faltam ${fmtFull(Math.max(0, rs.prox.faltam))} para o ${rs.prox.nivel}</div>
+    <div class="cyc-toolbar">
+      <div class="cyc-stats tiny">
+        <span>Nível <b class="gold-txt">${rs.nivel}</b></span>
+        <span class="dim">•</span>
+        <span><b class="gold-txt">${fmtFull(rs.pontos)}</b> pontos</span>
+        <span class="dim">•</span>
+        <span>Dano <b style="color:#9ce84a">+${Math.round((rs.bonus - 1) * 100)}%</b></span>
+        <span class="dim">•</span>
+        <span>${rs.descobertos}/${rs.total} encontrados · ${rs.completos} completos</span>
       </div>
-      <div style="text-align:right">
-        <div class="tiny dim">Dano contra bosses</div>
-        <div class="small" style="color:#9ce84a">
-          +${Math.round((rs.bonus - 1) * 100)}%</div>
+      <div class="cyc-controls">
+        <input id="cyclo-boss-busca" class="cyc-search" placeholder="Buscar…"
+          value="${CYCLO.bossBusca || ""}">
+        <div class="cyc-filter-group">
+          ${["todos", "bane", "archfoe", "nemesis"].map((f) => `
+            <button class="cyc-filter-btn ${cat === f ? "on" : ""}" data-boss-filtro="${f}"
+              ${f !== "todos" ? `style="color:${BOSS_CATS[f].cor}"` : ""}>
+              ${f === "todos" ? "Todos" : BOSS_CATS[f].nome}</button>`).join("")}
+        </div>
       </div>
-    </div>
-    <div class="tiny dim mb8">
-      ${rs.descobertos} de ${rs.total} bosses encontrados ·
-      ${rs.completos} completos
-    </div>
-    <div class="app-filters mb8">
-      ${["todos", "bane", "archfoe", "nemesis"].map((f) => `
-        <button class="sm ${cat === f ? "on" : ""}" data-boss-filtro="${f}">
-          ${f === "todos" ? "Todos" : BOSS_CATS[f].nome}</button>`).join("")}
     </div>
     <div class="app-grid">
       ${pagina.map((slug) => {
@@ -724,13 +727,13 @@ function renderCycloBosstiary(p, el) {
               ? bossMobImg(slug, 48, visto ? "" : "filter:brightness(0);")
               : mobImg(slug, 48, visto ? "" : "filter:brightness(0);"))}
           </div>
-          <div class="tiny">${visto ? m.name : "???"}</div>
+          <div class="tiny mob-name">${visto ? m.name : "???"}</div>
           <div class="tiny" style="color:${pr.cat.cor}">${pr.cat.nome}</div>
           <div class="tiny dim">${pr.kills} / ${pr.alvo}</div>
-          <div class="best-bar"><div style="width:${(pr.pct * 100).toFixed(0)}%
-            ;background:${pr.cat.cor}"></div></div>
+          <div class="mini-bar-track"><span class="mini-bar-fill"
+            style="width:${(pr.pct * 100).toFixed(0)}%;background:${pr.cat.cor}"></span></div>
         </div>`;
-      }).join("")}
+      }).join("") || `<div class="dim tiny">Nenhum boss nesse filtro.</div>`}
     </div>
     ${totalPags > 1 ? `<div class="row mt8" style="gap:6px;align-items:center">
       <button class="sm" data-boss-pag="${CYCLO.bossPag - 1}"
@@ -741,6 +744,14 @@ function renderCycloBosstiary(p, el) {
         ${CYCLO.bossPag >= totalPags - 1 ? "disabled" : ""}>Próxima ›</button>
     </div>` : ""}`;
 
+  const bossInp = $("#cyclo-boss-busca");
+  if (bossInp) bossInp.addEventListener("input", () => {
+    CYCLO.bossBusca = bossInp.value;
+    CYCLO.bossPag = 0;
+    renderCycloBosstiary(p, el);
+    const n = $("#cyclo-boss-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
   el.querySelectorAll("[data-boss-filtro]").forEach((b) =>
     b.addEventListener("click", () => {
       CYCLO.bossFiltro = b.dataset.bossFiltro;
@@ -784,38 +795,59 @@ function cycloBossDetail(p, el, slug) {
       <span class="v">${l.chance}%${l.max > 1 ? " ·até " + l.max : ""}</span>
     </div>`;
   }).join("");
-  const ganhos = (Math.min(pr.kills, pr.alvo) - Math.min(Math.max(0, pr.kills - 1), pr.alvo)) * pr.cat.pts;
+  const elemNome = m.element
+    ? ((typeof ELEMENTS !== "undefined" && ELEMENTS[m.element]) || {}).name || m.element
+    : null;
+  const elemCor = m.element
+    ? ((typeof ELEMENTS !== "undefined" && ELEMENTS[m.element]) || {}).color || "#c8c0a8"
+    : "#c8c0a8";
   el.innerHTML = `
-    <div class="row mb8" style="gap:6px;align-items:center">
-      <button class="sm" id="boss-voltar">← Voltar</button>
-      <b style="color:#d4af37">${m.name}</b>
-      <span style="flex:1"></span>
-      <span class="tiny dim">${pr.cat.nome} · ${pr.kills} / ${pr.alvo} abates</span>
+    <div class="boss-topbar">
+      <div class="boss-topbar-left">
+        <button class="cyc-filter-btn" id="boss-voltar">← Voltar</button>
+        <b class="boss-heading">${m.name}</b>
+        <span class="boss-tier-badge"
+          style="color:${pr.cat.cor};border-color:${pr.cat.cor}">${pr.cat.nome}</span>
+      </div>
+      <span class="boss-meta-kills"><b>${pr.kills}</b> / ${pr.alvo} abates</span>
     </div>
-    <div class="cyclo-cols">
+    <div class="boss-columns">
       <div>
-        <div class="app-img" style="width:64px;height:64px;margin-bottom:8px">
-          ${typeof bossMobImg === "function"
-            ? bossMobImg(slug, 64) : mobImg(slug, 64)}
+        <div class="boss-detail-card">
+          <div class="boss-sprite-box">
+            ${typeof bossMobImg === "function"
+              ? bossMobImg(slug, 72) : mobImg(slug, 72)}
+          </div>
+          ${linhaStat("Vida", fmtFull(m.hp || 0))}
+          ${linhaStat("Experiência", fmtFull(m.exp || 0))}
+          ${linhaStat("Dano base", m.damage || 0)}
+          ${linhaStat("Armadura", m.armor || 0)}
+          ${linhaStat("Velocidade", m.speed || "—")}
+          ${elemNome ? linhaStat("Elemento",
+              `<span style="color:${elemCor}">${elemNome}</span>`) : ""}
         </div>
-        ${linhaStat("Vida", fmtFull(m.hp || 0))}
-        ${linhaStat("Experiência", fmtFull(m.exp || 0))}
-        ${linhaStat("Dano base", m.damage || 0)}
-        ${linhaStat("Armadura", m.armor || 0)}
-        ${linhaStat("Velocidade", m.speed || "—")}
-        ${m.element ? linhaStat("Elemento", m.element) : ""}
-        <div class="small dim mt8 mb4">Progresso do Bosstiário</div>
-        <div class="best-bar big"><div style="width:${(pr.pct*100).toFixed(0)}%;background:${pr.cat.cor}"></div></div>
-        <div class="tiny dim mt4">
-          ${pr.completo ? "Bosstiário completo!" : `${pr.kills} / ${pr.alvo} para completar`}
-          · ${pr.cat.pts} pts/abate
+        <div class="boss-detail-card">
+          <div class="boss-detail-title">Progresso do Bosstiário</div>
+          <div class="mini-bar-track big"><span class="mini-bar-fill"
+            style="width:${(pr.pct * 100).toFixed(0)}%;background:${pr.cat.cor}"></span></div>
+          <div class="tiny dim mt4">
+            ${pr.completo ? "Bosstiário completo!"
+              : `${pr.kills} / ${pr.alvo} para completar`}
+            · ${pr.cat.pts} pts/abate
+          </div>
         </div>
       </div>
       <div>
-        <div class="small dim mb4">Resistências</div>
-        ${resistRows || `<div class="tiny dim">Nenhuma resistência.</div>`}
-        <div class="small dim mt8 mb4">Loot</div>
-        ${lootRows || `<div class="tiny dim">Sem loot.</div>`}
+        <div class="boss-detail-card">
+          <div class="boss-detail-title">Resistências</div>
+          ${resistRows || `<div class="tiny dim">Nenhuma resistência.</div>`}
+        </div>
+        <div class="boss-detail-card">
+          <div class="boss-detail-title">Loot</div>
+          <div class="boss-loot-list">
+            ${lootRows || `<div class="tiny dim">Sem loot.</div>`}
+          </div>
+        </div>
       </div>
     </div>`;
   $("#boss-voltar").addEventListener("click", () => {

@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 19:15";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Bosstiário reestruturado: busca por nome + filtros de categoria, cards com mini-barra na cor do tier e ficha do boss em 2 colunas — atributos, sprite em vitrine e progresso à esquerda, resistências e loot com rolagem à direita",
   "NOVO — Cyclopedia enxuta: a barra lateral ficou só com Bestiário, Bosstiário, Charms, Itens e Boss Slots (Market, Depot, Forje e cia. continuam no modal CIDADE) — header limpo com saldo e cards de criatura com barra de progresso em 3 estágios, dourada quando completo",
   "NOVO — Bestiário e Bosstiário limpos: a Cyclopedia mostra agora SOMENTE as criaturas e bosses que existem de verdade nas hunts e quests do jogo (~307 criaturas / ~80 bosses) — as 1.600+ fichas do catálogo Canary sem presença no mundo saíram da lista",
   "NOVO — Supplies viraram itens reais: o contador de CARGAS acabou — potions e runas compradas vão para a mochila, drops de hunt caem na Loot Pouch e o autoseller as vende pelo MESMO preço de compra do NPC (Ultimate Spirit 488, Supreme Health 625); cargas antigas do save migram sozinhas para itens no login",

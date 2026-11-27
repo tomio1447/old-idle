@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Bosstiário reestruturado (detalhe do boss em 2 colunas)
+
+- **Lista do bosstiário**: toolbar igual à do bestiário — métricas à esquerda (Nível, pontos, bônus de dano contra bosses, encontrados/completos), **busca por nome** + filtros de categoria (Todos/Bane/Archfoe/Nemesis, cada um na cor da categoria) à direita.
+- **Cards de boss**: nome truncado, categoria colorida, contador `kills / alvo` e mini-barra arredondada na cor da categoria (verde quando completo, com borda dourada).
+- **Detalhe do boss** (ex.: Plunder Patriarch): topbar alinhada com `← Voltar` + nome do boss + badge de categoria colorida + contador `21 / 30 abates` à direita.
+  - **Coluna esquerda**: sprite em vitrine com brilho radial, tabela de atributos (Vida, Experiência, Dano base, Armadura, Velocidade, Elemento traduzido e colorido) e o card de Progresso do Bosstiário (`21 / 30 para completar · 5 pts/abate`).
+  - **Coluna direita**: card de Resistências (7 elementos com ícone, cor e %) + card de Loot com rolagem própria (tooltip de item mantido).
+- Cores na mesma paleta quente do modal CIDADE (marrom/ouro), não a paleta azulada do mock.
+
+---
+
 ## 2026-11-27 — Cyclopedia enxuta: 5 abas, header limpo e cards com 3 barras
 
 - **Sidebar de 5 abas**: ficaram só `Bestiário`, `Bosstiário`, `Charms`, `Itens` e `Boss Slots`. Saíram `Hunts` (o modal próprio já cobre), `Casas` e `Arquivos Mágicos` (sem sistema no jogo) e toda a seção **CIDADE** (Market, Reward, Forje, Depot, Imbuements, Enpa, Gnomally, Tibianus — todos continuam acessíveis pelo modal CIDADE da topbar). A lista não rola mais.
