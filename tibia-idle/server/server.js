@@ -3243,6 +3243,18 @@ function worldBossMapBlockedCells(wz){
     return blocked;
   }catch(error){console.error("[world-boss] map collision",error&&error.message);return null;}
 }
+/* Boss rooms OTBM (cat "boss-room"): mesma colisão do worldBossMapBlockedCells,
+ * cacheada por mapa — roda a cada tick de instância e o arquivo é estático. */
+const _bossRoomBlkCache={};
+function bossRoomMapBlockedCells(hunt){
+  try{
+    const key=String(hunt.otbm)+"@"+String(hunt.otbmFloor==null?"?":hunt.otbmFloor);
+    if(_bossRoomBlkCache[key])return _bossRoomBlkCache[key];
+    const blocked=worldBossMapBlockedCells(hunt);
+    if(blocked)_bossRoomBlkCache[key]=blocked;
+    return blocked;
+  }catch(_e){return null;}
+}
 async function createWorldBossSharedInstance(db,event){
   if(!event||!event.joins||!event.joins.size)return {ok:false,error:"NO_JOINS"};
   const wz=WARZONES.find((w)=>w.id===event.warzoneId)||WARZONES[0];
@@ -3726,6 +3738,15 @@ async function tickInstance(db,body){
       if(auth&&quest&&Array.isArray(quest.walkFloors)){
         const fresh=questMapBlockedCells(quest);
         if(fresh){auth.blockedCells=fresh;if(state.state)state.state.blockedCells=fresh;}
+      }
+      /* Salas de boss salvas antes do fix da cerca de FOV carregam a janela
+       * de câmera como blockedCells — pathfinding/spawns ficam presos nela
+       * para sempre. Recalcula do OTBM (só paredes/footprint, sem FOV). */
+      const bossRoomHunt=state.state&&state.state.hunt;
+      if(auth&&auth.huntCat==="boss-room"&&bossRoomHunt&&bossRoomHunt.otbm){
+        const fresh=bossRoomMapBlockedCells(bossRoomHunt);
+        if(fresh){auth.blockedCells=Object.assign({},fresh);
+          if(state.state)state.state.blockedCells=auth.blockedCells;}
       }
     }catch(_e){}
     return advanceAuthorityState(state,elapsed,checkpointAt,visual,

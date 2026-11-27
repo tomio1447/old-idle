@@ -2900,3 +2900,17 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   monstro, wardens mortos e charm points ganhos. Funciona nos modos
   local e online (eventos echo-* do engine autoritativo também chegam
   com slug+armedAt). Reset de sessão zera o contador.
+
+- **FIX — Bonelord's Phylactery não nascia após limpar as Soulcages**: o hit
+  final que derrubava a última cage saía do dano antes do sync do pool
+  compartilhado — a cage morria segurando o resto do HP (212 no caso real) e
+  `cagePool>0` + zero cages vivas travava a luta para sempre. Agora o delta
+  de dano de cages mortas no step também drena o pool, e se não restar cage
+  viva o pool zera e a fase do boss libera (Phylactery + 4 Enthralled
+  Dragons). Corrigido no servidor (`tickBoneOverlord`) e no cliente
+  (`boneOverlordBossTick`, modo solo). Instâncias travadas existentes se
+  curam sozinhas no próximo tick.
+- **FIX — blockedCells de salas de boss recalculados no servidor**: instâncias
+  `boss-room` agora rehidratam a colisão direto do OTBM (paredes/footprint,
+  espelho do `huntMapBlocked` com `noFovBound`) a cada tick — pathfinding e
+  respawns não ficam presos em cercas velhas de snapshots antigos.

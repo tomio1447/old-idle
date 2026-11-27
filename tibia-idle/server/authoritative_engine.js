@@ -8019,12 +8019,22 @@ function tickBoneOverlord(auth,now){
    * morte de uma cage ressuscitaria o pool das outras). */
   const cages=mobs.filter((m)=>m.boCage);
   const live=cages.filter((m)=>m.hp>0);
+  /* O delta de uma cage morta no step também drena o pool: o hit final
+   * saía do dano antes do sync e o resto do pool morria com a cage —
+   * live ficava vazio com cagePool>0 e o pendingBoss nunca nascia. */
+  for(const m of cages){
+    const prev=Number(m._boSyncHp);
+    if(Number.isFinite(prev)&&prev>m.hp)
+      st.cagePool=Math.max(0,st.cagePool-(prev-m.hp));
+    if(!(m.hp>0))m._boSyncHp=m.hp;
+  }
+  /* Sem cage viva não há mais o que drenar (o hit final removeu todas
+   * antes do sync): zera o pool e libera a fase do boss em vez de travar. */
+  if(st.pendingBoss&&!live.length){
+    st.cagePool=0;
+    for(const s of mobs)if(s.boSpirit)s.hp=0;
+  }
   if(live.length){
-    for(const m of live){
-      const prev=Number(m._boSyncHp);
-      if(Number.isFinite(prev)&&prev>m.hp)
-        st.cagePool=Math.max(0,st.cagePool-(prev-m.hp));
-    }
     for(const m of live){m.hp=st.cagePool;m.maxHp=BO_CAGE_POOL;
       m._boSyncHp=st.cagePool;}
     if(st.cagePool<=0){
