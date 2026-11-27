@@ -857,6 +857,7 @@ function accountBossSlotOp(token,charId,opts){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
       if(typeof accountMaybeApplyShared==="function")accountMaybeApplyShared(r.data);
       return {ok:true,bossSlots:r.data.bossSlots,bossSlotRemoves:r.data.bossSlotRemoves,
+        bossSlot3:r.data.bossSlot3,cosmetics:r.data.cosmetics,
         gold:r.data.gold,character:r.data.character,saveVersion:r.data.saveVersion};
     }
     if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);

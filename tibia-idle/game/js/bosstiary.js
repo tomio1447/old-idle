@@ -180,6 +180,9 @@ const BOSS_SLOT_LEVELS = {
   nemesis: [1, 3, 5],
 };
 const BOSS_SLOT2_POINTS = 1500;
+/* Slot 3: desbloqueio ÚNICO por conta — 150 Tibia Coins (oficial). Gravado
+ * em cosmetics.bossSlot3 da conta e espelhado em p.bossSlot3 do save. */
+const BOSS_SLOT3_COINS = 150;
 /* Boss do dia (slot boosted): kill conta 3× no bosstiário — nos moldes do
  * kill bonus oficial (multiplier + boost). O loot extra já vem do
  * dailyBossLootMul do servidor (15–35% sorteado por dia). */
@@ -187,9 +190,18 @@ const BOSS_SLOT_DAILY_KILLS = 3;
 
 function ensureBossSlots(p) {
   if (!p.bossSlots || typeof p.bossSlots !== "object" || Array.isArray(p.bossSlots))
-    p.bossSlots = { 1: null, 2: null };
+    p.bossSlots = { 1: null, 2: null, 3: null };
   p.bossSlotRemoves = Math.max(0, Number(p.bossSlotRemoves) || 0);
+  p.bossSlot3 = p.bossSlot3 ? 1 : 0;
   return p;
+}
+
+/* Slot 3 desbloqueado? Flag da conta (cosmetics.bossSlot3) ou mirror no
+ * save do personagem (p.bossSlot3) — cobre modo local e saves antigos. */
+function bossSlot3Owned(p) {
+  if (p && p.bossSlot3) return true;
+  const cos = (typeof accountCosmetics === "function") ? accountCosmetics() : null;
+  return !!(cos && cos.bossSlot3);
 }
 
 /* Nível 0–3 de um boss (marcos de kills por categoria). */
@@ -222,7 +234,7 @@ function bossLootBonusPct(points) {
 function bossSlotBonusPct(p, slug) {
   ensureBossSlots(p);
   const sl = p.bossSlots || {};
-  if (sl[1] !== slug && sl[2] !== slug) return 0;
+  if (sl[1] !== slug && sl[2] !== slug && sl[3] !== slug) return 0;
   return bossLootBonusPct(p.bossPoints) +
     (bossSlotLevel(p, slug) >= 3 ? 25 : 0);
 }
@@ -244,7 +256,7 @@ function bossSlotList(p) {
 function bossSlotAssignError(p, slot, slug) {
   ensureBossSlots(p);
   slot = Number(slot);
-  if (slot !== 1 && slot !== 2) return "slot inválido";
+  if (slot !== 1 && slot !== 2 && slot !== 3) return "slot inválido";
   const m = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
     ? GAMEDATA.monsters[slug] : null;
   if (!m || !m.boss) return "não é um boss";
@@ -252,8 +264,10 @@ function bossSlotAssignError(p, slot, slug) {
     return "boss bloqueado — complete o nível 1 do bosstiário dele";
   if (slot === 2 && (p.bossPoints || 0) < BOSS_SLOT2_POINTS)
     return `o slot 2 exige ${typeof fmtFull === "function" ? fmtFull(BOSS_SLOT2_POINTS) : BOSS_SLOT2_POINTS} boss points`;
-  const other = slot === 1 ? 2 : 1;
-  if (p.bossSlots[other] === slug) return "este boss já ocupa o outro slot";
+  if (slot === 3 && !bossSlot3Owned(p))
+    return `o slot 3 exige o desbloqueio de ${BOSS_SLOT3_COINS} Tibia Coins`;
+  if ([1, 2, 3].some((s) => s !== slot && p.bossSlots[s] === slug))
+    return "este boss já ocupa outro slot";
   return null;
 }
 
@@ -268,7 +282,7 @@ function bossSlotAssign(p, slot, slug) {
 function bossSlotRemove(p, slot) {
   ensureBossSlots(p);
   slot = Number(slot);
-  if (slot !== 1 && slot !== 2) return { ok: false, erro: "slot inválido" };
+  if (slot !== 1 && slot !== 2 && slot !== 3) return { ok: false, erro: "slot inválido" };
   if (!p.bossSlots[slot]) return { ok: false, erro: "slot vazio" };
   const preco = bossSlotRemovePrice(p.bossSlotRemoves);
   if (preco > 0) {

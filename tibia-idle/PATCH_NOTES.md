@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — 3º Boss Slot por 150 Tibia Coins (regra oficial)
+
+- **O bug**: o terceiro card da aba Boss Slots era um card fixo do "Boss do Dia" — clicar nele não fazia nada e nenhum boss podia ser associado ao slot 3.
+- **Slot 3 real**: agora é um slot assignável igual aos outros. Bloqueado, mostra 🔒 + "Desbloqueia por 150 Tibia Coins" com botão de compra (ícone oficial de Tibia Coin); desbloqueado, associa/remove bosses normalmente.
+- **Compra por conta**: 150 TC debitados NT-first (não-transferíveis primeiro), mesma transação atômica do 3º slot de prey e do Charm Expansion — vale para **todos os personagens da conta** (mais generoso que o oficial, que é por personagem).
+- **Modelo completo**: `bossSlots` passa a ter 3 posições — assign/remove/bônus de loot/verificação "boss já ocupa outro slot" cobrem o slot 3 nos dois lados (cliente e engine autoritativa). O "Boss do Dia" continua como card separado ao lado, sempre boosted.
+- O slot 2 segue com a regra oficial: 1.500 boss points.
+
+---
+
 ## 2026-11-27 — Boss sempre nasce + cooldown nunca queima sem luta
 
 - **O bug**: "Boss nasce em 0s" travado, sala só com adds, instância quebrada → templo **e cooldown queimado**. A causa: se o checkpoint da instância chegasse sem o mob do boss e sem `arenaBossSpawn.pending`, a autoridade nunca agendava o spawn — e dano de adds já carimbava o cooldown. Pior: um fallback antigo marcava `mobs[0]` como boss — um wormling podia virar "o boss" e o kill dele encerrava a arena como vitória.

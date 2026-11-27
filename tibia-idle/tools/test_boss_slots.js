@@ -56,6 +56,7 @@ const uiSrc = fs.readFileSync(path.join(root, "game", "js", "cyclopedia-ui.js"),
 const cycSrc = fs.readFileSync(path.join(root, "game", "js", "cyclopedia.js"), "utf8");
 const engSrc = fs.readFileSync(path.join(root, "server", "authoritative_engine.js"), "utf8");
 const srvSrc = fs.readFileSync(path.join(root, "server", "server.js"), "utf8");
+const dbJsSrc = fs.readFileSync(path.join(root, "server", "db.js"), "utf8");
 const cliSrc = fs.readFileSync(path.join(root, "game", "js", "account-client.js"), "utf8");
 const cssSrc = fs.readFileSync(path.join(root, "game", "css", "layout.css"), "utf8");
 const dbSrc  = fs.readFileSync(path.join(root, "game", "js", "daily-boost.js"), "utf8");
@@ -81,12 +82,13 @@ const cycLite = grab(cycSrc, "activeMonsterSlugs");
 const monSrc = fs.readFileSync(path.join(root, "game", "js", "monsters.js"), "utf8");
 vm.runInContext(cycLite + "\n" + grab(monSrc, "monsterPlayable"), sandbox);
 vm.runInContext([
-  "BOSS_CATS", "BOSS_SLOT_LEVELS", "BOSS_SLOT2_POINTS", "BOSS_SLOT_DAILY_KILLS",
+  "BOSS_CATS", "BOSS_SLOT_LEVELS", "BOSS_SLOT2_POINTS", "BOSS_SLOT3_COINS",
+  "BOSS_SLOT_DAILY_KILLS",
 ].map((n) => grabConst(bosSrc, n)).join("\n"), sandbox);
 vm.runInContext([
   "ensureBosstiary", "bossCategory", "bosstiaryList", "bosstiaryProgress",
-  "ensureBossSlots", "bossSlotLevel", "bossSlotUnlocked", "bossLootBonusPct",
-  "bossSlotBonusPct", "bossSlotRemovePrice", "bossSlotList",
+  "ensureBossSlots", "bossSlot3Owned", "bossSlotLevel", "bossSlotUnlocked",
+  "bossLootBonusPct", "bossSlotBonusPct", "bossSlotRemovePrice", "bossSlotList",
   "bossSlotAssignError", "bossSlotAssign", "bossSlotRemove",
 ].map((n) => grab(bosSrc, n)).join("\n"), sandbox);
 const r = (code) => vm.runInContext(code, sandbox);
@@ -148,9 +150,11 @@ check(r(`bossSlotList({bosstiary:{"inativo":5}})`).length === 0,
 
 /* ---------- assign/remove compartilhado ---------- */
 console.log("\n[5] assign/remove (shared)");
-const pOk = `{bosstiary:{"mini-boss":10,"mid-boss":10},bossPoints:2000,bossSlots:{1:null,2:null},bossSlotRemoves:0,gold:0}`;
-check(r(`bossSlotAssignError(${pOk},3,'mini-boss')`) === "slot inválido",
-  "slot 3 inválido (é o do boss do dia)");
+const pOk = `{bosstiary:{"mini-boss":10,"mid-boss":10},bossPoints:2000,bossSlots:{1:null,2:null,3:null},bossSlotRemoves:0,gold:0}`;
+check(r(`bossSlotAssignError(${pOk},4,'mini-boss')`) === "slot inválido",
+  "slot 4 inválido");
+check(r(`bossSlotAssignError(${pOk},3,'mini-boss')`).indexOf("Tibia Coins") !== -1,
+  "slot 3 sem desbloqueio → exige Tibia Coins", r(`bossSlotAssignError(${pOk},3,'mini-boss')`));
 check(r(`bossSlotAssignError(${pOk},1,'sem-boss')`) === "não é um boss", "não-boss rejeitado");
 check(r(`bossSlotAssignError({bosstiary:{"mini-boss":5},bossSlots:{1:null,2:null}},1,'mini-boss')`)
       .indexOf("bloqueado") !== -1, "nível 0 rejeitado");
@@ -171,6 +175,32 @@ check(rRem.ok && rRem.preco === 100000 && rRem.gold === 50000 && rRem.rem === 3 
   "3ª remoção cobra 100k e limpa o slot", rRem);
 check(r(`bossSlotRemove({bosstiary:{"mini-boss":10},bossSlots:{1:"mini-boss",2:null},bossSlotRemoves:2,gold:5000},1).ok`) === false,
   "gold insuficiente → recusa sem limpar");
+
+/* ---------- slot 3 (150 Tibia Coins por conta — oficial) ---------- */
+console.log("\n[5b] slot 3 (desbloqueio por Tibia Coins)");
+check(r(`BOSS_SLOT3_COINS`) === 150, "BOSS_SLOT3_COINS = 150 (oficial)");
+check(r(`bossSlot3Owned({bossSlot3:1})`) === true &&
+      r(`bossSlot3Owned({})`) === false &&
+      r(`bossSlot3Owned({bossSlot3:0})`) === false,
+  "bossSlot3Owned: mirror do save ou cosmetics da conta");
+const p3 = `{bosstiary:{"mini-boss":10,"mid-boss":10,"mega-boss":1},bossPoints:0,bossSlots:{1:null,2:null,3:null},bossSlotRemoves:0,bossSlot3:1,gold:0}`;
+check(r(`bossSlotAssignError(${p3},3,'mini-boss')`) === null,
+  "slot 3 desbloqueado → assign válido mesmo sem os 1500 pts");
+const p3a = r(`(function(){var p=${p3};var x=bossSlotAssign(p,3,'mid-boss');return {ok:x.ok,slot3:p.bossSlots[3]};})()`);
+check(p3a.ok === true && p3a.slot3 === "mid-boss", "assign real no slot 3", p3a);
+check(r(`bossSlotAssignError({bosstiary:{"mini-boss":10},bossSlots:{1:"mini-boss",2:null,3:null},bossSlot3:1},3,'mini-boss')`)
+      .indexOf("outro slot") !== -1,
+  "mesmo boss no slot 1 trava o slot 3");
+check(r(`bossSlotAssignError({bosstiary:{"mini-boss":10,"mid-boss":10},bossPoints:2000,bossSlots:{1:"mini-boss",2:null,3:"mid-boss"},bossSlot3:1},2,'mid-boss')`)
+      .indexOf("outro slot") !== -1,
+  "mesmo boss no slot 3 trava o slot 2");
+check(r(`bossSlotRemove({bosstiary:{"mid-boss":10},bossSlots:{1:null,2:null,3:"mid-boss"},bossSlotRemoves:0,gold:0},3).ok`) === true,
+  "remove no slot 3 funciona");
+check(r(`bossSlotBonusPct({bosstiary:{"mega-boss":5},bossPoints:100,bossSlots:{1:null,2:null,3:"mega-boss"}},'mega-boss')`) === 60,
+  "bônus inclui o slot 3 (35 dos pontos a 100 + 25 do nível 3)",
+  r(`bossSlotBonusPct({bosstiary:{"mega-boss":5},bossPoints:100,bossSlots:{1:null,2:null,3:"mega-boss"}},'mega-boss')`));
+check(r(`bossSlotAssignError({bosstiary:{"mega-boss":1},bossSlots:{1:null,2:null,3:null},bossSlot3:1},3,'mega-boss')`) === null,
+  "boss nemesis nível 1 também pode ir pro slot 3");
 
 /* ---------- engine autoritativa ---------- */
 console.log("\n[6] engine (auth)");
@@ -197,8 +227,21 @@ check(rm.ok && rm.preco === 100000 && ep3.gold === 50000 && ep3.bossSlotRemoves 
 check(E.bossSlotBonusPct({ bosstiary: { "azerus": 30 }, bossPoints: 1000,
       bossSlots: { 1: "azerus", 2: null } }, "azerus") === 112,
   "bônus: 87 dos pontos (a 1000) + 25 do nível 3");
-
-/* ---------- integração ---------- */
+check(E.BOSS_SLOT3_COINS === 150, "engine exporta BOSS_SLOT3_COINS = 150");
+check(E.authBossSlotAssign(ep, 3, "urmahlullu-the-immaculate").ok === false,
+  "slot 3 sem bossSlot3 → rejeitado no engine");
+const ep4 = { bosstiary: { "urmahlullu-the-immaculate": 5 }, bossPoints: 0,
+              bossSlots: { 1: null, 2: null, 3: null }, bossSlotRemoves: 0, bossSlot3: 1, gold: 0 };
+check(E.authBossSlotAssign(ep4, 3, "urmahlullu-the-immaculate").ok === true &&
+      ep4.bossSlots[3] === "urmahlullu-the-immaculate",
+  "slot 3 assign ok no engine com bossSlot3=1");
+check(E.authBossSlotAssign(ep4, 2, "urmahlullu-the-immaculate").ok === false,
+  "boss no slot 3 trava o slot 2 (engine)");
+const rm3 = E.authBossSlotRemove(ep4, 3);
+check(rm3.ok === true && ep4.bossSlots[3] === null, "remove do slot 3 no engine");
+check(E.bossSlotBonusPct({ bosstiary: { "azerus": 30 }, bossPoints: 1000,
+      bossSlots: { 1: null, 2: null, 3: "azerus" } }, "azerus") === 112,
+  "bônus do engine inclui o slot 3");
 console.log("\n[7] integração loot/rota/UI");
 check(/bosstiaryKill\(item\.p,mob\.slug,isDailyBoss\(mob\.slug\)\?BOSS_SLOT_DAILY_KILLS:1\)/.test(engSrc),
   "boss do dia conta 3× no bosstiário (kill bonus boosted)");
@@ -216,8 +259,18 @@ check(cliSrc.includes('"/api/character/boss-slot"') &&
   "cliente chama a rota única pela fila de save (molde promote)");
 check(uiSrc.includes("bossSlot: renderCycloBossSlots") &&
       uiSrc.includes("data-slot-pick") && uiSrc.includes("data-slot-remove") &&
+      uiSrc.includes("data-slot3-buy") && uiSrc.includes("bossSlot3Owned") &&
       uiSrc.includes("dailyBoostCurrent"),
-  "aba Boss Slots renderiza 3 slots + picker + boosted do dia");
+  "aba Boss Slots: 3 slots assignáveis + buy do slot 3 + boosted do dia");
+check(srvSrc.includes('"unlock3"') && srvSrc.includes("db.buyBossSlot3") &&
+      srvSrc.includes("BOSS_SLOT3_COINS"),
+  "rota /api/character/boss-slot: op unlock3 compra pelo db (150 TC)");
+check(dbJsSrc.includes("buyBossSlot3") &&
+      dbJsSrc.includes("bossSlot3: 1") &&
+      dbJsSrc.includes("'$.bossSlot3', 1"),
+  "db.buyBossSlot3: débito NT-first + cosmetics.bossSlot3 (Json e MySQL)");
+check(cliSrc.includes("bossSlot3") && cliSrc.includes("cosmetics"),
+  "cliente repassa cosmetics/bossSlot3 na resposta da rota");
 check(dbSrc.includes("dailyBoostCurrent"), "daily-boost expõe o boss do dia");
 check(cycSrc.includes('{ id: "bossSlot", nome: "Boss Slots", icone: "bosstiary", pronta: true }'),
   "aba marcada pronta com o ícone do bosstiary");

@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "27/11/2026 às 21:00";
+const ALPHA_UPDATE_AT = "27/11/2026 às 16:55";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — 3º Boss Slot por 150 Tibia Coins (regra oficial): a Cyclopedia Boss Slots agora tem 3 slots assignáveis — o 3º desbloqueia num clique com 150 TC por conta (vale para todos os personagens) e o card do Boss do Dia segue mostrando o boosted do dia ao lado",
   "FIX — O boss SEMPRE nasce: o contador zerando não trava mais a sala — se a instância perder o spawn (checkpoint corrompido, bug de mecânica), a autoridade refabrica e respawna o boss sozinha. E o cooldown agora só conta DEPOIS que o boss nasceu: instância quebrada e dano de adds nunca mais queimam a tentativa",
   "FIX — Mini bosses da Falcon Bastion na taxa real: o sorteio dava 4% de chance por slot (1% a cada um dos 4) e chovia Grand Commander Soeren / Preceptor Lazare / Grand Chaplain Gaunder / Grand Canon Dominus — agora 0,01% combinado por spawn, raridade de verdade",
   "NOVO — Warzones 4, 5 e 6 com salas próprias: The Baron from Below, The Count of the Core e The Duke of the Depths agora lutam nas arenas reais (mapas da warzone com colisão de verdade) em vez da sala genérica — boss nasce ao norte, time entra pelo corredor sul",

@@ -976,6 +976,25 @@ JsonStore.prototype.buyCharmExpansion = function (accountId, coinCost) {
   this._save();
   return true;
 };
+/* 3º boss slot por conta (oficial: 150 TC): débito de Tibia Coins +
+ * grant atômicos — mesma estrutura do buyPreySlot/buyCharmExpansion. */
+JsonStore.prototype.buyBossSlot3 = function (accountId, coinCost) {
+  const a = this.findAccountById(accountId);
+  const cost = Math.max(0, Math.floor(Number(coinCost) || 0));
+  if (!a) return false;
+  let cos = a.cosmetics;
+  if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch (e) { cos = null; } }
+  cos = cos && typeof cos === "object" ? cos : {};
+  const haveNt = Math.max(0, Number(a.coins_nt) || 0);
+  const have = Math.max(0, Number(a.coins) || 0);
+  if (cos.bossSlot3 || haveNt + have < cost) return false;
+  const ntSpent = Math.min(haveNt, cost);
+  a.coins_nt = haveNt - ntSpent;
+  a.coins = have - (cost - ntSpent);
+  a.cosmetics = Object.assign({}, cos, { bossSlot3: 1 });
+  this._save();
+  return true;
+};
 JsonStore.prototype.bumpAccountBless = function (accountId, delta) {
   const a = this.findAccountById(accountId);
   if (!a) return 0;
@@ -3494,6 +3513,22 @@ async function MysqlStore() {
            cosmetics = JSON_SET(${json}, '$.charmExpansion', 1)
          WHERE id = ? AND coins + coins_nt >= ?
            AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.charmExpansion')), '0') IN ('0','false','null')`,
+        [cost, cost, cost, Number(id), cost]);
+      return !!(r && r.affectedRows > 0);
+    },
+    /* 3º boss slot por conta (oficial: 150 TC): um único UPDATE atômico —
+     * debita coins (NT primeiro) e marca bossSlot3 só se ainda não tiver
+     * e houver saldo. Mesma estrutura do buyPreySlot/buyCharmExpansion. */
+    async buyBossSlot3(id, coinCost) {
+      const cost = Math.max(0, Math.floor(Number(coinCost) || 0));
+      const json = "CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END";
+      const r = await this.run(
+        `UPDATE accounts SET
+           coins = coins - (? - LEAST(coins_nt, ?)),
+           coins_nt = coins_nt - LEAST(coins_nt, ?),
+           cosmetics = JSON_SET(${json}, '$.bossSlot3', 1)
+         WHERE id = ? AND coins + coins_nt >= ?
+           AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.bossSlot3')), '0') IN ('0','false','null')`,
         [cost, cost, cost, Number(id), cost]);
       return !!(r && r.affectedRows > 0);
     },

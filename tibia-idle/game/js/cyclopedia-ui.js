@@ -788,14 +788,14 @@ function renderCycloBossSlots(p, el) {
   const bonusBase = bossLootBonusPct(pts);
   const removes = p.bossSlotRemoves || 0;
   const slot2Ok = pts >= BOSS_SLOT2_POINTS;
+  const slot3Ok = (typeof bossSlot3Owned === "function") ? bossSlot3Owned(p) : !!p.bossSlot3;
   const unlocked = bossSlotList(p);
   const daily = (typeof dailyBoostCurrent === "function") ? dailyBoostCurrent() : null;
   const dailyBoss = daily && daily.boss && daily.boss.slug ? daily.boss : null;
   const pick = Number(CYCLO.slotPick) || 0;
   const busca = (CYCLO.slotBusca || "").toLowerCase();
   const pickList = pick ? unlocked.filter((s) => {
-    const other = pick === 1 ? 2 : 1;
-    if (p.bossSlots[other] === s) return false;
+    if ([1, 2, 3].some((k) => k !== pick && p.bossSlots[k] === s)) return false;
     if (!busca) return true;
     const m = GAMEDATA.monsters[s];
     return m && (m.name || "").toLowerCase().indexOf(busca) !== -1;
@@ -804,6 +804,18 @@ function renderCycloBossSlots(p, el) {
   const slotCard = (slot) => {
     const slug = p.bossSlots[slot];
     const m = slug && GAMEDATA.monsters[slug];
+    if (slot === 3 && !slot3Ok) return `
+      <div class="bslot-card is-locked">
+        <div class="bslot-title tiny dim">SLOT 3</div>
+        <div class="bslot-lock">🔒</div>
+        <div class="tiny dim" style="text-align:center">Desbloqueia por<br>
+          <b class="gold-txt">${typeof BOSS_SLOT3_COINS !== "undefined" ? BOSS_SLOT3_COINS : 150} Tibia Coins</b><br>
+          <span class="dim" style="font-size:10px">vale para todos os personagens da conta</span></div>
+        <button class="sm" data-slot3-buy
+          style="margin-top:6px;display:flex;align-items:center;gap:4px;justify-content:center">
+          Desbloquear <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif"
+            alt="" style="width:14px;height:14px"></button>
+      </div>`;
     if (slot === 2 && !slot2Ok) return `
       <div class="bslot-card is-locked">
         <div class="bslot-title tiny dim">SLOT 2</div>
@@ -846,17 +858,17 @@ function renderCycloBossSlots(p, el) {
 
   const dailyCard = dailyBoss ? `
     <div class="bslot-card is-boosted">
-      <div class="bslot-title tiny dim">SLOT 3 · BOSS DO DIA</div>
+      <div class="bslot-title tiny dim">BOSS DO DIA</div>
       <div class="app-img">${bossMobImg(dailyBoss.slug, 56)}</div>
       <div class="tiny mob-name">${dailyBoss.name || dailyBoss.slug}</div>
       <div class="tiny" style="color:#d4af37">Boosted</div>
       <div class="tiny" style="color:#9ce84a">+${Math.floor(Number(daily.lootBonus) || 0)}% loot
         · kills ×${BOSS_SLOT_DAILY_KILLS}</div>
       <div class="tiny dim" style="margin-top:6px;text-align:center">
-        Slot fixo — muda todo dia às 00h</div>
+        Fixo — muda todo dia às 00h</div>
     </div>` : `
     <div class="bslot-card is-locked">
-      <div class="bslot-title tiny dim">SLOT 3 · BOSS DO DIA</div>
+      <div class="bslot-title tiny dim">BOSS DO DIA</div>
       <div class="bslot-lock">🔒</div>
       <div class="tiny dim" style="text-align:center">Carregando o boss do dia…</div>
     </div>`;
@@ -876,6 +888,7 @@ function renderCycloBossSlots(p, el) {
     <div class="bslot-grid">
       ${slotCard(1)}
       ${slotCard(2)}
+      ${slotCard(3)}
       ${dailyCard}
     </div>
     ${pick ? `
@@ -919,13 +932,23 @@ function renderCycloBossSlots(p, el) {
         if (res.bossSlots) p.bossSlots = Object.assign({}, res.bossSlots);
         if (res.bossSlotRemoves !== undefined)
           p.bossSlotRemoves = Number(res.bossSlotRemoves) || 0;
+        if (res.bossSlot3) p.bossSlot3 = 1;
+        if (res.cosmetics) {
+          const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+          if (acc && typeof acc === "object") acc.cosmetics = res.cosmetics;
+        }
         if (typeof res.gold === "number") p.gold = res.gold;
         save();
         if (typeof renderAll === "function") renderAll();
-        toast(op === "assign" ? `Boss associado ao Slot ${slot}!` : "Boss removido do slot.");
+        toast(op === "assign" ? `Boss associado ao Slot ${slot}!`
+          : op === "unlock3" ? "Slot 3 desbloqueado!" : "Boss removido do slot.");
         finish();
       }).catch(() => toast("Falha de rede."));
       return;
+    }
+    /* unlock3 é compra por CONTA (Tibia Coins) — não existe caminho local. */
+    if (op === "unlock3") {
+      toast("O slot 3 só desbloqueia numa conta online (Tibia Coins)."); return;
     }
     /* Sem conta/servidor: aplica direto no p e persiste local (gold local é
      * a única referência — não há wallet de conta). */
@@ -948,6 +971,11 @@ function renderCycloBossSlots(p, el) {
     b.addEventListener("click", (ev) => {
       ev.stopPropagation();
       doOp(Number(b.dataset.slotRemove), "", "remove");
+    }));
+  el.querySelectorAll("[data-slot3-buy]").forEach((b) =>
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      doOp(3, "", "unlock3");
     }));
   el.querySelectorAll("[data-slot-boss]").forEach((c) =>
     c.addEventListener("click", () => doOp(pick, c.dataset.slotBoss, "assign")));

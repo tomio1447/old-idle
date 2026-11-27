@@ -3124,7 +3124,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 
 /* Boss Slots (Cyclopedia): grade dos 3 slots + picker — paleta quente. */
 .bslot-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;
   margin-bottom: 10px;
 }
 .bslot-card {

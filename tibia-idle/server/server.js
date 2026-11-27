@@ -54,7 +54,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   equipFromContainerAuth, unequipFromContainerAuth, depotActionAuth,
   assignCharm: authAssignCharm, clearCharm: authClearCharm,
   buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm,
-  authBossSlotAssign, authBossSlotRemove } = require("./authoritative_engine");
+  authBossSlotAssign, authBossSlotRemove, BOSS_SLOT3_COINS } = require("./authoritative_engine");
 const { forgeCanFuse, forgeFuseAuth, forgeConvergeFuseAuth, forgeTransferAuth } = require("./forge");
 /* Catalisadores de Weapon Proficiency — tabela + lógica compartilhada com
  * o cliente. O require interno de proficiency.js resolve os globals que o
@@ -2382,7 +2382,8 @@ async function persistBossSlotPlayer(db,acc,character,p,lease,op,slot){
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"boss-slot"});
   await publishPartyForCharacters(db,[updated.id],"boss-slot");
   return {code:200,body:{ok:true,op,slot,saveVersion:Number(updated.save_version),
-    bossSlots:p.bossSlots||{1:null,2:null},bossSlotRemoves:Number(p.bossSlotRemoves)||0,
+    bossSlots:p.bossSlots||{1:null,2:null,3:null},bossSlotRemoves:Number(p.bossSlotRemoves)||0,
+    bossSlot3:p.bossSlot3?1:0,
     gold:Math.max(0,Math.floor(Number(p.gold)||0)),
     character:accountCharacterSummary(updated,acc.gold),
     ...(sharedInventory?{sharedInventory}:{})}};
@@ -2393,14 +2394,42 @@ async function bossSlotCharacterApi(db,body){
   const denied=await requireLease(db,acc,body);if(denied)return denied;
   const charId=Number(body.char_id!==undefined?body.char_id:body.id);
   const op=String(body.op||""),slot=Number(body.slot),slug=String(body.slug||"");
-  if(!Number.isSafeInteger(charId)||charId<=0||(op!=="assign"&&op!=="remove"))
+  if(!Number.isSafeInteger(charId)||charId<=0||(op!=="assign"&&op!=="remove"&&op!=="unlock3"))
     return {code:400,body:{ok:false,error:"INVALID_BOSS_SLOT_OP",msg:"Operação de boss slot inválida"}};
   const character=await db.findCharacter(charId);
   if(!character||Number(character.account_id)!==Number(acc.id))
     return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
-  const applyTo=(target)=>op==="assign"
-    ?authBossSlotAssign(target,slot,slug):authBossSlotRemove(target,slot);
+  /* unlock3: compra do 3º boss slot por CONTA (150 TC, oficiais) — débito
+   * NT-first atômico no db; o mirror p.bossSlot3 entra no save do char
+   * pela mesma cadeia de patch/save. */
+  let cos=acc.cosmetics;
+  if(typeof cos==="string"){try{cos=JSON.parse(cos);}catch(e){cos=null;}}
+  cos=cos&&typeof cos==="object"?cos:{};
+  if(op==="unlock3"&&!cos.bossSlot3){
+    if(typeof db.buyBossSlot3!=="function"||!(await db.buyBossSlot3(acc.id,BOSS_SLOT3_COINS)))
+      return {code:400,body:{ok:false,error:"BOSS_SLOT3_COINS",
+        msg:"Tibia Coins insuficientes ("+BOSS_SLOT3_COINS+")"}};
+    cos.bossSlot3=1;
+  }
+  const slot3Owned=!!cos.bossSlot3;
+  const applyTo=(target)=>{
+    if(op==="unlock3"){target.bossSlot3=1;return{ok:true,op:"unlock3"};}
+    /* O slot 3 gateia por conta: o flag p.bossSlot3 do save pode estar
+     * velho (unlock em outra sessão) — injeta o mirror antes do gate. */
+    if(op==="assign"&&slot===3&&slot3Owned)target.bossSlot3=1;
+    return op==="assign"?authBossSlotAssign(target,slot,slug):authBossSlotRemove(target,slot);
+  };
+  const withCosmetics=async(res)=>{
+    if(op==="unlock3"&&res&&res.code===200){
+      const fresh=typeof db.findAccountById==="function"?await db.findAccountById(acc.id):null;
+      let fc=fresh?fresh.cosmetics:cos;
+      if(typeof fc==="string"){try{fc=JSON.parse(fc);}catch(e){fc=null;}}
+      res.body.cosmetics=fc&&typeof fc==="object"?fc:{bossSlot3:1};
+      res.body.bossSlot3=1;
+    }
+    return res;
+  };
   const resolved=await resolveInstanceRow(db,acc,charId);
   if(resolved.error)return resolved.error;
   const row=resolved.row;
@@ -2426,7 +2455,7 @@ async function bossSlotCharacterApi(db,body){
         await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
           status:result.instance.status,source:"boss-slot",holderId:String(body.holder_id||"")});
         const fresh=await db.findCharacter(charId);
-        return persistBossSlotPlayer(db,acc,fresh||character,appliedPlayer,lease,op,slot);
+        return withCosmetics(persistBossSlotPlayer(db,acc,fresh||character,appliedPlayer,lease,op,slot));
       }
       if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a operação"}};
       if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
@@ -2445,7 +2474,7 @@ async function bossSlotCharacterApi(db,body){
     return {code:400,body:{ok:false,error:"BOSS_SLOT_REJECTED",msg:(applied&&applied.erro)||"Operação recusada"}};
   if(op==="remove"&&typeof db.setAccountGold==="function")
     await db.setAccountGold(acc.id,Math.max(0,Math.floor(Number(p.gold)||0)));
-  return persistBossSlotPlayer(db,acc,character,p,lease,op,slot);
+  return withCosmetics(persistBossSlotPlayer(db,acc,character,p,lease,op,slot));
 }
 
 async function claimRewardChest(db,body){
