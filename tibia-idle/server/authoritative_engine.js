@@ -1981,13 +1981,20 @@ function openAuthPrimalBag(p){
   p.depot.push(item);
   return {ok:true,item:item};
 }
-/** Itens que ocupam 1 slot/instância na bag (armas, armaduras…). */
+/** Itens que ocupam 1 slot/instância na bag (armas, armaduras…).
+ * `s` é a categoria do slot de EQUIP: só slots equipáveis carregam
+ * instância (tier/charges/imbuements). Categorias de UI como "potion"
+ * ou "loot" são empilháveis — antes qualquer `s` truthy virava
+ * instância e um stack de potions pedia 1 slot por unidade (pouch→bag
+ * falhava com "mochila cheia" mesmo com slots livres). */
+const AUTH_INSTANCE_SLOTS=["weapon","armor","legs","helmet","boots",
+  "shield","ring","amulet","backpack","quiver"];
 function authItemNeedsBagInstance(slug){
   const it=ITEMS[slug];
   if(!it||!it.s||it.s==="ammo")return false;
   if(it.t==="distance"&&!it.imbSlots)return false;
   if(it.charges&&(it.s==="ring"||it.s==="amulet"||it.s==="boots")&&!it.imbSlots)return false;
-  return true;
+  return AUTH_INSTANCE_SLOTS.indexOf(it.s)>=0;
 }
 function authBagUsedSlots(p){
   let used=(Array.isArray(p.itemInstances)?p.itemInstances:[]).filter((i)=>i&&i.loc==="bag").length;

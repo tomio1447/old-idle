@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Pouch→mochila falhava com "mochila cheia" tendo espaço
+
+- **Sintoma**: arrastar uma stack da Loot Pouch para a mochila falhava com "Não foi possível mover (mochila cheia, CAP ou item ausente)" mesmo com slots e CAP livres.
+- **Causa**: `authItemNeedsBagInstance` (servidor) e `itemUsesInstances` (cliente) tratavam **qualquer** `s` truthy como item que ocupa 1 slot por instância. Itens com `s` de categoria de UI — `ultimate-mana-potion` (`s:"potion"`), `vexclaw-talon`/`some-grimeleech-wings` (`s:"loot"`) — passavam a exigir uma instância por unidade: uma stack de 177 potions pedia 177 slots na backpack de 20 → sempre falhava (e cada unidade instanciada ocuparia um slot real).
+- **Fix**: a regra agora cobre só slots equipáveis (`weapon/armor/legs/helmet/boots/shield/ring/amulet/backpack/quiver`) — `AUTH_INSTANCE_SLOTS` no servidor e `ITEM_INSTANCE_SLOTS` no cliente, espelhados. Potions e creature products voltam a empilhar (1 slot por tipo); armas, armaduras e acessórios com tier/charges/imbuements continuam por instância.
+- **Validado**: dados reais da Kina — as 64 stacks da pouch movem integralmente (antes `ultimate-mana-potion` ×177 falhava); `sanguine-blade`/`arcanomancer-regalia`/`backpack` seguem instanciados; `might-ring` (charge-stackable), `flash-arrow` (ammo), `lost-soul` (loot) seguem empilháveis.
+
+---
+
 ## 2026-11-27 — Boss bar exibe apenas o boss
 
 - **Sintoma**: a boss bar mostrava nome/HP de summons e monstros da sala — na fase das Soulcages do Bonelord's Phylactery a barra exibia "Scarith's Soulcage" e afins.

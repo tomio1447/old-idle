@@ -867,6 +867,13 @@ function migrateAmmoToCounter(p) {
   return p.ammo;
 }
 
+/* `s` é a categoria do slot de EQUIP: só slots equipáveis carregam
+ * instância (tier/charges/imbuements). Categorias de UI como "potion"
+ * ou "loot" empilham — o servidor espelha em AUTH_INSTANCE_SLOTS
+ * (qualquer `s` truthy virava instância e um stack de potions pedia
+ * 1 slot por unidade no pouch→bag). */
+const ITEM_INSTANCE_SLOTS = ["weapon", "armor", "legs", "helmet", "boots",
+  "shield", "ring", "amulet", "backpack", "quiver"];
 function itemUsesInstances(slug) {
   const it = GAMEDATA.items[slug];
   if (!it || !it.s || it.s === "ammo") return false;
@@ -878,7 +885,7 @@ function itemUsesInstances(slug) {
   // Anéis/amuletos/soft boots com cargas: CHEIOS empilham na bag; PARCIAIS
   // viram instâncias com .charges (não compartilham ledger por slug).
   if (isChargeStackableAccessory(slug)) return false;
-  return true;
+  return ITEM_INSTANCE_SLOTS.indexOf(it.s) >= 0;
 }
 
 /* Rings/amulets/boots com cargas e sem imbuement (SSA, might, time ring…). */
