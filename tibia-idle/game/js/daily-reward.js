@@ -32,7 +32,7 @@ function dailyRewardIcon(reward) {
   if (type === "wildcard") return "assets/ui/prey/prey_wildcard.png";
   if (type === "exp") return "assets/ui/store/xp-boost.png";
   if (type === "skill") return (typeof TRAINING_ICON_PATH !== "undefined" ? TRAINING_ICON_PATH : "assets/sprites/training/") + "skill-trainer-all.gif";
-  return (typeof TRAINING_ICON_PATH !== "undefined" ? TRAINING_ICON_PATH : "assets/sprites/training/") + "lasting-exercise-sword.gif";
+  return (typeof TRAINING_ICON_PATH !== "undefined" ? TRAINING_ICON_PATH : "assets/sprites/training/") + "lasting-sword.gif";
 }
 function dailyRewardLabel(reward, fallback) {
   if (reward && reward.label) return reward.label;

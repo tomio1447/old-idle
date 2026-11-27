@@ -1225,6 +1225,13 @@ function accountTrainingCheckpoint(training, stop) {
     // A espera da fila de instância fica FORA da fila de save: enfileirado,
     // o await do rabo oposto fecha espera circular e congela as duas filas.
     if (typeof accountLastInstancePromise === "function") await accountLastInstancePromise();
+    /* Tick periódico na janela de fechamento da instância: a row segue
+     * "active" por alguns ms após o fim da hunt e o servidor rejeitaria o
+     * checkpoint com 409 TRAINING_IN_COMBAT — ruído no console a cada tick.
+     * O próximo tick tenta de novo quando a row virar. O checkpoint final
+     * (stop) continua tentando: é o servidor quem decide. */
+    if (!stop && typeof accountInstanceActive === "function" && accountInstanceActive())
+      return false;
     return accountQueueSave(async () => {
     if (!accountLeaseAllowsSimulation()) return false;
     const owned = new Set(accountCharacterCacheRead().map((c) => String(c.id)));

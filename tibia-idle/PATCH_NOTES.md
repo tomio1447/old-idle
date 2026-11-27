@@ -4,6 +4,13 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Fix: ícone de exercise 404 + ruído 409 do checkpoint de treino
+
+- **Ícone de Exercise Weapon 404**: `dailyRewardIcon` montava `lasting-exercise-sword.gif` — o arquivo real é `lasting-sword.gif` (o card da recompensa de domingo/quinta mostrava imagem quebrada).
+- **Checkpoint de treino não suja mais o console com 409**: o tick periódico disparava o request na janela em que a instância da hunt ainda seguia `active` no servidor (ele responde "Encerre a hunt antes de treinar"). O cliente agora pula o tick enquanto `accountInstanceActive()` — o próximo já sai limpo; o checkpoint final (ao sair) continua tentando e quem decide é o servidor.
+
+---
+
 ## 2026-11-27 — Painel BÔNUS ATIVOS acima do Daily Boost
 
 - **Novo painel temporário** (`BÔNUS ATIVOS`) com o mesmo visual do Daily Boost — fica **acima** dele e só aparece enquanto houver bônus temporário ativo no personagem.

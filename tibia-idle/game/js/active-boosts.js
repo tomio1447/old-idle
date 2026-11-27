@@ -28,7 +28,7 @@
     if (typeof dailyRewardIcon === "function") return dailyRewardIcon({ type: type });
     if (type === "exp") return "assets/ui/store/xp-boost.png";
     return (typeof TRAINING_ICON_PATH !== "undefined" ? TRAINING_ICON_PATH : "assets/sprites/training/") +
-      (type === "skill" ? "skill-trainer-all.gif" : "lasting-exercise-sword.gif");
+      (type === "skill" ? "skill-trainer-all.gif" : "lasting-sword.gif");
   }
 
   function mins(leftMs) {
