@@ -182,7 +182,7 @@ function openDailyRewardModal(p, status) {
     <div class="panel-body daily-reward-body">
       <div class="tiny dim center mb8">
         Recompensa <b>por conta</b>, uma coleta por server save (00h — Brasília).
-        Hoje é <b>${todayName}</b>: colete <b style="color:#9ce84a">${dailyRewardLabel(reward)}</b>.
+        Hoje é <b>${todayName}</b>: colete <b style="color:#d4a038">${dailyRewardLabel(reward)}</b>.
       </div>
       ${todayCard}
       ${weaponCards}

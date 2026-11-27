@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Recompensa semanal com acabamento do client oficial
+
+- **Janela e trilhas chanfradas**: as linhas do cronograma e os cards de arma de exercise ganham o bevel 3D do Tibia (topo/esquerda claros, base/direita escuros), na mesma ardósia texturizada da janela.
+- **Dia atual destacado em dourado**: a linha de hoje sai do verde para a borda dourada quente com brilho interno e a tag **HOJE** em pílula verde bem definida; coletada, vira pílula dourada **COLETADO** mantendo a linha destacada.
+- **Card da recompensa do dia**: gradiente quente, borda dourada com filete interno e o ícone dentro de um slot chanfrado.
+- **Caixa informativa**: fundo ardósia chanfrado com o ícone `i` em círculo azul, estilo do aviso do client.
+- Botões do rodapé mantidos no padrão bevel do jogo — "Talvez depois" pedra e "Pegar a recompensa" dourado destacado.
+
+---
+
 ## 2026-11-27 — Boss Slots (Cyclopedia) — funcional no servidor
 
 - **Aba Boss Slots** (ícone do Bosstiário, molde io_bosstiary do Crystalserver/Tibia):
