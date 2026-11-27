@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Boss bar exibe apenas o boss
+
+- **Sintoma**: a boss bar mostrava nome/HP de summons e monstros da sala — na fase das Soulcages do Bonelord's Phylactery a barra exibia "Scarith's Soulcage" e afins.
+- **Causa**: `drawBossBar` (game/js/render.js) tinha dois caminhos errados — (1) o fallback `combat.mobs[0]` quando `combat.boss` existe mas nenhum mob carrega a flag `boss` (toda luta com `pendingBoss`: Phylactery fase das cages, Adventurer Group fase dos membros) exibia o primeiro mob da sala, que podia ser cage, spirit, an-eye ou bone-barrier; (2) `mobs.find(m => m.boss)` aceitava qualquer mob flagado — summons do Grand Master Oberon nascem com `boss:true`/`bossHelper:true` e podiam tomar a barra.
+- **Fix**: a seleção agora prefere o mob cujo id/slug corresponde ao `combat.boss.id` (`boss-<id>`, `<id>` ou slug do seed do servidor), com fallback apenas para mobs `boss:true` que não sejam helpers/summons (`bossHelper`, `hatredSummon`, `spiteTrash`, `maliceTrash`, `echoMinion`, `megaAspect`). Sem mob de boss válido a barra fica oculta — em vez de mostrar um monstro da sala.
+- **Preservado**: mini bosses de hunt (`bossMobs`, flag `boss:true`) continuam aparecendo na barra — são bosses legítimos.
+- **Validado**: simulação da seleção em 7 cenários — fase 1 do Phylactery (barra oculta), fase 2 (boss correto entre dragons/eyes), helper do Oberon listado antes do boss (boss vence), miniboss de hunt (mantido), trash flagado antes do Megalomania (boss vence), sprite slug ≠ bossId (match por `boss-<id>`) e seed do servidor (match por slug).
+
+---
+
 ## 2026-11-27 — Tracking de itens de addon e montaria (moldura + descrição)
 
 - **Moldura verde nos itens de addon**: todo item que serve de custo em receita de addon do NPC Addoner agora aparece com moldura verde (mesmo estilo 3D das molduras de classificação de forja) na mochila, loot pouch, stash, loot da hunt, reward chest e cyclopedia.

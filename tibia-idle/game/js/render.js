@@ -1494,7 +1494,16 @@ function bossBarFrame(bw, frameH, s) {
 // ranhuras diagonais e ponta brilhante (mockup medieval aprovado).
 function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
   if (!combat || !combat.mobs || !combat.mobs.length) return;
-  const boss = combat.mobs.find((m) => m.boss) || (combat.boss ? combat.mobs[0] : null);
+  /* Só o boss da sala entra na barra: summons/adds de mecânica (dragons,
+   * cages, eyes, bossHelpers) e mobs comuns nunca aparecem. Em lutas
+   * com pendingBoss (Phylactery, Adventurer Group) a barra fica oculta
+   * até o boss nascer — o fallback antigo em mobs[0] exibia o nome de
+   * um monstro da sala. */
+  const bid = combat.boss ? String(combat.boss.id || combat.boss.slug || combat.boss) : "";
+  const boss = combat.mobs.find((m) => m && m.boss && bid &&
+      (String(m.id) === "boss-" + bid || String(m.id) === bid || String(m.slug) === bid))
+    || combat.mobs.find((m) => m && m.boss && !m.bossHelper && !m.hatredSummon &&
+        !m.spiteTrash && !m.maliceTrash && !m.echoMinion && !m.megaAspect);
   if (!boss || boss.hp <= 0) return;
   const s = Math.max(1, Number(hudScale) || 1);
   offsetX = Number(offsetX) || 0;
