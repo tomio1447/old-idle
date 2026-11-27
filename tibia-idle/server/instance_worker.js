@@ -12,7 +12,21 @@ const {advanceAuthorityState}=require("./authoritative_engine");
 // rodava milhares de steps síncronos dentro da claim (GET_LOCK+FOR UPDATE)
 // e congelava o event loop inteiro. A dívida fica em carryMs no estado e
 // drena nas claims seguintes — o catchup só se espalha no tempo.
-const WORKER_STEP_BUDGET_MS=Math.max(50,Number(process.env.AUTH_WORKER_STEP_BUDGET_MS)||400);
+// O budget individual segue o do tick (150ms): slices menores entre claims
+// (que agora cedem o loop) deixam o stall máximo contínuo em ~150ms.
+const WORKER_STEP_BUDGET_MS=Math.max(50,Number(process.env.AUTH_WORKER_STEP_BUDGET_MS)||150);
+/* Budget de wall-clock do CICLO inteiro: claims são sequenciais e cada uma
+ * pode queimar WORKER_STEP_BUDGET_MS de JS síncrono — N instâncias em
+ * catch-up congelavam o servidor por N×400ms a cada segundo. Passou do
+ * budget, o restante volta na próxima volta (ORDER BY cursor ASC mantém
+ * quem está devendo na frente da fila). */
+const WORKER_CYCLE_BUDGET_MS=Math.max(100,Number(process.env.AUTH_WORKER_CYCLE_BUDGET_MS)||400);
+/* O tail pesado do claim (UPDATE de cada char + shared inventory + wallet +
+ * guild tasks) rodava a cada ~1s por instância ociosa porque loot do
+ * catch-up marcava dirty sempre. Adiar para WORKER_PERSIST_MS mantém o
+ * blob/cursor atualizados todo claim e escreve projeções a cada ~30s
+ * (taskKills acumulam num mapa pendente — espelho do hot.taskKills). */
+const WORKER_PERSIST_MS=Math.max(5000,Number(process.env.AUTH_WORKER_PERSIST_MS)||30000);
 
 function advanceInstanceClock(serialized,elapsed,checkpointAt){
   const authoritative=advanceAuthorityState(serialized,elapsed,checkpointAt,null,
@@ -35,9 +49,16 @@ async function runInstanceWorkerOnce(db,options){
   const maxStep=Math.max(100,Number(options.maxStepMs)||3600000);
   const minStep=Math.max(50,Number(options.minStepMs)||500);
   const ids=await db.instanceWorkerCandidates(limit),result={claimed:0,elapsed:0,skipped:0,errors:[]};
+  const cycleStart=Date.now();
   for(const accountId of ids){
+    // Sem stall contínuo: claims pesadas cedem o event loop entre si para
+    // que requests HTTP intercalem — sem isso um lote de instâncias em
+    // catch-up congelava o servidor por segundos a cada ciclo de 1s.
+    if(result.claimed&&Date.now()-cycleStart>=WORKER_CYCLE_BUDGET_MS){result.skipped++;continue;}
+    await new Promise((resolve)=>setImmediate(resolve));
     try{
-      const claim=await db.instanceWorkerClaim(accountId,now,maxStep,minStep,advanceInstanceClock);
+      const claim=await db.instanceWorkerClaim(accountId,now,maxStep,minStep,advanceInstanceClock,
+        {persistMs:WORKER_PERSIST_MS});
       if(claim&&claim.ok){result.claimed++;result.elapsed+=Number(claim.elapsed)||0;
         if(typeof options.onClaim==="function")await options.onClaim(claim);}
       else result.skipped++;

@@ -4287,7 +4287,7 @@ async function MysqlStore() {
         [Math.max(1,Math.min(500,Number(limit)||50))]);
       return rows.map((row)=>Number(row.account_id));
     },
-    async instanceWorkerClaim(accountId,now,maxStep,minStep,advanceState){
+    async instanceWorkerClaim(accountId,now,maxStep,minStep,advanceState,opts){
       const conn=await pool.getConnection(),lockName="idle-lease-"+Number(accountId);
       try{
         const [locks]=await conn.query("SELECT GET_LOCK(?,5) AS acquired",[lockName]);
@@ -4321,6 +4321,44 @@ async function MysqlStore() {
         }
         const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
         const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        /* Caminho leve: o tail pesado (bless wallets, pouch/forge→shared,
+         * UPDATE por char, guild kills, wallet de gold) rodava a CADA claim
+         * — toda instância ociosa com loot do catch-up custava dezenas de
+         * queries por segundo dentro da mesma txn. Persiste a cada
+         * opts.persistMs (ou no terminal): entre persists só o blob+cursor
+         * avançam e os taskKills acumulam num mapa pendente (mesmo molde do
+         * hot.taskKills do tick). */
+        const persistMs=Math.max(1000,Number(opts&&opts.persistMs)||30000);
+        this._workerHeavyAt=this._workerHeavyAt||new Map();
+        this._workerPendingKills=this._workerPendingKills||new Map();
+        const heavy=!!next.terminalReason||(now-(Number(this._workerHeavyAt.get(accountId))||0))>=persistMs;
+        if(!heavy){
+          for(const projection of next.characters||[]){
+            const tk=projection&&projection.taskKills;
+            if(!tk||typeof tk!=="object")continue;
+            const acc=this._workerPendingKills.get(Number(projection.id))||{};
+            for(const k of Object.keys(tk))acc[k]=(Number(acc[k])||0)+(Number(tk[k])||0);
+            this._workerPendingKills.set(Number(projection.id),acc);
+          }
+          await conn.query(
+            `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,
+               worker_total_ms=worker_total_ms+?,status='active',terminal_reason=NULL,ended_at=NULL
+             WHERE account_id=?`,
+            [next.state,new Date(checkpoint),new Date(checkpoint),elapsed,Number(accountId)]);
+          await conn.commit();return {ok:true,accountId:Number(accountId),elapsed,
+            version:Number(row.version)+1,terminalReason:null};
+        }
+        this._workerHeavyAt.set(accountId,now);
+        if(this._workerPendingKills.size){
+          for(const projection of next.characters||[]){
+            const acc=this._workerPendingKills.get(Number(projection.id));
+            if(!acc)continue;
+            const tk=projection.taskKills&&typeof projection.taskKills==="object"?projection.taskKills:{};
+            for(const k of Object.keys(acc))tk[k]=(Number(tk[k])||0)+(Number(acc[k])||0);
+            projection.taskKills=tk;
+            this._workerPendingKills.delete(Number(projection.id));
+          }
+        }
         next.state=await syncBlessWallets(conn,next.state);
         const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
         // Inventário da conta: tick terminal extrai containers para o shared

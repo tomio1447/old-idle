@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Freezes periódicos do servidor (worker de instâncias ociosas)
+
+- **Sintoma**: o jogo dava "freezadas" periódicas — todos os clientes parando de receber resposta por frações de segundo a alguns segundos, no local e na VM.
+- **Causa**: o instance worker, que avança a simulação das instâncias de abas fechadas, clama até 50 instâncias em sequência a cada 1s. Cada claim podia queimar até 400ms de step síncrono no event loop (catch-up de tempo offline) e, na sequência, uma transação pesada: UPDATE em cada personagem, extração de pouch/forge pro inventário da conta, propagação de gold e crédito de guild tasks — tudo dentro da mesma txn a cada claim, toda vez que o catch-up gerava loot. Um punhado de instâncias ociosas bastava para o lote travar o servidor por segundos a cada ciclo.
+- **Fix (server/instance_worker.js)**: claims agora cedem o event loop entre si (`setImmediate`), o ciclo inteiro tem budget de wall-clock (400ms — o resto volta na próxima volta, já que a fila ordena por cursor mais atrasado), e o budget de step por claim cai de 400ms → 150ms (mesmo do tick).
+- **Fix (server/db.js `instanceWorkerClaim`)**: o tail pesado passa a rodar só no terminal ou a cada ~30s por conta (`AUTH_WORKER_PERSIST_MS`, min 5s). Claims intermediárias só atualizam o blob + cursor; `taskKills` de guild acumulam num mapa pendente e entram inteiros no próximo persist (mesmo molde do `hot.taskKills` do tick PvP). `blessSpent`/`_pouchDirty`/`_forgeDirty` ficam no blob entre persists e o flush aplica o acumulado de uma vez.
+- **Validado no MySQL local**: claim 1 heavy → claim 2 light (versão sobe, zero writes de char, kills acumulam) → claim 3 heavy (pendings mergeados na projeção e creditados). `test_instance_checkpoint_cursor` e `test_idle_online_parity` verdes.
+- **Env knobs**: `AUTH_WORKER_STEP_BUDGET_MS` (150), `AUTH_WORKER_CYCLE_BUDGET_MS` (400), `AUTH_WORKER_PERSIST_MS` (30000).
+
+---
+
 ## 2026-11-27 — Brain Head e Cerebellum parando de andar
 
 - **Sintoma**: Brain Head e os 8 Cerebellum — monstros oficialmente estáticos — se movimentavam pela sala.
