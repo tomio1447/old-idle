@@ -7,39 +7,18 @@
  */
 "use strict";
 
+/* Sidebar enxuta: só o que existe de verdade no jogo. As seções "Hunts"
+ * (o modal próprio já cobre), "Casas" e "Arquivos Mágicos" (sem sistema)
+ * e os atalhos CIDADE (market/reward/depot/etc. — todos no modal CIDADE
+ * da topbar) saíram: a lista não rola mais e sobra espaço p/ a grade. */
 const CYCLO_ABAS = [
   { id: "bestiary", nome: "Bestiário", icone: "bestiary", pronta: true },
   { id: "bosstiary", nome: "Bosstiário", icone: "bosstiary", pronta: true },
   { id: "charms", nome: "Charms", icone: "charms", pronta: true },
-  { id: "hunts", nome: "Hunts", icone: "map", pronta: true },
   { id: "items", nome: "Itens", icone: "items", pronta: true },
-  { id: "houses", nome: "Casas", icone: "houses", pronta: false,
-    falta: "Não existe sistema de casas, aluguel nem mobília." },
   { id: "bossSlot", nome: "Boss Slots", icone: "bossSlot", pronta: false,
-    falta: "Depende do Bosstiário com dezenas de bosses e pontos de " +
-           "bosstiary; hoje só existe 1 boss no jogo." },
-  { id: "magicalArchives", nome: "Arquivos Mágicos", icone: "magical",
-    pronta: false,
-    falta: "Wheel of Destiny já tem UI própria; arquivos mágicos do " +
-           "cliente ainda não foram espelhados aqui." },
-  /* Grupo CIDADE: atalhos dos serviços do templo (market/depot/etc.). */
-  { id: "cidade", nome: "CIDADE", secao: true },
-  { id: "city-market", nome: "MARKET", pronta: true, cityAction: "market",
-    iconSrc: "assets/ui/market/market.png" },
-  { id: "city-reward", nome: "REWARD", pronta: true, cityAction: "reward",
-    iconSrc: "assets/item/reward-chest.png" },
-  { id: "city-forge", nome: "FORJE", pronta: true, cityAction: "forge",
-    iconSrc: "assets/item/exalted-core.gif" },
-  { id: "city-depot", nome: "DEPOT", pronta: true, cityAction: "depot",
-    iconSrc: "assets/item/depot-item-3497.png" },
-  { id: "city-imbuements", nome: "IMBUEMENTS", pronta: true,
-    cityAction: "imbuements", iconSrc: "assets/ui/imbuement-machine.png" },
-  { id: "city-enpa", nome: "ENPA", pronta: true, cityAction: "enpa",
-    iconSrc: "assets/npc/enpa-deia-pema_s.png" },
-  { id: "city-gnomally", nome: "GNOMALLY", pronta: true,
-    cityAction: "gnomally", iconSrc: "assets/npc/gnomally_s.png" },
-  { id: "city-tibianus", nome: "TIBIANUS", pronta: true,
-    cityAction: "tibianus", iconSrc: "assets/npc/king-tibianus_s.png" },
+    falta: "O sistema de slots do Bosstiário (bônus de dano por categoria) " +
+           "ainda não foi implementado — a lista de bosses já existe." },
 ];
 
 const BEST_CLASSES = {
@@ -426,6 +405,21 @@ function bestiaryProgress(p, slug) {
   };
 }
 
+/* Preenchimento das 3 barras do card (estilo Bestiário do Tibia): cada
+ * segmento é o progresso para o próximo marco — marcos[1] (Iniciado),
+ * marcos[2] (Experiente) e marcos[3] (Completo). O 1º marco (Descoberto,
+ * 1 kill) é o "visto" do card, não uma barra. */
+function bestiaryStages(p, slug) {
+  ensureCyclopedia(p);
+  const kills = p.bestiary[slug] || 0;
+  const marcos = bestiaryMarcos(slug);
+  return [0, 1, 2].map((i) => {
+    const ini = i === 0 ? 0 : marcos[i], fim = marcos[i + 1];
+    if (fim <= ini) return kills >= fim ? 1 : 0;
+    return Math.max(0, Math.min(1, (kills - ini) / (fim - ini)));
+  });
+}
+
 function bestiaryReveals(p, slug, campo) {
   const st = bestiaryStage(p, slug);
   if (st >= BEST_ESTAGIOS.length) return true;
@@ -686,7 +680,7 @@ function huntStarsHtml(n) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     CYCLO_ABAS, CHARMS, BEST_ESTAGIOS, bestiaryKill, bestiaryStage,
-    bestiaryProgress, bestiarySummary, bestiaryFinishedList,
+    bestiaryProgress, bestiaryStages, bestiarySummary, bestiaryFinishedList,
     activeMonsterSlugs, bestiarySlugs,
     buyCharm, upgradeCharm, assignCharm, clearCharm, charmTotals, charmOffensiveProc,
     charmMaxActive, charmActiveCount,

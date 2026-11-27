@@ -405,7 +405,8 @@ html[data-ui-mode="mobile"] .modal.forge-modal-shell {
 }
 html[data-ui-mode="mobile"] .modal-bg .modal > .panel-title,
 html[data-ui-mode="mobile"] .modal-bg .modal > .otc-win-head,
-html[data-ui-mode="mobile"] .modal-bg .modal > .cyclo-head {
+html[data-ui-mode="mobile"] .modal-bg .modal > .cyclo-head,
+html[data-ui-mode="mobile"] .modal-bg .modal > .cyclo-header {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -413,6 +414,7 @@ html[data-ui-mode="mobile"] .modal-bg .modal > .cyclo-head {
   flex: none;
 }
 html[data-ui-mode="mobile"] .modal-bg .modal > .panel-title button,
+html[data-ui-mode="mobile"] .modal-bg .modal > .cyclo-header button,
 html[data-ui-mode="mobile"] .modal-bg .modal button.sm {
   min-height: 40px;
   min-width: 40px;

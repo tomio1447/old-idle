@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Cyclopedia enxuta: 5 abas, header limpo e cards com 3 barras
+
+- **Sidebar de 5 abas**: ficaram só `Bestiário`, `Bosstiário`, `Charms`, `Itens` e `Boss Slots`. Saíram `Hunts` (o modal próprio já cobre), `Casas` e `Arquivos Mágicos` (sem sistema no jogo) e toda a seção **CIDADE** (Market, Reward, Forje, Depot, Imbuements, Enpa, Gnomally, Tibianus — todos continuam acessíveis pelo modal CIDADE da topbar). A lista não rola mais.
+- **Header novo**: título `📖 Cyclopedia` à esquerda e saldo em pill dourada + `✕` à direita, em faixa escura compacta — sem a moldura genérica vazia.
+- **Toolbar do bestiário**: métricas (Descobertos X/Y · Completos · charm points) à esquerda, busca e filtros (Todos/Vistos/Ocultos) à direita, com estilo próprio.
+- **Cards estilo Bestiário do Tibia**: barra de progresso inferior em **3 estágios** (cada segmento = um marco de kills), destaque dourado no card completo (barras ficam verdes), nome truncado com reticências e sprite apagada nas criaturas `???`. Detalhe do monstro também mostra as 3 barras; bosstiário ganha o mesmo destaque de completo. Grade de cards mais larga (84→110px).
+- **Limpeza**: `renderCycloHunts`, `openCycloCityAction` e os CSS de seção/cidade removidos; troca de aba reseta busca/filtro/página.
+
+---
+
 ## 2026-11-27 — Bestiário e Bosstiário mostram só criaturas do jogo
 
 - **Bestiário filtrado**: a Cyclopedia não lista mais o dump inteiro do Canary (1.655 fichas) — só as **~307 criaturas que realmente existem nas hunts e quests** do jogo (monstros das hunts ativas + `spawnWeights` + waves e bosses de quest). Fichas de hunts `comingSoon` e do dump sem presença ficam de fora.

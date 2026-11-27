@@ -11,26 +11,12 @@ const CYCLO = { aba: "bestiary", sub: "stats", filtro: "all", busca: "",
                 sel: null };
 
 function cycloIcon(aba, ativo) {
-  if (aba && aba.iconSrc) return aba.iconSrc;
   return `assets/ui/cyclopedia/${aba.icone}_${ativo ? "on" : "off"}.png`;
 }
 
 function closeCyclopediaModal() {
   const modal = $("#modal");
   if (modal) modal.classList.remove("show", "wide", "modal-cyclo");
-}
-
-function openCycloCityAction(action) {
-  closeCyclopediaModal();
-  if (action === "market" && typeof openMarket === "function") openMarket();
-  else if (action === "reward" && typeof openRewardChest === "function") openRewardChest();
-  else if (action === "forge" && typeof openForgeModal === "function") openForgeModal();
-  else if (action === "depot" && typeof openDepotModal === "function") openDepotModal();
-  else if (action === "imbuements" && typeof openImbueModal === "function") openImbueModal();
-  else if (action === "rewardShrine" && typeof openRewardShrine === "function") openRewardShrine();
-  else if (action === "enpa" && typeof openNpcShop === "function") openNpcShop("enpa");
-  else if (action === "gnomally" && typeof openNpcShop === "function") openNpcShop("gnomally");
-  else if (action === "tibianus" && typeof openNpcShop === "function") openNpcShop("tibianus");
 }
 
 function cycloCharmIdFromEl(el) {
@@ -45,13 +31,18 @@ function openCyclopedia(aba) {
   ensureCyclopedia(p);
   ensureWardrobe(p);
   if (aba) CYCLO.aba = aba;
+  /* A sidebar só tem as 5 abas — se o estado ficou numa aba removida
+   * (ex.: "hunts"), volta para o bestiário em vez de tela vazia. */
+  if (!CYCLO_ABAS.some((a) => a.id === CYCLO.aba)) CYCLO.aba = "bestiary";
 
   $("#modal-body").classList.remove("chard-modal-shell");
   $("#modal-body").innerHTML = `
-    <div class="panel-title">📖 Cyclopedia
-      <span style="flex:1"></span>
-      <span class="tiny gold-txt" id="cyclo-gold"></span>
-      <button class="sm" id="cyclo-close">✕</button>
+    <div class="cyclo-header">
+      <div class="cyclo-title">📖 Cyclopedia</div>
+      <div class="cyclo-header-right">
+        <span class="cyclo-gold-pill" id="cyclo-gold"></span>
+        <button class="cyclo-close" id="cyclo-close" aria-label="Fechar">✕</button>
+      </div>
     </div>
     <div class="panel-body cyclo-wrap">
       <div class="cyclo-tabs" id="cyclo-tabs"></div>
@@ -70,28 +61,19 @@ function openCyclopedia(aba) {
 function renderCycloTabs() {
   const el = $("#cyclo-tabs");
   if (!el) return;
-  el.innerHTML = CYCLO_ABAS.map((a) => {
-    if (a.secao) {
-      return `<div class="cyclo-tab-section" data-cyclo-section="${a.id}">${a.nome}</div>`;
-    }
-    return `
+  el.innerHTML = CYCLO_ABAS.map((a) => `
     <div class="cyclo-tab ${CYCLO.aba === a.id ? "active" : ""}
-                ${a.pronta ? "" : "indisponivel"}
-                ${a.cityAction ? "cyclo-tab-city" : ""}" data-cyclo-tab="${a.id}">
+                ${a.pronta ? "" : "indisponivel"}" data-cyclo-tab="${a.id}">
       <img src="${cycloIcon(a, CYCLO.aba === a.id)}" alt="">
       <span>${a.nome}</span>
-    </div>`;
-  }).join("");
+    </div>`).join("");
   $$("#cyclo-tabs [data-cyclo-tab]").forEach((b) =>
     b.addEventListener("click", () => {
-      const aba = CYCLO_ABAS.find((a) => a.id === b.dataset.cycloTab);
-      if (aba && aba.cityAction) {
-        openCycloCityAction(aba.cityAction);
-        return;
-      }
       CYCLO.aba = b.dataset.cycloTab;
       CYCLO.sel = null;
       CYCLO.busca = "";
+      CYCLO.pag = 0;
+      CYCLO.filtro = "all";
       renderCycloTabs();
       renderCycloContent();
     }));
@@ -122,7 +104,6 @@ function renderCycloContent() {
     bestiary: renderCycloBestiary,
     bosstiary: renderCycloBosstiary,
     charms: renderCycloCharms,
-    hunts: renderCycloHunts,
     items: renderCycloItems,
   }[CYCLO.aba] || (() => { el.innerHTML = ""; }))(p, el);
 }
@@ -546,31 +527,42 @@ function renderCycloBestiary(p, el) {
                           (CYCLO.pag + 1) * POR_PAGINA);
 
   el.innerHTML = `
-    <div class="row mb8" style="gap:6px;align-items:center">
-      <div class="tiny dim">
-        Descobertos <b style="color:#d4af37">${resumo.descobertos}</b>/${resumo.total}
-        · Completos <b style="color:#9ce84a">${resumo.completos}</b>
-        · <b class="gold-txt">${fmtFull(resumo.pontos)}</b> charm points
+    <div class="cyc-toolbar">
+      <div class="cyc-stats tiny">
+        <span>Descobertos <b class="gold-txt">${resumo.descobertos}</b>/${resumo.total}</span>
+        <span class="dim">•</span>
+        <span>Completos <b style="color:#9ce84a">${resumo.completos}</b></span>
+        <span class="dim">•</span>
+        <span><b class="gold-txt">${fmtFull(resumo.pontos)}</b> charm points</span>
       </div>
-      <span style="flex:1"></span>
-      <input id="cyclo-busca" placeholder="buscar…" value="${CYCLO.busca || ""}"
-        style="width:120px;padding:3px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      ${[["all", "Todos"], ["owned", "Vistos"], ["locked", "Ocultos"]]
-        .map(([f, t]) => `<button class="sm ${CYCLO.filtro === f ? "primary" : ""}"
-          data-best-filtro="${f}">${t}</button>`).join("")}
+      <div class="cyc-controls">
+        <input id="cyclo-busca" class="cyc-search" placeholder="Buscar…"
+          value="${CYCLO.busca || ""}">
+        <div class="cyc-filter-group">
+          ${[["all", "Todos"], ["owned", "Vistos"], ["locked", "Ocultos"]]
+            .map(([f, t]) => `<button class="cyc-filter-btn ${CYCLO.filtro === f ? "on" : ""}"
+              data-best-filtro="${f}">${t}</button>`).join("")}
+        </div>
+      </div>
     </div>
     <div class="app-grid">
       ${pagina.map((s) => {
         const m = GAMEDATA.monsters[s];
         const pr = bestiaryProgress(p, s);
         const visto = pr.estagio > 0;
-        return `<div class="app-card ${visto ? "" : "bloq"}" data-best="${s}">
+        const st = typeof bestiaryStages === "function"
+          ? bestiaryStages(p, s) : [pr.pct, 0, 0];
+        return `<div class="app-card mob-card ${visto ? "" : "bloq is-unknown"}
+          ${pr.completo ? "is-complete" : ""}" data-best="${s}">
           <div class="app-img">
             ${mobImg(s, 48, visto ? "" : "filter:brightness(0);")}
           </div>
-          <div class="tiny">${visto ? m.name : "???"}</div>
+          <div class="tiny mob-name">${visto ? m.name : "???"}</div>
           <div class="tiny dim">${pr.kills} mortes</div>
-          <div class="best-bar"><div style="width:${(pr.pct * 100).toFixed(0)}%"></div></div>
+          <div class="mob-stages">
+            ${st.map((w) => `<span class="mob-stage-bar"><span
+              class="mob-stage-fill" style="width:${(w * 100).toFixed(0)}%"></span></span>`).join("")}
+          </div>
         </div>`;
       }).join("") || `<div class="dim tiny">Nenhum monstro nesse filtro.</div>`}
     </div>
@@ -637,7 +629,12 @@ function cycloBestiaryDetail(p, el, slug) {
         ${linhaStat("Foge com", ver("velocidade",
           m.runAt ? m.runAt + "% de vida" : "não foge"))}
         <div class="small dim mt8 mb4">Progresso</div>
-        <div class="best-bar big"><div style="width:${(pr.pct * 100).toFixed(0)}%"></div></div>
+        <div class="mob-stages big">
+          ${(typeof bestiaryStages === "function"
+            ? bestiaryStages(p, slug) : [pr.pct, 0, 0])
+            .map((w) => `<span class="mob-stage-bar"><span
+              class="mob-stage-fill" style="width:${(w * 100).toFixed(0)}%"></span></span>`).join("")}
+        </div>
         <div class="tiny dim mt4">
           ${pr.completo ? "Bestiário completo!"
             : `${pr.kills} / ${pr.alvo} para <b>${
@@ -720,7 +717,8 @@ function renderCycloBosstiary(p, el) {
         const m = GAMEDATA.monsters[slug];
         const pr = bosstiaryProgress(p, slug);
         const visto = pr.kills > 0;
-        return `<div class="app-card ${visto ? "" : "bloq"}" data-boss-ficha="${slug}">
+        return `<div class="app-card mob-card ${visto ? "" : "bloq is-unknown"}
+          ${pr.completo ? "is-complete" : ""}" data-boss-ficha="${slug}">
           <div class="app-img">
             ${(typeof bossMobImg === "function"
               ? bossMobImg(slug, 48, visto ? "" : "filter:brightness(0);")
@@ -1160,88 +1158,6 @@ function cycloCharmDetail(p, id, finished) {
               })()
             : `<div class="tiny dim">Complete o bestiário de uma criatura com este personagem para associar.</div>`))}
     </div>`;
-}
-
-/* ------------------------------------------------------------------ hunts */
-
-function renderCycloHunts(p, el) {
-  const sections = (typeof HUNT_MODAL_SECTIONS !== "undefined")
-    ? HUNT_MODAL_SECTIONS
-    : [{ title: "Hunts", ids: Object.keys((GAMEDATA && GAMEDATA.hunts) || {}) }];
-  const busca = (CYCLO.huntBusca || "").toLowerCase();
-  const filtro = CYCLO.huntFiltro || "all";
-
-  const card = (id) => {
-    const hu = GAMEDATA.hunts[id];
-    if (!hu) return "";
-    if (busca && (hu.name || "").toLowerCase().indexOf(busca) === -1) return "";
-    const risk = typeof huntRisk === "function" ? huntRisk(p, hu) : { cls: "mid", txt: "—" };
-    if (filtro === "safe" && risk.cls === "high") return "";
-    if (filtro === "danger" && risk.cls !== "high") return "";
-    const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
-    const starsHtml = typeof huntStarsHtml === "function"
-      ? huntStarsHtml(stars) : `★${stars}`;
-    const mobs = (hu.monsters || []).slice(0, 6).map((m) => {
-      const st = typeof bestiaryStage === "function" ? bestiaryStage(p, m) : 0;
-      const charm = typeof charmOnRace === "function" ? charmOnRace(p, m) : null;
-      return `<span class="hunt-cyclo-mob ${st ? "" : "unk"}" title="${
-        GAMEDATA.monsters[m] ? GAMEDATA.monsters[m].name : m}">
-        ${mobImg(m, 28, st ? "" : "filter:brightness(0);")}
-        ${charm ? charmIconHtml(charm, 14) : ""}
-      </span>`;
-    }).join("");
-    const ativa = p.hunt === id;
-    return `<button class="hunt-cyclo-card ${ativa ? "active" : ""}" data-cyclo-hunt="${id}">
-      <div class="hunt-cyclo-top">
-        <span class="nm">${hu.name}</span>
-        ${starsHtml}
-      </div>
-      <div class="tiny dim">Nível recomendado <b>${hu.level || "?"}</b>
-        · ${fmt(hu.avgExp)} xp/kill
-        · <span class="risk ${risk.cls}">${risk.txt}</span></div>
-      <div class="hunt-cyclo-mobs">${mobs}</div>
-    </button>`;
-  };
-
-  el.innerHTML = `
-    <div class="row mb8" style="gap:6px;align-items:center">
-      <div class="tiny dim" style="flex:1">Hunting grounds no padrão Cyclopedia/Canary:
-        dificuldade (estrelas), nível recomendado e criaturas da área.</div>
-      <input id="cyclo-hunt-busca" placeholder="buscar hunt…"
-        value="${CYCLO.huntBusca || ""}"
-        style="width:130px;padding:3px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      ${[["all", "Todas"], ["safe", "Seguras"], ["danger", "Perigo"]]
-        .map(([f, t]) => `<button class="sm ${filtro === f ? "primary" : ""}"
-          data-hunt-filtro="${f}">${t}</button>`).join("")}
-    </div>
-    <div class="hunt-cyclo-sections">
-      ${sections.map((section) => {
-        const cards = section.ids.map(card).filter(Boolean).join("");
-        return `<section class="hunt-cyclo-section">
-          <div class="hunt-cat-title">${section.title}</div>
-          <div class="hunt-cyclo-grid">${cards ||
-            `<div class="hunt-section-empty">Em breve</div>`}</div>
-        </section>`;
-      }).join("")}
-    </div>`;
-
-  const inp = $("#cyclo-hunt-busca");
-  if (inp) inp.addEventListener("input", () => {
-    CYCLO.huntBusca = inp.value;
-    renderCycloHunts(p, el);
-    const n = $("#cyclo-hunt-busca");
-    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
-  });
-  $$("#cyclo-content [data-hunt-filtro]").forEach((b) =>
-    b.addEventListener("click", () => {
-      CYCLO.huntFiltro = b.dataset.huntFiltro;
-      renderCycloHunts(p, el);
-    }));
-  $$("#cyclo-content [data-cyclo-hunt]").forEach((b) =>
-    b.addEventListener("click", () => {
-      $("#modal").classList.remove("modal-cyclo");
-      if (typeof openHuntInfoModal === "function") openHuntInfoModal(b.dataset.cycloHunt);
-    }));
 }
 
 /* ----------------------------------------------------------------- itens */

@@ -169,10 +169,6 @@ function openNpcShop(shopKey) {
 
 function openCidadeService(action) {
   clearCityModalShells($("#modal-body"));
-  if (typeof openCycloCityAction === "function") {
-    openCycloCityAction(action);
-    return;
-  }
   if (action === "market" && typeof openMarket === "function") openMarket();
   else if (action === "reward" && typeof openRewardChest === "function") openRewardChest();
   else if (action === "rewardShrine" && typeof openRewardShrine === "function") openRewardShrine();

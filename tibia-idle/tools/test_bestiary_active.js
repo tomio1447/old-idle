@@ -31,10 +31,25 @@ function grab(src, name) {
   }
   throw new Error(name + " sem fechamento");
 }
+function grabConst(src, name) {
+  const i = src.indexOf(`const ${name} = `);
+  if (i < 0) throw new Error(name + " ausente");
+  let j = src.indexOf("=", i) + 1;
+  while (/\s/.test(src[j])) j++;
+  const open = src[j] === "[" ? "[" : "{";
+  const close = open === "[" ? "]" : "}";
+  let d = 0;
+  for (let k = j; k < src.length; k++) {
+    if (src[k] === open) d++;
+    else if (src[k] === close && !--d) return src.slice(i, k + 1) + ";";
+  }
+  throw new Error(name + " sem fechamento");
+}
 
 const cycSrc = fs.readFileSync(path.join(root, "game", "js", "cyclopedia.js"), "utf8");
 const bosSrc = fs.readFileSync(path.join(root, "game", "js", "bosstiary.js"), "utf8");
 const uiSrc = fs.readFileSync(path.join(root, "game", "js", "cyclopedia-ui.js"), "utf8");
+const cssSrc = fs.readFileSync(path.join(root, "game", "css", "layout.css"), "utf8");
 
 /* ---------- ambiente stub ---------- */
 const sandbox = {
@@ -73,8 +88,11 @@ const sandbox = {
 };
 vm.createContext(sandbox);
 vm.runInContext(
-  grab(cycSrc, "activeMonsterSlugs") + "\n" + grab(cycSrc, "bestiarySlugs"),
+  grab(cycSrc, "activeMonsterSlugs") + "\n" + grab(cycSrc, "bestiarySlugs")
+  + "\n" + grab(cycSrc, "bestiaryMarcos") + "\n" + grab(cycSrc, "bestiaryStages")
+  + "\n" + grabConst(cycSrc, "CYCLO_ABAS") + "\n" + grabConst(cycSrc, "BEST_ESTAGIOS"),
   sandbox);
+sandbox.ensureCyclopedia = (p) => { p.bestiary = p.bestiary || {}; };
 vm.runInContext(
   grab(bosSrc, "bossCategory") + "\n" + grab(bosSrc, "bosstiaryList"),
   sandbox);
@@ -120,6 +138,44 @@ check(/for \(const s of bestiarySlugs\(\)\)/.test(cycSrc),
   "bestiaryFinishedList itera só ativos");
 check(cycSrc.includes("activeMonsterSlugs, bestiarySlugs"),
   "helpers exportados no module.exports");
+
+/* ---------- sidebar enxuta + layout novo ---------- */
+console.log("\n[5] sidebar enxuta + layout");
+const abas = r("CYCLO_ABAS.map(a=>a.id)");
+check(JSON.stringify(abas) ===
+  JSON.stringify(["bestiary", "bosstiary", "charms", "items", "bossSlot"]),
+  "CYCLO_ABAS = só as 5 abas ativas", abas);
+check(!r("CYCLO_ABAS.some(a=>a.secao||a.cityAction)"),
+  "sem seções/atalhos CIDADE na sidebar");
+check(!uiSrc.includes("renderCycloHunts") && !uiSrc.includes("openCycloCityAction")
+  && !cycSrc.includes("city-"),
+  "código das abas removidas limpo (hunts/cityAction)");
+check(uiSrc.includes('class="cyclo-header"') && !uiSrc.includes("panel-title"),
+  "header próprio (título+gold+✕), sem panel-title genérico");
+check(uiSrc.includes("cyclo-gold-pill") && uiSrc.includes('id="cyclo-close"'),
+  "saldo em pill + botão fechar à direita");
+check(uiSrc.includes("cyc-toolbar") && uiSrc.includes("cyc-search")
+  && uiSrc.includes("cyc-filter-btn"), "toolbar com métricas + busca + filtros");
+check(uiSrc.includes("mob-stages") && uiSrc.includes("mob-stage-fill"),
+  "cards com barra de 3 estágios");
+check(cssSrc.includes(".cyclo-header") && cssSrc.includes(".mob-stages")
+  && cssSrc.includes(".cyc-filter-btn") && cssSrc.includes(".cyclo-gold-pill")
+  && cssSrc.includes("mob-card.is-complete"), "estilos novos no layout.css");
+check(!cssSrc.includes(".cyclo-tab-section") && !cssSrc.includes(".cyclo-tab-city"),
+  "CSS das abas removidas limpo");
+
+/* ---------- bestiaryStages: 3 barras por marco ---------- */
+console.log("\n[6] bestiaryStages (3 barras)");
+// marcos do stub: BEST_ESTAGIOS [1,25,100,250]
+const st = (k) => { sandbox.p = { bestiary: { rat: k } };
+  return r("bestiaryStages(p,'rat')"); };
+const approx = (arr, exp) => arr.every((v, i) => Math.abs(v - exp[i]) < 1e-6);
+check(approx(st(0), [0, 0, 0]), "0 kills → barras vazias", st(0));
+check(approx(st(12), [0.48, 0, 0]), "12 kills → barra 1 a 48%", st(12));
+check(approx(st(25), [1, 0, 0]), "marco u1 → barra 1 cheia", st(25));
+check(approx(st(60), [1, 35 / 75, 0]), "entre u1 e u2 → barra 2 parcial", st(60));
+check(approx(st(200), [1, 1, 100 / 150]), "entre u2 e total → barra 3 parcial", st(200));
+check(approx(st(250), [1, 1, 1]), "completo → 3 barras cheias", st(250));
 
 console.log(`\n${passed} ok, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

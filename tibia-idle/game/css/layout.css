@@ -3001,29 +3001,108 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
  * Layout do cliente: coluna de abas a esquerda, conteudo a direita. */
 .modal-bg .modal.wide, .modal-bg.wide .modal { width: min(940px, 97vw); }
 .modal-bg .modal.panel.market-shell { width: min(1100px, 97vw); }
+
+/* Cabeçalho limpo da Cyclopedia: título à esquerda, saldo + fechar à
+ * direita — substitui o .panel-title genérico só neste modal. */
+.cyclo-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: #100e0a;
+  border-bottom: 1px solid var(--border, #0d0b08);
+}
+.cyclo-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; letter-spacing: .4px;
+  color: var(--text-bright, #e8d4a2); text-shadow: 1px 1px 0 #000;
+}
+.cyclo-header-right { display: flex; align-items: center; gap: 10px; }
+.cyclo-gold-pill {
+  padding: 3px 9px; border-radius: 4px;
+  background: rgba(212, 175, 55, .1);
+  border: 1px solid rgba(212, 175, 55, .32);
+  color: #ffe680; font-size: 11px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cyclo-close {
+  width: 26px; height: 26px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border-in, #3a3428); background: #24211a;
+  color: #a49b84; font-size: 12px; font-weight: 700;
+}
+.cyclo-close:hover { color: var(--text-bright, #e8d4a2); border-color: #6b6455; }
+
 .cyclo-wrap { display: flex; gap: 8px; align-items: stretch; min-height: 420px; }
 .cyclo-tabs {
-  display: flex; flex-direction: column; gap: 2px; flex: none; width: 132px;
+  display: flex; flex-direction: column; gap: 2px; flex: none; width: 140px;
   border-right: 1px solid var(--border, #0d0b08); padding-right: 6px;
-  max-height: 70vh; overflow-y: auto;
 }
 .cyclo-tab {
-  display: flex; align-items: center; gap: 6px; padding: 5px 6px;
-  font-size: 11px; color: #a49b84; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  font-size: 11px; font-weight: 600; color: #a49b84; cursor: pointer;
   border: 1px solid transparent; background: #14120e;
 }
-.cyclo-tab:hover { background: #26221a; }
+.cyclo-tab:hover { background: #26221a; color: #c8c0a8; }
 .cyclo-tab.active {
-  background: #35301f; color: #ffe680; border-color: var(--gold, #d4af37);
+  background: rgba(212, 175, 55, .12); color: #ffe680;
+  border-color: rgba(212, 175, 55, .45);
 }
 .cyclo-tab.indisponivel { opacity: .5; }
 .cyclo-tab img { width: 18px; height: 18px; image-rendering: pixelated; }
-.cyclo-tab-section {
-  margin-top: 10px; padding: 6px 6px 2px; font-size: 10px; letter-spacing: .08em;
-  color: #d4af37; font-weight: bold; border-top: 1px solid #3a3428;
-}
-.cyclo-tab-city img { width: 16px; height: 16px; }
 .cyclo-content { flex: 1; min-width: 0; max-height: 70vh; overflow-y: auto; }
+
+/* Barra de ferramentas do bestiário: métricas à esquerda, busca e
+ * filtros à direita. */
+.cyc-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 8px;
+  padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--border, #0d0b08);
+}
+.cyc-stats {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; color: #a49b84;
+}
+.cyc-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cyc-search {
+  width: 170px; padding: 4px 8px; border-radius: 4px;
+  border: 1px solid var(--border-in, #3a3428);
+  background: #0e0c08; color: var(--text-bright, #e8d4a2); font-size: 11px;
+}
+.cyc-search:focus { outline: none; border-color: var(--gold, #d4af37); }
+.cyc-filter-group { display: inline-flex; gap: 3px; }
+.cyc-filter-btn {
+  padding: 4px 9px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border-in, #3a3428); background: #1d1a12;
+  color: #a49b84; font-size: 10px; font-weight: 700;
+}
+.cyc-filter-btn:hover { color: #c8c0a8; background: #26221a; }
+.cyc-filter-btn.on {
+  background: rgba(212, 175, 55, .14); border-color: rgba(212, 175, 55, .5);
+  color: #ffe680;
+}
+
+/* Cards de criatura/boss: nome truncado, barra de 3 estágios e destaque
+ * dourado quando completo. */
+.mob-card { transition: border-color .15s, background .15s, transform .12s; }
+.mob-card:hover { transform: translateY(-1px); }
+.mob-name {
+  max-width: 100%; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mob-card.is-unknown .mob-name { color: #6b6455; }
+.mob-card.is-complete {
+  border-color: rgba(212, 175, 55, .5);
+  box-shadow: inset 0 0 14px rgba(212, 175, 55, .08);
+}
+.mob-stages {
+  width: 86%; margin: 3px auto 0;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+}
+.mob-stages.big { width: 100%; margin-top: 4px; }
+.mob-stage-bar {
+  height: 4px; border-radius: 2px; background: #0d0b08; overflow: hidden;
+}
+.mob-stages.big .mob-stage-bar { height: 6px; }
+.mob-stage-fill { display: block; height: 100%; background: var(--gold, #d4af37); }
+.mob-card.is-complete .mob-stage-fill { background: #9ce84a; }
 .cyclo-subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .cyclo-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .cyclo-vazio {
@@ -3046,6 +3125,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .app-grid {
   display: grid; gap: 5px;
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+/* Cards do bestiário/bosstiário um pouco maiores — a sidebar enxuta
+ * liberou largura (padrão dos cards do Bestiário do Tibia). */
+.cyclo-content .app-grid {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 }
 .app-card {
   background: #24221e; border: 1px solid #16140f;
@@ -3617,26 +3701,6 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .hunt-stars { letter-spacing: 1px; }
 .hunt-star { color: #3a3428; font-size: 11px; }
 .hunt-star.on { color: #d4af37; }
-.hunt-cyclo-sections { display: flex; flex-direction: column; gap: 12px; }
-.hunt-cyclo-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px;
-}
-.hunt-cyclo-card {
-  text-align: left; background: #14120e; border: 1px solid #3a3428;
-  padding: 8px; cursor: pointer; color: inherit;
-}
-.hunt-cyclo-card:hover, .hunt-cyclo-card.active {
-  border-color: var(--gold, #d4af37); background: #26221a;
-}
-.hunt-cyclo-top {
-  display: flex; justify-content: space-between; align-items: center; gap: 6px;
-}
-.hunt-cyclo-top .nm { font-size: 12px; color: #ffe680; }
-.hunt-cyclo-mobs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.hunt-cyclo-mob { position: relative; display: inline-flex; }
-.hunt-cyclo-mob .charm-rune-icon {
-  position: absolute; right: -2px; bottom: -2px;
-}
 .hunt-modal-mob { position: relative; display: inline-flex; }
 .hunt-canary-card .nm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
