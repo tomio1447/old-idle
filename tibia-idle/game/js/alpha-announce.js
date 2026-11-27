@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — 8 mini bosses novos a 0,01% nas hunts: Zunzu (Lizard Town), Burster (The Void), Chizzoron (Draken Walls), Dharalion (Elfs Yalahar), Furyosa (MOTA Ext.), Sir Leopold (Book World), The Welter (Banuta Deeper) e Tyrn (Elder Wyrm) — todos aparecem na seção MINI BOSSES do modal",
   "FIX — Protector agora aumenta o Shielding de verdade: +30% sobre o total aparece no painel de skills, na mitigação e na cura de knight (que escala com Shielding no 15.25)",
   "NOVO — 3º slot de Prey por Tibia Coins: o botão do slot bloqueado leva direto à STORE → Preys, onde a liberação permanente custa 350 TC (vale para toda a conta)",
   "NOVO — The Rise of Podzilla Quest (400+): elimine 1500 monstros em Podzilla Bottom, enfrente The Rootkraken e ganhe a outfit Rootwalker com addons",

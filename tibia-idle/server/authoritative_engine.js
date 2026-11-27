@@ -67,6 +67,7 @@ require("../game/js/final-radiant.js").registerMonsters(MONSTERS);
 // Book World (150+): 6 Inkborn do update 15.10, ausentes do dump
 // Canary — fichas oficiais no patch da hunt.
 require("../game/js/book-world.js").registerMonsters(MONSTERS);
+require("../game/js/the-void.js").registerMonsters(MONSTERS);
 // Sir Leonard (Book World, 150+): boss final da Book World Quest do
 // update 15.10, ausente do dump Canary — ficha oficial no patch.
 require("../game/js/sir-leonard.js").registerMonsters(MONSTERS);
@@ -652,7 +653,9 @@ for(const slug of Object.keys(QAMMO)){
   if(raw.tipo&&!it.ammoKind)it.ammoKind=raw.tipo;
 }
 const HUNTS=Object.assign(read("hunts.json"),{
-  "mota-extension":{monsters:["floating-savant","retching-horror","fury","hellhound","demon"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "mota-extension":{monsters:["floating-savant","retching-horror","fury","hellhound","demon"],cat:"hard",pack:10,packMin:6,packMax:10,
+    bossMobs:["furyosa"],
+    spawnWeights:{"floating-savant":2000,"retching-horror":2000,"fury":2000,"hellhound":2000,"demon":2000,"furyosa":1}},
   "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"],cat:"hard",pack:10,packMin:6,packMax:10,
     bossMobs:["ugly-monster"],
     spawnWeights:{"cobra-vizier":3334,"cobra-scout":3333,"cobra-assassin":3333,"ugly-monster":1}},
@@ -709,8 +712,10 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "book-world":{monsters:["bluebeak","bramble-wyrmling","crusader",
     "hawk-hopper","headwalker","lion-hydra"],
     cat:"mid",pack:8,packMin:6,packMax:8,
-    spawnWeights:{"bluebeak":16,"bramble-wyrmling":17,"crusader":17,
-      "hawk-hopper":17,"headwalker":17,"lion-hydra":16}},
+    bossMobs:["sir-leopold"],
+    spawnWeights:{"bluebeak":1600,"bramble-wyrmling":1700,"crusader":1700,
+      "hawk-hopper":1700,"headwalker":1700,"lion-hydra":1600,
+      "sir-leopold":1}},
   "bashmuul-issavi":{monsters:["bashmu","juvenile-bashmu"],cat:"hard",pack:10,packMin:8,packMax:10,
     spawnWeights:{"bashmu":50,"juvenile-bashmu":50}},
   "true-asuras":{monsters:["true-dawnfire-asura","true-midnight-asura","true-frost-flower-asura","true-feverbloom-asura"],

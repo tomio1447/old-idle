@@ -60,6 +60,7 @@ const BOOK_WORLD_ITEMS = {
   "book-with-an-hourglass":   { n: "book with an hourglass",   s: null, t: "loot", cid: 51425, w: 13.0, sell: 1450, npcSell: 1450 },
   "sealing-wax":              { n: "sealing wax",              s: null, t: "loot", cid: 51426, w: 0.5,  sell: 620,  npcSell: 620 },
   "etcher":                   { n: "etcher",                   s: null, t: "loot", cid: 51443, w: 3.0,  sell: 30000, npcSell: 30000 },
+  "colourful-quill":          { n: "colourful quill",          s: null, t: "loot", cid: 51421, w: 0.6,  sell: 110000, npcSell: 110000 },
   "hydra-head":               { n: "hydra head",               s: null, t: "loot", cid: 10282, w: 13.0, sell: 600,  npcSell: 600 },
 };
 
@@ -252,6 +253,49 @@ const LION_HYDRA = {
   best: Object.assign({}, BOOK_WORLD_BEST, { ocor: 0 }),
 };
 
+/* Sir Leopold (miniboss Nemesis da Book World, update 15.10) — ausente do
+ * dump Canary: ficha oficial TibiaWiki (81.000 hp, 26.000 exp, self-heal
+ * 0-325, senses invisible). Mesmo looktype 1847 do Crusader/Sir Leonard,
+ * addons 3 e cores oficiais [78,19,94,95]. */
+const SIR_LEOPOLD = {
+  name: "Sir Leopold",
+  hp: 81000, exp: 26000,
+  speed: 150, armor: 15, defense: 25,
+  damage: 500, element: "physical", attackSpeed: 2000,
+  skills: [
+    { el: "ice", min: 100, max: 350, int: 2500, ch: 15, range: 7,
+      miss: "ice", alvo: 1 },
+    { el: "holy", min: 100, max: 250, int: 2500, ch: 10, range: 7,
+      miss: "holy", alvo: 1 },
+  ],
+  defSkills: [
+    { n: "healing", min: 0, max: 325, int: 5000, ch: 20 },
+  ],
+  looktype: 1847, race: "blood", raceId: 2694, targetDistance: 1,
+  staticAttack: 90, boss: 1, imune: ["invisible"],
+  loot: [
+    { chance: 100, max: 74, item: "platinum-coin" },
+    { chance: 100, max: 1, item: "etcher" },
+    { chance: 100, max: 1, item: "blank-imbuement-scroll" },
+    { chance: 100, max: 1, item: "proficiency-catalyst" },
+    { chance: 73, max: 2, item: "blue-gem" },
+    { chance: 38, max: 2, item: "white-gem" },
+    { chance: 36, max: 1, item: "colourful-quill" },
+    { chance: 29, max: 1, item: "silver-amulet" },
+    { chance: 29, max: 1, item: "protection-amulet" },
+    { chance: 20, max: 1, item: "bronze-amulet" },
+    { chance: 11, max: 1, item: "knight-axe" },
+    { chance: 11, max: 1, item: "knight-legs" },
+    { chance: 9, max: 1, item: "time-ring" },
+    { chance: 7, max: 1, item: "death-ring" },
+    { chance: 4, max: 1, item: "axe-ring" },
+    { chance: 4, max: 1, item: "warrior-helmet" },
+    { chance: 4, max: 1, item: "knight-armor" },
+    { chance: 2, max: 1, item: "ancient-shield" },
+    { chance: 2, max: 1, item: "stone-skin-amulet" },
+  ],
+};
+
 const BOOK_WORLD_MONSTERS = {
   "bluebeak": BLUEBEAK,
   "bramble-wyrmling": BRAMBLE_WYRMLING,
@@ -259,6 +303,7 @@ const BOOK_WORLD_MONSTERS = {
   "hawk-hopper": HAWK_HOPPER,
   "headwalker": HEADWALKER,
   "lion-hydra": LION_HYDRA,
+  "sir-leopold": SIR_LEOPOLD,
 };
 
 const BOOK_WORLD_DATA = {
@@ -322,14 +367,17 @@ if (typeof module !== "undefined" && module.exports)
       "headwalker",
       "lion-hydra",
     ],
-    /* occurrence oficial: todas Comum → peso igual. */
+    bossMobs: ["sir-leopold"],
+    /* occurrence oficial das regulares: todas Comum → 16/17 reescalado
+     * para 10000; Sir Leopold entra como miniboss 1/10001 ≈ 0,01%. */
     spawnWeights: {
-      "bluebeak": 16,
-      "bramble-wyrmling": 17,
-      "crusader": 17,
-      "hawk-hopper": 17,
-      "headwalker": 17,
-      "lion-hydra": 16,
+      "bluebeak": 1600,
+      "bramble-wyrmling": 1700,
+      "crusader": 1700,
+      "hawk-hopper": 1700,
+      "headwalker": 1700,
+      "lion-hydra": 1600,
+      "sir-leopold": 1,
     },
     color: "#4a7a8a",
     scene: "palace",

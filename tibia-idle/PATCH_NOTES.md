@@ -4,6 +4,18 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — 8 mini bosses a 0,01% nas hunts
+
+- **8 minibosses com 0,01% por slot** (peso 1/10001, convenção Mawhawk/Ugly Monster; nascem `boss:true` → loot no Reward Chest): Lizardstown → **Battlemaster Zunzu**, The Void → **Burster**, Draken Walls → **Chizzoron the Distorter**, Elfs Yalahar → **Dharalion**, MOTA Extension → **Furyosa**, Book World → **Sir Leopold**, Banuta Deeper → **The Welter** e Elder Wyrm Darashia → **Tyrn**. Todos aparecem na seção MINI BOSSES do modal de hunts.
+- **Fichas novas fora do dump Canary**: `burster` (10.000 hp/exp, melee físico até 800, Energy Beam, imune a energy — sprite = looktype 878 do Breach Brood) em `the-void.js` e `sir-leopold` (looktype 1847, pose de addon `py=3`, cores oficiais; sheet 9×4@64 renderizada via `tools/build_sir_leopold_sheet.py`) em `book-world.js` — ambos também registrados no MONSTERS do servidor via `registerMonsters` + entrada em `canarymonsters.json`.
+- **Itens de loot novos**: `colourful-quill` (cid 51421, Yasir/Fiona 110.000) e fichas faltantes no `gamedata.js` — `cornucopia`/`silver-raid-token`/`sun-mirror` (sem comprador NPC → sell 0) e `hydra-egg` (500). Ícones renderizados do DAT 15.x.
+- **Banuta Deeper restaurada no modal**: a hunt existia em `GAMEDATA` mas sumiu da seção HUNTS 100–250 (`hunt-sections.js`) — reinserida.
+- **Paridade engine**: `mota-extension` e `book-world` (estáticas em `HUNTS`) receberam `bossMobs`/`spawnWeights`; as demais 6 hidratam via descriptor (`captureAuthHuntDef`). Engine agora também carrega `the-void.js`/`book-world.js` para registrar os monstros novos.
+- **Pale Count / "Vampires Edron" adiado**: a hunt não existe mais no jogo (foi removida da lista); o The Pale Count ficou fora deste lote.
+- Teste novo `tools/test_minibosses.js`: bossMobs + soma 10001 nas 8 hunts, fichas cliente×engine, sheets/ícones/loot, paridade estática e taxa real do `pickHuntSpawnSlug` (~0,01%).
+
+---
+
 ## 2026-11-27 — Fix: Protector não aumentava o Shielding
 
 - **`effSkill`/`stanceSkill` ignoravam `shieldPct`**: as stances 15.25 aplicavam `meleePct` (Blood Rage) e `distPct` (Sharpshooter) na skill efetiva, mas o `shieldPct` do Protector (+30% sobre o total, oficial) nunca entrava — a "Escudo" do painel, a mitigação local (`playerMitigationPct`) e o boost de cura de knight (`shielding/4` como ML) ficavam sem o bônus. `playerDefense`/`gearTotals` aplicava o percentual à parte, o que dobraria o bônus após o fix — a aplicação manual foi removida (mantido o `shieldPercent` de buffs como Virtue of Harmony).

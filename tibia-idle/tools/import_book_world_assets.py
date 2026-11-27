@@ -38,6 +38,7 @@ LOOT_ITEMS = {
     "book-with-an-hourglass": 51425,
     "sealing-wax": 51426,
     "torn-page": 51427,
+    "colourful-quill": 51421,
     "pressed-flower": 51428,
     "etcher": 51443,
     "hydra-head": 10282,

@@ -23,6 +23,8 @@
     packMin: 5,
     packMax: 8,
     monsters: ["wyrm", "elder-wyrm"],
+    bossMobs: ["tyrn"],
+    spawnWeights: { "wyrm": 5000, "elder-wyrm": 5000, "tyrn": 1 },
     color: "#6a7a4a",
     scene: "desert",
     otbm: "elder_wyrm_darashia",

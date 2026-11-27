@@ -4,6 +4,66 @@
  */
 "use strict";
 
+/* Burster (miniboss Nemesis do Otherworld, update 10.94) — ausente do dump
+ * Canary: ficha oficial TibiaWiki (10.000 hp, 10.000 exp, melee 0-800+
+ * físico + Energy Beam 0-300+, imune a energy). Mesmo looktype 878 do
+ * Breach Brood — sheet reusa a arte da espécie. */
+const BURSTER = {
+  name: "Burster",
+  hp: 10000, exp: 10000,
+  speed: 135, armor: 0, defense: 0,
+  damage: 800, element: "physical", attackSpeed: 2000,
+  resist: { energy: 100 },
+  skills: [
+    { el: "energy", min: 0, max: 300, int: 2000, ch: 30, range: 7,
+      miss: "energy", alvo: 1 },
+  ],
+  looktype: 878, race: "venom", raceId: 1278, targetDistance: 1,
+  staticAttack: 90, boss: 1, imune: ["paralyze", "invisible"],
+  loot: [
+    { chance: 100, max: 44, item: "gold-coin" },
+    { chance: 100, max: 10, item: "platinum-coin" },
+    { chance: 100, max: 1, item: "crystallized-anger" },
+    { chance: 100, max: 1, item: "curious-matter" },
+    { chance: 100, max: 1, item: "plasma-pearls" },
+    { chance: 100, max: 1, item: "spark-sphere" },
+    { chance: 100, max: 1, item: "volatile-proto-matter" },
+    { chance: 57, max: 1, item: "energy-bar" },
+    { chance: 52, max: 1, item: "great-health-potion" },
+    { chance: 39, max: 1, item: "energy-drink" },
+    { chance: 30, max: 1, item: "ring-of-red-plasma" },
+    { chance: 26, max: 1, item: "collar-of-red-plasma" },
+    { chance: 26, max: 1, item: "ring-of-blue-plasma" },
+    { chance: 22, max: 1, item: "collar-of-green-plasma" },
+    { chance: 17, max: 1, item: "ring-of-green-plasma" },
+    { chance: 17, max: 1, item: "collar-of-blue-plasma" },
+    { chance: 17, max: 1, item: "great-mana-potion" },
+    { chance: 17, max: 1, item: "cyan-crystal-fragment" },
+    { chance: 13, max: 1, item: "blue-crystal-shard" },
+    { chance: 9, max: 1, item: "great-spirit-potion" },
+    { chance: 9, max: 1, item: "green-crystal-shard" },
+    { chance: 9, max: 1, item: "blue-crystal-splinter" },
+    { chance: 4, max: 1, item: "collar-of-orange-plasma" },
+    { chance: 4, max: 1, item: "ring-of-orange-plasma" },
+    { chance: 0.5, max: 1, item: "lightning-legs" },
+  ],
+  best: { classe: "Cnidarians", toKill: 5, u1: 10, u2: 60, charm: 10,
+    stars: 5, ocor: 3, locais: "Otherworld (Dwarf Bridge)." },
+  grupo: "extra_dimensional",
+};
+
+const VOID_MONSTERS = { "burster": BURSTER };
+
+const VOID_DATA = {
+  registerMonsters(monsters) {
+    if (!monsters) return;
+    for (const slug in VOID_MONSTERS)
+      monsters[slug] = VOID_MONSTERS[slug];
+  },
+};
+if (typeof module !== "undefined" && module.exports)
+  module.exports = VOID_DATA;
+
 (function registerTheVoid() {
   if (typeof GAMEDATA === "undefined") return;
   if (!GAMEDATA.items) GAMEDATA.items = {};
@@ -60,6 +120,26 @@
       if (GAMEDATA.items[slug].cid == null) GAMEDATA.items[slug].cid = def.cid;
     }
   }
+  /* Monstro novo (ausente do dump Canary) — registra nos dois catálogos
+   * para spawn/loot resolverem igual aos demais. */
+  if (typeof MONSTERDATA !== "undefined" && MONSTERDATA) {
+    for (const slug in VOID_MONSTERS)
+      MONSTERDATA[slug] = VOID_MONSTERS[slug];
+  }
+  GAMEDATA.monsters = GAMEDATA.monsters || {};
+  for (const slug in VOID_MONSTERS)
+    GAMEDATA.monsters[slug] = VOID_MONSTERS[slug];
+
+  /* Sheet 9x4 de células 64x64 (mesma arte do Breach Brood, looktype 878). */
+  if (typeof MOBSHEETS !== "undefined" && MOBSHEETS &&
+      !MOBSHEETS["burster"]) {
+    MOBSHEETS["burster"] = { ch: 64, cols: 9, cw: 64, rows: 4 };
+  }
+  if (typeof CREATURE_ANCHORS !== "undefined" && CREATURE_ANCHORS &&
+      !CREATURE_ANCHORS["burster"]) {
+    CREATURE_ANCHORS["burster"] = { sw: 64, sh: 64, ox: 0, oy: 0 };
+  }
+
   if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
 
   GAMEDATA.hunts["the-void"] = {
@@ -71,7 +151,9 @@
     packMin: 5,
     packMax: 8,
     monsters: ["reality-reaver", "dread-intruder", "breach-brood"],
-    spawnWeights: { "reality-reaver": 34, "dread-intruder": 33, "breach-brood": 33 },
+    bossMobs: ["burster"],
+    spawnWeights: { "reality-reaver": 3334, "dread-intruder": 3333,
+      "breach-brood": 3333, "burster": 1 },
     color: "#594b72",
     scene: "palace",
     otbm: "thevoid",
