@@ -7984,7 +7984,7 @@ const BO_CAGE_POOL=120000,BO_GAZE_MS=20000,BO_EYE_FUSE_MS=5000,
   BO_EYE_RADIUS=2,BO_EYE_PCT=30,BO_WRAITH_PCT=15,
   BO_MANA_TICKS=5,BO_MANA_PCT=5,BO_MANA_MS=2000,
   BO_CURSE_TICKS=4,BO_CURSE_MS=4000,
-  BO_CAGE_HEAL=5000,BO_SPIRIT_LINK_RADIUS=2,BO_TELEPORT_PCT=0.5;
+  BO_CAGE_HEAL=5000,BO_SCARITH_HEAL=3500,BO_SPIRIT_LINK_RADIUS=2,BO_TELEPORT_PCT=0.5;
 const BO_CAGE_SPAWNS=[
   {slug:"zharvorins-soulcage",spirit:"zharvorins-spirit",dx:8,dy:-5},
   {slug:"myzareths-soulcage",spirit:"myzareths-spirit",dx:-12,dy:-5},
@@ -8045,7 +8045,9 @@ function tickBoneOverlord(auth,now){
       const cage=live.find((m)=>m.boCage===s.boCageSlug);if(!cage)continue;
       const d=Math.max(Math.abs(s.cx-cage.cx),Math.abs(s.cy-cage.cy));
       if(d<=BO_SPIRIT_LINK_RADIUS&&st.cagePool<BO_CAGE_POOL){
-        st.cagePool=Math.min(BO_CAGE_POOL,st.cagePool+BO_CAGE_HEAL/10);
+        // Scarith cura 30% menos que as outras cages (oficial: up to 5k/turn).
+        const healAmt=(s.boCageSlug==="scariths-soulcage"?BO_SCARITH_HEAL:BO_CAGE_HEAL)/10;
+        st.cagePool=Math.min(BO_CAGE_POOL,st.cagePool+healAmt);
         for(const m of live){m.hp=st.cagePool;m._boSyncHp=st.cagePool;}
       }
       if(st.cagePool<BO_CAGE_POOL*BO_TELEPORT_PCT&&now-(Number(s._boTpAt)||0)>30000&&d>2){

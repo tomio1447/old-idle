@@ -2928,3 +2928,8 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   cliente agora encerra a instância no servidor ("resume-failed") em vez
   de só limpar a sessão local — antes, cada login repetia o mesmo fetch
   → throw → cidade, num ciclo sem saída.
+
+- **BALANCE — Scarith's Soulcage cura 30% menos**: o espírito linkado à
+  cage da Scarith passa a curar o pool compartilhado em 3.500 por turno
+  (era 5.000). As outras três cages (Zharvorin, Myzareth, Elyrax) seguem
+  em 5.000/turno — espelhado no servidor e no modo solo.

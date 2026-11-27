@@ -600,6 +600,7 @@ const BO_WRAITH_PCT = 15;        // 15% hp atual
 const BO_MANA_TICKS = 5, BO_MANA_PCT = 5, BO_MANA_MS = 2000;
 const BO_CURSE_TICKS = 4, BO_CURSE_MS = 4000;
 const BO_CAGE_HEAL = 5000;       // "up to 5,000+ per turn"
+const BO_SCARITH_HEAL = 3500;    // Scarith cura 30% menos que as outras cages
 const BO_SPIRIT_LINK_RADIUS = 2; // espírito perto da cage → cura
 const BO_TELEPORT_PCT = 0.5;     // pool <50% → spirit teleporta à cage
 
@@ -1621,7 +1622,8 @@ function boneOverlordBossTick(c, now) {
       if (!cage) continue;
       const d = Math.max(Math.abs(s.cx - cage.cx), Math.abs(s.cy - cage.cy));
       if (d <= BO_SPIRIT_LINK_RADIUS && st.cagePool < BO_CAGE_POOL) {
-        st.cagePool = Math.min(BO_CAGE_POOL, st.cagePool + BO_CAGE_HEAL / 10);
+        const healAmt = (s.boCageSlug === "scariths-soulcage" ? BO_SCARITH_HEAL : BO_CAGE_HEAL) / 10;
+        st.cagePool = Math.min(BO_CAGE_POOL, st.cagePool + healAmt);
         for (const m of live) { m.hp = st.cagePool; m._boSyncHp = st.cagePool; }
       }
       /* Pool baixo → espírito teleporta à sua cage. */
@@ -1734,7 +1736,7 @@ const ROOST_DATA = {
   BO_CAGE_POOL, BO_CAGE_SPAWNS, BO_DRAGON_SPAWNS, BO_GAZE_MS,
   BO_EYE_FUSE_MS, BO_EYE_RADIUS, BO_EYE_PCT, BO_WRAITH_PCT,
   BO_MANA_TICKS, BO_MANA_PCT, BO_MANA_MS, BO_CURSE_TICKS, BO_CURSE_MS,
-  BO_CAGE_HEAL, BO_SPIRIT_LINK_RADIUS, BO_TELEPORT_PCT,
+  BO_CAGE_HEAL, BO_SCARITH_HEAL, BO_SPIRIT_LINK_RADIUS, BO_TELEPORT_PCT,
   monsterSlugs: Object.keys(ROOST_MONSTERS),
   roostRollWeapon, roostCanExchange, roostState,
   registerMonsters(monsters) {
