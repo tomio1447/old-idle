@@ -395,13 +395,17 @@ function chardPaintCharStrip() {
   }
 
   const acc = isOnline ? CHARD.chars.account : null;
+  const _charListForLimit = isOnline ? (CHARD.chars.characters || []) : (CHARD.chars.chars || []);
+  const _maxChars = (typeof ACCOUNT_MAX_CHARS === "number" && ACCOUNT_MAX_CHARS > 0)
+    ? ACCOUNT_MAX_CHARS : 4;
+  const rosterFull = _charListForLimit.length >= _maxChars;
   host.innerHTML = `
     <div class="chard-chars-row">
       ${cards}
-      <button type="button" class="chard-char-card chard-char-new" id="chard-new-char" title="Criar novo personagem">
+      ${rosterFull ? "" : `<button type="button" class="chard-char-card chard-char-new" id="chard-new-char" title="Criar novo personagem">
         <span class="chard-char-plus">＋</span>
         <span class="chard-char-info"><b>Novo</b><i>personagem</i></span>
-      </button>
+      </button>`}
     </div>
     <div class="chard-chars-actions">
       ${acc && !acc.emailVerified ? `<button class="sm" id="chard-verify-email" title="Confirmar e-mail da conta">📧 Confirmar e-mail</button>` : ""}
