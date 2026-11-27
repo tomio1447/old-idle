@@ -7741,6 +7741,8 @@ function arenaBossBindMechanics(auth,now){
   if(!auth||!auth.bossId)return false;
   const boss=(auth.mobs||[]).find((m)=>m&&m.boss&&m.hp>0);
   if(!boss)return false;
+  auth._bossAppeared=true;
+  if(auth._engagePending){auth._engagePending=false;authMarkBossEngaged(auth);}
   if(auth.arenaBossSpawn&&auth.arenaBossSpawn.mechanicsBound)return false;
   if(auth.arenaBossSpawn)auth.arenaBossSpawn.mechanicsBound=true;
   now=Number(now)||auth.clock;
@@ -7930,6 +7932,48 @@ function arenaBossSpawnTick(auth,now){
     arenaBossBindMechanics(auth,now);
   }
   return true;
+}
+/* Ajustes de entrada por boss para um mob fabricado (init tardio ou
+ * ensureBossArenaMob) — espelha os fixups do initializeAuthority. */
+function applyFabricatedBossFixes(auth,boss){
+  if(!auth||!boss)return;
+  // The Unwelcome: imune a TODO dano — só cai pela vida compartilhada com a
+  // Brother Worm (unwelcomeTick). Sem isso o boss fabricado nascia matável.
+  if(String(auth.bossId||"")==="the-unwelcome"){
+    boss.def=Object.assign({},boss.def,{resist:{physical:100,energy:100,earth:100,
+      fire:100,ice:100,holy:100,death:100,lifedrain:100,manadrain:100,drown:100}});
+  }
+}
+/* "O boss sempre nasce": se uma arena de boss ficou sem mob boss vivo e sem
+ * pendência de spawn (pending perdido no checkpoint, create sem
+ * arenaBossSpawn, bug de mecânica), fabrica um novo e agenda — antes a sala
+ * podia ficar vazia pra sempre com o banner travado em "0s" até a instância
+ * cair no watchdog. Não fabrica nas mecânicas que seguram o boss fora de
+ * mobs legitimamente (ag/cw/bo/mega pendingBoss e world boss). */
+function ensureBossArenaMob(auth,now){
+  if(!auth||auth.ended||auth.terminalReason||auth.bossDefeated)return;
+  if(String(auth.kind||"")!=="boss"||!auth.bossId)return;
+  if(auth.mega||(typeof authIsWorldBoss==="function"&&authIsWorldBoss(auth)))return;
+  if(arenaBossSpawnPending(auth))return;
+  // Qualquer mob boss — até morto: a janela hp=0→ended (Unwelcome: a Brother
+  // Worm derruba o boss no step N e o kill processa no N+1) não pode
+  // fabricar um duplicado.
+  if((auth.mobs||[]).some((m)=>m&&m.boss))return;
+  if(auth.ag&&auth.ag.pendingBoss)return;
+  if(auth.cw&&auth.cw.pendingBoss)return;
+  if(auth.bo&&auth.bo.pendingBoss)return;
+  const slug=String(auth.bossSlug||auth.bossId);
+  const boss=makeMob(auth,slug,true);
+  if(!boss)return;
+  auth.bossSlug=slug;
+  applyFabricatedBossFixes(auth,boss);
+  const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+  const sp=auth.spawnPoints&&auth.spawnPoints[0];
+  boss.cx=sp?Number(sp.cx):Math.floor(gw/2);
+  boss.cy=sp?Number(sp.cy):Math.floor(gh/2);
+  boss.x=(boss.cx+.5)/gw;boss.y=(boss.cy+.5)/gh;boss.sx=boss.x;boss.sy=boss.y;
+  boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
+  arenaBossDeferSpawn(auth,boss,1500);
 }
 /* Adventurer Group (Roost of the Graveborn): enquanto auth.ag vive,
  * membros em vida vermelha (<=30%) viram o avatar da vocação (crítico em
@@ -9461,7 +9505,9 @@ function unwelcomeTick(auth,now){
 function authMarkBossEngaged(auth,force){
   if(!auth||auth._bossFightEngaged||String(auth.kind||"")!=="boss"||!auth.bossId||
      (typeof authIsWorldBoss==="function"&&authIsWorldBoss(auth)))return;
-  if(!force&&!auth._entryConfirmed){auth._engagePending=true;return;}
+  // Sem o boss nascido (_bossAppeared) não existe tentativa a consumir:
+  // dano de adds/sala vazia/instância quebrada nunca queima o cooldown.
+  if(!force&&(!auth._entryConfirmed||!auth._bossAppeared)){auth._engagePending=true;return;}
   auth._bossFightEngaged=true;
   for(const item of auth.players||[]){
     const p=item&&item.p;if(!p)continue;
@@ -10206,6 +10252,7 @@ function step(auth,now,opts){if(auth.ended)return;
     if(auth.greed.immune)fillGreed(auth);}
   // Spawn adiado antes das mecânicas — Hatred/Spite/Malice precisam do boss em mobs.
   arenaBossSpawnTick(auth,now);
+  ensureBossArenaMob(auth,now);
   tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);fillPrimalAdds(auth);tickAdventurerGroup(auth,now);tickEldritch(auth,now);tickIceHorror(auth,now);tickGravedigger(auth,now);tickBoneOverlord(auth,now);tickCourtWarlock(auth,now);tickRootkraken(auth,now);
   tickEchoRaid(auth,now);
   syncBossImmunityFlags(auth);
@@ -10953,8 +11000,16 @@ function initializeAuthority(descriptor,instanceId,now){
         auth.mobs.unshift(boss);
       }
     }
-    if(!boss)boss=auth.mobs[0];
+    if(!boss){
+      // NUNCA marque um add como boss (o antigo mobs[0] pegava um wormling:
+      // o kill dele encerrava a arena como "boss-defeated"). Casa por slug.
+      const want=String((combat.boss&&(combat.boss.sprite||combat.boss.baseMonster))||auth.bossId||"");
+      boss=auth.mobs.find((m)=>m&&String(m.slug||"")===want)||null;
+    }
     if(boss)boss.boss=true;
+    if(!auth.bossSlug)
+      auth.bossSlug=String((combat.boss&&(combat.boss.sprite||combat.boss.baseMonster))||
+        (boss&&boss.slug)||auth.bossId||"");
     // The Unwelcome (Feast of Souls): imune a TODO dano (resist 100 em
     // todos os elementos) — oficialmente só cai pela vida compartilhada
     // com a Brother Worm (auth.unwelcome / unwelcomeTick).
@@ -11026,6 +11081,22 @@ function initializeAuthority(descriptor,instanceId,now){
     }else if(boss){
       // Já spawnado (resume / spawned=true): liga mecânicas agora.
       arenaBossBindMechanics(auth,auth.clock);
+    }else{
+      // Checkpoint sem boss e sem pendência (visual vazio/corrompido):
+      // fabrica e agenda — a sala nunca fica sem o alvo da luta.
+      const slug=String(auth.bossSlug||auth.bossId||"");
+      const created=slug&&makeMob(auth,slug,true,"boss-"+String(auth.bossId||"boss"));
+      if(created){
+        const sp=auth.spawnPoints&&auth.spawnPoints[0];
+        created.cx=sp?Number(sp.cx):Math.floor(gw/2);
+        created.cy=sp?Number(sp.cy):Math.floor(gh/2);
+        created.x=(created.cx+.5)/gw;created.y=(created.cy+.5)/gh;
+        created.sx=created.x;created.sy=created.y;
+        created.allowBlockedSpawn=true;
+        created.fixedSpawnCx=created.cx;created.fixedSpawnCy=created.cy;
+        applyFabricatedBossFixes(auth,created);
+        arenaBossDeferSpawn(auth,created,bossArenaSpawnDelayMs(auth.bossId));
+      }
     }
     syncBossImmunityFlags(auth);}
   // Quest initialization: preserve questWaves from descriptor

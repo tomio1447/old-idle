@@ -84,6 +84,7 @@ function arenaBossBindMechanics(c, now) {
   if (!c || !c.boss) return false;
   const bossLive = (c.mobs || []).find((m) => m && m.boss && m.hp > 0);
   if (!bossLive) return false;
+  c._bossAppeared = true;
   if (c.arenaBossSpawn && c.arenaBossSpawn.mechanicsBound) return false;
   if (c.arenaBossSpawn) c.arenaBossSpawn.mechanicsBound = true;
   now = now || Date.now();

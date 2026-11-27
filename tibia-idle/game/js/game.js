@@ -81,10 +81,10 @@ function clearInstanceSession(reason,localOnly) {
  * cliente marca o mapa quebrado, dá location.reload() e, no boot, re-entra
  * automaticamente no mesmo mapa com estado de cliente limpo.
  * Marker: {charId,kind,huntId,bossId,instanceMode,reason,at,attempts,
- * consumed}. `attempts` conta quebras do MESMO mapa (cap 2 re-entradas
- * automáticas — a 3ª quebra manda pro templo em vez de loopar reload). */
+ * consumed}. `attempts` conta quebras do MESMO mapa (cap 5 re-entradas
+ * automáticas — a 6ª quebra manda pro templo em vez de loopar reload). */
 const BROKEN_INSTANCE_KEY = "tibia-idle-broken-instance-v1";
-const BROKEN_INSTANCE_MAX_REENTRY = 2;
+const BROKEN_INSTANCE_MAX_REENTRY = 5;
 const BROKEN_INSTANCE_TTL_MS = 15 * 60 * 1000;
 function markBrokenInstance(reason) {
   try {
@@ -2315,11 +2315,16 @@ function bossState(p, id) {
  * kill/taken) para o caso de o HP já ter voltado ao máximo na saída. */
 function bossFightEngaged(c) {
   if (!c || !c.boss) return false;
-  if (c.bossDefeated || c._bossFightEngaged) return true;
+  if (c.bossDefeated) return true;
   const mobs = Array.isArray(c.mobs) ? c.mobs : [],
     bid = String((c.boss && (c.boss.id || c.boss.slug)) || ""),
     bm = mobs.find((m) => m && (m.boss || String(m.slug || "") === bid)),
     bmax = bm ? (Number(bm.maxHp) || Number(bm.def && bm.def.hp) || 0) : 0;
+  // O boss nunca nasceu = a tentativa nunca aconteceu: dano de adds da sala
+  // (wormlings, lobby) e instâncias quebradas não queimam o cooldown. O bm
+  // vivo cobre resume local onde o flag _bossAppeared não foi serializado.
+  if (!c._bossAppeared && !(bm && Number(bm.hp) > 0)) return false;
+  if (c._bossFightEngaged) return true;
   if (bm && bmax > 0 && Number(bm.hp) < bmax) return true;
   const ps = (Array.isArray(c.players) && c.players.length ? c.players
     : (c.player ? [c.player] : [])).concat(G.p ? [{ p: G.p }] : []);
@@ -5942,6 +5947,10 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
   }
   if(Array.isArray(previous.mobs)){previous.mobs.splice(0,previous.mobs.length,...reconciledMobs);}
   else previous.mobs=reconciledMobs;
+  // Boss autoritativo presente = a tentativa existe de verdade (gate do CD).
+  if(reconciledMobs.some((m)=>m&&m.boss&&Number(m.hp)>0)||
+     (incoming.arenaBossSpawn&&incoming.arenaBossSpawn.spawned))
+    previous._bossAppeared=true;
 
   // Eventos de combate (dano/cura/kill/dust/death/condition/buff) gerados
   // pelo servidor entram na fila local sem substituir os eventos com `ts`
@@ -6249,6 +6258,11 @@ function loop(ts) {
         ONLINE_AUTH_ACC=Math.min(ONLINE_AUTH_ACC-ONLINE_AUTH_TICK_MS,ONLINE_AUTH_TICK_MS);
         requestOnlineAuthorityTick();
       }
+      // Countdown do boss zerado: dispara o tick na hora — o spawn sai no
+      // próximo step do engine em vez de esperar o ciclo de 1s.
+      if(typeof arenaBossSpawnPending==="function"&&arenaBossSpawnPending(G.combat)&&
+         Date.now()>=(Number(G.combat.arenaBossSpawn.at)||0))
+        requestOnlineAuthorityTick();
       // Somente interpolação/pathfinding visual roda no cliente online.
       if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now());
       else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,dt);

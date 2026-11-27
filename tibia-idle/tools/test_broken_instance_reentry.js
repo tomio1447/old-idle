@@ -3,7 +3,7 @@
  * - quebra marca o mapa (hunt/boss) e dispara location.reload();
  * - world boss / batalha PvP / quest NÃO geram marker (caem no templo);
  * - no boot o marker é consumido UMA vez e re-entra no mapa certo;
- * - cap de re-entradas: a 3ª quebra do mesmo mapa vai pro templo;
+ * - cap de re-entradas: a 6ª quebra do mesmo mapa vai pro templo (cap 5);
  * - o marker preserva a contagem entre reloads (anti-loop). */
 const fs = require("fs"), path = require("path");
 const ROOT = path.join(__dirname, "..");
@@ -124,7 +124,7 @@ console.log("\n== Arbaziloth pede o modo de novo ==");
     "arbaziloth reabre a escolha de modo");
 }
 
-console.log("\n== Cap anti-loop: 3ª quebra vai pro templo ==");
+console.log("\n== Cap anti-loop: 6ª quebra vai pro templo (MAX=5) ==");
 {
   delete store[BROKEN_INSTANCE_KEY];
   G.combat = { huntId: "wasp-nest", instanceMode: "non-pvp", players: [] };
@@ -133,9 +133,17 @@ console.log("\n== Cap anti-loop: 3ª quebra vai pro templo ==");
   const m2 = markBrokenInstance("x");        // quebrou de novo (mesmo mapa)
   consumeBrokenInstanceReentry();            // boot 2 → re-entra
   const m3 = markBrokenInstance("x");        // 3ª quebra
+  consumeBrokenInstanceReentry();            // boot 3 → re-entra
+  const m4 = markBrokenInstance("x");        // 4ª quebra
+  consumeBrokenInstanceReentry();            // boot 4 → re-entra
+  const m5 = markBrokenInstance("x");        // 5ª quebra
+  consumeBrokenInstanceReentry();            // boot 5 → re-entra
+  const m6 = markBrokenInstance("x");        // 6ª quebra — estoura o cap
   ok(m1 && m1.attempts === 1, "1ª quebra: attempts=1");
   ok(m2 && m2.attempts === 2, "2ª quebra: attempts=2 (mesmo mapa soma)");
-  ok(m3 === null, "3ª quebra: sem marker (temple fallback)");
+  ok(m3 && m3.attempts === 3, "3ª quebra: attempts=3 (re-entra)");
+  ok(m5 && m5.attempts === 5, "5ª quebra: attempts=5 (re-entra)");
+  ok(m6 === null, "6ª quebra: sem marker (temple fallback)");
   ok(!(BROKEN_INSTANCE_KEY in store), "marker limpo após o cap");
 }
 

@@ -4,6 +4,16 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Boss sempre nasce + cooldown nunca queima sem luta
+
+- **O bug**: "Boss nasce em 0s" travado, sala só com adds, instância quebrada → templo **e cooldown queimado**. A causa: se o checkpoint da instância chegasse sem o mob do boss e sem `arenaBossSpawn.pending`, a autoridade nunca agendava o spawn — e dano de adds já carimbava o cooldown. Pior: um fallback antigo marcava `mobs[0]` como boss — um wormling podia virar "o boss" e o kill dele encerrava a arena como vitória.
+- **O boss sempre nasce**: novo `ensureBossArenaMob` roda a cada step da autoridade — arena de boss sem mob boss e sem pendência refabrica o boss e agenda o spawn (guards para as mecânicas que seguram o boss fora de `mobs` legitimamente: Adventurer Group, Court Warlock, Phylactery, Mega e world boss). `initializeAuthority` também fabrica quando o checkpoint vem vazio.
+- **Cooldown blindado**: novo flag `_bossAppeared` — `authMarkBossEngaged` (servidor) e `bossFightEngaged` (cliente) só contam a tentativa depois que o boss nasceu. Dano de adds, sala vazia ou instância quebrada **nunca queimam a tentativa**.
+- **Spawn instantâneo**: countdown zerado dispara tick da autoridade na hora em vez de esperar o ciclo de 1s.
+- **Recuperação**: cap de re-entradas em instância quebrada subiu de 2 para 5 antes do fallback pro templo.
+
+---
+
 ## 2026-11-27 — Mini bosses da Falcon Bastion com a taxa real de 0,01%
 
 - **O bug**: os `spawnWeights` davam peso `1` a cada um dos 4 mini bosses contra `48`/`48` de Falcon Knight/Paladin — **1% por mini boss, 4% combinado por slot de spawn**. Com pack 6–8 e respawn ~1s isso gerava centenas de mini bosses por hora.
