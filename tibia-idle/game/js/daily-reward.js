@@ -10,7 +10,7 @@
  * drena dentro da área de treino (templo/boss/quest não consomem).
  */
 
-const DAILY_REWARD_STATE = { checking: false, shownDay: "", timer: null };
+const DAILY_REWARD_STATE = { checking: false, shownDay: "", timer: null, claimable: false };
 const DAILY_REWARD_WEAPONS = [
   "exercise-sword", "exercise-axe", "exercise-club", "exercise-bow",
   "exercise-rod", "exercise-wand", "exercise-shield", "exercise-wraps",
@@ -30,7 +30,7 @@ function dailyRewardVocWeapons(p) {
 function dailyRewardIcon(reward) {
   const type = String(reward && reward.type || "exercise");
   if (type === "wildcard") return "assets/ui/prey/prey_wildcard.png";
-  if (type === "exp") return "assets/ui/prey/prey_xp.png";
+  if (type === "exp") return "assets/ui/store/xp-boost.png";
   if (type === "skill") return (typeof TRAINING_ICON_PATH !== "undefined" ? TRAINING_ICON_PATH : "assets/sprites/training/") + "skill-trainer-all.gif";
   return (typeof TRAINING_ICON_PATH !== "undefined" ? TRAINING_ICON_PATH : "assets/sprites/training/") + "lasting-exercise-sword.gif";
 }
@@ -56,10 +56,41 @@ async function dailyRewardCheck(p, attempt) {
   const token = sessionToken();
   if (!token) return;
   const r = await accountDailyRewardStatus(token, p.id);
+  DAILY_REWARD_STATE.claimable = !!(r && r.ok && r.available);
+  if (typeof renderCidadeRewardNotify === "function") renderCidadeRewardNotify(p);
   if (!r || !r.ok || !r.available) return;
   if (DAILY_REWARD_STATE.shownDay === r.rewardDay) return;
   DAILY_REWARD_STATE.shownDay = r.rewardDay;
   openDailyRewardModal(p, r);
+}
+
+/* Recompensa semanal ainda disponível para coletar neste server save —
+ * alimenta o "!" do botão Reward Shrine no modal CIDADE. */
+function dailyRewardIsClaimable(p) {
+  return !!(p && DAILY_REWARD_STATE.claimable);
+}
+
+/* Abre o Reward Shrine direto do modal CIDADE: busca o status atual e
+ * mostra o cronograma mesmo quando o dia já foi coletado. */
+async function openRewardShrine(p) {
+  const player = p || (typeof G !== "undefined" && G ? G.p : null);
+  if (!player) return;
+  if (typeof accountApiConfigured !== "function" || !accountApiConfigured()
+      || typeof sessionToken !== "function" || !sessionToken()
+      || typeof accountDailyRewardStatus !== "function") {
+    if (typeof toast === "function")
+      toast("A Reward Shrine funciona no modo online (conta + servidor).", "bad");
+    return;
+  }
+  const r = await accountDailyRewardStatus(sessionToken(), player.id);
+  DAILY_REWARD_STATE.claimable = !!(r && r.ok && r.available);
+  if (typeof renderCidadeRewardNotify === "function") renderCidadeRewardNotify(player);
+  if (!r || !r.ok) {
+    if (typeof toast === "function")
+      toast((r && r.msg) || "Não foi possível consultar a recompensa.", "bad");
+    return;
+  }
+  openDailyRewardModal(player, r);
 }
 
 /* Re-checa a cada 10 min durante a sessão — pega o server save sem
@@ -93,11 +124,13 @@ function openDailyRewardModal(p, status) {
   const weekRows = schedule.map((row) => {
     const isToday = row.weekday === weekday;
     const tag = isToday ? (claimed ? "coletado" : "hoje") : "";
+    const bang = isToday && !claimed
+      ? '<span class="cidade-reward-bang cidade-reward-bang--card" title="Recompensa disponível" aria-label="Recompensa disponível">!</span>' : "";
     return `<div class="dr-week-row ${isToday ? "today" : ""} ${isToday && claimed ? "done" : ""}">
       <img src="${dailyRewardIcon(row.reward)}" alt="">
       <span class="dr-week-day">${row.dayName || DAILY_REWARD_DAY_NAMES[row.weekday] || ""}</span>
       <span class="dr-week-label">${dailyRewardLabel(row.reward, "—")}</span>
-      ${tag ? `<span class="dr-week-tag">${tag}</span>` : ""}
+      ${tag ? `<span class="dr-week-tag">${tag}</span>` : ""}${bang}
     </div>`;
   }).join("");
 
@@ -193,6 +226,8 @@ function openDailyRewardModal(p, status) {
       if (msgEl) msgEl.textContent = "Coletando...";
       const r = await accountClaimDailyReward(sessionToken(), p.id, needsWeapon ? selected : "");
       if (r && r.ok) {
+        DAILY_REWARD_STATE.claimable = false;
+        if (typeof renderCidadeRewardNotify === "function") renderCidadeRewardNotify(p);
         if (typeof toast === "function") toast(r.msg || "Recompensa coletada.", "good");
         else if (typeof addLog === "function") addLog("info", r.msg || "Recompensa coletada.");
         if (typeof save === "function") save();

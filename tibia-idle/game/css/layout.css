@@ -6657,6 +6657,7 @@ body.quest-lobby-open #party-panel { display:none !important; }
 .dr-week { display:flex; flex-direction:column; gap:4px; }
 .dr-week-row {
   display:flex; align-items:center; gap:8px;
+  position:relative;
   padding:4px 8px;
   background:rgba(10,12,16,.5); border:1px solid #2c3038; border-radius:5px;
   font:10px Verdana, sans-serif;

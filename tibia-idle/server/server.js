@@ -4023,8 +4023,13 @@ async function charmInstanceOp(db,body){
     const item=descriptor.authority&&descriptor.authority.players&&
       descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
     if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+    const cos=typeof acc.cosmetics==="string"
+      ?(function(){try{return JSON.parse(acc.cosmetics);}catch(e){return{};}})()
+      :(acc.cosmetics||{});
+    const maxCharms=cos.charmExpansion?Infinity
+      :(Number(acc.vip_until)||0)>Date.now()?6:2;
     const r=op==="clear"?authClearCharm(item.p,charmId)
-      :op==="assign"?authAssignCharm(item.p,charmId,race)
+      :op==="assign"?authAssignCharm(item.p,charmId,race,maxCharms)
       :op==="buy"?authBuyCharm(item.p,charmId)
       :authUpgradeCharm(item.p,charmId);
     if(!r||!r.ok){rejection=(r&&r.erro)||"Operação de charm recusada";return null;}
@@ -7386,6 +7391,11 @@ async function main() {
       if (req.method === "POST" && url === "/api/store/prey-slot") {
         const body = await readBody(req);
         const r = await store.buyPreySlot(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/store/charm-expansion") {
+        const body = await readBody(req);
+        const r = await store.buyCharmExpansion(db, body);
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/store/bless") {

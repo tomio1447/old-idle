@@ -27,6 +27,7 @@ function openCycloCityAction(action) {
   else if (action === "forge" && typeof openForgeModal === "function") openForgeModal();
   else if (action === "depot" && typeof openDepotModal === "function") openDepotModal();
   else if (action === "imbuements" && typeof openImbueModal === "function") openImbueModal();
+  else if (action === "rewardShrine" && typeof openRewardShrine === "function") openRewardShrine();
   else if (action === "enpa" && typeof openNpcShop === "function") openNpcShop("enpa");
   else if (action === "gnomally" && typeof openNpcShop === "function") openNpcShop("gnomally");
   else if (action === "tibianus" && typeof openNpcShop === "function") openNpcShop("tibianus");
@@ -1139,12 +1140,21 @@ function cycloCharmDetail(p, id, finished) {
         + (race
           ? `<button type="button" class="gi-btn-assign" id="charm-clear" data-charm-id="${id}">Remover associação</button>`
           : (finished.length
-            ? `<div class="gi-assign-row">
-                 <span id="charm-race-preview">${mobImg(finished[0], 36)}</span>
-                 <select id="charm-race-sel" class="gi-charm-race-sel">${opts}</select>
-               </div>
-               <button type="button" class="gi-btn-assign" id="charm-assign" data-charm-id="${id}">
-                 Associar Criatura</button>`
+            ? (function () {
+                const max = typeof charmMaxActive === "function" ? charmMaxActive() : 2;
+                const count = typeof charmActiveCount === "function" ? charmActiveCount(p) : 0;
+                const full = count >= max;
+                const limitTxt = max === Infinity
+                  ? `${count} charms ativos — Charm Expansion (sem limite)`
+                  : `${count}/${max} charms ativos${full ? " — limite atingido" : ""}`;
+                return `<div class="gi-assign-row">
+                     <span id="charm-race-preview">${mobImg(finished[0], 36)}</span>
+                     <select id="charm-race-sel" class="gi-charm-race-sel">${opts}</select>
+                   </div>
+                   <button type="button" class="gi-btn-assign" id="charm-assign" data-charm-id="${id}" ${full ? "disabled" : ""}>
+                     Associar Criatura</button>
+                   <div class="tiny dim">${limitTxt}${full ? ". Charm Expansion (Store → Extras) remove o limite." : ""}</div>`;
+              })()
             : `<div class="tiny dim">Complete o bestiário de uma criatura com este personagem para associar.</div>`))}
     </div>`;
 }

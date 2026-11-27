@@ -91,6 +91,16 @@ const CIDADE_MODAL_CATALOG = [
     descKey: "cidade.desc.reward",
   },
   {
+    action: "rewardShrine",
+    nameKey: "btn.rewardShrine",
+    name: "REWARD SHRINE",
+    roleKey: "cidade.role.rewardShrine",
+    role: "Recompensa semanal",
+    icon: "assets/ui/store/reward-shrine.png",
+    descKey: "cidade.desc.rewardShrine",
+    desc: "Colete a recompensa semanal da conta — uma coleta por server save.",
+  },
+  {
     action: "forge",
     nameKey: "cidade.name.forge",
     name: "FORJE",
@@ -165,6 +175,7 @@ function openCidadeService(action) {
   }
   if (action === "market" && typeof openMarket === "function") openMarket();
   else if (action === "reward" && typeof openRewardChest === "function") openRewardChest();
+  else if (action === "rewardShrine" && typeof openRewardShrine === "function") openRewardShrine();
   else if (action === "forge" && typeof openForgeModal === "function") openForgeModal();
   else if (action === "depot" && typeof openDepotModal === "function") openDepotModal();
   else if (action === "imbuements" && typeof openImbueModal === "function") openImbueModal();
@@ -174,6 +185,14 @@ function openCidadeService(action) {
 function cidadeRewardPendingCount(p) {
   if (!p || typeof rewardChestBundleList !== "function") return 0;
   try { return rewardChestBundleList(p).length; } catch (e) { return 0; }
+}
+
+/* Recompensa semanal ainda não coletada neste server save (Reward Shrine). */
+function cidadeShrinePendingCount(p) {
+  if (!p) return 0;
+  try {
+    return (typeof dailyRewardIsClaimable === "function" && dailyRewardIsClaimable(p)) ? 1 : 0;
+  } catch (e) { return 0; }
 }
 
 function cidadeRewardBangHtml(n, extraClass) {
@@ -203,7 +222,9 @@ function ensureCidadeRewardBang() {
 
 function renderCidadeRewardNotify(p) {
   const player = p || (typeof G !== "undefined" && G ? G.p : null);
-  const n = cidadeRewardPendingCount(player);
+  const chestN = cidadeRewardPendingCount(player);
+  const shrineN = cidadeShrinePendingCount(player);
+  const n = chestN + shrineN;
   const bang = ensureCidadeRewardBang();
   if (bang) {
     if (n > 0) {
@@ -212,8 +233,8 @@ function renderCidadeRewardNotify(p) {
       bang.innerHTML = "!" + (n > 1
         ? `<span class="cidade-reward-bang-count">${n}</span>` : "");
       bang.title = n === 1
-        ? "1 recompensa de boss para recolher"
-        : `${n} recompensas de boss para recolher`;
+        ? "1 recompensa para recolher na cidade"
+        : `${n} recompensas para recolher na cidade`;
     } else {
       bang.hidden = true;
       bang.setAttribute("aria-hidden", "true");
@@ -221,16 +242,24 @@ function renderCidadeRewardNotify(p) {
       bang.removeAttribute("title");
     }
   }
-  const card = document.querySelector('#cidade-modal-list [data-cidade-action="reward"]');
-  if (card) {
+  const perCard = {
+    reward: [chestN, chestN === 1 ? "Recompensa de boss pendente" : "Recompensas de boss pendentes"],
+    rewardShrine: [shrineN, "Recompensa semanal disponível"],
+  };
+  for (const action of Object.keys(perCard)) {
+    const cnt = perCard[action][0], title = perCard[action][1];
+    const card = document.querySelector(`#cidade-modal-list [data-cidade-action="${action}"]`);
+    if (!card) continue;
     let cardBang = card.querySelector(".cidade-reward-bang");
-    if (n > 0) {
+    if (cnt > 0) {
       if (!cardBang) {
-        card.insertAdjacentHTML("beforeend", cidadeRewardBangHtml(n, "cidade-reward-bang--card"));
+        card.insertAdjacentHTML("beforeend", cidadeRewardBangHtml(cnt, "cidade-reward-bang--card"));
+        card.querySelector(".cidade-reward-bang").title = title;
       } else {
-        cardBang.innerHTML = "!" + (n > 1
-          ? `<span class="cidade-reward-bang-count">${n}</span>` : "");
+        cardBang.innerHTML = "!" + (cnt > 1
+          ? `<span class="cidade-reward-bang-count">${cnt}</span>` : "");
         cardBang.hidden = false;
+        cardBang.title = title;
       }
     } else if (cardBang) {
       cardBang.remove();
@@ -269,7 +298,9 @@ function renderCidadeCatalog() {
       const name = tt(entry.nameKey, entry.name);
       const role = tt(entry.roleKey, entry.role);
       const desc = tt(entry.descKey, entry.descKey);
-      const bang = entry.action === "reward" ? cidadeRewardBangHtml(pending, "cidade-reward-bang--card") : "";
+      const cardPending = entry.action === "reward" ? pending
+        : entry.action === "rewardShrine" ? cidadeShrinePendingCount(G.p) : 0;
+      const bang = cardPending > 0 ? cidadeRewardBangHtml(cardPending, "cidade-reward-bang--card") : "";
       return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card cidade-modal-card" data-cidade-action="${entry.action}">
         <span class="mobs" aria-hidden="true">
           <img src="${entry.icon}" alt="" class="cidade-modal-sprite">

@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Reward Shrine na cidade + ícones oficiais + Charm Expansion na Store
+
+- **Reward Shrine no modal CIDADE**: novo card entre Reward Chest e Forje (ícone oficial da Reward Shrine) que abre o modal de recompensa semanal a qualquer momento — inclusive quando já coletado, pra consultar o cronograma. Enquanto houver recompensa disponível no server save, o "!" aparece no card, no botão CIDADE da topbar e na linha do dia dentro do modal.
+- **Ícones oficiais**: os assets vieram do CDN oficial da store/cliente (static.tibia.com via cache e weserv) — XP Boost substitui o ícone antigo nos dias de bônus de EXP; os packs de VIP passam a usar as coroas oficiais de Premium Time (30/90/360 por tamanho de pack); o 3º slot de prey usa o ícone oficial de Permanent Prey Slot.
+- **Charm Expansion (Store → Extras, 450 Tibia Coins)**: produto por conta, compra única. Oficial: conta free associa charms em até 2 criaturas, VIP em até 6, Charm Expansion remove o limite. Implementado o limite que faltava — `charmMaxActive`/`charmActiveCount` no cliente (cyclopedia) e `authAssignCharm` no engine com `maxActive` (2 free / 6 VIP / ∞ expansion), enforced também no `charmInstanceOp` das instâncias. Remover associação continua grátis; quem já tinha mais de 2 associações não perde nada — só não associa novas até ficar abaixo do limite ou comprar a expansão.
+- **Compra atômica**: `buyCharmExpansion` nos dois storages — JsonStore (débito NT→coins + `cosmetics.charmExpansion=1` numa operação) e MySQL (UPDATE único com guarda de saldo e de já-desbloqueado). 409 em re-compra ou saldo insuficiente; ledger registra `ref: "charm-expansion"`.
+- **Nova aba "Extras" na Store**: abriga o Charm Expansion (e produtos avulsos futuros), com estado "Desbloqueado" após a compra.
+- **Teste**: `node tools/test_charm_expansion.js` — 12 asserts: catálogo expõe 450 TC, 409 sem saldo, checkout+simulate creditam, compra debita e marca cosmetics, 409 na re-compra e `/api/me` reflete o desbloqueio.
+
+---
+
 ## 2026-11-27 — Recompensa diária: cronograma semanal por conta
 
 - **Por conta, não por personagem**: a marca de coleta migrou de `p.dailyRewardDay` (por char) para `cosmetics.weeklyRewardDay` (conta). Uma coleta por server save vale para a conta inteira; sem coletar, o próximo save substitui (não acumula — como antes).

@@ -37,6 +37,8 @@ const PREY_PACKS = [
 ];
 /* 3º slot de prey permanente, por CONTA — pago com Tibia Coins. */
 const PREY_SLOT_COINS = 350;
+/* Charm Expansion permanente, por CONTA — preço oficial da Store. */
+const CHARM_EXPANSION_COINS = 450;
 
 async function changePreys(db, body, consume) {
   const acc = await db.findAccountByToken(body && body.token);
@@ -76,6 +78,28 @@ async function buyPreySlot(db, body) {
     msg: "3º slot de prey desbloqueado para toda a conta!" } };
 }
 
+/* Charm Expansion permanente (conta inteira): libera assign de TODOS os
+ * charms desbloqueados de uma vez (oficial: free 2 / premium 6 / expansion
+ * ilimitado). Mesma estrutura do buyPreySlot. */
+async function buyCharmExpansion(db, body) {
+  const acc = await db.findAccountByToken(body && body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const cos = typeof acc.cosmetics === "string"
+    ? (function () { try { return JSON.parse(acc.cosmetics); } catch (e) { return {}; } })()
+    : (acc.cosmetics || {});
+  if (cos.charmExpansion) return { code: 409, body: { ok: false, msg: "Charm Expansion já desbloqueado." } };
+  if (typeof db.buyCharmExpansion !== "function")
+    return { code: 500, body: { ok: false, msg: "Indisponível neste storage." } };
+  if (!await db.buyCharmExpansion(acc.id, CHARM_EXPANSION_COINS))
+    return { code: 409, body: { ok: false, msg: "Tibia Coins insuficientes (precisa de " + CHARM_EXPANSION_COINS + ")." } };
+  const fresh = await db.findAccountById(acc.id);
+  await addLedger(db, { accountId: acc.id, login: acc.login, kind: "purchase",
+    delta: -CHARM_EXPANSION_COINS, coinsAfter: fresh.coins, brlCents: 0, ref: "charm-expansion",
+    note: "Charm Expansion permanente (" + CHARM_EXPANSION_COINS + " TC)" });
+  return { code: 200, body: { ok: true, coins: fresh.coins, coinsNt: fresh.coins_nt || 0, cosmetics: fresh.cosmetics,
+    msg: "Charm Expansion desbloqueado para toda a conta!" } };
+}
+
 function mpConfigured() { return !!MP_ACCESS_TOKEN; }
 function packById(id) { return COIN_PACKS.find((p) => p.id === String(id || "")) || null; }
 function vipById(id) { return VIP_PACKS.find((p) => p.id === String(id || "")) || null; }
@@ -91,6 +115,7 @@ function catalog() {
     vip: VIP_PACKS.slice(),
     preys: PREY_PACKS.map((p) => Object.assign({}, p)),
     preySlotCoins: PREY_SLOT_COINS,
+    charmExpansionCoins: CHARM_EXPANSION_COINS,
   };
 }
 
@@ -852,7 +877,7 @@ async function recordGrant(db, acc, amount, after) {
 
 module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
-  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, buyPreySlot, PREY_PACKS, PREY_SLOT_COINS,
+  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, buyPreySlot, buyCharmExpansion, PREY_PACKS, PREY_SLOT_COINS, CHARM_EXPANSION_COINS,
   COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE, BLESS_PRICE,
   buyImbuement, IMBUEMENT_TIER_COINS,
 };

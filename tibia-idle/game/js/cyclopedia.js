@@ -513,6 +513,20 @@ function upgradeCharm(p, id) {
   return { ok: true, id: cid, tier: tier + 1 };
 }
 
+/* Limite oficial de charms ativos ao mesmo tempo: conta free 2, VIP 6,
+ * Charm Expansion (Store, por conta) ilimitado. */
+function charmMaxActive() {
+  try {
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    if (acc && acc.cosmetics && acc.cosmetics.charmExpansion) return Infinity;
+    if (typeof isVip === "function" && isVip()) return 6;
+  } catch (e) {}
+  return 2;
+}
+function charmActiveCount(p) {
+  return Object.keys((p && p.charmRace) || {}).length;
+}
+
 function assignCharm(p, id, slug) {
   ensureCyclopedia(p);
   const cid = resolveCharmId(id);
@@ -526,6 +540,11 @@ function assignCharm(p, id, slug) {
   const other = charmOnRace(p, slug);
   if (other && other !== cid)
     return { ok: false, erro: "Essa criatura já tem outra runa." };
+  const max = charmMaxActive();
+  if (!p.charmRace[cid] && charmActiveCount(p) >= max)
+    return { ok: false, erro: max === 6
+      ? "Limite de 6 charms ativos (VIP). Charm Expansion (Store) remove o limite."
+      : "Limite de 2 charms ativos. VIP libera 6; Charm Expansion (Store) remove o limite." };
   p.charmRace[cid] = slug;
   return { ok: true, id: cid };
 }
@@ -630,6 +649,7 @@ if (typeof module !== "undefined" && module.exports) {
     CYCLO_ABAS, CHARMS, BEST_ESTAGIOS, bestiaryKill, bestiaryStage,
     bestiaryProgress, bestiarySummary, bestiaryFinishedList,
     buyCharm, upgradeCharm, assignCharm, clearCharm, charmTotals, charmOffensiveProc,
+    charmMaxActive, charmActiveCount,
     charmTier, charmFx, charmCostAt, CHARM_TIERS,
     charmOwned, charmAssignedRace, charmOnRace, charmIconHtml,
     huntStars, huntStarsHtml, ensureCyclopedia, resolveCharmId,

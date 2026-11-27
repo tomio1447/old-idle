@@ -3620,7 +3620,10 @@ function upgradeCharm(p,id){
   if(p.charmPoints<cost)return{ok:false,erro:"Charm points insuficientes."};
   p.charmPoints-=cost;p.charms[cid]=tier+1;return{ok:true,id:cid,tier:tier+1};
 }
-function assignCharm(p,id,slug){
+/* Limite oficial de charms ativos: free 2 / VIP 6 / Charm Expansion
+ * (cosmetics.charmExpansion da conta) ilimitado — o chamador passa
+ * maxActive resolvido a partir da conta. */
+function assignCharm(p,id,slug,maxActive){
   ensurePlayerCharms(p);
   const cid=resolveCharmId(id);const c=cid&&CHARMS[cid];
   if(!c)return{ok:false,erro:"Charm desconhecido."};
@@ -3629,6 +3632,11 @@ function assignCharm(p,id,slug){
   for(const other of Object.keys(p.charmRace)){
     if(p.charmRace[other]===slug&&other!==cid)return{ok:false,erro:"Essa criatura já tem outra runa."};
   }
+  const max=Number.isFinite(maxActive)?maxActive:2;
+  if(!p.charmRace[cid]&&Object.keys(p.charmRace).length>=max)
+    return{ok:false,erro:max===6
+      ?"Limite de 6 charms ativos (VIP). Charm Expansion (Store) remove o limite."
+      :"Limite de 2 charms ativos. VIP libera 6; Charm Expansion (Store) remove o limite."};
   p.charmRace[cid]=slug;return{ok:true,id:cid};
 }
 function clearCharm(p,id){

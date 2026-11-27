@@ -957,6 +957,25 @@ JsonStore.prototype.buyPreySlot = function (accountId, coinCost) {
   this._save();
   return true;
 };
+/* Charm Expansion por conta (oficial: 450 TC): débito de Tibia Coins +
+ * grant atômicos — mesma estrutura do buyPreySlot. */
+JsonStore.prototype.buyCharmExpansion = function (accountId, coinCost) {
+  const a = this.findAccountById(accountId);
+  const cost = Math.max(0, Math.floor(Number(coinCost) || 0));
+  if (!a) return false;
+  let cos = a.cosmetics;
+  if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch (e) { cos = null; } }
+  cos = cos && typeof cos === "object" ? cos : {};
+  const haveNt = Math.max(0, Number(a.coins_nt) || 0);
+  const have = Math.max(0, Number(a.coins) || 0);
+  if (cos.charmExpansion || haveNt + have < cost) return false;
+  const ntSpent = Math.min(haveNt, cost);
+  a.coins_nt = haveNt - ntSpent;
+  a.coins = have - (cost - ntSpent);
+  a.cosmetics = Object.assign({}, cos, { charmExpansion: 1 });
+  this._save();
+  return true;
+};
 JsonStore.prototype.bumpAccountBless = function (accountId, delta) {
   const a = this.findAccountById(accountId);
   if (!a) return 0;
@@ -3459,6 +3478,22 @@ async function MysqlStore() {
            cosmetics = JSON_SET(${json}, '$.preySlot', 1)
          WHERE id = ? AND coins + coins_nt >= ?
            AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.preySlot')), '0') IN ('0','false','null')`,
+        [cost, cost, cost, Number(id), cost]);
+      return !!(r && r.affectedRows > 0);
+    },
+    /* Charm Expansion por conta (oficial: 450 TC): um único UPDATE
+     * atômico — debita coins (NT primeiro) e marca charmExpansion só se
+     * ainda não tiver e houver saldo. */
+    async buyCharmExpansion(id, coinCost) {
+      const cost = Math.max(0, Math.floor(Number(coinCost) || 0));
+      const json = "CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END";
+      const r = await this.run(
+        `UPDATE accounts SET
+           coins = coins - (? - LEAST(coins_nt, ?)),
+           coins_nt = coins_nt - LEAST(coins_nt, ?),
+           cosmetics = JSON_SET(${json}, '$.charmExpansion', 1)
+         WHERE id = ? AND coins + coins_nt >= ?
+           AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.charmExpansion')), '0') IN ('0','false','null')`,
         [cost, cost, cost, Number(id), cost]);
       return !!(r && r.affectedRows > 0);
     },

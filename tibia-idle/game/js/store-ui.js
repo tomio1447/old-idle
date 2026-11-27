@@ -97,6 +97,7 @@ function renderStoreNav() {
     { id: "mounts", nome: "Mounts" },
     { id: "bless", nome: "BLESS" },
     { id: "preys", nome: "Preys" },
+    { id: "extras", nome: "Extras" },
     { id: "vouchers", nome: "Vouchers" },
     { id: "history", nome: "Histórico" },
   ];
@@ -133,6 +134,7 @@ async function renderStoreTab() {
   if (_storeTab === "mounts") return renderStoreCosmetics(main, "mount");
   if (_storeTab === "bless") return renderStoreBless(main);
   if (_storeTab === "preys") return renderStorePreys(main);
+  if (_storeTab === "extras") return renderStoreExtras(main);
   if (_storeTab === "vouchers") return renderStoreVouchers(main);
   if (_storeTab === "history") return renderStoreHistory(main);
   if (_storeTab === "admin") return renderStoreAdmin(main);
@@ -204,7 +206,7 @@ async function renderStorePreys(main) {
     Wildcards antigos do personagem são utilizados primeiro.</div>
     <div class="store-pack-grid">
       <div class="store-pack">
-        <img src="assets/ui/prey/prey_perm_test.png" width="32" height="32" alt="3º Prey Slot">
+        <img src="assets/ui/store/permanent-prey-slot.png" width="32" height="32" alt="3º Prey Slot">
         <div class="store-pack-label">3º Slot de Prey</div>
         <div class="tiny dim">permanente · toda a conta</div>
         <div class="store-pack-price">${storeCoinIcon()} ${slotCost} TC</div>
@@ -255,6 +257,59 @@ async function renderStorePreys(main) {
   });
 }
 
+/* Charm Expansion permanente por CONTA (oficial: 450 TC) — libera o
+ * assign de todos os charms desbloqueados de uma vez (sem: 2 / VIP: 6). */
+function charmExpansionOwned() {
+  const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+  return !!(acc && acc.cosmetics && acc.cosmetics.charmExpansion);
+}
+
+async function renderStoreExtras(main) {
+  main.innerHTML = `<div class="tiny dim">Carregando...</div>`;
+  const cat = await ensureStoreCatalog();
+  if (!cat.ok) { main.innerHTML = `<div class="tiny" style="color:#ff9a6a">${storeEsc(cat.msg)}</div>`; return; }
+  const cost = Math.max(1, Number(cat.charmExpansionCoins) || 450);
+  const owned = charmExpansionOwned();
+  main.innerHTML = `
+    <div class="tiny dim mb4">Upgrades permanentes para <b>toda a conta</b>.</div>
+    <div class="store-pack-grid">
+      <div class="store-pack">
+        <img src="assets/ui/store/charm-expansion.png" width="48" height="48" alt="Charm Expansion">
+        <div class="store-pack-label">Charm Expansion</div>
+        <div class="tiny dim">Associe <b>todos</b> os seus charms desbloqueados de uma vez — sem o limite de 2 (6 com VIP) charms ativos por criatura completada no bestiário.</div>
+        <div class="store-pack-price">${storeCoinIcon()} ${cost} TC</div>
+        <button type="button" class="sm primary full" id="store-charm-expansion" ${owned ? "disabled" : ""}>
+          ${owned ? "Desbloqueado" : "Desbloquear"}</button>
+      </div>
+    </div>`;
+  const btn = main.querySelector("#store-charm-expansion");
+  if (btn) btn.addEventListener("click", async () => {
+    if (btn.dataset.confirm !== "yes") {
+      btn.dataset.confirm = "yes";
+      btn.textContent = `Confirmar (${cost} TC)`;
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const r = await accountCharmExpansionRequest(sessionToken());
+      toast(r.msg || (r.ok ? "Charm Expansion desbloqueado." : "Falha ao desbloquear."), r.ok ? "level" : "bad");
+      if (main.isConnected && _storeTab === "extras") openStoreModal("extras");
+    } catch (e) {
+      toast("Não foi possível confirmar a compra. Confira o saldo antes de tentar novamente.", "bad");
+      btn.disabled = false;
+    }
+  });
+}
+
+/* Ícones oficiais de Premium Time (coroas da store oficial) por tamanho
+ * de pack — a coroa mais ornamentada representa o pacote maior. */
+function storeVipPackIcon(pack) {
+  const days = Math.max(0, Number(pack && pack.days) || 0);
+  if (days >= 30) return "assets/ui/store/premium-time-360.png";
+  if (days >= 7) return "assets/ui/store/premium-time-90.png";
+  return "assets/ui/store/premium-time-30.png";
+}
+
 async function renderStoreVip(main) {
   main.innerHTML = `<div class="tiny dim">Carregando VIP...</div>`;
   const cat = await ensureStoreCatalog();
@@ -269,6 +324,7 @@ async function renderStoreVip(main) {
     <div class="store-pack-grid">
       ${packs.map((p) => `
         <div class="store-pack">
+          <img src="${storeVipPackIcon(p)}" width="48" height="48" alt="${storeEsc(p.label)}" class="store-pack-img">
           <div class="store-pack-label">${storeEsc(p.label)}</div>
           <div class="store-pack-price">${storeCoinIcon()} ${p.coins} TC</div>
           <button type="button" class="sm primary full" data-store-vip="${storeEsc(p.id)}">Comprar</button>

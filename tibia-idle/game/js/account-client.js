@@ -3216,6 +3216,21 @@ async function accountPreySlotRequest(token) {
   }
   return r.data || { ok: false, msg: "Falha ao desbloquear o slot." };
 }
+/* Charm Expansion permanente (conta inteira) — 450 TC na Store. */
+async function accountCharmExpansionRequest(token) {
+  const r = await _api("POST", "/api/store/charm-expansion", { token });
+  if (r.data && r.data.ok) {
+    if (r.data.coins != null && typeof storeApplyCoins === "function")
+      storeApplyCoins(r.data.coins, r.data.coinsNt);
+    const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+    if (acc && r.data.cosmetics) {
+      acc.cosmetics = Object.assign({}, acc.cosmetics || {}, {
+        charmExpansion: r.data.cosmetics.charmExpansion || 0 });
+      sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+    }
+  }
+  return r.data || { ok: false, msg: "Falha ao desbloquear o Charm Expansion." };
+}
 async function storeBuyBless(token) {
   const r = await _api("POST", "/api/store/bless", { token });
   if (r.data && r.data.ok) {

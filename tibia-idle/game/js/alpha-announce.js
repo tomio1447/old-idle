@@ -6,10 +6,13 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "27/11/2026 às 13:30";
+const ALPHA_UPDATE_AT = "27/11/2026 às 16:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Reward Shrine na cidade: o modal CIDADE ganhou um botão com o ícone oficial da Reward Shrine que abre o cronograma de recompensa semanal a qualquer momento — um '!' aparece no card e no botão CIDADE enquanto houver recompensa para coletar",
+  "NOVO — Charm Expansion na STORE → Extras (450 TC, por conta): remove o limite de charms ativos — conta free associa em até 2 criaturas, VIP em até 6, a expansão libera ilimitado (modelo oficial)",
+  "NOVO — Ícones oficiais na Store e recompensas: packs de VIP usam as coroas oficiais de Premium Time, o 3º slot de prey usa o ícone oficial de Permanent Prey Slot e o XP Boost ganhou o ícone oficial nos dias de bônus de EXP",
   "NOVO — Recompensa diária reformulada: cronograma SEMANAL POR CONTA (uma coleta por server save para todos os personagens) — dom 1.500 cargas de exercise, seg/qua 10 Prey Wildcards, ter +25% de EXP por 1h de caça, qui 500 cargas, sex +100% de EXP por 30min e sáb +100% de Skill por 30min de treino — bônus de EXP só drena em hunt e o de Skill só dentro da área de treino",
   "FIX — Mover itens da Loot Pouch para a mochila não falha mais com 'mochila cheia' tendo espaço: stacks de potions e creature products eram contados como 1 slot por unidade em vez de 1 por tipo",
   "FIX — Boss bar agora exibe apenas o boss: summons e monstros da sala (Soulcages, spirits, dragons, eyes) não aparecem mais — em lutas de fases como o Bonelord's Phylactery a barra fica oculta até o boss nascer",
