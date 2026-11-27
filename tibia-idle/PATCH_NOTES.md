@@ -4,6 +4,18 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Boss Slots (Cyclopedia) — funcional no servidor
+
+- **Aba Boss Slots** (ícone do Bosstiário, molde io_bosstiary do Crystalserver/Tibia):
+  - **2 slots por personagem** para associar bosses desbloqueados (nível ≥1 do bosstiário dele: Bane 10 / Archfoe 3 / Nemesis 1 kill). O **slot 2** exige 1.500 boss points, com barra de progresso enquanto bloqueado.
+  - **Slot 3 = Boss do Dia** (boosted): fixo, mostra o daily boss com o loot sorteado (+15–35%) — e cada kill do boss do dia conta **3×** no bosstiário.
+  - **Bônus de loot do slot**: ao abater o boss slotted, a chance de loot multiplica pelo bônus derivado dos boss points (curva oficial) + **25%** se o boss completou o nível 3.
+  - **Remover** o boss do slot: as 2 primeiras são grátis; a partir da 3ª custa `300.000 × remoções − 500.000` gp.
+  - Operações **autoritativas no servidor** (`POST /api/character/boss-slot`, mesma cadeia da promoção): em instância o patch aplica no snapshot autoritativo; na cidade grava o save versionado e debita o wallet da conta. Sem conta, aplica local.
+- Marcos de nível por categoria escalados aos alvos do jogo (Bane 10/20/30, Archfoe 3/7/10, Nemesis 1/3/5 — mesmo espírito dos oficiais 25/100/300, 5/20/60, 1/3/5).
+
+---
+
 ## 2026-11-27 — Bosstiário reestruturado (detalhe do boss em 2 colunas)
 
 - **Lista do bosstiário**: toolbar igual à do bestiário — métricas à esquerda (Nível, pontos, bônus de dano contra bosses, encontrados/completos), **busca por nome** + filtros de categoria (Todos/Bane/Archfoe/Nemesis, cada um na cor da categoria) à direita.

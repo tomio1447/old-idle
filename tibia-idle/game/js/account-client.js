@@ -839,6 +839,30 @@ function accountSelectInstanceCharm(token,charId,charmId,race,op){
     return {ok:false,msg:r.data.msg||"Não foi possível aplicar o charm",error:r.data.error};
   });
 }
+/* Boss Slots — autoritativo no servidor (mesma cadeia da promoção): UMA
+ * rota decide o caminho — em instância aplica o patch no snapshot (senão a
+ * extração regrava p.bossSlots/p.gold antigos), na cidade muta o save
+ * versionado e debita o wallet da conta (o remove cobra gold e gold é
+ * chave protegida do save comum). */
+function accountBossSlotOp(token,charId,opts){
+  opts=opts||{};
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};
+    const id=String(charId||""),cache=await accountEnsureVersions(token,[id]),summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),
+      op:String(opts.op||"assign"),slot:Number(opts.slot)||0,slug:String(opts.slug||""),
+      expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/character/boss-slot",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof accountMaybeApplyShared==="function")accountMaybeApplyShared(r.data);
+      return {ok:true,bossSlots:r.data.bossSlots,bossSlotRemoves:r.data.bossSlotRemoves,
+        gold:r.data.gold,character:r.data.character,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível aplicar o boss slot",code:r.code,error:r.data.error};
+  });
+}
 /* Equipa/desequipa um item da bag ou Loot Pouch na instância ativa. Sem isso
  * o tick autoritativo (200ms) restaura o equipamento anterior — o falcon bow
  * "voltava" depois de equipar o crossbow. */

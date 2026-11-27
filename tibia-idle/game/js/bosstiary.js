@@ -163,6 +163,124 @@ function bosstiaryDamageBonus(p) {
   return 1 + Math.min(0.25, bosstiaryLevel(p) * 0.01);
 }
 
+/* ------------------------------------------------------------ Boss Slots
+ * Molde Crystalserver/Tibia (io_bosstiary): cada char tem 2 slots fixos
+ * (o 2º pede 1500 boss points) + o slot do boss do dia (boosted). Um boss
+ * slotted dá chance extra de loot ao ser abatido: bônus dos boss points
+ * (curva oficial) + 25% se o boss está no nível 3. Trocar de boss é grátis
+ * nas 2 primeiras vezes; a partir da 3ª custa 300k*remoções - 500k.
+ *
+ * Níveis por categoria (marcos de kills; nível 3 = completo, pois o último
+ * marco É o alvo): Bane 10/20/30, Archfoe 3/7/10, Nemesis 1/3/5 — mesma
+ * escala dos oficiais (25/100/300, 5/20/60, 1/3/5) ajustada aos nossos
+ * alvos de categoria. */
+const BOSS_SLOT_LEVELS = {
+  bane: [10, 20, 30],
+  archfoe: [3, 7, 10],
+  nemesis: [1, 3, 5],
+};
+const BOSS_SLOT2_POINTS = 1500;
+/* Boss do dia (slot boosted): kill conta 3× no bosstiário — nos moldes do
+ * kill bonus oficial (multiplier + boost). O loot extra já vem do
+ * dailyBossLootMul do servidor (15–35% sorteado por dia). */
+const BOSS_SLOT_DAILY_KILLS = 3;
+
+function ensureBossSlots(p) {
+  if (!p.bossSlots || typeof p.bossSlots !== "object" || Array.isArray(p.bossSlots))
+    p.bossSlots = { 1: null, 2: null };
+  p.bossSlotRemoves = Math.max(0, Number(p.bossSlotRemoves) || 0);
+  return p;
+}
+
+/* Nível 0–3 de um boss (marcos de kills por categoria). */
+function bossSlotLevel(p, slug) {
+  ensureBosstiary(p);
+  const kills = p.bosstiary[slug] || 0;
+  const lv = BOSS_SLOT_LEVELS[bossCategory(slug)] || BOSS_SLOT_LEVELS.bane;
+  let lvl = 0;
+  for (const k of lv) if (kills >= k) lvl++;
+  return lvl;
+}
+
+/* "Unlocked" p/ slot = nível ≥1 (oficial: getBosstiaryFinished level 1). */
+function bossSlotUnlocked(p, slug) {
+  return bossSlotLevel(p, slug) >= 1;
+}
+
+/* Bônus de loot derivado dos boss points — curva oficial
+ * io_bosstiary.calculateLootBonus. */
+function bossLootBonusPct(points) {
+  const pts = Math.max(0, Number(points) || 0);
+  if (pts <= 250) return Math.floor(25 + pts / 10);
+  if (pts < 1250) return Math.floor(37.5 + pts / 20);
+  return Math.floor(100 + 0.5 *
+    (Math.sqrt(8 * ((pts - 1250) / 5) + 81) - 9));
+}
+
+/* % extra de chance de loot quando o boss slotted é abatido:
+ * bônus dos pontos + 25 se o boss atingiu o nível 3. */
+function bossSlotBonusPct(p, slug) {
+  ensureBossSlots(p);
+  const sl = p.bossSlots || {};
+  if (sl[1] !== slug && sl[2] !== slug) return 0;
+  return bossLootBonusPct(p.bossPoints) +
+    (bossSlotLevel(p, slug) >= 3 ? 25 : 0);
+}
+
+/* Preço de remover um boss do slot (oficial calculteRemoveBoss):
+ * as 2 primeiras remoções são grátis; da 3ª em diante 300k*vezes - 500k. */
+function bossSlotRemovePrice(removes) {
+  removes = Math.max(0, Number(removes) || 0);
+  return removes < 2 ? 0 : 300000 * removes - 500000;
+}
+
+/* Bosses que podem ocupar um slot (nível ≥1 e ativos no mundo). */
+function bossSlotList(p) {
+  return bosstiaryList().filter((s) => bossSlotUnlocked(p, s));
+}
+
+/* Validação compartilhada cliente/servidor antes do assign.
+ * Retorna null se pode associar, ou a mensagem do motivo. */
+function bossSlotAssignError(p, slot, slug) {
+  ensureBossSlots(p);
+  slot = Number(slot);
+  if (slot !== 1 && slot !== 2) return "slot inválido";
+  const m = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
+    ? GAMEDATA.monsters[slug] : null;
+  if (!m || !m.boss) return "não é um boss";
+  if (!bossSlotUnlocked(p, slug))
+    return "boss bloqueado — complete o nível 1 do bosstiário dele";
+  if (slot === 2 && (p.bossPoints || 0) < BOSS_SLOT2_POINTS)
+    return `o slot 2 exige ${typeof fmtFull === "function" ? fmtFull(BOSS_SLOT2_POINTS) : BOSS_SLOT2_POINTS} boss points`;
+  const other = slot === 1 ? 2 : 1;
+  if (p.bossSlots[other] === slug) return "este boss já ocupa o outro slot";
+  return null;
+}
+
+function bossSlotAssign(p, slot, slug) {
+  const erro = bossSlotAssignError(p, slot, slug);
+  if (erro) return { ok: false, erro: erro };
+  p.bossSlots[Number(slot)] = slug;
+  return { ok: true };
+}
+
+/* Remove: cobra o preço da remoção N+1 e limpa o slot. */
+function bossSlotRemove(p, slot) {
+  ensureBossSlots(p);
+  slot = Number(slot);
+  if (slot !== 1 && slot !== 2) return { ok: false, erro: "slot inválido" };
+  if (!p.bossSlots[slot]) return { ok: false, erro: "slot vazio" };
+  const preco = bossSlotRemovePrice(p.bossSlotRemoves);
+  if (preco > 0) {
+    if ((p.gold || 0) < preco)
+      return { ok: false, erro: `custa ${typeof fmtFull === "function" ? fmtFull(preco) : preco} gp` };
+    p.gold -= preco;
+  }
+  p.bossSlots[slot] = null;
+  p.bossSlotRemoves++;
+  return { ok: true, preco: preco };
+}
+
 /* Resumo para o cabecalho da aba. */
 function bosstiarySummary(p) {
   ensureBosstiary(p);
@@ -184,5 +302,9 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     BOSS_CATS, bossCategory, bosstiaryList, bosstiaryKill,
     bosstiaryProgress, bosstiaryLevel, bosstiaryDamageBonus, bosstiarySummary,
+    BOSS_SLOT_LEVELS, BOSS_SLOT2_POINTS, BOSS_SLOT_DAILY_KILLS,
+    ensureBossSlots, bossSlotLevel, bossSlotUnlocked, bossLootBonusPct,
+    bossSlotBonusPct, bossSlotRemovePrice, bossSlotList,
+    bossSlotAssignError, bossSlotAssign, bossSlotRemove,
   };
 }

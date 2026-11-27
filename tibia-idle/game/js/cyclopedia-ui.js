@@ -75,6 +75,8 @@ function renderCycloTabs() {
       CYCLO.busca = "";
       CYCLO.pag = 0;
       CYCLO.filtro = "all";
+      CYCLO.slotPick = 0;
+      CYCLO.slotBusca = "";
       renderCycloTabs();
       renderCycloContent();
     }));
@@ -104,6 +106,7 @@ function renderCycloContent() {
     character: renderCycloCharacter,
     bestiary: renderCycloBestiary,
     bosstiary: renderCycloBosstiary,
+    bossSlot: renderCycloBossSlots,
     charms: renderCycloCharms,
     items: renderCycloItems,
   }[CYCLO.aba] || (() => { el.innerHTML = ""; }))(p, el);
@@ -768,6 +771,198 @@ function renderCycloBosstiary(p, el) {
       CYCLO.bossSel = c.dataset.bossFicha;
       renderCycloBosstiary(p, el);
     }));
+}
+
+/* ------------------------------------------------------------ boss slots
+ * Boss Slots no molde io_bosstiary do Crystalserver: 2 slots fixos (o 2º
+ * exige 1.500 boss points) + o slot fixo do boss do dia. Um boss slotted
+ * dá chance extra de loot ao ser abatido (bônus dos pontos + 25% se o boss
+ * está no nível 3) — aplicado no chanceMult autoritativo do servidor.
+ * Remover custa a partir da 3ª vez (300k*remoções-500k). Todas as ops vão
+ * pela rota autoritativa /api/character/boss-slot — o servidor decide o
+ * caminho instância×cidade e debita o wallet da conta. */
+function renderCycloBossSlots(p, el) {
+  ensureBosstiary(p);
+  ensureBossSlots(p);
+  const pts = p.bossPoints || 0;
+  const bonusBase = bossLootBonusPct(pts);
+  const removes = p.bossSlotRemoves || 0;
+  const slot2Ok = pts >= BOSS_SLOT2_POINTS;
+  const unlocked = bossSlotList(p);
+  const daily = (typeof dailyBoostCurrent === "function") ? dailyBoostCurrent() : null;
+  const dailyBoss = daily && daily.boss && daily.boss.slug ? daily.boss : null;
+  const pick = Number(CYCLO.slotPick) || 0;
+  const busca = (CYCLO.slotBusca || "").toLowerCase();
+  const pickList = pick ? unlocked.filter((s) => {
+    const other = pick === 1 ? 2 : 1;
+    if (p.bossSlots[other] === s) return false;
+    if (!busca) return true;
+    const m = GAMEDATA.monsters[s];
+    return m && (m.name || "").toLowerCase().indexOf(busca) !== -1;
+  }) : [];
+
+  const slotCard = (slot) => {
+    const slug = p.bossSlots[slot];
+    const m = slug && GAMEDATA.monsters[slug];
+    if (slot === 2 && !slot2Ok) return `
+      <div class="bslot-card is-locked">
+        <div class="bslot-title tiny dim">SLOT 2</div>
+        <div class="bslot-lock">🔒</div>
+        <div class="tiny dim" style="text-align:center">Desbloqueia com<br>
+          <b class="gold-txt">${fmtFull(pts)} / ${fmtFull(BOSS_SLOT2_POINTS)}</b> boss points</div>
+        <div class="mini-bar-track"><span class="mini-bar-fill"
+          style="width:${Math.min(100, (pts / BOSS_SLOT2_POINTS) * 100).toFixed(0)}%"></span></div>
+      </div>`;
+    if (!m) return `
+      <div class="bslot-card is-empty ${unlocked.length ? "" : "is-locked"}"
+        ${unlocked.length ? `data-slot-pick="${slot}"` : ""}>
+        <div class="bslot-title tiny dim">SLOT ${slot}</div>
+        <div class="bslot-empty-sign">${unlocked.length ? "+" : "🔒"}</div>
+        <div class="tiny dim" style="text-align:center">
+          ${unlocked.length
+            ? "Clique para associar um boss"
+            : "Alcance o nível 1 de um boss no Bosstiário para desbloquear"}</div>
+      </div>`;
+    const pr = bosstiaryProgress(p, slug);
+    const lvl = bossSlotLevel(p, slug);
+    const bonus = bossSlotBonusPct(p, slug);
+    const preco = bossSlotRemovePrice(removes);
+    return `
+      <div class="bslot-card">
+        <div class="bslot-title tiny dim">SLOT ${slot}
+          <span class="bslot-lv" style="color:${pr.cat.cor}">Nv ${lvl}</span></div>
+        <div class="app-img">${bossMobImg(slug, 56)}</div>
+        <div class="tiny mob-name">${m.name}</div>
+        <div class="tiny" style="color:${pr.cat.cor}">${pr.cat.nome}
+          <span class="dim">· ${pr.kills} kills</span></div>
+        <div class="tiny" style="color:#9ce84a">+${bonus}% chance de loot</div>
+        <div class="row" style="gap:6px;margin-top:6px">
+          <button class="sm" data-slot-pick="${slot}">Trocar</button>
+          <button class="sm" data-slot-remove="${slot}">
+            ${preco > 0 ? `Remover (${fmtFull(preco)} gp)` : "Remover"}</button>
+        </div>
+      </div>`;
+  };
+
+  const dailyCard = dailyBoss ? `
+    <div class="bslot-card is-boosted">
+      <div class="bslot-title tiny dim">SLOT 3 · BOSS DO DIA</div>
+      <div class="app-img">${bossMobImg(dailyBoss.slug, 56)}</div>
+      <div class="tiny mob-name">${dailyBoss.name || dailyBoss.slug}</div>
+      <div class="tiny" style="color:#d4af37">Boosted</div>
+      <div class="tiny" style="color:#9ce84a">+${Math.floor(Number(daily.lootBonus) || 0)}% loot
+        · kills ×${BOSS_SLOT_DAILY_KILLS}</div>
+      <div class="tiny dim" style="margin-top:6px;text-align:center">
+        Slot fixo — muda todo dia às 00h</div>
+    </div>` : `
+    <div class="bslot-card is-locked">
+      <div class="bslot-title tiny dim">SLOT 3 · BOSS DO DIA</div>
+      <div class="bslot-lock">🔒</div>
+      <div class="tiny dim" style="text-align:center">Carregando o boss do dia…</div>
+    </div>`;
+
+  el.innerHTML = `
+    <div class="cyc-toolbar">
+      <div class="cyc-stats tiny">
+        <span><b class="gold-txt">${fmtFull(pts)}</b> boss points</span>
+        <span class="dim">•</span>
+        <span>Bônus de loot <b style="color:#9ce84a">+${bonusBase}%</b>
+          <span class="dim">(+25% no nível 3)</span></span>
+        <span class="dim">•</span>
+        <span class="dim">Remoções: ${removes} · próxima
+          ${bossSlotRemovePrice(removes) ? fmtFull(bossSlotRemovePrice(removes)) + " gp" : "grátis"}</span>
+      </div>
+    </div>
+    <div class="bslot-grid">
+      ${slotCard(1)}
+      ${slotCard(2)}
+      ${dailyCard}
+    </div>
+    ${pick ? `
+      <div class="cyc-toolbar" style="margin-top:4px">
+        <div class="cyc-stats tiny">
+          <span>Escolha um boss para o <b class="gold-txt">Slot ${pick}</b>
+            <span class="dim">(${pickList.length} desbloqueados)</span></span>
+        </div>
+        <div class="cyc-controls">
+          <input id="bslot-busca" class="cyc-search" placeholder="Buscar…"
+            value="${CYCLO.slotBusca || ""}">
+          <button class="sm" id="bslot-pick-close">Cancelar</button>
+        </div>
+      </div>
+      <div class="app-grid">
+        ${pickList.map((slug) => {
+          const m = GAMEDATA.monsters[slug];
+          const pr = bosstiaryProgress(p, slug);
+          const lvl = bossSlotLevel(p, slug);
+          return `<div class="app-card mob-card" data-slot-boss="${slug}">
+            <div class="app-img">${bossMobImg(slug, 48)}</div>
+            <div class="tiny mob-name">${m.name}</div>
+            <div class="tiny" style="color:${pr.cat.cor}">${pr.cat.nome}
+              <span class="dim">· Nv ${lvl}</span></div>
+            <div class="tiny dim">${pr.kills} kills</div>
+          </div>`;
+        }).join("") || `<div class="dim tiny">Nenhum boss desbloqueado.</div>`}
+      </div>` : ""}`;
+
+  const doOp = (slot, slug, op) => {
+    const finish = () => {
+      CYCLO.slotPick = 0;
+      CYCLO.slotBusca = "";
+      renderCycloBossSlots(p, el);
+    };
+    if (typeof accountBossSlotOp === "function" &&
+        typeof accountApiConfigured === "function" && accountApiConfigured() &&
+        typeof accountSessionToken === "function" && accountSessionToken()) {
+      accountBossSlotOp(accountSessionToken(), p.id, { op, slot, slug }).then((res) => {
+        if (!res || !res.ok) { toast(res && res.msg || "Operação recusada"); return; }
+        if (res.bossSlots) p.bossSlots = Object.assign({}, res.bossSlots);
+        if (res.bossSlotRemoves !== undefined)
+          p.bossSlotRemoves = Number(res.bossSlotRemoves) || 0;
+        if (typeof res.gold === "number") p.gold = res.gold;
+        save();
+        if (typeof renderAll === "function") renderAll();
+        toast(op === "assign" ? `Boss associado ao Slot ${slot}!` : "Boss removido do slot.");
+        finish();
+      }).catch(() => toast("Falha de rede."));
+      return;
+    }
+    /* Sem conta/servidor: aplica direto no p e persiste local (gold local é
+     * a única referência — não há wallet de conta). */
+    const r = op === "assign" ? bossSlotAssign(p, slot, slug) : bossSlotRemove(p, slot);
+    if (!r.ok) { toast(r.erro); return; }
+    if (typeof charmSaveChar === "function") charmSaveChar(p); else save();
+    if (typeof renderAll === "function") renderAll();
+    toast(op === "assign" ? `Boss associado ao Slot ${slot}!`
+      : `Boss removido${r.preco ? ` por ${fmtFull(r.preco)} gp` : ""}.`);
+    finish();
+  };
+
+  el.querySelectorAll("[data-slot-pick]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.slotPick = Number(b.dataset.slotPick) || 0;
+      CYCLO.slotBusca = "";
+      renderCycloBossSlots(p, el);
+    }));
+  el.querySelectorAll("[data-slot-remove]").forEach((b) =>
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      doOp(Number(b.dataset.slotRemove), "", "remove");
+    }));
+  el.querySelectorAll("[data-slot-boss]").forEach((c) =>
+    c.addEventListener("click", () => doOp(pick, c.dataset.slotBoss, "assign")));
+  const inp = $("#bslot-busca");
+  if (inp) inp.addEventListener("input", () => {
+    CYCLO.slotBusca = inp.value;
+    renderCycloBossSlots(p, el);
+    const n = $("#bslot-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  const close = $("#bslot-pick-close");
+  if (close) close.addEventListener("click", () => {
+    CYCLO.slotPick = 0; CYCLO.slotBusca = "";
+    renderCycloBossSlots(p, el);
+  });
 }
 
 /* Ficha de boss no molde do bestiário: info permanente (vida, exp, dano,

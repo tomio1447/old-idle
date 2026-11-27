@@ -53,7 +53,8 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authReconcileOrphanBagCounts, authAddItemToBag,
   equipFromContainerAuth, unequipFromContainerAuth, depotActionAuth,
   assignCharm: authAssignCharm, clearCharm: authClearCharm,
-  buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm } = require("./authoritative_engine");
+  buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm,
+  authBossSlotAssign, authBossSlotRemove } = require("./authoritative_engine");
 const { forgeCanFuse, forgeFuseAuth, forgeConvergeFuseAuth, forgeTransferAuth } = require("./forge");
 /* Catalisadores de Weapon Proficiency — tabela + lógica compartilhada com
  * o cliente. O require interno de proficiency.js resolve os globals que o
@@ -2358,6 +2359,93 @@ async function promoteCharacterApi(db,body){
   if(typeof db.setAccountGold==="function")
     await db.setAccountGold(acc.id,Math.max(0,walletGold-PROMOTION_PRICE));
   return persistPromotedPlayer(db,acc,character,p,lease);
+}
+
+/* Boss Slots (molde io_bosstiary do Crystalserver) — autoritativo no
+ * servidor, mesma cadeia da promoção: em instância aplica o patch dentro do
+ * snapshot (senão o tick sobrescreve p.bossSlots/p.gold); na cidade muta o
+ * save versionado e debita o WALLET da conta (o remove cobra gold e o p.gold
+ * do save é só espelho — gold é chave protegida). */
+async function persistBossSlotPlayer(db,acc,character,p,lease,op,slot){
+  await syncCityWallet(db,acc,p);
+  let sharedInventory=null;
+  if(SharedInv&&typeof db.accountSharedInventory==="function")
+    sharedInventory=await splitSharedInventory(db,acc,p,true);
+  const result=await db.saveCharactersVersioned(acc.id,[{
+    id:Number(character.id),expectedVersion:Number(character.save_version),voc:character.voc,
+    level:Math.max(1,Number(p.level)||Number(character.level)||1),data:JSON.stringify(p),
+    extra:{hp:Math.max(0,Number(p.hp)||0),mp:Math.max(0,Number(p.mp)||0)},
+  }],lease);
+  if(!result.ok)return saveConflictResponse(result,acc);
+  const updated=result.characters[0];
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"boss-slot",updated,false);
+  publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"boss-slot"});
+  await publishPartyForCharacters(db,[updated.id],"boss-slot");
+  return {code:200,body:{ok:true,op,slot,saveVersion:Number(updated.save_version),
+    bossSlots:p.bossSlots||{1:null,2:null},bossSlotRemoves:Number(p.bossSlotRemoves)||0,
+    gold:Math.max(0,Math.floor(Number(p.gold)||0)),
+    character:accountCharacterSummary(updated,acc.gold),
+    ...(sharedInventory?{sharedInventory}:{})}};
+}
+async function bossSlotCharacterApi(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id!==undefined?body.char_id:body.id);
+  const op=String(body.op||""),slot=Number(body.slot),slug=String(body.slug||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||(op!=="assign"&&op!=="remove"))
+    return {code:400,body:{ok:false,error:"INVALID_BOSS_SLOT_OP",msg:"Operação de boss slot inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const applyTo=(target)=>op==="assign"
+    ?authBossSlotAssign(target,slot,slug):authBossSlotRemove(target,slot);
+  const resolved=await resolveInstanceRow(db,acc,charId);
+  if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    let last=null;
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
+      if(!current||current.status!=="active")break;
+      let check=null,appliedPlayer=null;
+      const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
+        let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+        const item=descriptor.authority&&descriptor.authority.players&&
+          descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+        if(!item||!item.p)return null;
+        const r=applyTo(item.p);
+        if(!r||!r.ok){check={code:400,error:"BOSS_SLOT_REJECTED",msg:(r&&r.erro)||"Operação recusada"};return null;}
+        appliedPlayer=cloneJson(item.p);
+        descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+      },lease);
+      last=result;
+      if(check)return {code:check.code,body:{ok:false,error:check.error,msg:check.msg}};
+      if(result.ok){
+        await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+          status:result.instance.status,source:"boss-slot",holderId:String(body.holder_id||"")});
+        const fresh=await db.findCharacter(charId);
+        return persistBossSlotPlayer(db,acc,fresh||character,appliedPlayer,lease,op,slot);
+      }
+      if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a operação"}};
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
+    }
+    if(last&&last.error==="INSTANCE_NOT_ACTIVE"){/* cai no save do personagem */}
+    else if(last&&!last.ok)
+      return {code:409,body:{ok:false,error:last.error,msg:"Não foi possível aplicar o boss slot",
+        instance:instanceSummary(last.instance,true)}};
+  }
+  let p=await loadCityPlayer(db,acc,character);
+  /* O remove valida e debita o WALLET real da conta — o p.gold do save é
+   * espelho (mesmo motivo da promoção). */
+  p.gold=Math.max(0,Math.floor(Number(acc.gold)||0));
+  const applied=applyTo(p);
+  if(!applied||!applied.ok)
+    return {code:400,body:{ok:false,error:"BOSS_SLOT_REJECTED",msg:(applied&&applied.erro)||"Operação recusada"}};
+  if(op==="remove"&&typeof db.setAccountGold==="function")
+    await db.setAccountGold(acc.id,Math.max(0,Math.floor(Number(p.gold)||0)));
+  return persistBossSlotPlayer(db,acc,character,p,lease,op,slot);
 }
 
 async function claimRewardChest(db,body){
@@ -7312,6 +7400,9 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/character/promote") {
         const r = await promoteCharacterApi(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/character/boss-slot") {
+        const r = await bossSlotCharacterApi(db, await readBody(req));return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/forge/fuse") {
         const r = await forgeFuseApi(db, await readBody(req));return send(res, r.code, r.body);

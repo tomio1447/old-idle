@@ -16,9 +16,7 @@ const CYCLO_ABAS = [
   { id: "bosstiary", nome: "Bosstiário", icone: "bosstiary", pronta: true },
   { id: "charms", nome: "Charms", icone: "charms", pronta: true },
   { id: "items", nome: "Itens", icone: "items", pronta: true },
-  { id: "bossSlot", nome: "Boss Slots", icone: "bossSlot", pronta: false,
-    falta: "O sistema de slots do Bosstiário (bônus de dano por categoria) " +
-           "ainda não foi implementado — a lista de bosses já existe." },
+  { id: "bossSlot", nome: "Boss Slots", icone: "bosstiary", pronta: true },
 ];
 
 const BEST_CLASSES = {

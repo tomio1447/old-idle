@@ -3846,6 +3846,65 @@ function bosstiaryCategory(slug){
 }
 function bosstiaryLevel(p){return Math.floor(Math.sqrt((Number(p&&p.bossPoints)||0)/25));}
 function bosstiaryDamageBonus(p){return 1+Math.min(0.25,bosstiaryLevel(p)*0.01);}
+/* Boss Slots (molde io_bosstiary do Crystalserver): 2 slots por char, o 2º
+ * exige 1500 boss points. Um boss slotted dá chance extra de loot ao ser
+ * abatido: bônus dos pontos (curva oficial) + 25% se nível 3. Remoções
+ * 1-2 grátis; depois 300k*vezes-500k. Marcos por categoria escalados aos
+ * alvos do jogo (Bane 10/20/30, Archfoe 3/7/10, Nemesis 1/3/5). */
+const BOSS_SLOT_LEVELS={bane:[10,20,30],archfoe:[3,7,10],nemesis:[1,3,5]};
+const BOSS_SLOT2_POINTS=1500;
+const BOSS_SLOT_DAILY_KILLS=3; // boss do dia conta 3× no bosstiário
+function ensureBossSlots(p){
+  if(!p.bossSlots||typeof p.bossSlots!=="object"||Array.isArray(p.bossSlots))
+    p.bossSlots={1:null,2:null};
+  p.bossSlotRemoves=Math.max(0,Number(p.bossSlotRemoves)||0);return p;
+}
+function bossSlotLevel(p,slug){
+  p.bosstiary=p.bosstiary&&typeof p.bosstiary==="object"?p.bosstiary:{};
+  const kills=Number(p.bosstiary[slug])||0;
+  const lv=BOSS_SLOT_LEVELS[bosstiaryCategory(slug)]||BOSS_SLOT_LEVELS.bane;
+  let lvl=0;for(const k of lv)if(kills>=k)lvl++;return lvl;
+}
+function bossLootBonusPct(points){
+  const pts=Math.max(0,Number(points)||0);
+  if(pts<=250)return Math.floor(25+pts/10);
+  if(pts<1250)return Math.floor(37.5+pts/20);
+  return Math.floor(100+0.5*(Math.sqrt(8*((pts-1250)/5)+81)-9));
+}
+function bossSlotBonusPct(p,slug){
+  ensureBossSlots(p);const sl=p.bossSlots;
+  if(sl[1]!==slug&&sl[2]!==slug)return 0;
+  return bossLootBonusPct(p.bossPoints)+(bossSlotLevel(p,slug)>=3?25:0);
+}
+function bossSlotRemovePrice(removes){
+  removes=Math.max(0,Number(removes)||0);
+  return removes<2?0:300000*removes-500000;
+}
+function bossSlotAssignError(p,slot,slug){
+  ensureBossSlots(p);slot=Number(slot);
+  if(slot!==1&&slot!==2)return "slot inválido";
+  const def=monsterDef(slug);if(!def||!def.boss)return "não é um boss";
+  if(bossSlotLevel(p,slug)<1)return "boss bloqueado — complete o nível 1 do bosstiário dele";
+  if(slot===2&&(Number(p.bossPoints)||0)<BOSS_SLOT2_POINTS)return "o slot 2 exige 1500 boss points";
+  const other=slot===1?2:1;if(p.bossSlots[other]===slug)return "este boss já ocupa o outro slot";
+  return null;
+}
+function authBossSlotAssign(p,slot,slug){
+  const erro=bossSlotAssignError(p,slot,slug);if(erro)return{ok:false,erro};
+  p.bossSlots[Number(slot)]=slug;return{ok:true,slot:Number(slot),slug};
+}
+function authBossSlotRemove(p,slot){
+  ensureBossSlots(p);slot=Number(slot);
+  if(slot!==1&&slot!==2)return{ok:false,erro:"slot inválido"};
+  if(!p.bossSlots[slot])return{ok:false,erro:"slot vazio"};
+  const preco=bossSlotRemovePrice(p.bossSlotRemoves);
+  if(preco>0){
+    if((Number(p.gold)||0)<preco)return{ok:false,erro:"gold insuficiente ("+preco+" gp)"};
+    p.gold=Math.max(0,(Number(p.gold)||0)-preco);
+  }
+  p.bossSlots[slot]=null;p.bossSlotRemoves++;
+  return{ok:true,preco};
+}
 function bestiaryKill(p,slug,n){
   if(!p||!slug)return 0;
   p.bestiary=p.bestiary&&typeof p.bestiary==="object"?p.bestiary:{};
@@ -6937,7 +6996,8 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     const beforeLevel=Number(item.p.level)||1;
     addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
     bestiaryKill(item.p,mob.slug,1);
-    if(mob.boss||(mob.def&&mob.def.boss))bosstiaryKill(item.p,mob.slug,1);
+    if(mob.boss||(mob.def&&mob.def.boss))
+      bosstiaryKill(item.p,mob.slug,isDailyBoss(mob.slug)?BOSS_SLOT_DAILY_KILLS:1);
     // Weapon Proficiency: XP por abate na arma empunhada + life/mana on kill.
     const profK=(PROF_FN&&typeof PROF_FN.proficiencyOnKill==="function")
       ?PROF_FN.proficiencyOnKill(auth,item.p,mob):null;
@@ -6966,10 +7026,13 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   const gTempLoot=guildTempBonusOn(leader,mob&&mob.boss?"bossLoot":"loot")?1.25:1;
   // DAILY BOSS: +15%–35% chance de loot no boss do dia (sorteado por dia).
   const dailyLoot=(mob&&mob.boss&&isDailyBoss(mob.slug))?dailyBossLootMul():1;
+  // BOSS SLOT: boss slotted do líder dá chance extra de loot — bônus dos
+  // boss points (curva oficial) + 25% se o boss está no nível 3.
+  const slotLoot=(mob&&mob.boss)?(1+bossSlotBonusPct(leader,mob.slug)/100):1;
   // idle: l.chance * lootRate * (c.lootMul || 1) — PVP usa lootMul 1.25
   // Boss: rate de loot dobrada (2x a chance — quantidade nunca multiplica).
   const bossRateMul=mob&&mob.boss?2:1;
-  const chanceMult=lootRate*bossRateMul*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot*gTempLoot*dailyLoot;
+  const chanceMult=lootRate*bossRateMul*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot*gTempLoot*dailyLoot*slotLoot;
   if(mob.boss&&(auth.kind==="hunt"||!auth.rewardBundleId))
     auth.rewardBundleId=String(auth.bossId||mob.slug)+"-"+String(auth.clock||stepTs||Date.now());
   // Mini boss de hunt: bundle PRÓPRIO por morte (o reward chest lista cada
@@ -11361,6 +11424,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   FORGE_PROC_CHANCES,FORGE_AMPLIFICATION,FORGE_ONSLAUGHT_BONUS_PCT,
   PVP_AI,
   bestiaryKill,bosstiaryKill,bosstiaryDamageBonus,boostSpellDamage,boostHealAmount,scalePlayerDamage,
+  authBossSlotAssign,authBossSlotRemove,bossSlotBonusPct,bossSlotLevel,bossLootBonusPct,
   tickDelayedHits,wheelApplySpellBoost,playerResistPct,augmentTotals,authoritySpeedPts,
   huntModeOf,boxTargetCell,safeTargetCell,playerAttackRangeSQM,pvpAttackRangeSQM,
   wandMissileOf,physicalHitFx,basicHitFx,WAND_SHOOT,

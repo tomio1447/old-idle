@@ -71,6 +71,10 @@
       .catch(function () {});
   }
 
+  /* Boss do dia para outros módulos (aba Boss Slots da Cyclopedia): devolve
+   * o payload já cacheado pelo poll — sem fetch extra. */
+  window.dailyBoostCurrent = function () { return current; };
+
   /* Poll a cada 60s — barato e resolve a virada de 00h sem timer complicado. */
   function start() {
     var btn = document.getElementById("daily-boost-toggle");
