@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Bestiário e Bosstiário mostram só criaturas do jogo
+
+- **Bestiário filtrado**: a Cyclopedia não lista mais o dump inteiro do Canary (1.655 fichas) — só as **~307 criaturas que realmente existem nas hunts e quests** do jogo (monstros das hunts ativas + `spawnWeights` + waves e bosses de quest). Fichas de hunts `comingSoon` e do dump sem presença ficam de fora.
+- **Bosstiário idem**: só os **~80 bosses ativos** — bosses de hunt, wave/boss de quest e as arenas de `BOSS_DEFS` (world bosses, bosses de missão). O check de sprite usa `monsterPlayable` (lê `MOBSHEETS` direto) em vez do flag `jogavel`, que ficava `false` nos bosses de patch — 11 bosses que têm arte (Phosphorus, Mimar Haffar, Sir Leonard, Dragon Pack, Brain Head etc.) agora aparecem.
+- **Implementação**: `activeMonsterSlugs()` e `bestiarySlugs()` em `cyclopedia.js` (set computado sob demanda — questdata/hunt patches carregam depois) exportadas no `module.exports`; `renderCycloBestiary`, `bestiarySummary` e `bestiaryFinishedList` (contadores do modal, aba de charms) passam pelo set. `bosstiaryList` exige `m.boss` + presença ativa + sprite.
+
+---
+
 ## 2026-11-27 — Supplies viram itens reais (fim do contador CARGAS)
 
 - **CARGAS removido**: o contador virtual `p.supplies` morreu — potions e runas agora são itens de verdade. Compra no NPC/supplies vai para a **mochila** (com checagem de slot antes de gastar o gold), loot de hunt vai para a **Loot Pouch** e conjuras (academia/mana train) produzem itens. Migração automática no login: cargas antigas do save viram unidades na mochila (mana-fluid→mana-potion incluso).

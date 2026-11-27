@@ -518,7 +518,10 @@ function cycloAppearance(p, el, opts) {
 function renderCycloBestiary(p, el) {
   const resumo = bestiarySummary(p);
   const busca = (CYCLO.busca || "").toLowerCase();
-  let ls = Object.keys(GAMEDATA.monsters);
+  /* Só criaturas ativas nas hunts/quests — o catálogo Canary completo tem
+   * ~1650 fichas, mas a maioria não existe no jogo (bestiarySlugs). */
+  let ls = typeof bestiarySlugs === "function" ? bestiarySlugs()
+    : Object.keys(GAMEDATA.monsters);
   if (busca) {
     ls = ls.filter((s) =>
       GAMEDATA.monsters[s].name.toLowerCase().indexOf(busca) !== -1);

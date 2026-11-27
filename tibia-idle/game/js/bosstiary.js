@@ -41,13 +41,33 @@ function bossCategory(slug) {
   return "bane";
 }
 
-/* Todos os bosses que podem entrar na lista (precisam de arte). */
+/* Bosses realmente enfrentáveis no jogo: flag `boss` + sprite (jogavel) +
+ * presença em hunt ativa/quest (activeMonsterSlugs) ou referenciado por um
+ * BOSS_DEFS (modal de bosses e world bosses). O dump Canary tem ~370
+ * bosses, mas só uma fração existe aqui. */
 function bosstiaryList(filtro) {
   if (typeof GAMEDATA === "undefined") return [];
+  const ativos = typeof activeMonsterSlugs === "function"
+    ? activeMonsterSlugs() : new Set();
+  if (typeof BOSS_DEFS !== "undefined" && BOSS_DEFS) {
+    for (const id in BOSS_DEFS) {
+      const b = BOSS_DEFS[id];
+      if (!b) continue;
+      if (b.baseMonster) ativos.add(b.baseMonster);
+      if (b.sprite) ativos.add(b.sprite);
+    }
+  }
   const out = [];
   for (const slug in GAMEDATA.monsters) {
     const m = GAMEDATA.monsters[slug];
-    if (!m.boss || !m.jogavel) continue;
+    if (!m.boss) continue;
+    /* Sprite: monsterPlayable lê MOBSHEETS direto — o flag m.jogavel fica
+     * stale nos monstros registrados por patch (a sheet é adicionada depois
+     * do fundirMonsterData). */
+    const temSprite = typeof monsterPlayable === "function"
+      ? monsterPlayable(slug) : m.jogavel;
+    if (!temSprite) continue;
+    if (!ativos.has(slug)) continue;
     if (filtro && filtro !== "todos" && bossCategory(slug) !== filtro) continue;
     out.push(slug);
   }

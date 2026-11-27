@@ -436,9 +436,48 @@ function bestiaryReveals(p, slug, campo) {
   return false;
 }
 
+/* Slugs de criaturas realmente enfrentáveis no jogo: monstros das hunts
+ * ativas (o modal HUNTS e as salas de boss registradas como hunt — defs
+ * `comingSoon` ficam de fora) e das quests de waves. O bestiário e o
+ * bosstiário listam SÓ estes: o catálogo Canary fundido tem ~1650 fichas,
+ * mas centenas de criaturas não existem no jogo. */
+function activeMonsterSlugs() {
+  const set = new Set();
+  if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts) {
+    for (const id in GAMEDATA.hunts) {
+      const h = GAMEDATA.hunts[id];
+      if (!h || h.comingSoon) continue;
+      (h.monsters || []).forEach((s) => set.add(s));
+      Object.keys(h.spawnWeights || {}).forEach((s) => set.add(s));
+    }
+  }
+  if (typeof QUEST_DEFS !== "undefined" && QUEST_DEFS) {
+    for (const id in QUEST_DEFS) {
+      const q = QUEST_DEFS[id];
+      if (!q) continue;
+      (q.waveMonsters || []).forEach((s) => set.add(s));
+      if (q.boss) set.add(q.boss);
+    }
+  }
+  return set;
+}
+
+/* Criaturas do bestiário: ativas e NÃO-boss (bosses ficam no bosstiário,
+ * modelo oficial — não listar o mesmo monstro nas duas abas). */
+function bestiarySlugs() {
+  const ativos = activeMonsterSlugs();
+  const out = [];
+  for (const slug of ativos) {
+    const m = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
+      ? GAMEDATA.monsters[slug] : null;
+    if (m && !m.boss) out.push(slug);
+  }
+  return out;
+}
+
 function bestiarySummary(p) {
   ensureCyclopedia(p);
-  const todos = Object.keys(GAMEDATA.monsters || {});
+  const todos = bestiarySlugs();
   let desc = 0, comp = 0;
   for (const s of todos) {
     const st = bestiaryStage(p, s);
@@ -452,7 +491,7 @@ function bestiarySummary(p) {
 function bestiaryFinishedList(p) {
   ensureCyclopedia(p);
   const out = [];
-  for (const s of Object.keys(GAMEDATA.monsters || {})) {
+  for (const s of bestiarySlugs()) {
     if (bestiaryStage(p, s) >= BEST_ESTAGIOS.length) out.push(s);
   }
   out.sort((a, b) => (GAMEDATA.monsters[a].name || a)
@@ -648,6 +687,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     CYCLO_ABAS, CHARMS, BEST_ESTAGIOS, bestiaryKill, bestiaryStage,
     bestiaryProgress, bestiarySummary, bestiaryFinishedList,
+    activeMonsterSlugs, bestiarySlugs,
     buyCharm, upgradeCharm, assignCharm, clearCharm, charmTotals, charmOffensiveProc,
     charmMaxActive, charmActiveCount,
     charmTier, charmFx, charmCostAt, CHARM_TIERS,
