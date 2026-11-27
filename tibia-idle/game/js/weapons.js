@@ -155,10 +155,14 @@ function estiloAnim(slug, it, tam) {
  */
 
 /* Retorna a classe CSS de borda conforme a classificacao do item:
- * cls 4 -> amarelo, cls 3 -> roxo, cls 2 -> azul, cls 1 ou sem -> vazio */
+ * cls 4 -> amarelo, cls 3 -> roxo, cls 2 -> azul, cls 1 ou sem -> vazio.
+ * Sem classificacao de forja, itens cosmeticos ganham moldura propria:
+ * cos-addon (verde, NPC Addoner) ou cos-mount (azul, NPC Lothar). */
 function itemClsBorder(slug) {
   const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
-  return (it.cls && it.cls >= 2) ? "cls-" + it.cls : "";
+  if (it.cls && it.cls >= 2) return "cls-" + it.cls;
+  const cos = (typeof cosmeticItemUse === "function") ? cosmeticItemUse(slug) : null;
+  return cos ? "cos-" + cos.kind : "";
 }
 function itemImg(slug, tam, cls, count) {
   const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
@@ -170,8 +174,9 @@ function itemImg(slug, tam, cls, count) {
   }
   // 2o argumento como string = classe CSS (assinatura antiga do ui.js)
   if (typeof tam === "string") { cls = tam; tam = 0; }
-  // classe de classificacao (forja): cls-2 azul, cls-3 roxo, cls-4 amarelo
-  const clsBorder = (it.cls && it.cls >= 2) ? `cls-${it.cls}` : "";
+  // classe de classificacao (forja): cls-2 azul, cls-3 roxo, cls-4 amarelo;
+  // sem cls, moldura cosmetica cos-addon/cos-mount (itemClsBorder decide)
+  const clsBorder = itemClsBorder(slug);
   const clsAll = [cls, clsBorder].filter(Boolean).join(" ");
   const px = tam || 32;
   if (itemTemStackFrames(it)) {

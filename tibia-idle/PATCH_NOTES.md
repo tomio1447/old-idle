@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Tracking de itens de addon e montaria (moldura + descrição)
+
+- **Moldura verde nos itens de addon**: todo item que serve de custo em receita de addon do NPC Addoner agora aparece com moldura verde (mesmo estilo 3D das molduras de classificação de forja) na mochila, loot pouch, stash, loot da hunt, reward chest e cyclopedia.
+- **Moldura azul nos itens de montaria**: todo custo de receita de montaria do Lothar — incluindo catalisadores como a gryphon-mask — aparece com moldura azul.
+- **Descrição no tooltip**: cada item cosmético mostra o que desbloqueia e onde trocar — ex.: "Addon 1 do outfit Citizen — NPC Addoner", "Montaria Crystal Wolf — NPC Lothar". Itens que servem a mais de uma receita listam todas (addons em verde, montarias em azul, outfits em dourado); catalisadores exibem "(não consumido)".
+- **Implementação**: `cosmetic-npcs-data.js` deriva `COSMETIC_ITEM_USES` (slug → receitas) dos `COSMETIC_NPC_RECIPES`; `cosmeticItemUse()` em `cosmetic-npcs.js` resolve nomes via `APP_OUTFIT`/`APP_MOUNT`; `itemClsBorder` devolve `cos-addon`/`cos-mount` quando o item não tem moldura de forja (cls ≥ 2 vence); `itemTip` adiciona as linhas coloridas. Prioridade addon > montaria > outfit quando o mesmo item serve a mais de um tipo.
+
+---
+
 ## 2026-11-27 — Salas de boss: spawn fora da área transitável (cerca de FOV)
 
 - **Sintoma**: na sala do Bonelord's Phylactery (Roost of the Graveborn) o jogador só conseguia andar alguns SQMs — o resto da sala parecia piso bloqueado.

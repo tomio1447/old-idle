@@ -248,4 +248,18 @@ if (typeof GAMEDATA !== "undefined") {
   for (const slug in COSMETIC_ITEM_DEFS) if (!reg[slug]) reg[slug] = COSMETIC_ITEM_DEFS[slug];
 }
 
-if (typeof module !== "undefined" && module.exports) { module.exports = COSMETIC_NPC_RECIPES; module.exports.ITEM_DEFS = COSMETIC_ITEM_DEFS; }
+/* Mapa derivado: slug de custo → receitas cosméticas que o consomem (inclui
+ * catalyst, marcado). Alimenta a moldura do item (verde addon / azul
+ * montaria via itemClsBorder) e a linha de descrição no tooltip (itemTip) —
+ * ambos consultam cosmeticItemUse(). */
+const COSMETIC_ITEM_USES = {};
+for (const _recipe of COSMETIC_NPC_RECIPES) {
+  for (const _alt of (_recipe.alternatives || [])) for (const _cost of _alt) {
+    (COSMETIC_ITEM_USES[_cost.slug] = COSMETIC_ITEM_USES[_cost.slug] || []).push(_recipe);
+  }
+  if (_recipe.catalyst)
+    (COSMETIC_ITEM_USES[_recipe.catalyst] = COSMETIC_ITEM_USES[_recipe.catalyst] || [])
+      .push(Object.assign({}, _recipe, { catalystUse: true }));
+}
+
+if (typeof module !== "undefined" && module.exports) { module.exports = COSMETIC_NPC_RECIPES; module.exports.ITEM_DEFS = COSMETIC_ITEM_DEFS; module.exports.ITEM_USES = COSMETIC_ITEM_USES; }

@@ -317,6 +317,17 @@ function itemTip(slug, extra, slot, instId) {
   if (it.vocs) h += `<div class="tt-req">Vocação: ${it.vocs.join(", ")}</div>`;
   if (it.w) h += `<div class="tt-req">Peso ${it.w.toFixed(2)} oz</div>`;
   if (it.desc) h += `<div class="tiny dim mt4">${it.desc}</div>`;
+  // Item cosmético rastreado: o que desbloqueia e em qual NPC trocar.
+  // Verde = addon (Addoner), azul = montaria (Lothar), dourado = outfit.
+  if (typeof cosmeticItemUse === "function") {
+    const cos = cosmeticItemUse(slug);
+    if (cos) {
+      const colors = { addon: "#5ad65a", mount: "#5aa0e0", outfit: "#c9b285" };
+      h += `<div class="tiny mt4">${cos.entries.map((e) =>
+        `<span style="color:${colors[e.kind] || "#c9b285"}">${e.text}</span>`
+      ).join("<br>")}</div>`;
+    }
+  }
   if (it.sell) h += `<div class="tt-sell">Vende por ${fmtFull(it.sell)} gp</div>`;
   if (extra) h += `<div class="dim tiny mt4">${extra}</div>`;
   return h;

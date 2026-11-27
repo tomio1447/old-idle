@@ -7,6 +7,48 @@ function cosmeticEscape(text) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
+/* Item cosmético: tracking do que o item desbloqueia (addon/outfit/montaria
+ * + NPC responsável) para a moldura e a linha de descrição do tooltip.
+ * Moldura: verde = item de addon (Addoner), azul = item de montaria (Lothar).
+ * Um item que serve aos dois tipos tem prioridade addon (verde); as linhas
+ * de descrição listam todos os usos, inclusive outfit (sem moldura). */
+function cosmeticItemUse(slug) {
+  if (typeof COSMETIC_ITEM_USES === "undefined") return null;
+  const list = COSMETIC_ITEM_USES[slug];
+  if (!list || !list.length) return null;
+  const order = { addon: 0, mount: 1, outfit: 2 };
+  const entries = [], seen = {};
+  for (const r of list.slice().sort((a, b) => order[a.kind] - order[b.kind])) {
+    if (seen[r.id + (r.catalystUse ? ":cat" : "")]) continue;
+    seen[r.id + (r.catalystUse ? ":cat" : "")] = true;
+    if (r.kind === "addon") {
+      const o = (typeof APP_OUTFIT !== "undefined") &&
+        (APP_OUTFIT[r.target + "-m"] || APP_OUTFIT[r.target + "-f"]);
+      const name = (o && o.nome) || r.target.replace(/-/g, " ");
+      entries.push({ kind: "addon",
+        text: `Addon ${r.addon} do outfit ${cosmeticEscape(name)} — NPC Addoner` +
+          (r.catalystUse ? " (não consumido)" : "") });
+    } else if (r.kind === "mount") {
+      const m = (typeof APP_MOUNT !== "undefined") && APP_MOUNT[r.target];
+      const name = (m && m.nome) || r.target.replace(/-/g, " ");
+      entries.push({ kind: "mount",
+        text: `Montaria ${cosmeticEscape(name)} — NPC Lothar` +
+          (r.catalystUse ? " (não consumido)" : "") });
+    } else {
+      const o = (typeof APP_OUTFIT !== "undefined") &&
+        (APP_OUTFIT[r.target + "-m"] || APP_OUTFIT[r.target + "-f"]);
+      const name = (o && o.nome) || r.target.replace(/-/g, " ");
+      entries.push({ kind: "outfit",
+        text: `Outfit ${cosmeticEscape(name)} — NPC Addoner` +
+          (r.catalystUse ? " (não consumido)" : "") });
+    }
+  }
+  if (!entries.length) return null;
+  const kind = entries.find((e) => e.kind === "addon") ? "addon"
+    : entries.find((e) => e.kind === "mount") ? "mount" : null;
+  return kind ? { kind, entries } : null;
+}
+
 function cosmeticNpcPortrait(id) {
   return `<span data-cosmetic-portrait="${id}" class="npc-modal-sprite" style="display:inline-flex;width:52px;height:52px"></span>`;
 }

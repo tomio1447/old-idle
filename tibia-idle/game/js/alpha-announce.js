@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Tracking de itens cosméticos: itens de addon ganham moldura VERDE e itens de montaria moldura AZUL, com descrição no tooltip dizendo o que desbloqueiam e em qual NPC trocar (Addoner/Lothar)",
   "FIX — Salas de boss com movimento travado (Bonelord's Phylactery e outras 5): o jogador nascia fora da área transitável e só andava alguns SQMs — agora a arena inteira é pisável",
   "FIX — Travadas periódicas do jogo: o relógio de instâncias ociosas não congela mais o servidor a cada segundo (claims com budget, yield entre elas e persist pesado a cada 30s)",
   "FIX — Brain Head e os Cerebellum não se movem mais (oficial: são estáticos e atacam do SQM) — o mesmo fix trava os demons da Annihilator e o Pillar of Dark Energy",

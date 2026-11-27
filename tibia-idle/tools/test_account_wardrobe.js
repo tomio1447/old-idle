@@ -377,3 +377,29 @@ test("catalog recipes have unique IDs and positive integer item quantities", () 
     assert.ok(Number.isSafeInteger(item.count) && item.count > 0);
   }
 });
+
+test("ITEM_USES indexes every cost and catalyst back to its recipes", () => {
+  const uses = recipes.ITEM_USES;
+  assert.ok(uses && typeof uses === "object");
+  for (const recipe of recipes) {
+    for (const items of recipe.alternatives || []) for (const item of items) {
+      assert.ok((uses[item.slug] || []).some((r) => r.id === recipe.id),
+        item.slug + ": receita " + recipe.id + " ausente no ITEM_USES");
+    }
+    if (recipe.catalyst) {
+      const cat = (uses[recipe.catalyst] || []).find((r) => r.id === recipe.id);
+      assert.ok(cat && cat.catalystUse, recipe.catalyst + ": catalyst sem marcação");
+    }
+  }
+  // Resolução da moldura: slug em receita de addon -> addon (verde);
+  // slug só em receita de montaria -> mount (azul).
+  const kindOf = (slug) => {
+    const kinds = new Set((uses[slug] || []).map((r) => r.kind));
+    return kinds.has("addon") ? "addon" : kinds.has("mount") ? "mount" : null;
+  };
+  assert.equal(kindOf("minotaur-leather"), "addon");
+  assert.equal(kindOf("medusa-shield"), "addon");
+  assert.equal(kindOf("diapason"), "mount");
+  assert.equal(kindOf("gryphon-mask"), "mount");
+  assert.equal(kindOf("demon-helmet"), null);
+});
