@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=reward-tibia-v1">
+  <link rel="stylesheet" href="css/layout.css?v=active-boosts-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wod-cidade-v1">
@@ -541,6 +541,15 @@
     <!-- ============================ ESQUERDA DA TELA -->
     <div class="col col-right">
 
+      <div class="panel daily-boost-panel active-boosts-panel" id="active-boosts-panel" hidden>
+        <div class="panel-title">
+          <span>BÔNUS ATIVOS</span>
+          <span class="spacer" style="flex:1"></span>
+          <button type="button" class="daily-boost-toggle" id="active-boosts-toggle" title="Minimizar">▾</button>
+        </div>
+        <div class="panel-body daily-boost-body" id="active-boosts-body"></div>
+      </div>
+
       <div class="panel daily-boost-panel" id="daily-boost-panel" hidden>
         <div class="panel-title">
           <span data-i18n="daily.title">DAILY BOOST</span>
@@ -769,6 +778,7 @@
 <script src="js/server-config.js"></script>
 <script src="js/announce.js?v=gm-panel-v1"></script>
 <script src="js/daily-boost.js?v=boss-slots-v1"></script>
+<script src="js/active-boosts.js?v=active-boosts-v1"></script>
 <script src="js/player-profile.js?v=guild-req-tab-v1"></script>
 <script src="js/account-client.js?v=boss-slots-v1"></script>
 <script src="js/chat.js?v=chat-dock-v1"></script>

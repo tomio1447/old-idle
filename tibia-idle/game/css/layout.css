@@ -223,6 +223,14 @@ canvas { image-rendering: pixelated; }
 }
 .daily-boost-toggle:hover { color: #ffe680; border-color: #ffd65a; }
 
+/* Bônus ativos — painel temporário com o mesmo chrome do Daily Boost
+ * (células .daily-boost-*; ícone de item no lugar do mob sprite). */
+.active-boost-icon {
+  width: 36px; height: 36px;
+  image-rendering: pixelated; object-fit: contain;
+}
+.active-boosts-panel .daily-boost-bonus { color: #ffd65a; }
+
 .server-reconnect-banner {
   position: fixed; inset: 0; z-index: 9200;
   display: flex; align-items: center; justify-content: center;

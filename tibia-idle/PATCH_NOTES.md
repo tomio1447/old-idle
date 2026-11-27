@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Painel BÔNUS ATIVOS acima do Daily Boost
+
+- **Novo painel temporário** (`BÔNUS ATIVOS`) com o mesmo visual do Daily Boost — fica **acima** dele e só aparece enquanto houver bônus temporário ativo no personagem.
+- Lista cada bônus com **multiplicador e tempo restante**:
+  - `Bônus EXP ×N — restam Xmin de caça` (o relógio do bônus só drena em hunt),
+  - `Bônus Skill ×N — restam Xmin de treino` (só drena na área de treino),
+  - bônus de skill legado por tempo (`skillBoostUntil`, ×1.5 no relógio).
+- Repinta a cada 1s (o leftMs desce em tempo real nos ticks de combate/treino), some sozinho quando o último bônus acaba e tem o mesmo botão de minimizar (estado salvo).
+
+---
+
 ## 2026-11-27 — Recompensa semanal com acabamento do client oficial
 
 - **Janela e trilhas chanfradas**: as linhas do cronograma e os cards de arma de exercise ganham o bevel 3D do Tibia (topo/esquerda claros, base/direita escuros), na mesma ardósia texturizada da janela.
