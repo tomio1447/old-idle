@@ -458,6 +458,10 @@ function renderStats(p) {
   const rows = [
     ["Experiência", fmtFull(p.exp)],
     ["Próximo nível", fmtFull(Math.max(0, expForLevel(p.level + 1) - p.exp))],
+    ...(p.expBoost && Number(p.expBoost.leftMs) > 0
+      ? [["Bônus EXP", `×${Number(p.expBoost.mul) || 1} · ${Math.ceil(Number(p.expBoost.leftMs) / 60000)}min de caça`]] : []),
+    ...(p.skillBoost && Number(p.skillBoost.leftMs) > 0
+      ? [["Bônus Skill", `×${Number(p.skillBoost.mul) || 1} · ${Math.ceil(Number(p.skillBoost.leftMs) / 60000)}min de treino`]] : []),
     ["Dano por golpe", `${dmg.min}–${dmg.max}`],
     ["Armadura", def.armor],
     ["Defesa", def.defense],

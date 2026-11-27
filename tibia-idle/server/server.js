@@ -219,7 +219,6 @@ async function authorizeMaintenance(req,body,db){
  * nem countdown de manutenção. SERVER_SAVE_EXIT=1 restaura o restart
  * legado pós-save (deploy/manual ops apenas). */
 const SERVER_SAVE_TZ=String(process.env.SERVER_SAVE_TZ||"America/Sao_Paulo").trim()||"America/Sao_Paulo";
-const DAILY_EXERCISE_CHARGES=Math.max(1,parseInt(process.env.DAILY_EXERCISE_CHARGES||"3000",10)||3000);
 const SERVER_META_FILE=path.join(
   process.env.GLOBAL_IDLE_DATA_DIR?path.resolve(process.env.GLOBAL_IDLE_DATA_DIR):path.join(__dirname,"data"),
   "server-meta.json");
@@ -235,7 +234,9 @@ function serverSaveWall(date){
     year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})
     .formatToParts(date).filter((p)=>p.type!=="literal")
     .reduce((o,p)=>(o[p.type]=p.value,o),{});
+  const y=+parts.year,m=+parts.month,d=+parts.day;
   return {day:`${parts.year}-${parts.month}-${parts.day}`,
+    weekday:new Date(Date.UTC(y,m-1,d)).getUTCDay(),
     seconds:((+parts.hour)%24)*3600+(+parts.minute)*60+(+parts.second)};
 }
 /* Savestate global: persiste tudo o que ainda estiver volátil SEM derrubar
@@ -257,7 +258,8 @@ async function runServerSave(db,day){
   saveServerMeta(SERVER_META);
   console.log("[server-save] 00:00 "+SERVER_SAVE_TZ+" — savestate global + recompensa diária ("+day+")");
   await runGlobalSavestate(db).catch((e)=>console.error("[savestate]",e&&e.message));
-  try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll("server-save",{day,charges:DAILY_EXERCISE_CHARGES});}catch(e){}
+  try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")
+    SYNC_BUS.broadcastAll("server-save",{day,reward:weeklyRewardForDay(day)});}catch(e){}
   if(process.env.SERVER_SAVE_EXIT==="1"){
     // Opt-in legado (deploy/ops): restart supervisionado após o save.
     setTimeout(()=>{console.log("[server-save] SERVER_SAVE_EXIT=1 — reiniciando processo");process.exit(0);},2500);
@@ -279,26 +281,72 @@ function startServerSaveScheduler(db){
 const EXERCISE_REWARD_WEAPONS={"exercise-sword":"sword","exercise-axe":"axe","exercise-club":"club",
   "exercise-bow":"dist","exercise-rod":"magic","exercise-wand":"magic","exercise-shield":"shield",
   "exercise-wraps":"fist"};
-function dailyRewardInfo(p){
-  const claimedDay=String(p&&p.dailyRewardDay||"");
-  return {rewardDay:DAILY_REWARD_DAY,claimedDay,charges:DAILY_EXERCISE_CHARGES,
-    available:!!DAILY_REWARD_DAY&&claimedDay<DAILY_REWARD_DAY};
+/* Cronograma semanal da recompensa diária — POR CONTA (antes era 3000
+ * cargas de Lasting por personagem). Um claim por conta por server save;
+ * não acumula: sem coletar, o próximo server save substitui.
+ * type: exercise (cargas Lasting no char que coleta, arma = skill),
+ *       wildcard (+preyCards no pool compartilhado da conta),
+ *       exp (p.expBoost {mul,leftMs} — só drena/aplica em hunt),
+ *       skill (p.skillBoost {mul,leftMs} — só drena/aplica na área de treino). */
+const WEEKLY_REWARDS=[
+  {type:"exercise",charges:1500,label:"1.500 cargas de Exercise Weapon"},        // domingo
+  {type:"wildcard",cards:10,label:"10 Prey Wildcards"},                          // segunda
+  {type:"exp",mul:1.25,leftMs:3600000,label:"+25% de EXP por 1h de caça"},       // terça
+  {type:"wildcard",cards:10,label:"10 Prey Wildcards"},                          // quarta
+  {type:"exercise",charges:500,label:"500 cargas de Exercise Weapon"},           // quinta
+  {type:"exp",mul:2,leftMs:1800000,label:"+100% de EXP por 30min de caça"},      // sexta
+  {type:"skill",mul:2,leftMs:1800000,label:"+100% de Skill por 30min de treino"},// sábado
+];
+const WEEKLY_DAY_NAMES=["domingo","segunda-feira","terça-feira","quarta-feira",
+  "quinta-feira","sexta-feira","sábado"];
+function weeklyRewardForDay(day){
+  const m=String(day||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m)return {weekday:0,dayName:WEEKLY_DAY_NAMES[0],reward:WEEKLY_REWARDS[0]};
+  const wd=new Date(Date.UTC(+m[1],+m[2]-1,+m[3])).getUTCDay();
+  return {weekday:wd,dayName:WEEKLY_DAY_NAMES[wd],reward:WEEKLY_REWARDS[wd]||null};
 }
-function applyDailyExerciseReward(p,weaponId){
-  const skill=EXERCISE_REWARD_WEAPONS[String(weaponId||"")];
-  if(!skill)return {error:{code:400,body:{ok:false,error:"INVALID_EXERCISE_WEAPON",msg:"Arma de treino inválida."}}};
-  const info=dailyRewardInfo(p);
-  if(!info.available)return {error:{code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
-    msg:"Recompensa já coletada neste ciclo.",dailyReward:info}}};
-  const prior=p.trainingExercise&&typeof p.trainingExercise==="object"?p.trainingExercise:{};
-  const balances=prior.balances&&typeof prior.balances==="object"?prior.balances:{};
-  if(prior.plan&&prior.plan!=="free"&&prior.charges!=null&&balances[prior.plan]==null)balances[prior.plan]=prior.charges;
-  balances.exercise=Math.max(0,Math.floor(Number(balances.exercise)||0));
-  // O bônus cai no pool Lasting — acumula com as cargas compradas na store.
-  balances.lasting=Math.max(0,Math.floor(Number(balances.lasting)||0))+DAILY_EXERCISE_CHARGES;
-  p.trainingExercise={skill,weapon:String(weaponId),activePlan:"lasting",balances,active:true};
-  p.dailyRewardDay=info.rewardDay;
-  return {charges:DAILY_EXERCISE_CHARGES,trainingExercise:p.trainingExercise};
+function accountCosmeticsObj(acc){
+  let cos=acc&&acc.cosmetics;
+  if(typeof cos==="string"){try{cos=JSON.parse(cos);}catch(e){cos=null;}}
+  return cos&&typeof cos==="object"&&!Array.isArray(cos)?cos:{};
+}
+function weeklyRewardInfo(acc){
+  const cos=accountCosmeticsObj(acc);
+  const claimedDay=String(cos.weeklyRewardDay||"");
+  const cur=weeklyRewardForDay(DAILY_REWARD_DAY);
+  return {rewardDay:DAILY_REWARD_DAY,claimedDay,weekday:cur.weekday,dayName:cur.dayName,
+    reward:cur.reward,available:!!DAILY_REWARD_DAY&&claimedDay<DAILY_REWARD_DAY,
+    schedule:WEEKLY_REWARDS.map((r,i)=>({weekday:i,dayName:WEEKLY_DAY_NAMES[i],reward:r}))};
+}
+/* Aplica o payload no char. exercise/wildcard marcam só o coletor;
+ * boosts e o marcador dailyRewardDay (belt anti-duplo-claim) vão em todo
+ * char escrito — a verdade do claim por conta fica em cosmetics. */
+function applyWeeklyCharReward(p,reward,isClaimer,weaponId,rewardDay){
+  /* Cinto-e-suspensórios contra grant duplo quando a marca da conta
+   * (cosmetics) se perde após o char já gravado. Só barra exercise/
+   * wildcard — boost é idempotente (reaplicar seta o mesmo valor). */
+  if(isClaimer&&reward.type!=="exp"&&reward.type!=="skill"&&
+    String(p.dailyRewardDay||"")>=String(rewardDay))
+    return {error:{code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
+      msg:"Recompensa já coletada neste ciclo."}}};
+  if(reward.type==="exercise"){
+    if(!isClaimer)return {skipped:true};
+    const skill=EXERCISE_REWARD_WEAPONS[String(weaponId||"")];
+    if(!skill)return {error:{code:400,body:{ok:false,error:"INVALID_EXERCISE_WEAPON",msg:"Arma de treino inválida."}}};
+    const prior=p.trainingExercise&&typeof p.trainingExercise==="object"?p.trainingExercise:{};
+    const balances=prior.balances&&typeof prior.balances==="object"?prior.balances:{};
+    if(prior.plan&&prior.plan!=="free"&&prior.charges!=null&&balances[prior.plan]==null)balances[prior.plan]=prior.charges;
+    balances.exercise=Math.max(0,Math.floor(Number(balances.exercise)||0));
+    // O bônus cai no pool Lasting — acumula com as cargas compradas na store.
+    balances.lasting=Math.max(0,Math.floor(Number(balances.lasting)||0))+reward.charges;
+    p.trainingExercise={skill,weapon:String(weaponId),activePlan:"lasting",balances,active:true};
+  }else if(reward.type==="exp"){
+    p.expBoost={mul:Number(reward.mul)||1,leftMs:Math.max(0,Math.floor(Number(reward.leftMs)||0))};
+  }else if(reward.type==="skill"){
+    p.skillBoost={mul:Number(reward.mul)||1,leftMs:Math.max(0,Math.floor(Number(reward.leftMs)||0))};
+  }
+  if(isClaimer)p.dailyRewardDay=rewardDay;
+  return {ok:true};
 }
 
 function allowedOrigin(req){const origin=req.headers.origin;if(!origin)return null;
@@ -1625,7 +1673,7 @@ async function loadCharacter(db, token, id) {
 // preferências/visual; XP, skills, gold, kills, bless e cooldowns vêm das
 // transações autoritativas (ou das ferramentas Admin explícitas).
 const PROTECTED_SAVE_KEYS=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-  "bosses","missions","wardrobe","_accountCosmetics","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests","_pouchBase","_walletSynced"];
+  "bosses","missions","wardrobe","_accountCosmetics","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests","_pouchBase","_walletSynced","expBoost","skillBoost"];
 function prepareCharacterSave(c,body,opts){
   opts=opts||{};
   let payload=body.data;
@@ -2397,12 +2445,18 @@ async function getDailyReward(db,body){
   if(!character||Number(character.account_id)!==Number(acc.id))
     return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
   let p={};try{p=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
-  return {code:200,body:Object.assign({ok:true},dailyRewardInfo(p))};
+  const info=weeklyRewardInfo(acc);
+  const cos=accountCosmeticsObj(acc);
+  return {code:200,body:Object.assign({ok:true},info,{
+    preyCards:Math.max(0,Math.floor(Number(cos.preyCards)||0)),
+    expBoost:p.expBoost||null,skillBoost:p.skillBoost||null})};
 }
 
-/* Server save diário: coleta das 3000 cargas de Exercise Weapon. Segue o
- * fluxo do reward chest — instância ativa recebe patch autoritativo; char
- * no templo persiste direto. Não acumula: claimedDay vs rewardDay. */
+/* Server save diário: recompensa SEMANAL POR CONTA (ver WEEKLY_REWARDS).
+ * Segue o fluxo do reward chest — instância ativa recebe patch autoritativo;
+ * char no templo persiste direto. Não acumula: a marca de claim fica em
+ * cosmetics.weeklyRewardDay (verdade da conta); p.dailyRewardDay no char
+ * coletor é só cinto-e-suspensórios contra grant duplo. */
 async function claimDailyExerciseReward(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -2413,14 +2467,64 @@ async function claimDailyExerciseReward(db,body){
   const character=await db.findCharacter(charId);
   if(!character||Number(character.account_id)!==Number(acc.id))
     return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const info=weeklyRewardInfo(acc);
+  if(!info.available)return {code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
+    msg:"Recompensa já coletada neste ciclo.",dailyReward:info}};
+  const reward=info.reward||{};
   const weaponId=String(body.weapon||"");
-  if(!EXERCISE_REWARD_WEAPONS[weaponId])
+  if(reward.type==="exercise"&&!EXERCISE_REWARD_WEAPONS[weaponId])
     return {code:400,body:{ok:false,error:"INVALID_EXERCISE_WEAPON",msg:"Arma de treino inválida."}};
-  let preData={};try{preData=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
-  const preInfo=dailyRewardInfo(preData);
-  if(!preInfo.available)return {code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
-    msg:"Recompensa já coletada neste ciclo.",dailyReward:preInfo}};
+  const isBoost=reward.type==="exp"||reward.type==="skill";
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  /* Marca a conta (cosmetics.weeklyRewardDay) e credita o pool de wildcards.
+   * setAccountCosmetics ignora preyCards no payload — só via changePreyCards. */
+  const finishAccount=async()=>{
+    await db.setAccountCosmetics(acc.id,{weeklyRewardDay:info.rewardDay});
+    if(reward.type==="wildcard"&&typeof db.changePreyCards==="function")
+      await db.changePreyCards(acc.id,Math.max(0,Math.floor(Number(reward.cards)||0)),0);
+  };
+  /* Boosts valem para TODOS os chars da conta: grava nos que estão na
+   * cidade (fora da instância). Idempotente (seta valor, não acumula). */
+  const saveCityChars=async(excludeIds)=>{
+    if(!isBoost)return null;
+    const rows=(await db.charactersOf(acc.id))
+      .filter((c)=>!excludeIds.has(Number(c.id)));
+    if(!rows.length)return null;
+    const saves=[];
+    for(const c of rows){
+      let cp={};try{cp=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){cp={};}
+      const r=applyWeeklyCharReward(cp,reward,false,null,info.rewardDay);
+      if(r&&r.error)return r.error;
+      saves.push({id:Number(c.id),expectedVersion:Number(c.save_version),voc:c.voc,
+        level:Math.max(1,Number(cp.level)||Number(c.level)||1),data:JSON.stringify(cp),
+        extra:{hp:Math.max(0,Number(cp.hp)||0),mp:Math.max(0,Number(cp.mp)||0)}});
+    }
+    const result=await db.saveCharactersVersioned(acc.id,saves,lease);
+    if(!result.ok)return saveConflictResponse(result,acc);
+    for(const c of result.characters||[])
+      publishSync(acc.id,"character",{id:Number(c.id),saveVersion:Number(c.save_version),source:"daily-reward-boost"});
+    return null;
+  };
+  const done=async(persisted,claimP)=>{
+    await finishAccount();
+    const freshAcc=await db.findAccountById(acc.id)||acc;
+    const freshCos=accountCosmeticsObj(freshAcc);
+    persisted.body.dailyReward=weeklyRewardInfo(freshAcc);
+    persisted.body.preyCards=Math.max(0,Math.floor(Number(freshCos.preyCards)||0));
+    if(claimP){
+      persisted.body.trainingExercise=claimP.trainingExercise;
+      persisted.body.expBoost=claimP.expBoost||null;
+      persisted.body.skillBoost=claimP.skillBoost||null;
+    }
+    persisted.body.msg=reward.type==="exercise"
+      ?`+${reward.charges} cargas de Lasting Exercise Weapon coletadas.`
+      :reward.type==="wildcard"
+        ?`+${reward.cards} Prey Wildcards adicionados à conta.`
+        :reward.type==="exp"
+          ?`Bônus de EXP ×${reward.mul} por ${Math.round((reward.leftMs||0)/60000)}min de caça ativado em todos os personagens.`
+          :`Bônus de Skill ×${reward.mul} por ${Math.round((reward.leftMs||0)/60000)}min de treino ativado em todos os personagens.`;
+    return persisted;
+  };
   const resolved=await resolveInstanceRow(db,acc,charId);
   if(resolved.error)return resolved.error;
   const row=resolved.row;
@@ -2429,14 +2533,27 @@ async function claimDailyExerciseReward(db,body){
     for(let attempt=0;attempt<4;attempt++){
       const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
       if(!current||current.status!=="active")break;
-      let claimedPlayer=null,applied=null;
+      let claimedPlayer=null,applied=null,patchedIds=new Set();
       const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
         let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
-        const item=descriptor.authority&&descriptor.authority.players&&
-          descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+        const players=descriptor.authority&&descriptor.authority.players||[];
+        const item=players.find((entry)=>String(entry.id)===String(charId));
         if(!item||!item.p)return null;
-        applied=applyDailyExerciseReward(item.p,weaponId);
-        if(applied.error)return null;
+        if(reward.type!=="wildcard"){
+          for(const entry of players){
+            if(!entry||!entry.p)continue;
+            patchedIds.add(Number(entry.id));
+            const r=applyWeeklyCharReward(entry.p,reward,
+              String(entry.id)===String(charId),weaponId,info.rewardDay);
+            if(r&&r.error){applied=r;return null;}
+          }
+        }else{
+          if(String(item.p.dailyRewardDay||"")>=String(info.rewardDay)){
+            applied={error:{code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
+              msg:"Recompensa já coletada neste ciclo."}}};return null;}
+          item.p.dailyRewardDay=info.rewardDay;
+          patchedIds.add(Number(item.id));
+        }
         claimedPlayer=cloneJson(item.p);
         descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
       },lease);
@@ -2448,10 +2565,9 @@ async function claimDailyExerciseReward(db,body){
         const fresh=await db.findCharacter(charId);
         const persisted=await persistClaimedPlayer(db,acc,fresh||character,claimedPlayer,lease);
         if(persisted.code!==200)return persisted;
-        persisted.body.trainingExercise=claimedPlayer.trainingExercise;
-        persisted.body.dailyReward=dailyRewardInfo(claimedPlayer);
-        persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Lasting Exercise Weapon coletadas.`;
-        return persisted;
+        const cityErr=await saveCityChars(patchedIds);
+        if(cityErr)return cityErr;
+        return done(persisted,claimedPlayer);
       }
       if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a coleta"}};
       if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
@@ -2462,14 +2578,23 @@ async function claimDailyExerciseReward(db,body){
         instance:instanceSummary(last.instance,true)}};
   }
   let p=await loadCityPlayer(db,acc,character);
-  const applied=applyDailyExerciseReward(p,weaponId);
-  if(applied.error)return applied.error;
+  if(reward.type!=="wildcard"){
+    const applied=applyWeeklyCharReward(p,reward,true,weaponId,info.rewardDay);
+    if(applied&&applied.error)return applied.error;
+  }else{
+    if(String(p.dailyRewardDay||"")>=String(info.rewardDay))
+      return {code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
+        msg:"Recompensa já coletada neste ciclo.",dailyReward:info}};
+    p.dailyRewardDay=info.rewardDay;
+  }
+  if(isBoost){/* demais chars da conta ganham o boost antes do coletor,
+      para conflito de versão abortar antes da marca do coletor */
+    const cityErr=await saveCityChars(new Set([charId]));
+    if(cityErr)return cityErr;
+  }
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
   if(persisted.code!==200)return persisted;
-  persisted.body.trainingExercise=p.trainingExercise;
-  persisted.body.dailyReward=dailyRewardInfo(p);
-  persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Lasting Exercise Weapon coletadas.`;
-  return persisted;
+  return done(persisted,p);
 }
 
 /* Configuração de treino por personagem — skill + modalidade de qualquer

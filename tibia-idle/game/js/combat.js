@@ -5426,11 +5426,15 @@ function combatTick(c, p, dt, now) {
   if (typeof huntTimeMissionTick === "function") huntTimeMissionTick(c, p, dt);
 
   const staminaPlayers=(c.players&&c.players.length)?c.players:[{p}];
+  const boostHunt=!!c.huntId&&!c.boss&&!c.worldBoss&&!c.questId&&!c.pvp;
   for(const ent of staminaPlayers)if(ent&&ent.p){
     // Caça só drena; o carimbo avança para o tempo caçando não contar como
     // "ocioso" no próximo regen do load/save.
     ent.p.stamina=Math.max(0,(Number(ent.p.stamina)||0)-dt/1000);
     ent.p.staminaAt=Date.now();
+    // Boost semanal de EXP: o relógio só corre em hunt.
+    if(boostHunt&&ent.p.expBoost&&Number(ent.p.expBoost.leftMs)>0)
+      ent.p.expBoost.leftMs=Math.max(0,Number(ent.p.expBoost.leftMs)-dt);
   }
   // O pool da conta acompanha o dreno local — sem isto o sync de cidade
   // "ressuscitaria" a stamina gasta na caça (modo online o dreno é
@@ -5678,6 +5682,9 @@ function combatTick(c, p, dt, now) {
     const staminaMul = staminaNow <= 0 ? 0 : (staminaNow < 3 * 3600 ? 0.5 :
       (staminaNow > 13 * 3600 && vipStamina ? 1.5 : 1));
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
+    // Boost semanal de EXP (terça +25%/sexta +100%) — só em hunt.
+    if (boostHunt && p.expBoost && Number(p.expBoost.leftMs) > 0)
+      exp = Math.floor(exp * Math.max(1, Number(p.expBoost.mul) || 1));
     if (typeof soulwarTaintExpMultiplier === "function")
       exp = Math.floor(exp * soulwarTaintExpMultiplier(c, p));
     // Prey de EXP (TibiaWiki/Prey_System): +13~40% de experiência
@@ -5701,15 +5708,20 @@ function combatTick(c, p, dt, now) {
     if (partyShare) {
       exp = partyShare.leaderExp;
       for (const mem of partyShare.members) {
+        // Boost semanal de EXP é por char — multiplica a parte do membro.
+        let memExp = mem.exp;
+        const memEnt = (c.players || []).find((ent) => ent && ent.p && String(ent.id) === String(mem.id));
+        if (boostHunt && memEnt && memEnt.p.expBoost && Number(memEnt.p.expBoost.leftMs) > 0)
+          memExp = Math.floor(memExp * Math.max(1, Number(memEnt.p.expBoost.mul) || 1));
         const ups = (typeof partyApplyToMember === "function")
-          ? partyApplyToMember(mem.id, mem.exp) : 0;
+          ? partyApplyToMember(mem.id, memExp) : 0;
         // PARTY COMBAT: o membro em cena (entidade viva) também ganha o XP
         // na hora — o save do roster é cópia e não refletiria o level-up
         if (typeof partyApplyToMemberLive === "function") {
-          partyApplyToMemberLive(mem.id, mem.exp);
+          partyApplyToMemberLive(mem.id, memExp);
         }
         if (typeof partyRecordKill === "function") {
-          partyRecordKill(p, mem.id, mem.exp, 0, ups);
+          partyRecordKill(p, mem.id, memExp, 0, ups);
         }
       }
       if (typeof partyRecordKill === "function") partyRecordKill(p, null, exp, 0, 0);

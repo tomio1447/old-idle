@@ -4,6 +4,25 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Recompensa diária: cronograma semanal por conta
+
+- **Por conta, não por personagem**: a marca de coleta migrou de `p.dailyRewardDay` (por char) para `cosmetics.weeklyRewardDay` (conta). Uma coleta por server save vale para a conta inteira; sem coletar, o próximo save substitui (não acumula — como antes).
+- **Cronograma semanal** (`WEEKLY_REWARDS` no server, segue o fuso do server save):
+  - domingo: 1.500 cargas de Lasting Exercise Weapon (vão para o char que coleta — a arma escolhida define o skill)
+  - segunda e quarta: 10 Prey Wildcards no pool compartilhado da conta (`cosmetics.preyCards`)
+  - terça: bônus de EXP ×1,25 por 1h de caça (`p.expBoost`) — todos os chars da conta
+  - quinta: 500 cargas de Lasting Exercise Weapon
+  - sexta: bônus de EXP ×2 por 30min de caça — todos os chars
+  - sábado: bônus de Skill ×2 por 30min de treino (`p.skillBoost`) — todos os chars
+- **Drain correto do bônus de EXP**: o relógio só corre em HUNT (`auth.kind==="hunt"` no engine; `!boss && !worldBoss && !questId && !pvp` no cliente). Boss, quest, PvP, treino e templo não consomem o bônus.
+- **Drain correto do bônus de Skill**: o relógio só corre dentro da área de treino — `advanceTrainingPlayer` no servidor cobre os primeiros ms de cada janela de checkpoint (hits além do saldo saem sem multiplicador); `academyTrainingTick` espelha por golpe no cliente.
+- **Modal semanal**: grade com os 7 dias (hoje destacado, "coletado" quando marcado), cartão do prêmio do dia, seletor de arma só nos dias de exercise e linhas com o tempo restante de boosts ativos; painel de detalhes do char mostra "Bônus EXP/Skill ×mul · Nmin".
+- **`expBoost`/`skillBoost` são server-owned**: entram em `PROTECTED_SAVE_KEYS` — o save do cliente não restaura tempo já drenado.
+- **Compat**: `dailyRewardDay` nos chars permanece como marcador "cinto-e-suspensórios" do coletor dentro do patch da instância; endpoints `/api/training/daily-reward` e `/api/training/daily-claim` mantidos (payload do claim aceita `weapon`, exigida só em dias de exercise).
+- **Teste**: `node tools/test_weekly_daily_reward.js` — sobe o server real em JsonStore temporário e exercita status, claim por tipo, marca da conta, +10 wildcards no pool, boost nos dois chars da conta e 409 no re-claim e no claim pelo outro char (22 asserts).
+
+---
+
 ## 2026-11-27 — Pouch→mochila falhava com "mochila cheia" tendo espaço
 
 - **Sintoma**: arrastar uma stack da Loot Pouch para a mochila falhava com "Não foi possível mover (mochila cheia, CAP ou item ausente)" mesmo com slots e CAP livres.

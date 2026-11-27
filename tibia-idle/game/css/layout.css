@@ -6644,6 +6644,36 @@ body.quest-lobby-open #party-panel { display:none !important; }
 .dr-actions { gap:8px; }
 .dr-actions button { flex:1; }
 .dr-actions #dr-claim { flex:2; }
+/* Recompensa semanal: cartão do dia + cronograma. */
+.dr-today-card {
+  display:flex; gap:10px; align-items:center;
+  padding:10px 12px;
+  background:#1d1f26; border:1px solid var(--gold,#d4af37); border-radius:6px;
+}
+.dr-today-card img { width:44px; height:44px; image-rendering:pixelated; object-fit:contain; }
+.dr-today-info { display:flex; flex-direction:column; gap:3px; }
+.dr-today-info b { color:#9ce84a; font:bold 12px Verdana, sans-serif; }
+.dr-today-info .tiny { line-height:1.35; }
+.dr-week { display:flex; flex-direction:column; gap:4px; }
+.dr-week-row {
+  display:flex; align-items:center; gap:8px;
+  padding:4px 8px;
+  background:rgba(10,12,16,.5); border:1px solid #2c3038; border-radius:5px;
+  font:10px Verdana, sans-serif;
+}
+.dr-week-row img { width:20px; height:20px; image-rendering:pixelated; object-fit:contain; opacity:.8; }
+.dr-week-row .dr-week-day { flex:0 0 74px; color:#e8dfd0; text-transform:capitalize; }
+.dr-week-row .dr-week-label { flex:1; color:#b9b2a0; }
+.dr-week-row .dr-week-tag {
+  flex:0 0 auto; padding:1px 7px; border-radius:8px;
+  background:#4c6b3a; color:#eaf6d8; font:bold 9px Verdana, sans-serif;
+  text-transform:uppercase;
+}
+.dr-week-row.today { border-color:#4c6b3a; box-shadow:inset 0 0 10px rgba(76,107,58,.25); }
+.dr-week-row.today .dr-week-label { color:#e8dfd0; }
+.dr-week-row.done { opacity:.55; }
+.dr-week-row.done .dr-week-tag { background:#3a3e48; color:#b9b2a0; }
+.dr-boosts { color:#9ce84a; font-size:10px; line-height:1.5; }
 @media (max-width:560px) {
   .dr-grid { grid-template-columns:repeat(3, 1fr); }
 }

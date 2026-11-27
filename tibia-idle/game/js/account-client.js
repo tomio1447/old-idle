@@ -1254,10 +1254,11 @@ function accountDailyRewardStatus(token,charId){
     .then((r)=>(r&&r.data&&r.data.ok)?r.data:{ok:false})
     .catch(()=>({ok:false}));
 }
-/* Coleta o bônus do server save diário (3000 cargas de Lasting Exercise
- * Weapon — acumula com as compradas na store). A escolha da arma define
- * o skill treinado; claimedDay é server-owned — não acumula se o
- * jogador deixar passar um ciclo. */
+/* Coleta a recompensa SEMANAL do server save — POR CONTA (ver
+ * WEEKLY_REWARDS no server): cargas de exercise vão para o char que coleta
+ * (arma = skill), wildcards entram no pool de Prey Cards da conta e boosts
+ * de EXP/Skill são concedidos a todos os personagens. A marca de claim é
+ * cosmetics.weeklyRewardDay — server-owned, não acumula entre ciclos. */
 function accountClaimDailyReward(token,charId,weapon){
   return accountQueueSave(async()=>{
     if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};
@@ -1266,11 +1267,21 @@ function accountClaimDailyReward(token,charId,weapon){
     const r=await _api("POST","/api/training/daily-claim",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      const acc=typeof sessionAccount==="function"?sessionAccount():null;
+      if(acc){
+        const cos=acc.cosmetics=Object.assign({},acc.cosmetics||{});
+        if(r.data.preyCards!=null)cos.preyCards=Math.max(0,Math.floor(Number(r.data.preyCards)||0));
+        if(r.data.dailyReward&&r.data.dailyReward.claimedDay)cos.weeklyRewardDay=r.data.dailyReward.claimedDay;
+        sessionStorage.setItem("tibia-idle-account",JSON.stringify(acc));
+      }
       if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id){
         if(r.data.trainingExercise)G.p.trainingExercise=r.data.trainingExercise;
+        if(r.data.expBoost)G.p.expBoost=r.data.expBoost;
+        if(r.data.skillBoost)G.p.skillBoost=r.data.skillBoost;
         if(r.data.dailyReward)G.p.dailyRewardDay=r.data.dailyReward.claimedDay;
       }
-      return {ok:true,msg:r.data.msg,trainingExercise:r.data.trainingExercise};
+      return {ok:true,msg:r.data.msg,trainingExercise:r.data.trainingExercise,
+        expBoost:r.data.expBoost,skillBoost:r.data.skillBoost,preyCards:r.data.preyCards};
     }
     if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
     return {ok:false,msg:r.data.msg||"Não foi possível coletar a recompensa",code:r.code};

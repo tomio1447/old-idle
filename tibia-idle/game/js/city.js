@@ -651,7 +651,13 @@ function academyTrainingTick(t, p, dt, now, dummyPos) {
   // autoritativo (skills/skillTries/ml/manaSpent/trainingExercise).
   if (activePlan.id !== "free")
     state.balances[activePlan.id] = Math.max(0, (Number(state.balances[activePlan.id]) || 0) - 1);
-  const rate = activePlan.bonus;
+  /* Boost semanal de skill (sábado): ×mul enquanto o saldo durar — o
+   * relógio corre só dentro do treino (por golpe, ~intervalo do dummy).
+   * Previsão local; o checkpoint do servidor reconcilia. */
+  const sbActive = p.skillBoost && Number(p.skillBoost.leftMs) > 0;
+  const sbMul = sbActive ? Math.max(1, Number(p.skillBoost.mul) || 1) : 1;
+  if (sbActive) p.skillBoost.leftMs = Math.max(0, Number(p.skillBoost.leftMs) - academyAttackDelay(t, p));
+  const rate = activePlan.bonus * sbMul;
   let skillUp = false, shieldUp = false;
   if (t.skill === "magic") {
     const gain = Math.floor(EXERCISE_MANA * rate);

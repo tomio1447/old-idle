@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
+const ALPHA_UPDATE_AT = "27/11/2026 às 13:30";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Recompensa diária reformulada: cronograma SEMANAL POR CONTA (uma coleta por server save para todos os personagens) — dom 1.500 cargas de exercise, seg/qua 10 Prey Wildcards, ter +25% de EXP por 1h de caça, qui 500 cargas, sex +100% de EXP por 30min e sáb +100% de Skill por 30min de treino — bônus de EXP só drena em hunt e o de Skill só dentro da área de treino",
   "FIX — Mover itens da Loot Pouch para a mochila não falha mais com 'mochila cheia' tendo espaço: stacks de potions e creature products eram contados como 1 slot por unidade em vez de 1 por tipo",
   "FIX — Boss bar agora exibe apenas o boss: summons e monstros da sala (Soulcages, spirits, dragons, eyes) não aparecem mais — em lutas de fases como o Bonelord's Phylactery a barra fica oculta até o boss nascer",
   "FIX — Carregamento de instância blindado: a tela de loading agora só sai quando a arena e TODAS as sprites das criaturas vivas estão prontas (sem mais sprites pipocando ao voltar de uma caçada), e uma instância que quebra o resume é encerrada no servidor em vez de prender a conta num ciclo de falhas",

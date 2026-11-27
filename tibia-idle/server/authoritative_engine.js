@@ -2650,6 +2650,12 @@ function advanceTrainingPlayer(p, now, sessionId, vip, holderId, stop) {
   const interval = 2000 / (vip ? 1.1 : 1);
   const available = clock.carry + elapsed;
   const hits = Math.floor(available / interval);
+  /* Boost semanal de skill (sábado): o relógio corre só enquanto o char
+   * treina — cobre os primeiros ms desta janela; hits além do saldo saem
+   * sem multiplicador. */
+  const sbMs=Math.max(0,Number(p.skillBoost&&p.skillBoost.leftMs)||0);
+  const boostedHits=sbMs>0?Math.min(hits,Math.floor((clock.carry+Math.min(sbMs,available))/interval)):0;
+  if(p.skillBoost)p.skillBoost.leftMs=Math.max(0,sbMs-Math.min(sbMs,available));
   clock.carry = available - hits * interval;
   const before = { ml: Number(p.ml) || 0, skills: Object.assign({}, p.skills || {}) };
   for (let i = 0; i < hits; i++) {
@@ -2658,9 +2664,10 @@ function advanceTrainingPlayer(p, now, sessionId, vip, holderId, stop) {
     state.activePlan = plan;
     if (plan !== "free") balances[plan]--;
     const bonus = plan === "lasting" ? 1.5 : plan === "exercise" ? 1.25 : 1;
-    if (skill === "magic") addManaSpent(p, Math.floor(600 * bonus));
-    else addSkillTries(p, skill, 7 * bonus);
-    if (skill !== "shield") addSkillTries(p, "shield", 7 * bonus);
+    const boostMul=i<boostedHits?Math.max(1,Number(p.skillBoost.mul)||1):1;
+    if (skill === "magic") addManaSpent(p, Math.floor(600 * bonus * boostMul));
+    else addSkillTries(p, skill, 7 * bonus * boostMul);
+    if (skill !== "shield") addSkillTries(p, "shield", 7 * bonus * boostMul);
   }
   const advances = [];
   if ((Number(p.ml) || 0) > before.ml) advances.push({ type: "magic", from: before.ml, to: p.ml });
@@ -6881,7 +6888,10 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   let totalShare=0;const shares=[];
   for(const item of receivers){
     const portion=eligible?split.each:baseExp;
-    let share=finalExp(item.p,portion,mob.slug,auth.expMul||1);
+    // Boost semanal de EXP: multiplica só em hunt e só enquanto há tempo.
+    const eb=(auth.kind==="hunt"&&item.p.expBoost&&Number(item.p.expBoost.leftMs)>0)
+      ?Math.max(1,Number(item.p.expBoost.mul)||1):1;
+    let share=finalExp(item.p,portion,mob.slug,(auth.expMul||1)*eb);
     const taintExp=soulwarTaintExpMultiplier(auth,item.p);
     if(taintExp!==1)share=Math.floor(share*taintExp);
     // Hazard exp bonus (crystalserver): +3,5% por nível de hazard.
@@ -10123,6 +10133,10 @@ function step(auth,now,opts){if(auth.ended)return;
     }
     if(now>pool.at){pool.v=Math.max(0,pool.v-(now-pool.at)/1000);pool.at=now;}
     p.stamina=pool.v;p.staminaAt=now;
+    /* Bônus de EXP da recompensa semanal (terça/sexta): o relógio só corre
+     * em HUNT — boss, quest, pvp, treino e templo não consomem o bônus. */
+    if(auth.kind==="hunt"&&p&&p.expBoost&&Number(p.expBoost.leftMs)>0)
+      p.expBoost.leftMs=Math.max(0,Number(p.expBoost.leftMs)-dt);
     if(item.downUntil&&now>=item.downUntil){
       if(item.permadead||authIsBossFight(auth)){
         item.permadead=true;p.hp=0;
