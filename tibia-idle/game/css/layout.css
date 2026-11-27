@@ -1345,9 +1345,9 @@ button.reward-boss-card--empty .reward-boss-chest { background:#1a0d0d; border-c
 }
 .world-bosses-icon {
   display:inline-block; width:24px; height:24px; flex:0 0 24px;
-  background-image:url('../assets/mob/goshnar-s-megalomania-purple.png');
-  background-size:contain; background-position:center; background-repeat:no-repeat;
-  image-rendering:pixelated;
+  background-image:url('../assets/mob/deathstrike.png');
+  background-size:72px 96px; background-position:0 -48px;
+  image-rendering:pixelated; animation:hunts-demon-walk .72s steps(1,end) infinite;
 }
 .npcs-btn-icon {
   display:inline-block; width:22px; height:22px; flex:0 0 22px;
