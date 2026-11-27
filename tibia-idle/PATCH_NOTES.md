@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Brain Head e Cerebellum parando de andar
+
+- **Sintoma**: Brain Head e os 8 Cerebellum — monstros oficialmente estáticos — se movimentavam pela sala.
+- **Causa**: o movimento dos mobs é dirigido pelo `monsterThinkStep` do cliente (posições ficam no `visualKeys` do merge, o servidor não sobrescreve), e dois buracos faziam eles andarem: `monsterSpeedPts` tratava `speed: 0` como falsy e caía no fallback de 100, e nada respeitava a flag `mob.noMove` (a mesma que o engine usa e que os snapshots já traziam).
+- **Fix**: `monsterSpeedPts` honra `speed: 0` explícito (mi.speed ou def.speed), e `monsterThinkStep` retorna cedo para `mob.noMove || speed <= 0` — o monstro só encara o alvo e ataca do SQM. `noMove: true` marcado no boss e nos Cerebellum no spawn cliente (offline/solo). Efeito colateral positivo: Annihilator demons e o Pillar of Dark Energy, que também chegavam com `noMove` mas andavam pelo mesmo bug, ficam estáticos agora.
+
+---
+
 ## 2026-11-27 — Tela preta quando o lease da conta está em outra aba
 
 - **Sintoma**: jogador via a interface (menus, painéis) mas a área do jogo ficava 100% preta, no Edge e no Chrome. Causa: o `loop()` retornava antes de renderizar quando `accountLeaseAllowsSimulation()` era falso — a simulação pausava **e** a cena nunca era desenhada. Bastava o lease estar preso em outra aba/dispositivo (409 em `/api/lease/acquire`) ou órfão de uma sessão que caiu.

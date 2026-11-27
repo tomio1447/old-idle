@@ -153,6 +153,7 @@ function brainheadBossSpawnCerebellum(c) {
     const def = Object.assign({}, base);
     def.ranged = true;
     def.speed = 0;
+    def.noMove = true;
     const cx = pos.x - ox;
     const cy = pos.y - oy;
     const s = (typeof cellToScreen === "function") ? cellToScreen(cx, cy, w, h) : { x: (cx + 0.5) / w, y: (cy + 0.5) / h };
@@ -169,6 +170,7 @@ function brainheadBossSpawnCerebellum(c) {
       moving: false,
       attackAnim: 0,
       speed: 0,
+      noMove: true,
       cx: cx,
       cy: cy,
       x: s.x,
@@ -193,6 +195,7 @@ function brainheadBossInit(c, player) {
   boss.def.ranged = true;
   boss.def.speed = 0;
   boss.speed = 0;
+  boss.noMove = true;
   const cerebella = brainheadBossSpawnCerebellum(c, player);
   c.brainHead = { boss: boss, cerebella: cerebella, immune: true, startedAt: Date.now() };
   return true;

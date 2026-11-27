@@ -57,10 +57,14 @@ function monsterStaticChance(mob) {
   return Math.min(99, Math.max(95, (mi.staticAttack === undefined ? 90 : mi.staticAttack) + 7));
 }
 
-/* Velocidade base do monstro, em pontos de speed do Canary */
+/* Velocidade base do monstro, em pontos de speed do Canary.
+ * speed:0 explícito (boss estático) não pode cair no fallback — `0||x`
+ * devolvia 100 e o Brain Head/Cerebellum andavam. */
 function monsterSpeedPts(mob) {
   const mi = moveInfo(mob.slug);
-  return mi.speed || (mob.def && mob.def.speed) || 100;
+  if (mi.speed !== undefined) return Number(mi.speed) || 0;
+  if (mob.def && mob.def.speed !== undefined) return Number(mob.def.speed) || 0;
+  return 100;
 }
 
 /* Alcance de ataque em SQM.
@@ -108,6 +112,14 @@ function stepJitterMs(ent) {
 function monsterThinkStep(c, mob, alvo, occ, now) {
   ensureCell(mob);
   if (mob.hp <= 0) return false;
+
+  // Imóvel (noMove/speed 0 — Brain Head, Cerebellum, pilares): só encara o
+  // alvo e ataca do SQM, como no engine (`if(mob.noMove)continue`).
+  if (mob.noMove || monsterSpeedPts(mob) <= 0) {
+    mob.moving = false;
+    if (alvo) mob.dir = dirTo(mob, alvo);
+    return false;
+  }
 
   // passo em andamento: so continua interpolando
   if (mob.moving) return false;

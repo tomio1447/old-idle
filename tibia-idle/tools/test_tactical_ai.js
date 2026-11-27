@@ -61,5 +61,18 @@ vm.runInContext(`
 
   // 6. Movimento de monstro é deliberadamente mais estático (mínimo 95%).
   if (monsterStaticChance({ slug: "rat", def: {} }) < 95) fail("Monstro ainda se move demais.");
+
+  // 7. Mob imóvel (noMove/speed 0) nunca pisa — Brain Head/Cerebellum.
+  //    monsterSpeedPts: speed:0 explícito não pode cair no fallback de 100.
+  window.MONSTERMOVES["cerebellum"] = { attackable: 1, hostile: 1, speed: 0, staticAttack: 99, targetDistance: 7 };
+  if (monsterSpeedPts({ slug: "cerebellum", def: { speed: 0 } }) !== 0)
+    fail("speed:0 virou fallback 100 em monsterSpeedPts.");
+  const still = { cx: 5, cy: 5, id: "cb", hp: 100, slug: "cerebellum", def: { speed: 0 }, noMove: true };
+  const victim = { cx: 5, cy: 1, p: { hp: 100 } };
+  for (let i = 0; i < 50; i++) monsterThinkStep({ mobs: [still] }, still, victim, new Map(), i * 300);
+  if (still.cx !== 5 || still.cy !== 5 || still.moving) fail("mob noMove pisou.");
+  const still2 = { cx: 5, cy: 5, id: "cb2", hp: 100, slug: "cerebellum", def: {} };
+  for (let i = 0; i < 50; i++) monsterThinkStep({ mobs: [still2] }, still2, victim, new Map(), i * 300);
+  if (still2.cx !== 5 || still2.cy !== 5 || still2.moving) fail("mob speed:0 (sem noMove) pisou.");
   console.log("OK: IA tática — segurança, wave, adjacência, reservas e estabilidade.");
 `, ctx);
