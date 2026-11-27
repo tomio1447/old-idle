@@ -81,6 +81,18 @@ function pvpAiControlTick(auth, now) {
 
     const driven = (Number(item._pvpDrivenAt) || 0) > now - AI_DRIVEN_MS;
     const offlineMs = now - (Number(item._pvpDrivenAt) || 0);
+    /* Presença voltou depois de ausência confirmada (aba fechada/reload —
+     * AFK com aba aberta nunca seta _aiOffline): devolve o controle de
+     * imediato, sem exigir movimento. Sem isto o char ficava em AI_HARD
+     * com a aba reaberta até a primeira ação do jogador. */
+    const wasOffline = !!item._aiOffline;
+    item._aiOffline = !driven;
+    if (driven && wasOffline && c.mode !== AI_MODES.HUMAN &&
+        c.mode !== AI_MODES.DISABLED) {
+      aiSet(item, AI_MODES.HUMAN_RETURNING, now);
+      item._aiGoal = null; item._aiTargetId = null;
+      if (item._pvpCtrl && item._pvpCtrl._aiOwned) item._pvpCtrl = null;
+    }
     let actAt = Number(item._pvpHumanActAt) || 0;
     /* Benefício da dúvida: char pilotado sem histórico (actAt=0 — recém
      * materializado) ganha o carimbo no primeiro contato; só quem FOI

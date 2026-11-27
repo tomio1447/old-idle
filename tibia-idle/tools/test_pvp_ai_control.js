@@ -692,5 +692,33 @@ console.log("== RP: alcance PvP de 10sqm (bolt/crossbow/spells) ==");
   ok(eng.pvpAttackRangeSQM(auth, ek) === 1, "knight continua melee (1)");
 }
 
+console.log("== reconnect: presença de volta devolve controle sem atividade ==");
+{
+  // Aba fechada 9s+ (offline) → AI_HARD. Aba reabre com a MESMA pose (o
+  // char não se moveu): sem atividade intencional, o retorno da presença
+  // já devolve o controle — antes ficava AI_HARD até o primeiro input.
+  let a = adv(makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]), [], 9500);
+  let it = a.players.find((p) => String(p.id) === "1");
+  ok(a.pvpBattle.aiControl["1"] === "AI_HARD", "setup: aba fechada → AI_HARD");
+  // eco parado na posição autoritativa (o cliente reconcilia o self sob AI)
+  a = adv(a, [vis("1", it.cx, it.cy)], 200);
+  it = a.players.find((p) => String(p.id) === "1");
+  ok(a.pvpBattle.aiControl["1"] === "HUMAN_RETURNING",
+    "presença voltando → HUMAN_RETURNING (sem exigir input)");
+  a = adv(a, [vis("1", it.cx, it.cy)], 700);
+  ok(a.pvpBattle.aiControl["1"] === "HUMAN", "graça → HUMAN: controle de volta");
+}
+{
+  // AFK com a aba ABERTA nunca marca _aiOffline — o takeover por AFK
+  // (confirmAfk) continua exigindo input do jogador para devolver.
+  const a = makeAuth([mkChar(1, 100, 1, 5, 1), mkChar(2, 200, 2, 8, 1)]);
+  const it = a.players[0];
+  it._pvpDrivenAt = Date.now(); it._pvpHumanActAt = Date.now() - 50000;
+  PVP_AI.pvpAiControlTick(a, Date.now());
+  PVP_AI.pvpAiControlTick(a, Date.now());
+  ok(it._aiCtl.mode === "AI_HARD" && !it._aiOffline,
+    "AFK online: AI_HARD sem _aiOffline (não devolve sozinho)");
+}
+
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
 console.log("\nALL PVP AI CONTROL TESTS PASSED");

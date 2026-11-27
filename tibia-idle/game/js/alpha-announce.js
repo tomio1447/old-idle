@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Guild War: fechar e reabrir a aba durante a guerra devolve o controle imediato (o char não fica mais preso no modo IA nem 'teleporta' ao assumir)",
   "NOVO — 8 mini bosses novos a 0,01% nas hunts: Zunzu (Lizard Town), Burster (The Void), Chizzoron (Draken Walls), Dharalion (Elfs Yalahar), Furyosa (MOTA Ext.), Sir Leopold (Book World), The Welter (Banuta Deeper) e Tyrn (Elder Wyrm) — todos aparecem na seção MINI BOSSES do modal",
   "FIX — Protector agora aumenta o Shielding de verdade: +30% sobre o total aparece no painel de skills, na mitigação e na cura de knight (que escala com Shielding no 15.25)",
   "NOVO — 3º slot de Prey por Tibia Coins: o botão do slot bloqueado leva direto à STORE → Preys, onde a liberação permanente custa 350 TC (vale para toda a conta)",

@@ -5518,10 +5518,16 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdH
        String(local.slug||"")!==String(remote&&remote.slug||"")))
       return hydrateMobDef(Object.assign({},remote));
     const visual={};for(const key of visualKeys)if(local[key]!==undefined)visual[key]=local[key];
-    // PvP: só o char pilotado preserva a posição local (predição).
+    // PvP: só o char pilotado preserva a posição local (predição) — exceto
+    // quando a IA do servidor dirige esse mesmo char (AI_HARD/RETURNING,
+    // aba fechada ou AFK): a célula autoritativa vence senão o self fica
+    // congelado e "teleporta" ao devolver o controle.
+    const _pvpSelfAi=!!(previous&&previous.pvpBattle&&previous.pvpBattle.aiControl&&
+      (previous.pvpBattle.aiControl[entityId(local)]==="AI_HARD"||
+       previous.pvpBattle.aiControl[entityId(local)]==="HUMAN_RETURNING"));
     const pvpRemoteEnt=isPlayer&&!!(previous&&previous.pvpBattle)&&
-      entityId(local)!==localActiveId&&
-      entityId(local)!==String(typeof sessionCharId==="function"?sessionCharId()||"":"");
+      (_pvpSelfAi||(entityId(local)!==localActiveId&&
+      entityId(local)!==String(typeof sessionCharId==="function"?sessionCharId()||"":"")));
     const playerRef=isPlayer&&local.p&&typeof local.p==="object"?local.p:null;
     const localDef=local.def;
     // HP anterior do player para a garantia de dano visível (sync de dano):

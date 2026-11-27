@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Guild War: reconexão devolve o controle de imediato
+
+- **Rejoin na guerra já funcionava** (aba fechada → instância PvP tem prioridade no `resolveInstanceRow`, boot resume e `pvpBackgroundSync` reentra sozinho), mas o **controle não voltava**: o char ficava em `AI_HARD` até o primeiro input — e, enquanto a IA do servidor o movia, o cliente mostrava o próprio char congelado e "teleportava" de volta ao assumir.
+- **Fix engine (`pvp-ai.js`)**: presença que retorna após ausência confirmada (`_aiOffline` — só seta quando a aba realmente fechou; AFK com aba aberta não passa) transiciona direto para `HUMAN_RETURNING` → `HUMAN` após a graça de 500ms, sem exigir input.
+- **Fix cliente (`game.js`)**: o próprio char sob `AI_HARD`/`HUMAN_RETURNING` segue a célula autoritativa como os demais (`pvpRemoteEnt`) — nada de self congelado nem snap de posição ao devolver o controle.
+- Regressão em `test_pvp_ai_control.js`: fechar e reabrir a aba devolve o controle sem input; AFK online continua exigindo confirmação.
+
+---
+
 ## 2026-11-27 — 8 mini bosses a 0,01% nas hunts
 
 - **8 minibosses com 0,01% por slot** (peso 1/10001, convenção Mawhawk/Ugly Monster; nascem `boss:true` → loot no Reward Chest): Lizardstown → **Battlemaster Zunzu**, The Void → **Burster**, Draken Walls → **Chizzoron the Distorter**, Elfs Yalahar → **Dharalion**, MOTA Extension → **Furyosa**, Book World → **Sir Leopold**, Banuta Deeper → **The Welter** e Elder Wyrm Darashia → **Tyrn**. Todos aparecem na seção MINI BOSSES do modal de hunts.
