@@ -8287,7 +8287,12 @@ function initAccountLogin() {
         msg("");if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
         try{sessionStorage.removeItem("tibia-idle-online-autoload");}catch(e){}
         const target=(result.characters||[]).find(c=>String(c.id)===String(autoId));
-        if(target&&(result.characters||[]).length>=ACCOUNT_MAX_CHARS)enterCharacter(sessionToken()||token,target);
+        /* Troca/retomada de instância: com autoload armado o destino já é
+         * conhecido — entra direto. O picker só aparece quando não há
+         * alvo (login ou refresh sem instância pendente), nunca no meio
+         * da troca (antes exigia a roster cheia: contas com slot livre
+         * viam a seleção a cada troca). */
+        if(target)enterCharacter(sessionToken()||token,target);
         else {
           if (typeof showGameLoading === "function") showGameLoading(false);
           showPicker(sessionToken()||token, result.account, result.characters || []);

@@ -166,8 +166,10 @@ function bindAlphaTestBanner() {
 function bootAlphaAnnounce() {
   bindAlphaAnnounceModal();
   bindAlphaTestBanner();
-  // Alpha: mostrar em todo page load (anúncio).
-  openAlphaAnnounceModal();
+  // Anúncio de login: reload de troca/retomada de instância (autoload,
+  // boot-loading ou autologin armados) entra direto — não reexibe.
+  const resuming = typeof isBootLoadingArmed === "function" && isBootLoadingArmed();
+  if (!resuming) openAlphaAnnounceModal();
 }
 
 window.ALPHA_DISCORD_URL = ALPHA_DISCORD_URL;

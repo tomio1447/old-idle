@@ -4,6 +4,13 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Patch notes e seleção de personagem só no login
+
+- **Patch notes**: o modal de novidades abria em **todo** page load, incluindo o reload feito para trocar de instância/personagem. Agora só abre quando não há retomada armada (`tibia-idle-online-autoload`, `boot-loading` ou `autologin`) — troca de instância entra direto, sem anúncio no meio.
+- **Seleção de personagem**: no resume com autoload, o char só entrava direto se a roster estivesse **cheia** — contas com slot livre viam a tela de seleção a cada troca. Agora, com autoload válido, entra direto sempre; a seleção só aparece quando não há destino pendente (login ou refresh sem instância).
+
+---
+
 ## 2026-11-27 — Warzones 4, 5 e 6 com salas e bosses próprios
 
 - **Arenas reais**: `warzone4/5/6.otbm` (já publicados em `game/maps/`) agora alimentam a instância — WZ4 The Baron from Below (28×16), WZ5 The Count of the Core (24×24) e WZ6 The Duke of the Depths (26×25), todas em z=7. Antes elas rodavam num grid default 40×40 sem colisão e sem o mapa da sala.
