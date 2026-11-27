@@ -502,6 +502,7 @@ must(roostSrc.includes("ELD_WANDER_MS") && roostSrc.includes("eldWanderStep") &&
 /* ---------------- OTBMs: bounds, spawns, caminhabilidade ---------------- */
 const tfCtx = { console }; tfCtx.window = tfCtx; vm.createContext(tfCtx);
 vm.runInContext(fs.readFileSync(path.join(js, "tileflags.js"), "utf8"), tfCtx);
+vm.runInContext(fs.readFileSync(path.join(js, "huntmapdata.js"), "utf8"), tfCtx);
 const TILEFLAGS = tfCtx.TILEFLAGS || {};
 const MAPS = [
   ["adventurer-group", "first_dragon.otbm", "first_dragon.otbm"],
@@ -558,6 +559,22 @@ for (const [bossId, betaRel, mapName] of MAPS) {
   }
   const bx = room.boss.x - map.sourceBounds.minX, by = room.boss.y - map.sourceBounds.minY;
   must(seen[bx + "," + by], bossId + ": bossspawn inalcançável a partir do playerspawn");
+  /* Cerca de FOV (mesmo bug da Hat of The Mad): a janela de câmera 21×13
+   * central virava limite de movimento em huntMapBlocked — com salas
+   * maiores que 21×13 o spawn na borda caía fora da área transitável e só
+   * alguns SQMs funcionavam (o servidor nunca aplica fov). cat "boss-room"
+   * desativa a cerca no loader (otbmhunt.js): colisão = paredes do OTBM. */
+  const roomDef = ctx.GAMEDATA.hunts[bossId + "-room"];
+  must(roomDef && roomDef.cat === "boss-room", bossId + ": def sem cat boss-room");
+  const hmF = OTBM.huntMapFromOtbm(map, TILEFLAGS);
+  hmF.fovWidth = Number(roomDef.otbmFovWidth) || 0;
+  hmF.fovHeight = Number(roomDef.otbmFovHeight) || 0;
+  const B = (x, y) => tfCtx.huntMapBlocked(hmF, x, y);
+  if (bossId === "bonelords-phylactery")
+    must(B(sx, sy), "sem a regra de boss-room o spawn da phylactery fica fora do fov (sanidade)");
+  if (roomDef.noFovBound || roomDef.cat === "boss-room") hmF.noFovBound = true;
+  must(!B(sx, sy), bossId + ": playerspawn bloqueado pela cerca de fov");
+  must(!B(bx, by), bossId + ": bossspawn bloqueado pela cerca de fov");
   /* Tiles: todos têm sprite + catálogo RME. */
   const used = new Set();
   Object.values(map.cells).forEach((c) => {

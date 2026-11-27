@@ -163,7 +163,10 @@ function huntMapFromOtbmAsync(hunt, done) {
       mapa.idleFovHeight = Number(hunt.otbmFovHeight) || 0;
       const hm = OTBM.huntMapFromOtbm(mapa,
         (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {});
-      if (hm && hunt.noFovBound) hm.noFovBound = true;
+      // Salas de boss (cat "boss-room") são arenas completas: a colisão vem
+      // das paredes do .otbm, como no servidor — a janela de câmera nunca pode
+      // servir de cerca (senão o spawn na borda fica fora da área transitável).
+      if (hm && (hunt.noFovBound || hunt.cat === "boss-room")) hm.noFovBound = true;
       // Pisos funcionais da hunt (ex.: annihilator): ids de chão marcados
       // como bloqueio no .dat liberam a célula — mesmo passe do servidor
       // (questMapBlockedCells), senão o movimento local trava o mapa inteiro.

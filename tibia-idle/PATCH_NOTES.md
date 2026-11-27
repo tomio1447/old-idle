@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Salas de boss: spawn fora da área transitável (cerca de FOV)
+
+- **Sintoma**: na sala do Bonelord's Phylactery (Roost of the Graveborn) o jogador só conseguia andar alguns SQMs — o resto da sala parecia piso bloqueado.
+- **Causa**: a janela de câmera 21×13 central do mapa é usada como cerca de movimento em `huntMapBlocked` quando a hunt não tem `noFovBound`. As 5 salas da Roost têm 25–38×25–32 SQMs; o spawn do Bonelord (local y=19) caía **fora** da cerca (y≤18) — o jogador nascia num SQM "bloqueado" e só conseguia dar meia dúzia de passos. Mesmo bug da Hat of The Mad; o servidor nunca aplica fov (só paredes do OTBM), então era desync client-only.
+- **Auditoria**: 6 salas `cat: "boss-room"` tinham o spawn fora da cerca — bonelords-phylactery, vladrukh, mimar-haffar, goshnars-cruelty, sugar-daddy e sugar-mommy. Todas estavam quebradas do mesmo jeito; as demais salas de boss tinham áreas externas inalcançáveis onde mobs podiam nascer e "sumir".
+- **Fix (game/js/otbmhunt.js)**: `cat: "boss-room"` agora implica `noFovBound` no loader — numa arena de boss a colisão é toda do OTBM (igual ao servidor); a janela de fov continua sendo só câmera. Resolve as 6 salas quebradas e a classe inteira de salas futuras. Hunts normais mantêm a cerca (o mapa OTBM inclui cenário decorativo fora da área jogável).
+- **Validado**: simulação do pipeline completo (OTBM → `huntMapFromOtbm` → `huntMapBlocked`) — as 5 salas da Roost têm spawn livre e componente conectado; `test_roost_graveborn.js` ganhou asserts da cerca (incluindo sanidade: sem a regra o spawn da phylactery fica cercado).
+- **Achado separado (não corrigido)**: `magma-bubble-room` tem spawn dentro de parede do OTBM e quase nenhum SQM transitável no mapa — bug de dados do mapa, mas o boss está marcado `unavailable` ("EM BREVE"), então não afeta jogadores hoje.
+
+---
+
 ## 2026-11-27 — Freezes periódicos do servidor (worker de instâncias ociosas)
 
 - **Sintoma**: o jogo dava "freezadas" periódicas — todos os clientes parando de receber resposta por frações de segundo a alguns segundos, no local e na VM.
