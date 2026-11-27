@@ -1116,9 +1116,41 @@ function combatManaSkillGain(c, mana) {
   return mana * (c.skillMul || 1);
 }
 
+/* Estoque de uma supply = unidades na bag + loot pouch (+ p.supplies legado
+ * de saves antigos — o normalizePlayer migra tudo para a bag, mas o engine
+ * autoritativo pode rodar em saves ainda não migrados). Supplies são itens
+ * reais: compra vai para a bag, loot vai para a pouch (e é vendido pelo
+ * autoseller ao preço de compra do NPC). */
+function supplyStockCount(p, slug) {
+  if (!p || !slug) return 0;
+  return ((p.bag && p.bag[slug]) || 0) +
+         ((p.lootPouch && p.lootPouch[slug]) || 0) +
+         ((p.supplies && p.supplies[slug]) || 0);
+}
+
+/* Consome 1 unidade: legado p.supplies → bag → pouch. */
+function consumeSupplyUnit(p, slug) {
+  const sup = p.supplies && p.supplies[slug];
+  if (sup > 0) { p.supplies[slug] = sup - 1; if (!p.supplies[slug]) delete p.supplies[slug]; return true; }
+  const bag = p.bag && p.bag[slug];
+  if (bag > 0) { p.bag[slug] = bag - 1; if (!p.bag[slug]) delete p.bag[slug]; return true; }
+  const pouch = p.lootPouch && p.lootPouch[slug];
+  if (pouch > 0) { p.lootPouch[slug] = pouch - 1; if (!p.lootPouch[slug]) delete p.lootPouch[slug]; return true; }
+  return false;
+}
+
+/* Slugs de supply com estoque (para scans "melhor potion disponível"). */
+function supplyStockSlugs(p) {
+  const out = [];
+  for (const slug in SUPPLIES) {
+    if (supplyStockCount(p, slug) > 0) out.push(slug);
+  }
+  return out;
+}
+
 function hasSelectedSupply(p, slug) {
   if (!slug || !p) return false;
-  if (p.supplies && Object.prototype.hasOwnProperty.call(p.supplies, slug)) return true;
+  if (supplyStockCount(p, slug) > 0) return true;
   const cfg = p.config || {};
   return cfg.healSupply === slug || cfg.manaSupply === slug || cfg.shooterRune === slug;
 }
@@ -1126,16 +1158,17 @@ function hasSelectedSupply(p, slug) {
 function canRechargeSupply(p, slug) {
   const s = SUPPLIES[slug];
   if (!s || (s.lvl || 1) > p.level) return false;
-  if ((p.supplies[slug] || 0) > 0) return true;
+  if (supplyStockCount(p, slug) > 0) return true;
   // Helper selecionou a potion/runa: permite auto-compra no uso (mesmo com
-  // CARGAS 0 e sem chave prévia em p.supplies).
+  // estoque 0).
   return hasSelectedSupply(p, slug) && p.gold >= supplyPrice(s, p.level);
 }
 
 /*
- * Consome 1 carga de runa/potion. Se a carga selecionada chegou a 0,
- * compra exatamente a próxima carga no momento do uso, descontando do gold.
- * Assim não existe mais restock periódico secando o saldo do jogador.
+ * Consome 1 unidade de runa/potion. Se o estoque (bag + pouch) zerou,
+ * compra exatamente a próxima unidade no momento do uso, descontando do
+ * gold — a unidade comprada é usada na hora, sem entrar no inventário.
+ * Assim não existe restock periódico secando o saldo do jogador.
  */
 function consumeSupplyCharge(c, p, slug) {
   const s = SUPPLIES[slug];
@@ -1144,10 +1177,9 @@ function consumeSupplyCharge(c, p, slug) {
   // subir skill, nao para gastar o estoque de runa e potion do jogador
   if (c && c.training) return true;
 
-  if ((p.supplies[slug] || 0) <= 0) {
+  if (supplyStockCount(p, slug) <= 0) {
     const cost = supplyPrice(s, p.level);
     if (!spendGold(p, cost)) return false;
-    p.supplies[slug] = 1;
     if (c && c.stats) {
       c.stats.supplyCost += cost;
       c.stats.supplyBought = c.stats.supplyBought || {};
@@ -1155,9 +1187,10 @@ function consumeSupplyCharge(c, p, slug) {
     }
     if (c && c.events)
       c.events.push({ t: "supply-buy", name: s.name, cost: cost });
+  } else if (!consumeSupplyUnit(p, slug)) {
+    return false;
   }
 
-  p.supplies[slug] = Math.max(0, (p.supplies[slug] || 0) - 1);
   if (c && c.stats) {
     c.stats.supplyUsed[slug] = (c.stats.supplyUsed[slug] || 0) + 1;
   }
@@ -3214,16 +3247,12 @@ function tryUseRune(c, p, target, now, forcada) {
   if (forcada) {
     const sf = SUPPLIES[forcada];
     if (!sf || sf.type !== "attack") return false;
-    if (!Object.prototype.hasOwnProperty.call(p.supplies, forcada)) p.supplies[forcada] = 0;
     if (!canRechargeSupply(p, forcada)) return false;
     best = forcada;
   } else if (p.config.shooterType === "rune" && p.config.shooterRune) {
     const s = SUPPLIES[p.config.shooterRune];
-    if (s && s.type === "attack") {
-      if (!Object.prototype.hasOwnProperty.call(p.supplies, p.config.shooterRune))
-        p.supplies[p.config.shooterRune] = 0;
-      if (canRechargeSupply(p, p.config.shooterRune)) best = p.config.shooterRune;
-    }
+    if (s && s.type === "attack" && canRechargeSupply(p, p.config.shooterRune))
+      best = p.config.shooterRune;
   }
   // Sem shooterRune/combo: não escolhe a "melhor runa" do estoque sozinho.
   if (!best) return false;
@@ -3569,7 +3598,7 @@ function tryHeal(c, p, now) {
       if (s && s.type === "heal" && canRechargeSupply(p, selectedHealSupply))
         best = selectedHealSupply;
     } else {
-      for (const slug in p.supplies) {
+      for (const slug of supplyStockSlugs(p)) {
         const s = SUPPLIES[slug];
         if (!s || s.type !== "heal" || !canRechargeSupply(p, slug)) continue;
         if (!best || s.tier > SUPPLIES[best].tier) best = slug;
@@ -3763,7 +3792,7 @@ function canHeal(c, p) {
       const s = SUPPLIES[p.config.healSupply];
       if (s && s.type === "heal" && canRechargeSupply(p, p.config.healSupply)) return true;
     } else {
-      for (const slug in p.supplies) {
+      for (const slug of supplyStockSlugs(p)) {
         const s = SUPPLIES[slug];
         if (s && s.type === "heal" && canRechargeSupply(p, slug)) return true;
       }
@@ -3774,8 +3803,9 @@ function canHeal(c, p) {
 
 /*
  * Legado: antes havia restock automático a cada 15s, que gastava o gold sem
- * ação direta do jogador. Agora supplies usam cargas: só desconta gold quando
- * uma carga selecionada chega a 0 e precisa ser usada novamente.
+ * ação direta do jogador. Agora supplies são itens reais: só desconta gold
+ * quando o estoque selecionado chega a 0 e uma unidade precisa ser comprada
+ * no uso.
  */
 function autoRestock() {
   return 0;
@@ -3892,8 +3922,6 @@ function tryMana(c, p, now) {
   for (const slug of cands) {
     const s = SUPPLIES[slug];
     if (!s || !s.mana) continue;
-    if (!Object.prototype.hasOwnProperty.call(p.supplies || {}, slug))
-      p.supplies = Object.assign({}, p.supplies, { [slug]: 0 });
     if (!(canRechargeSupply(p, slug) && consumeSupplyCharge(c, p, slug))) continue;
     const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
     p.mp = Math.min(max.mp, p.mp + amount);
@@ -4941,11 +4969,12 @@ function rollLoot(c, p, mob) {
       if (typeof handleMissionCounter === "function") handleMissionCounter(p, c.huntId, "gold", g);
       got.push({ item: l.item, count: count });
       continue;
-    } else if (SUPPLIES[l.item]) {
-      p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
     } else if (it.s === "ammo") {
       addAmmo(p, l.item, count);
     } else {
+      /* Supplies são itens reais agora (sem CARGAS): caem na pouch como
+       * qualquer loot — o autoseller vende ao preço de compra do NPC e o
+       * consumo em combate drena bag/pouch. */
       const ok = (typeof routeLootItem === "function")
         ? routeLootItem(p, l.item, count)
         : addLootPouch(p, l.item, count);
@@ -5001,8 +5030,6 @@ function rollLoot(c, p, mob) {
           c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
           got.push({ item: l.item, count: count });
           continue;
-        } else if (SUPPLIES[l.item]) {
-          p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
         } else if (it.s === "ammo") {
           addAmmo(p, l.item, count);
         } else {

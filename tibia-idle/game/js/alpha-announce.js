@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 18:30";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Supplies viraram itens reais: o contador de CARGAS acabou — potions e runas compradas vão para a mochila, drops de hunt caem na Loot Pouch e o autoseller as vende pelo MESMO preço de compra do NPC (Ultimate Spirit 488, Supreme Health 625); cargas antigas do save migram sozinhas para itens no login",
   "NOVO — Bonelord's Phylactery agora é WORLD BOSS: o boss final da Roost of the Graveborn entra pelo lobby do World Bosses (até 5 jogadores, 1 char por conta) — kill credita a Missão 3 da quest para todos os participantes",
   "NOVO — Reward Shrine na cidade: o modal CIDADE ganhou um botão com o ícone oficial da Reward Shrine que abre o cronograma de recompensa semanal a qualquer momento — um '!' aparece no card e no botão CIDADE enquanto houver recompensa para coletar",
   "NOVO — Charm Expansion na STORE → Extras (450 TC, por conta): remove o limite de charms ativos — conta free associa em até 2 criaturas, VIP em até 6, a expansão libera ilimitado (modelo oficial)",

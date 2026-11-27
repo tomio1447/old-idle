@@ -158,7 +158,6 @@ function newPlayer(name, voc, sex) {
     supplyStash: {},        // rings/amulets com cargas (Auto Supply Stash)
     lootConfig: { noCollect: [], noSell: [] },
     cap: 5000,              // capacidade base (oz); piso se a fórmula por nível for menor
-    supplies: { "mana-potion": 0 }, // slug -> count/carga selecionada
     hunt: null,             // id da hunt ativa
     stamina: 15 * 3600,     // segundos (15h cheio)
     deaths: 0,
@@ -1427,12 +1426,13 @@ function sessionLootValue(lootMap) {
 }
 
 /* REGRA DA CASA (a pedido do jogador): TODO item coletavel vai para a
- * loot pouch — inclusive equipamento. A mochila fica so para o que o
- * jogador compra/separa na mao; moedas viram gold na hora e supplies tem
- * contador proprio (ambos tratados antes nos caminhos de loot). */
+ * loot pouch — inclusive equipamento e supplies (potions/runas são itens
+ * reais desde que o contador de cargas morreu: o autoseller as vende ao
+ * preço de compra do NPC). A mochila fica só para o que o jogador
+ * compra/separa na mão; moedas viram gold na hora. */
 function shouldGoLootPouch(slug) {
   const it = GAMEDATA.items[slug];
-  if (!it || currencyValue(slug) || SUPPLIES[slug]) return false;
+  if (!it || currencyValue(slug)) return false;
   return true;
 }
 

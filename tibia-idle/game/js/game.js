@@ -681,19 +681,24 @@ function normalizePlayer(p) {
   // paladino sempre tem uma munição padrão selecionada
   if (p.voc === "paladin" && !p.config.refillArrow && !p.config.refillBolt)
     p.config.refillArrow = "arrow";
-  p.supplies = p.supplies || {};
-  // Migracao do update 15.25.3a4a52: mana fluid foi REMOVIDO do jogo.
-  // Cargas guardadas viram mana-potion (mesma faixa de restauracao) e a
-  // selecao do Helper passa a apontar para ela.
-  if (Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) {
-    const q = p.supplies["mana-fluid"] || 0;
-    if (q > 0) {
-      p.supplies["mana-potion"] = (p.supplies["mana-potion"] || 0) + q;
+  p.bag = p.bag || {};
+  /* CARGAS morreu: o contador p.supplies não existe mais — supplies são
+   * itens reais (compra → bag, loot → pouch). Migra save antigo: cada
+   * carga vira 1 unidade do item na mochila. A conversão antiga de
+   * mana-fluid→mana-potion (update 15.25.3a4a52) roda antes de migrar. */
+  if (p.supplies && typeof p.supplies === "object" && !Array.isArray(p.supplies)) {
+    if ((p.supplies["mana-fluid"] || 0) > 0) {
+      p.supplies["mana-potion"] = (p.supplies["mana-potion"] || 0) + p.supplies["mana-fluid"];
+      delete p.supplies["mana-fluid"];
     }
-    delete p.supplies["mana-fluid"];
+    for (const slug in p.supplies) {
+      const n = Math.max(0, Math.floor(Number(p.supplies[slug]) || 0));
+      if (n && typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug])
+        p.bag[slug] = (p.bag[slug] || 0) + n;
+    }
   }
+  delete p.supplies;
   if (p.config.manaSupply === "mana-fluid") p.config.manaSupply = "mana-potion";
-  if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-potion")) p.supplies["mana-potion"] = 0;
   // Sem seleção explícita = nenhuma potion de mana (jogador escolhe 1 no Helper).
   // Saves antigos sem o campo nascem desativados — não forçar mana-potion.
   if (p.config.manaSupply === undefined || p.config.manaSupply === null)
@@ -708,13 +713,7 @@ function normalizePlayer(p) {
     // Potion selecionada ficou ilegal (nível/voc) — desativa; não auto-troca.
     p.config.manaSupply = "";
   }
-  // Garante chave de supply para a potion selecionada (CARGAS 0 + auto-buy).
-  if (p.config.manaSupply && !Object.prototype.hasOwnProperty.call(p.supplies, p.config.manaSupply))
-    p.supplies[p.config.manaSupply] = 0;
-  if (p.config.healSupply && !Object.prototype.hasOwnProperty.call(p.supplies, p.config.healSupply))
-    p.supplies[p.config.healSupply] = 0;
   if (p.config.autoWalk === undefined) p.config.autoWalk = true;
-  p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 20;
   p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   p.lootPouch = p.lootPouch || {};
@@ -893,9 +892,9 @@ function computeOffline(p) {
   }
   let gold = Math.floor(est.gold * hours * effRate * modeMul);
 
-  // supplies/ammo offline usam o mesmo modelo de cargas do combate online:
-  // cargas existentes são consumidas; se uma carga selecionada está 0, compra
-  // a próxima diretamente do gold balance.
+  // supplies offline usam o mesmo modelo do combate online: unidades na
+  // bag/pouch são consumidas; se a supply selecionada zerou, a próxima é
+  // comprada no uso, direto do gold balance.
   let supplyCost = 0;
   const usedSupplies = {};
 
@@ -928,7 +927,7 @@ function computeOffline(p) {
   const offlineStats = { supplyUsed: usedSupplies, supplyCost: 0, supplyBought: {} };
   const offlineCombat = { stats: offlineStats, events: [] };
   let runeUse = Math.min(4000, Math.floor(kills * 0.35));
-  const supplySlugs = Object.keys(p.supplies || {}).filter((slug) => {
+  const supplySlugs = (typeof supplyStockSlugs === "function" ? supplyStockSlugs(p) : []).filter((slug) => {
     const s = SUPPLIES[slug];
     return s && (s.type === "heal" || s.type === "attack" || s.type === "mana");
   });
@@ -952,12 +951,11 @@ function computeOffline(p) {
   if (VOCATIONS[p.voc].weapon === "magic")
     addManaSpent(p, Math.floor(kills * 40 * skillMul));
 
-  // loot vai para supplies, loot pouch ou municao — TODO item (equipamento
-  // incluso) cai na pouch, regra da casa. Moedas (platinum/crystal) são
-  // convertidas direto em gold.
+  // loot vai para a loot pouch ou municao — TODO item (equipamento e
+  // supplies inclusos) cai na pouch, regra da casa. Moedas
+  // (platinum/crystal) são convertidas direto em gold.
   for (const slug in loot) {
     if (currencyValue(slug)) gold += creditCurrency(p, slug, loot[slug]);
-    else if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
     else if (GAMEDATA.items[slug] && GAMEDATA.items[slug].s === "ammo") addAmmo(p, slug, loot[slug]);
     else if (typeof routeLootItem === "function") routeLootItem(p, slug, loot[slug]);
     else if (shouldGoLootPouch(slug)) addLootPouch(p, slug, loot[slug]);
@@ -1400,7 +1398,7 @@ function rewardText(reward) {
   const out = [];
   if (reward.gold) out.push(fmtFull(reward.gold) + " gp");
   (reward.items || []).forEach((r) => out.push((r.count || 1) + "x " + itemName(r.slug)));
-  (reward.supplies || []).forEach((r) => out.push((r.count || 1) + " carga(s) " + (SUPPLIES[r.slug] ? SUPPLIES[r.slug].name : itemName(r.slug))));
+  (reward.supplies || []).forEach((r) => out.push((r.count || 1) + "x " + (SUPPLIES[r.slug] ? SUPPLIES[r.slug].name : itemName(r.slug))));
   if (reward.partyExp) out.push(fmtFull(reward.partyExp) + " EXP para a party");
   if (reward.bossAccess)
     out.push("Acesso ao boss " + (reward.bossName || reward.bossAccess));
@@ -1419,7 +1417,7 @@ function grantMissionReward(p, reward) {
     addLootPouch(p, r.slug, r.count || 1);
   }
   for (const r of reward.supplies || [])
-    p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.count || 1);
+    addLootPouch(p, r.slug, r.count || 1);
   if (reward.partyExp) {
     // Online o engine concede a EXP a cada membro da party no kill
     // (autoridade). Offline aplica local em todos os membros em combate.

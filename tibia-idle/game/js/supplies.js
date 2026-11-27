@@ -375,9 +375,10 @@ function giveStartingItems(p) {
     const existe = typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug];
     if (!existe) continue;
 
-    // runa e potion viram carga de supply, nao item de mochila
+    // runa e potion são itens reais da mochila (sem contador de cargas)
     if (SUPPLIES[slug]) {
-      p.supplies[slug] = (p.supplies[slug] || 0) + it.qtd;
+      if (typeof addItem === "function") addItem(p, slug, it.qtd);
+      else p.bag[slug] = (p.bag[slug] || 0) + it.qtd;
       continue;
     }
     // municao vira contador
@@ -408,11 +409,14 @@ function giveStartingItems(p) {
   // seleciona no Helper as potions que o personagem REALMENTE recebeu.
   // bestSupply escolheria a melhor liberada por nivel, que no nivel 1 pode
   // ser uma que ele nao tem em estoque — o jogador entraria na hunt achando
-  // que tem cura configurada e o motor compraria carga por carga.
+  // que tem cura configurada e o motor compraria unidade por unidade.
   const temEstoque = (tipo) => {
     let melhor = null, pw = -1;
-    for (const slug in p.supplies) {
-      if ((p.supplies[slug] || 0) <= 0) continue;
+    const stock = (typeof supplyStockCount === "function")
+      ? (slug) => supplyStockCount(p, slug)
+      : (slug) => (p.bag[slug] || 0) + (p.lootPouch[slug] || 0);
+    for (const slug in SUPPLIES) {
+      if (stock(slug) <= 0) continue;
       const s = SUPPLIES[slug];
       if (!s || !supplyAllowed(p, slug)) continue;
       const ehTipo = tipo === "heal" ? s.type === "heal"

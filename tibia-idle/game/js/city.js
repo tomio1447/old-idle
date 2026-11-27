@@ -226,7 +226,7 @@ function manaTrainCanSelect(p, r) {
 function manaTrainProductLabel(r) {
   if (r.type === "ammo") return `${r.amount}x ${itemName(r.slug)}`;
   const s = SUPPLIES[r.slug];
-  return `${r.charges || 1} carga(s) de ${s ? s.name : itemName(r.slug)}`;
+  return `${r.charges || 1}x ${s ? s.name : itemName(r.slug)}`;
 }
 
 function setManaTrain(p, id) {
@@ -258,7 +258,10 @@ function runManaTrainTick(p) {
       if (!p.equip.ammo || p.equip.ammo.item === r.slug) setActiveAmmo(p, r.slug);
     }
   } else {
-    p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
+    /* Runa conjurada vira item na mochila; sem slot, cai na pouch (que o
+     * autoseller vende). */
+    if (!(typeof addItem === "function" && addItem(p, r.slug, r.charges || 1)))
+      addLootPouch(p, r.slug, r.charges || 1);
   }
   return {
     recipe: r,
@@ -559,7 +562,7 @@ function academyConjureProduct(r) {
   if (r.kind === "ammo") return `${r.amount}x ${itemName(r.slug)}`;
   if (r.kind === "supply") {
     const s = SUPPLIES[r.slug];
-    return `${r.charges || 1} carga(s) de ${s ? s.name : itemName(r.slug)}`;
+    return `${r.charges || 1}x ${s ? s.name : itemName(r.slug)}`;
   }
   return r.name;
 }
@@ -578,7 +581,8 @@ function castAcademyConjure(p, id) {
     addAmmo(p, r.slug, r.amount);
     if (!p.equip.ammo || p.equip.ammo.item === r.slug) setActiveAmmo(p, r.slug);
   } else if (r.kind === "supply") {
-    p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
+    if (!(typeof addItem === "function" && addItem(p, r.slug, r.charges || 1)))
+      addLootPouch(p, r.slug, r.charges || 1);
   } else if (r.kind === "support" && typeof G !== "undefined" && G.training) {
     if (r.buff === "haste") G.training.hasteUntil = Date.now() + (r.duration || 60000);
     if (r.words === "utevo gran lux") G.training.lightUntil = Date.now() + 180000;

@@ -4,6 +4,17 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Supplies viram itens reais (fim do contador CARGAS)
+
+- **CARGAS removido**: o contador virtual `p.supplies` morreu — potions e runas agora são itens de verdade. Compra no NPC/supplies vai para a **mochila** (com checagem de slot antes de gastar o gold), loot de hunt vai para a **Loot Pouch** e conjuras (academia/mana train) produzem itens. Migração automática no login: cargas antigas do save viram unidades na mochila (mana-fluid→mana-potion incluso).
+- **Autoseller paga o preço de compra do NPC**: o `sell` de todas as supplies foi alinhado ao `buy` no cliente **e no engine** (patch novo em `ITEMS` — ultimate-spirit 488, supreme-health 625, sudden-death 162 etc.) — drops de potion/runa na pouch são vendidos pelo mesmo valor que o NPC cobra.
+- **Consumo em combate drena estoque real**: ordem legado → bag → pouch nos dois lados (`consumeSupplyUnit`/`consumeSupplyCharge` no cliente, `authSupplyStock`/`consumeSupply` no engine). Estoque zerado com a supply selecionada no Helper → a próxima unidade é comprada no uso, direto do gold (sem restock periódico — `autoRestock` virou no-op).
+- **Sprites animadas**: Ultimate Spirit Potion e Supreme Health Potion (e as outras 4 potions do update 15.25) passam a renderizar a tira animada via `itemImg` no painel de supplies, no Helper e na loja do NPC — antes iam como PNG estático.
+- **UI**: "CARGAS" virou contagem de unidades (xN) nas lojas, no Helper e nas descrições de recompensa/conjura; texto explicativo novo na loja de supplies.
+- **Teste**: `node tools/test_supply_items.js` — 36 asserts: sell=buy no engine, drop → pouch, sellAuthPouchItem/sellAll a preço NPC, ordem de consumo + auto-compra no uso nos dois motores, migração do `normalizePlayer`.
+
+---
+
 ## 2026-11-27 — Bonelord's Phylactery agora é World Boss (lobby até 5 jogadores)
 
 - **World Boss "Roost of the Graveborn"**: a Phylactery saiu do modal de bosses e virou card no modal WORLD BOSSES (`warzoneId "phylactery"`, sprite/dataMonster próprios). Entrada exclusiva por lobby — AUTO JOIN (espera lobby aberto) ou CREATE LOBBY (open/closed), 1 char por conta, até 5 jogadores, como Bakragore/Phosphorus.

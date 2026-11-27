@@ -595,6 +595,22 @@ const WAND_PERFECT_SHOT={"eldritch-wand":{shotDmg:65,shotRange:4},"gilded-eldrit
 for(const slug of Object.keys(WAND_PERFECT_SHOT)){
   if(ITEMS[slug])Object.assign(ITEMS[slug],WAND_PERFECT_SHOT[slug]);
 }
+/* Supplies são itens reais (CARGAS removido): alinha `sell` ao preço de
+ * compra do NPC — espelho do registrarItens do cliente — para que potions/
+ * runas na pouch sejam vendidas pelo autoseller pelo mesmo valor do NPC.
+ * Runes fora da tabela ficam com sell do catálogo (ou 0 → não vende). */
+for(const slug of Object.keys(POTIONS)){
+  const price=SUPPLY_PRICE[slug]||supplyPriceOf(slug);
+  const cur=ITEMS[slug]||{};
+  ITEMS[slug]=Object.assign({},cur,{name:cur.name||slug,type:cur.type||"supply",
+    sell:price,buy:cur.buy||price});
+}
+for(const slug of Object.keys(RUNES)){
+  if(!SUPPLY_PRICE[slug])continue;
+  const cur=ITEMS[slug]||{};
+  ITEMS[slug]=Object.assign({},cur,{name:cur.name||slug,type:cur.type||"supply",
+    sell:SUPPLY_PRICE[slug],buy:cur.buy||SUPPLY_PRICE[slug]});
+}
 let WHEEL_SLOTS={},WHEEL_SPELL_UPGRADES={},WHEEL_SKILL_VOC={},WHEEL_LEECH={life:0.75,mana:0.25},WHEEL_FN=null;
 try{
   const wd=require(path.join(__dirname,"..","game","js","wheeldata.js"));
@@ -3296,7 +3312,7 @@ function runeUsable(p,id,now){
   const group=String(rd.grupo||rd.group||"1");
   if((p._groupCd[group]||p._groupCd["1"]||0)>now)return false;
   p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};
-  if((Number(p.supplies[id])||0)>0||(Number(p.lootPouch[id])||0)>0)return true;
+  if((Number(p.supplies[id])||0)>0||(Number(p.bag&&p.bag[id])||0)>0||(Number(p.lootPouch[id])||0)>0)return true;
   return supplySelected(p,id)&&(Number(p.gold)||0)>=supplyPriceOf(id);
 }
 function spellIsMultiHit(s){
@@ -4513,12 +4529,20 @@ function supplyPriceOf(slug){
   }
   return 0;
 }
+/* Estoque de uma supply = unidades na bag + loot pouch + p.supplies legado
+ * (saves ainda não migrados pelo cliente). Supplies são itens reais: compra
+ * vai para a bag, loot vai para a pouch (vendida pelo autoseller). */
+function authSupplyStock(p,slug){
+  if(!p||!slug)return 0;
+  return (Number(p.bag&&p.bag[slug])||0)+(Number(p.lootPouch&&p.lootPouch[slug])||0)
+    +(Number(p.supplies&&p.supplies[slug])||0);
+}
 function supplySelected(p,slug){
   if(!slug||!p)return false;
   const cfg=p.config||{};
-  // Helper "USANDO" conta mesmo com CARGAS 0 (auto-compra no use).
+  // Helper "USANDO" conta mesmo com estoque 0 (auto-compra no uso).
   if(cfg.healSupply===slug||cfg.manaSupply===slug||cfg.shooterRune===slug)return true;
-  if(p.supplies&&Object.prototype.hasOwnProperty.call(p.supplies,slug))return true;
+  if(authSupplyStock(p,slug)>0)return true;
   return Array.isArray(cfg.combo)&&cfg.combo.some((slot)=>slot&&slot.kind==="rune"&&slot.id===slug);
 }
 function recordSupplyUse(auth,slug,cost){
@@ -4529,17 +4553,20 @@ function recordSupplyUse(auth,slug,cost){
 }
 function consumeSupply(auth,p,slug){
   if(!slug||!p)return false;
-  p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};
+  p.supplies=p.supplies||{};p.bag=p.bag||{};p.lootPouch=p.lootPouch||{};
   const cost=supplyPriceOf(slug);
-  if((p.supplies[slug]||0)<=0&&(p.lootPouch[slug]||0)<=0){
+  if(authSupplyStock(p,slug)<=0){
+    /* Estoque zerado: compra a unidade no uso (gold direto, sem criar item —
+     * a unidade comprada é gasta na hora, como antes). */
     if(!supplySelected(p,slug)||cost<=0||(Number(p.gold)||0)<cost)return false;
     p.gold=Math.max(0,(Number(p.gold)||0)-cost);
-    p.supplies[slug]=1;
     if(auth){ensureSupplyStats(auth);auth.stats.supplyBought[slug]=(Number(auth.stats.supplyBought[slug])||0)+1;}
+  }else{
+    if((p.supplies[slug]||0)>0){p.supplies[slug]--;if(!p.supplies[slug])delete p.supplies[slug];}
+    else if((p.bag[slug]||0)>0){p.bag[slug]--;if(!p.bag[slug])delete p.bag[slug];}
+    else if((p.lootPouch[slug]||0)>0){p.lootPouch[slug]--;if(!p.lootPouch[slug])delete p.lootPouch[slug];}
+    else return false;
   }
-  if((p.supplies[slug]||0)>0)p.supplies[slug]--;
-  else if((p.lootPouch[slug]||0)>0)p.lootPouch[slug]--;
-  else return false;
   recordSupplyUse(auth,slug,cost);
   return true;
 }
@@ -4562,7 +4589,7 @@ function runeReady(p,slug,now){
   if(s.ml&&Number(p.ml||0)<Number(s.ml))return false;
   if((Number(p._offensiveCd)||0)>now)return false;
   if((Number(p._runeCd)||0)>now)return false;
-  if((p.supplies&&p.supplies[slug]||0)>0||(p.lootPouch&&p.lootPouch[slug]||0)>0)return true;
+  if(authSupplyStock(p,slug)>0)return true;
   return supplySelected(p,slug)&&(Number(p.gold)||0)>=supplyPriceOf(slug);
 }
 function potionAllowed(p,slug,pot){
@@ -6600,7 +6627,9 @@ function creditHuntLoot(p,slug,count){
     p.gold=(Number(p.gold)||0)+gained;
     return {ok:true,discarded:false,gold:gained,currency:true};
   }
-  if(isSupplyItem(slug)){p.supplies=p.supplies||{};p.supplies[slug]=(Number(p.supplies[slug])||0)+count;return {ok:true,discarded:false};}
+  /* Supplies são itens reais (CARGAS removido): seguem o caminho normal de
+   * loot — pouch com checagem de capacidade — e são vendidas pelo
+   * autoseller ao preço de compra do NPC. */
   if(isAmmoItem(slug)){p.ammo=p.ammo||{};p.ammo[slug]=(Number(p.ammo[slug])||0)+count;return {ok:true,discarded:false};}
   const weight=itemUnitWeight(slug)*count;
   if(weight>freeCapacity(p)+1e-9)return {ok:false,discarded:true,reason:"cap"};
@@ -7075,16 +7104,12 @@ function usePotion(auth,p){
   const itemAt=Math.max(1,Math.min(99,Number(cfg.healItemAt!==undefined?cfg.healItemAt:cfg.healAt)||(_aiCfg?_aiCfg.healItemAt:0)||60));
   const manaAt=Math.max(1,Math.min(99,Number(cfg.manaAt)||(_aiCfg?_aiCfg.manaAt:0)||50));
   const orderOf=(selected,fallback)=>{
-    if(selected){
-      if(!Object.prototype.hasOwnProperty.call(p.supplies,selected))p.supplies[selected]=0;
-      return [selected];
-    }
-    return fallback.filter((slug)=>Object.prototype.hasOwnProperty.call(p.supplies,slug));
+    if(selected)return [selected];
+    return fallback.filter((slug)=>authSupplyStock(p,slug)>0);
   };
   const drink=(slug)=>{
     const pot=POTIONS[slug];
     if(pot&&(pot.hp||pot.mp)){
-      if(!Object.prototype.hasOwnProperty.call(p.supplies,slug))p.supplies[slug]=0;
       if(!potionAllowed(p,slug,pot)||!consumeSupply(auth,p,slug))return false;
       if(pot.hp)p.hp=Math.min(max.hp,p.hp+roll(auth,pot.hp[0],pot.hp[1]));
       if(pot.mp)p.mp=Math.min(max.mp,p.mp+roll(auth,pot.mp[0],pot.mp[1]));
@@ -7111,14 +7136,12 @@ function usePotion(auth,p){
   if(!cfg.noManaPotions&&!cfg.noPotions&&mpPct<=manaAt){
     const selected=cfg.manaSupply||(_aiCfg&&_aiCfg.manaSupply);
     if(selected){
-      if(!Object.prototype.hasOwnProperty.call(p.supplies,selected))p.supplies[selected]=0;
       if(!drink(selected)){
         // Seleção vedada (vocação/nível) ou indisponível: cai na melhor
         // potion de mana permitida pela MANA_POTION_ORDER — sem isso um
         // EK configurado com ultimate-mana-potion nunca bebe mana.
         for(const slug of MANA_POTION_ORDER){
           if(slug===selected||!potionAllowed(p,slug,POTIONS[slug]||{}))continue;
-          if(!Object.prototype.hasOwnProperty.call(p.supplies,slug))p.supplies[slug]=0;
           if(drink(slug))break;
         }
       }

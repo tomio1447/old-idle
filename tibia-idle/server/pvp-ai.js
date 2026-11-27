@@ -600,10 +600,13 @@ function pvpAiDecide(auth, item, now) {
  * orders.health/mana vêm do engine (HEALTH_POTION_ORDER/MANA_POTION_ORDER)
  * — a validação lvl/voc continua em potionAllowed/consumeSupply. */
 function pvpAiPotionCfg(p, orders) {
-  const sup = p && p.supplies || {};
-  const pick = (list) => Array.isArray(list)
-    ? list.find((s) => Object.prototype.hasOwnProperty.call(sup, s) && (Number(sup[s]) || 0) > 0)
-    : null;
+  /* Estoque = itens reais na bag + pouch (+ p.supplies legado de saves não
+   * migrados). Mesma contagem do authSupplyStock do engine. */
+  const stock = (s) => p
+    ? (Number(p.bag && p.bag[s]) || 0) + (Number(p.lootPouch && p.lootPouch[s]) || 0)
+      + (Number(p.supplies && p.supplies[s]) || 0)
+    : 0;
+  const pick = (list) => Array.isArray(list) ? list.find((s) => stock(s) > 0) : null;
   return { healItemAt: 75, manaAt: 60,
     healSupply: pick(orders && orders.health), manaSupply: pick(orders && orders.mana) };
 }

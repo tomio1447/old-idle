@@ -3673,18 +3673,20 @@ function renderSupplies(p) {
   let h = "";
   for (const slug in SUPPLIES) {
     const s = SUPPLIES[slug];
-    const have = p.supplies[slug] || 0;
+    const have = typeof supplyStockCount === "function"
+      ? supplyStockCount(p, slug) : (p.bag[slug] || 0);
     h += `<div class="row" style="justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.25)">
       <div class="row" style="gap:5px;min-width:0">
-        <img src="assets/item/${s.sprite}.png" style="max-width:22px;max-height:22px;object-fit:contain;image-rendering:pixelated" alt="">
+        ${typeof itemImg === "function" ? itemImg(s.sprite, 22)
+          : `<img src="assets/item/${s.sprite}.png" style="max-width:22px;max-height:22px;object-fit:contain;image-rendering:pixelated" alt="">`}
         <div style="min-width:0">
           <div class="tiny" style="color:#c8c0a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
-          <div class="tiny dim">${fmtFull(supplyPrice(s, p.level))} gp/carga · cargas ${have}</div>
+          <div class="tiny dim">${fmtFull(supplyPrice(s, p.level))} gp/unid · x${fmtFull(have)}</div>
         </div>
       </div>
       <div class="row" style="gap:2px">
-        <button class="sm" data-buy="${slug}" data-n="10">+10c</button>
-        <button class="sm" data-buy="${slug}" data-n="100">+100c</button>
+        <button class="sm" data-buy="${slug}" data-n="10">+10</button>
+        <button class="sm" data-buy="${slug}" data-n="100">+100</button>
       </div>
     </div>`;
   }
@@ -3694,9 +3696,13 @@ function renderSupplies(p) {
       const slug = b.dataset.buy, n = parseInt(b.dataset.n, 10);
       const s = SUPPLIES[slug];
       const cost = supplyPrice(s, G.p.level) * n;
+      if (typeof hasBagSpace === "function" && !hasBagSpace(G.p, slug)) {
+        toast("Mochila cheia — libere um slot para comprar.", "bad"); return;
+      }
       if (!spendGold(G.p, cost)) { toast("Ouro insuficiente", ""); return; }
-      G.p.supplies[slug] = (G.p.supplies[slug] || 0) + n;
-      addLog("sell", `Comprou ${n} carga(s) de ${s.name} por ${fmtFull(cost)} gp`);
+      if (typeof addItem === "function") addItem(G.p, slug, n);
+      else G.p.bag[slug] = (G.p.bag[slug] || 0) + n;
+      addLog("sell", `Comprou ${n} unidade(s) de ${s.name} por ${fmtFull(cost)} gp`);
       renderAll();
     });
   });
@@ -3977,7 +3983,7 @@ function renderHelper(p) {
             ${s.lvl > 1 ? `<span class="tiny dim">· nv ${s.lvl}</span>` : ""}</div>
           <div class="tiny dim">
             <span class="gold-txt">${fmtFull(supplyPrice(s, p.level))} gp</span>
-            · <span class="charge-highlight">CARGAS ${p.supplies[slug] || 0}</span>
+            · <span class="charge-highlight">x${fmtFull(typeof supplyStockCount === "function" ? supplyStockCount(p, slug) : (p.bag[slug] || 0))}</span>
             · ${valores.join(" · ")}
           </div>
           ${motivo ? `<div class="tiny" style="color:#ff9090">requer ${motivo}</div>` : ""}
@@ -4113,7 +4119,6 @@ function renderHelper(p) {
       const slot = b.dataset.supplySlot || (SUPPLIES[slug] && SUPPLIES[slug].type === "mana" ? "mana" : "heal");
       const s = SUPPLIES[slug];
       if (!s) return;
-      if (!Object.prototype.hasOwnProperty.call(p.supplies, slug)) p.supplies[slug] = 0;
       if (slot === "mana") {
         // Exclusivo: só 1 potion de mana; toggle desativa.
         p.config.manaSupply = p.config.manaSupply === slug ? "" : slug;
@@ -5269,9 +5274,6 @@ function desenhaComboPicker() {
         if (ru && ru.area) min = 2;
       }
       combo[slot] = { kind: kind, id: id, min: min };
-      // runa escolhida precisa existir no mapa de supplies para poder recarregar
-      if (kind === "rune" &&
-          !Object.prototype.hasOwnProperty.call(p.supplies, id)) p.supplies[id] = 0;
       save();
       desenhaComboPicker();
       renderHelper(p);

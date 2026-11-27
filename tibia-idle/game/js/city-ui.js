@@ -1090,7 +1090,8 @@ function npcSupply(p) {
     const locked = (s.lvl || 1) > p.level;
     const price = supplyPrice(s, p.level);
     const pw = supplyPower(s, p.level);
-    const have = p.supplies[slug] || 0;
+    const have = typeof supplyStockCount === "function"
+      ? supplyStockCount(p, slug) : (p.bag[slug] || 0);
     const eff = s.type === "heal" ? `cura ${pw[0]}–${pw[1]}` :
                 s.type === "attack" ? `dano ${pw[0]}–${pw[1]}` :
                 s.type === "mana" ? `mana ${pw[0]}–${pw[1]}` : "comida";
@@ -1098,17 +1099,17 @@ function npcSupply(p) {
       ${itemImg(s.sprite, 30)}
       <div style="flex:1;min-width:0">
         <div class="small">${s.name}</div>
-        <div class="tiny dim">${eff} · cargas ${have} · ${fmtFull(price)} gp/carga${locked ? ` · <span style="color:#ff9a6a">nv ${s.lvl}</span>` : ""}</div>
+        <div class="tiny dim">${eff} · x${fmtFull(have)} · ${fmtFull(price)} gp/unid${locked ? ` · <span style="color:#ff9a6a">nv ${s.lvl}</span>` : ""}</div>
       </div>
       <div class="row" style="gap:2px">
         ${[10, 50, 200].map((n) => `<button class="sm" data-buy-sup="${slug}"
           data-n="${n}" ${locked || p.gold < price * n ? "disabled" : ""}>
-          +${n}c</button>`).join("")}
+          +${n}</button>`).join("")}
       </div>
     </div>`;
   }).join("");
   return goldLine(p) + `<div class="list" style="max-height:340px">${rows}</div>
-    <div class="tiny dim mt4">Supplies usam cargas. Se uma carga selecionada chegar a 0, a próxima é comprada automaticamente no uso.</div>`;
+    <div class="tiny dim mt4">Supplies são itens reais: a compra vai para a mochila e o loot para a pouch (o autoseller vende ao preço de compra do NPC). Se o estoque da potion/runa selecionada zerar, a próxima unidade é comprada automaticamente no uso.</div>`;
 }
 
 /* ---------------------------------------------------------- vender */
@@ -1581,9 +1582,13 @@ function bindNpc(id, type) {
       const slug = b.dataset.buySup, n = parseInt(b.dataset.n, 10);
       const s = SUPPLIES[slug];
       const cost = supplyPrice(s, p.level) * n;
+      if (typeof hasBagSpace === "function" && !hasBagSpace(p, slug)) {
+        toast("Mochila cheia — libere um slot para comprar.", "bad"); return;
+      }
       if (!spendGold(p, cost)) { toast("Ouro insuficiente"); return; }
-      p.supplies[slug] = (p.supplies[slug] || 0) + n;
-      addLog("sell", `Comprou ${n} carga(s) de ${s.name} por ${fmtFull(cost)} gp`);
+      if (typeof addItem === "function") addItem(p, slug, n);
+      else p.bag[slug] = (p.bag[slug] || 0) + n;
+      addLog("sell", `Comprou ${n} unidade(s) de ${s.name} por ${fmtFull(cost)} gp`);
       refreshNpc(id);
     }));
 
