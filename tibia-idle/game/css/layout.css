@@ -5650,6 +5650,7 @@ button.danger {
 }
 .otc-raw-note b { color: #ffe680; }
 .otc-analyser-section-title { margin: 7px 0 3px; color: #d8dadd; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+.otc-echo-icon { width: 16px; height: 16px; vertical-align: -3px; image-rendering: pixelated; margin-right: 3px; }
 .otc-analyser-line {
   min-height: 25px; display: flex; align-items: center; gap: 5px; padding: 3px 4px;
   border-bottom: 1px solid #2d3036;

@@ -715,8 +715,7 @@ function otcAnalyserEchoMobName(slug) {
   return typeof displayMonsterName === "function" ? displayMonsterName(n) : n;
 }
 function otcAnalyserEchoSection(c, stats) {
-  const track = (stats && stats.echoRaid) || null;
-  if (!track || (!(Number(track.portals) || 0) && !(track.armed || []).length)) return "";
+  const track = (stats && stats.echoRaid) || { portals: 0, armed: [] };
   const portals = Math.max(0, Number(track.portals) || 0);
   const armed = Array.isArray(track.armed) ? track.armed : [];
   const wardens = Math.max(0, Number(track.wardens) || 0);
@@ -730,10 +729,10 @@ function otcAnalyserEchoSection(c, stats) {
     const mob = a.slug ? ` <small>${otcAnalyserEscape(otcAnalyserEchoMobName(a.slug))}</small>` : "";
     return `<div class="otc-analyser-line"><span><b>${rel}</b>${mob}</span><strong><em>ativada</em></strong></div>`;
   }).join("");
-  return `<div class="otc-analyser-section-title">Echo Raids</div>
+  return `<div class="otc-analyser-section-title"><img class="otc-echo-icon" src="assets/ui/echo-raid-portal.gif" alt=""> Echo Raids</div>
     <div class="otc-loot-econ">
-      <div class="otc-loot-econ-row"><span>Portais aparecidos</span><b>${otcAnalyserNumber(portals)}</b></div>
-      <div class="otc-loot-econ-row"><span>Ativadas (pisou)</span><b>${otcAnalyserNumber(armed.length)}</b></div>
+      <div class="otc-loot-econ-row"><span>Echo Raids <small>(apareceu)</small></span><b>${otcAnalyserNumber(portals)}</b></div>
+      <div class="otc-loot-econ-row"><span>Actived Echo Raids <small>(foi ativa)</small></span><b>${otcAnalyserNumber(armed.length)}</b></div>
       ${wardens ? `<div class="otc-loot-econ-row"><span>Wardens mortos</span><b>${otcAnalyserNumber(wardens)}</b></div>` : ""}
       ${charmPts ? `<div class="otc-loot-econ-row"><span>Charm points</span><b>+${otcAnalyserNumber(charmPts)}</b></div>` : ""}
     </div>

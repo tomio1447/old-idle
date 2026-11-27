@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Echo Raids no Hunt Session Analyser
+
+- **Nova parte "Echo Raids"** (sempre visível, com o ícone do portal): **Echo Raids** = quantas vezes o portal apareceu na sessão; **Actived Echo Raids** = quantas vezes a raid foi ativada (pisou no portal).
+- Abaixo ficam Wardens mortos, Charm points ganhos e a timeline das ativações.
+- As echo raids já estavam ativas nos dois lados (portal 0.05% por kill elegível 1–2★, warden 4× HP + 7–12 minions) — o painel agora mostra os números.
+
+---
+
 ## 2026-11-27 — Patch notes e seleção de personagem só no login
 
 - **Patch notes**: o modal de novidades abria em **todo** page load, incluindo o reload feito para trocar de instância/personagem. Agora só abre quando não há retomada armada (`tibia-idle-online-autoload`, `boot-loading` ou `autologin`) — troca de instância entra direto, sem anúncio no meio.
