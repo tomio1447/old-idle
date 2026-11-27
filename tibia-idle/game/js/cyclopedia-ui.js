@@ -792,135 +792,145 @@ function renderCycloBossSlots(p, el) {
   const unlocked = bossSlotList(p);
   const daily = (typeof dailyBoostCurrent === "function") ? dailyBoostCurrent() : null;
   const dailyBoss = daily && daily.boss && daily.boss.slug ? daily.boss : null;
-  const pick = Number(CYCLO.slotPick) || 0;
+  /* Modelo de alvo persistente (mockup): um slot fica SELECIONADO e o picker
+   * embaixo é sempre visível — clicar num boss atribui ao slot alvo. */
+  const selectable = (s) => s === 1 || (s === 2 && slot2Ok) || (s === 3 && slot3Ok);
+  let target = Number(CYCLO.slotTarget) || 0;
+  if (!selectable(target))
+    target = [1, 2, 3].find((s) => selectable(s) && !p.bossSlots[s])
+          || [1, 2, 3].find(selectable) || 0;
+  CYCLO.slotTarget = target;
   const busca = (CYCLO.slotBusca || "").toLowerCase();
-  const pickList = pick ? unlocked.filter((s) => {
-    if ([1, 2, 3].some((k) => k !== pick && p.bossSlots[k] === s)) return false;
+  const pickList = unlocked.filter((s) => {
     if (!busca) return true;
     const m = GAMEDATA.monsters[s];
     return m && (m.name || "").toLowerCase().indexOf(busca) !== -1;
-  }) : [];
+  });
 
-  const slotCard = (slot) => {
+  const slotBox = (slot) => {
     const slug = p.bossSlots[slot];
     const m = slug && GAMEDATA.monsters[slug];
-    if (slot === 3 && !slot3Ok) return `
-      <div class="bslot-card is-locked">
-        <div class="bslot-title tiny dim">SLOT 3</div>
-        <div class="bslot-lock">🔒</div>
-        <div class="tiny dim" style="text-align:center">Desbloqueia por<br>
-          <b class="gold-txt">${typeof BOSS_SLOT3_COINS !== "undefined" ? BOSS_SLOT3_COINS : 150} Tibia Coins</b><br>
-          <span class="dim" style="font-size:10px">vale para todos os personagens da conta</span></div>
-        <button class="sm" data-slot3-buy
-          style="margin-top:6px;display:flex;align-items:center;gap:4px;justify-content:center">
-          Desbloquear <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif"
-            alt="" style="width:14px;height:14px"></button>
-      </div>`;
+    const isTarget = target === slot;
+    const head = `<div class="slot-header"><span>SLOT ${slot}</span>
+      <span>${isTarget ? "SELECIONADO" : ""}</span></div>`;
     if (slot === 2 && !slot2Ok) return `
-      <div class="bslot-card is-locked">
-        <div class="bslot-title tiny dim">SLOT 2</div>
-        <div class="bslot-lock">🔒</div>
-        <div class="tiny dim" style="text-align:center">Desbloqueia com<br>
-          <b class="gold-txt">${fmtFull(pts)} / ${fmtFull(BOSS_SLOT2_POINTS)}</b> boss points</div>
-        <div class="mini-bar-track"><span class="mini-bar-fill"
-          style="width:${Math.min(100, (pts / BOSS_SLOT2_POINTS) * 100).toFixed(0)}%"></span></div>
+      <div class="boss-slot-box is-locked">${head}
+        <div class="slot-center-empty">
+          <div class="slot-plus-btn is-lock">🔒</div>
+          <div class="slot-hint">Desbloqueia com<br>
+            <b class="val-gold">${fmtFull(pts)} / ${fmtFull(BOSS_SLOT2_POINTS)}</b> boss points</div>
+          <div class="mini-bar-track"><span class="mini-bar-fill"
+            style="width:${Math.min(100, (pts / BOSS_SLOT2_POINTS) * 100).toFixed(0)}%"></span></div>
+        </div>
+      </div>`;
+    if (slot === 3 && !slot3Ok) return `
+      <div class="boss-slot-box is-locked">${head}
+        <div class="slot-center-empty">
+          <div class="slot-plus-btn is-lock">🔒</div>
+          <div class="slot-hint">Desbloqueia por<br>
+            <b class="val-gold">${typeof BOSS_SLOT3_COINS !== "undefined" ? BOSS_SLOT3_COINS : 150} Tibia Coins</b><br>
+            <span class="dim" style="font-size:10px">vale para toda a conta</span></div>
+          <button class="sm slot-buy-btn" data-slot3-buy>
+            Desbloquear <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif"
+              alt=""></button>
+        </div>
       </div>`;
     if (!m) return `
-      <div class="bslot-card is-empty ${unlocked.length ? "" : "is-locked"}"
-        ${unlocked.length ? `data-slot-pick="${slot}"` : ""}>
-        <div class="bslot-title tiny dim">SLOT ${slot}</div>
-        <div class="bslot-empty-sign">${unlocked.length ? "+" : "🔒"}</div>
-        <div class="tiny dim" style="text-align:center">
-          ${unlocked.length
+      <div class="boss-slot-box ${isTarget ? "is-target" : ""}
+        ${unlocked.length ? "is-selectable" : "is-locked"}"
+        ${unlocked.length ? `data-slot-target="${slot}"` : ""}>${head}
+        <div class="slot-center-empty">
+          <div class="slot-plus-btn">${unlocked.length ? "+" : "🔒"}</div>
+          <div class="slot-hint">${unlocked.length
             ? "Clique para associar um boss"
-            : "Alcance o nível 1 de um boss no Bosstiário para desbloquear"}</div>
+            : "Alcance o nível 1 de um boss no Bosstiário"}</div>
+        </div>
       </div>`;
     const pr = bosstiaryProgress(p, slug);
     const lvl = bossSlotLevel(p, slug);
     const bonus = bossSlotBonusPct(p, slug);
     const preco = bossSlotRemovePrice(removes);
     return `
-      <div class="bslot-card">
-        <div class="bslot-title tiny dim">SLOT ${slot}
-          <span class="bslot-lv" style="color:${pr.cat.cor}">Nv ${lvl}</span></div>
-        <div class="app-img">${bossMobImg(slug, 56)}</div>
-        <div class="tiny mob-name">${m.name}</div>
-        <div class="tiny" style="color:${pr.cat.cor}">${pr.cat.nome}
-          <span class="dim">· ${pr.kills} kills</span></div>
-        <div class="tiny" style="color:#9ce84a">+${bonus}% chance de loot</div>
-        <div class="row" style="gap:6px;margin-top:6px">
-          <button class="sm" data-slot-pick="${slot}">Trocar</button>
-          <button class="sm" data-slot-remove="${slot}">
-            ${preco > 0 ? `Remover (${fmtFull(preco)} gp)` : "Remover"}</button>
+      <div class="boss-slot-box is-selectable ${isTarget ? "is-target" : ""}"
+        data-slot-target="${slot}">${head}
+        <div class="slot-center-filled">
+          <div class="slot-sprite">${bossMobImg(slug, 44)}</div>
+          <div class="slot-boss-name">${m.name}</div>
+          <div class="slot-boss-meta" style="color:${pr.cat.cor}">${pr.cat.nome} • Nv ${lvl}</div>
+          <div class="slot-bonus-line">+${bonus}% loot • ${pr.kills} kills</div>
         </div>
+        <button class="slot-clear-btn" data-slot-remove="${slot}">
+          ${preco > 0 ? `Remover (${fmtFull(preco)} gp)` : "Remover boss"}</button>
       </div>`;
   };
 
-  const dailyCard = dailyBoss ? `
-    <div class="bslot-card is-boosted">
-      <div class="bslot-title tiny dim">BOSS DO DIA</div>
-      <div class="app-img">${bossMobImg(dailyBoss.slug, 56)}</div>
-      <div class="tiny mob-name">${dailyBoss.name || dailyBoss.slug}</div>
-      <div class="tiny" style="color:#d4af37">Boosted</div>
-      <div class="tiny" style="color:#9ce84a">+${Math.floor(Number(daily.lootBonus) || 0)}% loot
-        · kills ×${BOSS_SLOT_DAILY_KILLS}</div>
-      <div class="tiny dim" style="margin-top:6px;text-align:center">
-        Fixo — muda todo dia às 00h</div>
+  const dailyBox = dailyBoss ? `
+    <div class="boss-slot-box is-boosted">
+      <div class="slot-header"><span>BOSS DO DIA</span>
+        <span class="slot-tag-boost">BOOSTED</span></div>
+      <div class="slot-center-filled">
+        <div class="slot-sprite">${bossMobImg(dailyBoss.slug, 44)}</div>
+        <div class="slot-boss-name">${dailyBoss.name || dailyBoss.slug}</div>
+        <div class="slot-boss-meta" style="color:#fde047">Boosted</div>
+        <div class="slot-bonus-line">+${Math.floor(Number(daily.lootBonus) || 0)}% loot
+          • kills ×${BOSS_SLOT_DAILY_KILLS}</div>
+      </div>
+      <div class="slot-footer-note">Fixo — muda todo dia às 00h</div>
     </div>` : `
-    <div class="bslot-card is-locked">
-      <div class="bslot-title tiny dim">BOSS DO DIA</div>
-      <div class="bslot-lock">🔒</div>
-      <div class="tiny dim" style="text-align:center">Carregando o boss do dia…</div>
+    <div class="boss-slot-box is-locked">
+      <div class="slot-header"><span>BOSS DO DIA</span><span></span></div>
+      <div class="slot-center-empty">
+        <div class="slot-plus-btn is-lock">🔒</div>
+        <div class="slot-hint">Carregando o boss do dia…</div>
+      </div>
     </div>`;
 
   el.innerHTML = `
-    <div class="cyc-toolbar">
-      <div class="cyc-stats tiny">
-        <span><b class="gold-txt">${fmtFull(pts)}</b> boss points</span>
-        <span class="dim">•</span>
-        <span>Bônus de loot <b style="color:#9ce84a">+${bonusBase}%</b>
-          <span class="dim">(+25% no nível 3)</span></span>
-        <span class="dim">•</span>
-        <span class="dim">Remoções: ${removes} · próxima
+    <div class="bs-summary-bar">
+      <div class="bs-summary-items">
+        <span><strong class="val-gold">${fmtFull(pts)}</strong> boss points</span>
+        <span>•</span>
+        <span>Bônus de loot <strong class="val-green">+${bonusBase}%</strong>
+          (+25% no nível 3)</span>
+        <span>•</span>
+        <span>Remoções: <strong>${removes}</strong> • próxima
           ${bossSlotRemovePrice(removes) ? fmtFull(bossSlotRemovePrice(removes)) + " gp" : "grátis"}</span>
       </div>
     </div>
-    <div class="bslot-grid">
-      ${slotCard(1)}
-      ${slotCard(2)}
-      ${slotCard(3)}
-      ${dailyCard}
+    <div class="bs-slots-grid">
+      ${slotBox(1)}
+      ${slotBox(2)}
+      ${slotBox(3)}
+      ${dailyBox}
     </div>
-    ${pick ? `
-      <div class="cyc-toolbar" style="margin-top:4px">
-        <div class="cyc-stats tiny">
-          <span>Escolha um boss para o <b class="gold-txt">Slot ${pick}</b>
-            <span class="dim">(${pickList.length} desbloqueados)</span></span>
-        </div>
-        <div class="cyc-controls">
-          <input id="bslot-busca" class="cyc-search" placeholder="Buscar…"
-            value="${CYCLO.slotBusca || ""}">
-          <button class="sm" id="bslot-pick-close">Cancelar</button>
+    ${target ? `
+      <div class="bs-picker-bar">
+        <h2 class="bs-picker-title">Escolha um boss para o
+          <span>Slot ${target}</span> (${pickList.length} desbloqueados)</h2>
+        <div class="bs-picker-actions">
+          <input id="bslot-busca" class="bs-search" type="search"
+            placeholder="Buscar..." value="${CYCLO.slotBusca || ""}">
+          <button class="bs-cancel-btn" id="bslot-pick-close">Cancelar</button>
         </div>
       </div>
-      <div class="app-grid">
+      <div class="bs-boss-grid">
         ${pickList.map((slug) => {
           const m = GAMEDATA.monsters[slug];
           const pr = bosstiaryProgress(p, slug);
           const lvl = bossSlotLevel(p, slug);
-          return `<div class="app-card mob-card" data-slot-boss="${slug}">
-            <div class="app-img">${bossMobImg(slug, 48)}</div>
-            <div class="tiny mob-name">${m.name}</div>
-            <div class="tiny" style="color:${pr.cat.cor}">${pr.cat.nome}
-              <span class="dim">· Nv ${lvl}</span></div>
-            <div class="tiny dim">${pr.kills} kills</div>
+          const assigned = [1, 2, 3].some((k) => p.bossSlots[k] === slug);
+          return `<div class="bs-boss-card ${assigned ? "is-assigned" : ""}"
+            data-slot-boss="${slug}">
+            <span class="bs-card-sprite">${bossMobImg(slug, 40)}</span>
+            <span class="bs-card-name">${m.name}</span>
+            <span class="bs-card-rank" style="color:${pr.cat.cor}">${pr.cat.nome} • Nv ${lvl}</span>
+            <span class="bs-card-kills">${pr.kills} kills${assigned ? " • Ativo" : ""}</span>
           </div>`;
         }).join("") || `<div class="dim tiny">Nenhum boss desbloqueado.</div>`}
       </div>` : ""}`;
 
   const doOp = (slot, slug, op) => {
     const finish = () => {
-      CYCLO.slotPick = 0;
       CYCLO.slotBusca = "";
       renderCycloBossSlots(p, el);
     };
@@ -961,10 +971,13 @@ function renderCycloBossSlots(p, el) {
     finish();
   };
 
-  el.querySelectorAll("[data-slot-pick]").forEach((b) =>
-    b.addEventListener("click", () => {
-      CYCLO.slotPick = Number(b.dataset.slotPick) || 0;
-      CYCLO.slotBusca = "";
+  /* Clicar num slot selecionável (vazio ou cheio) marca ele como alvo —
+   * o picker embaixo atribui ao alvo. */
+  el.querySelectorAll("[data-slot-target]").forEach((b) =>
+    b.addEventListener("click", (ev) => {
+      if (ev.target.closest("[data-slot-remove]") ||
+          ev.target.closest("[data-slot3-buy]")) return;
+      CYCLO.slotTarget = Number(b.dataset.slotTarget) || 0;
       renderCycloBossSlots(p, el);
     }));
   el.querySelectorAll("[data-slot-remove]").forEach((b) =>
@@ -978,7 +991,7 @@ function renderCycloBossSlots(p, el) {
       doOp(3, "", "unlock3");
     }));
   el.querySelectorAll("[data-slot-boss]").forEach((c) =>
-    c.addEventListener("click", () => doOp(pick, c.dataset.slotBoss, "assign")));
+    c.addEventListener("click", () => doOp(target, c.dataset.slotBoss, "assign")));
   const inp = $("#bslot-busca");
   if (inp) inp.addEventListener("input", () => {
     CYCLO.slotBusca = inp.value;
@@ -988,7 +1001,8 @@ function renderCycloBossSlots(p, el) {
   });
   const close = $("#bslot-pick-close");
   if (close) close.addEventListener("click", () => {
-    CYCLO.slotPick = 0; CYCLO.slotBusca = "";
+    CYCLO.slotBusca = "";
+    CYCLO.slotTarget = 0;
     renderCycloBossSlots(p, el);
   });
 }

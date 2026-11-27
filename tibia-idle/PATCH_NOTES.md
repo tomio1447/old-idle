@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Boss Slots: novo visual + 3º slot por 150 Tibia Coins
+
+- **Novo visual (modelo OTClient dark)**: a aba Boss Slots ganhou o layout do mockup — barra de resumo (boss points, bônus de loot, remoções), cards de slot em tema escuro e grade de bosses com cores de categoria (Bane verde, Archfoe azul, Nemesis vermelho).
+- **Seleção por alvo**: clicar num slot (vazio ou cheio) marca ele como SELECIONADO — o picker fica sempre visível embaixo e clicar num boss atribui ao slot alvo. Bosses já slotted aparecem marcados "Ativo" com borda verde.
+- **3º slot real**: desbloqueia por **150 Tibia Coins** (regra oficial de preço), compra atômica NT-first por conta — vale para todos os personagens. O card do Boss do Dia segue ao lado, sempre boosted.
+- Slot 2 segue pedindo 1.500 boss points.
+
+---
+
 ## 2026-11-27 — 3º Boss Slot por 150 Tibia Coins (regra oficial)
 
 - **O bug**: o terceiro card da aba Boss Slots era um card fixo do "Boss do Dia" — clicar nele não fazia nada e nenhum boss podia ser associado ao slot 3.

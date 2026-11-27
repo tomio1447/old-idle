@@ -258,10 +258,11 @@ check(cliSrc.includes('"/api/character/boss-slot"') &&
       cliSrc.includes("function accountBossSlotOp") && cliSrc.includes("accountQueueSave"),
   "cliente chama a rota única pela fila de save (molde promote)");
 check(uiSrc.includes("bossSlot: renderCycloBossSlots") &&
-      uiSrc.includes("data-slot-pick") && uiSrc.includes("data-slot-remove") &&
+      uiSrc.includes("data-slot-target") && uiSrc.includes("data-slot-remove") &&
       uiSrc.includes("data-slot3-buy") && uiSrc.includes("bossSlot3Owned") &&
+      uiSrc.includes("bs-picker-title") && uiSrc.includes("bs-boss-card") &&
       uiSrc.includes("dailyBoostCurrent"),
-  "aba Boss Slots: 3 slots assignáveis + buy do slot 3 + boosted do dia");
+  "aba Boss Slots: alvo SELECIONADO + picker persistente + buy slot 3 + boosted");
 check(srvSrc.includes('"unlock3"') && srvSrc.includes("db.buyBossSlot3") &&
       srvSrc.includes("BOSS_SLOT3_COINS"),
   "rota /api/character/boss-slot: op unlock3 compra pelo db (150 TC)");
@@ -274,9 +275,10 @@ check(cliSrc.includes("bossSlot3") && cliSrc.includes("cosmetics"),
 check(dbSrc.includes("dailyBoostCurrent"), "daily-boost expõe o boss do dia");
 check(cycSrc.includes('{ id: "bossSlot", nome: "Boss Slots", icone: "bosstiary", pronta: true }'),
   "aba marcada pronta com o ícone do bosstiary");
-check(cssSrc.includes(".bslot-card") && cssSrc.includes(".bslot-grid") &&
-      cssSrc.includes(".bslot-empty-sign"),
-  "CSS dos slots presente");
+check(cssSrc.includes(".boss-slot-box") && cssSrc.includes(".bs-slots-grid") &&
+      cssSrc.includes(".bs-boss-card") && cssSrc.includes(".is-target") &&
+      cssSrc.includes(".slot-plus-btn"),
+  "CSS dos slots presente (modelo de alvo)");
 
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);
