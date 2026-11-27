@@ -22,6 +22,10 @@ var QUEST_DEFS = {
     otbmFovBounds:     { x: 1010, y: 1015, w: 34, h: 32, z: 8 },
     otbmFovWidth:      21,
     otbmFovHeight:     13,
+    /* A janela 21×13 (câmera) era usada como cerca de movimento e bloqueava
+     * o fundo do laboratório (sala desce até local y26, fov para em y21).
+     * A colisão já vem das paredes do OTBM — igual ao servidor. */
+    noFovBound:        true,
     otbmRuntimeWidth:  34,
     otbmRuntimeHeight: 32,
     otbmSpawn:         { x: 1026, y: 1032, z: 8 },    // centro do mapa (abs)
@@ -130,6 +134,10 @@ var QUEST_DEFS = {
     otbmFovBounds:     { x: 1010, y: 1014, w: 49, h: 39, z: 7 },
     otbmFovWidth:      21,
     otbmFovHeight:     13,
+    /* Mesma cerca de movimento do fov (21×13 central → local y13–25) deixava
+     * a metade de cima da sala (y8–18) intransitável só no cliente: mobs
+     * nasciam lá (o servidor não aplica fov) e ficavam inalcançáveis. */
+    noFovBound:        true,
     otbmRuntimeWidth:  49,
     otbmRuntimeHeight: 39,
     otbmSpawn:         { x: 1032, y: 1027, z: 7 },   // centro da sala (abs)

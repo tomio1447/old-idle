@@ -73,6 +73,25 @@ for (let y = 8; y <= 17; y++) for (let x = 15; x <= 31; x++) {
 }
 must(mobWalk >= 160, "mobSpawnRange deve ter ≥160 sqm livres (achou " + mobWalk + ")");
 
+/* Cerca de FOV: a janela de câmera 21×13 central (local y13–25) era usada
+ * como limite de movimento em huntMapBlocked e bloqueava a metade de cima
+ * da sala (y8–18) só no cliente — mobs nasciam lá (o servidor não aplica
+ * fov) e ficavam inalcançáveis. `noFovBound` remove a cerca: colisão vem
+ * das paredes do OTBM. */
+vm.runInContext(fs.readFileSync(path.join(js, "huntmapdata.js"), "utf8"), ctx);
+{
+  const m2 = OTBM.read(pub.buffer.slice(pub.byteOffset, pub.byteOffset + pub.byteLength), { z: 7 });
+  const cropped = OTBM.crop(m2, QUEST_DEFS["hat-of-the-mad"].otbmFovBounds);
+  cropped.idleTargetWidth = 49; cropped.idleTargetHeight = 39;
+  cropped.idleFovWidth = 21; cropped.idleFovHeight = 13;
+  const hm = OTBM.huntMapFromOtbm(cropped, ctx.TILEFLAGS);
+  const B = (x, y) => ctx.huntMapBlocked(hm, x, y);
+  must(B(20, 10) && B(20, 8), "sem noFovBound a metade de cima fica cercada pelo fov (sanidade)");
+  hm.noFovBound = true;
+  must(!B(20, 10) && !B(20, 8) && !B(16, 9), "noFovBound: metade de cima da sala deve ser caminhável");
+  must(B(0, 0) && B(48, 38), "noFovBound: bordas continuam bloqueadas");
+}
+
 /* Todos os tiles usados têm sprite importado. */
 const used = new Set();
 for (const c of Object.values(m.cells)) {
@@ -91,6 +110,7 @@ must(q.level === 30 && q.maxPlayers === 4 && q.maxPerAccount === 4,
   "level/maxPlayers/maxPerAccount errados (design: level 30, 4 chars da conta)");
 must(q.otbm === "hat_of_the_mad" && q.otbmFloor === 7, "otbm/floor errados");
 must(q.otbmRuntimeWidth === 49 && q.otbmRuntimeHeight === 39, "runtime grid deve ser 49×39");
+must(q.noFovBound === true, "noFovBound ausente — fov cercaria metade da sala no cliente");
 must(q.otbmSpawn && q.otbmSpawn.x === 1032 && q.otbmSpawn.y === 1027 && q.otbmSpawn.z === 7,
   "otbmSpawn deve ser {1032,1027,7}");
 must(q.spawnRange && q.spawnRange.minX === 21 && q.spawnRange.maxX === 23 &&

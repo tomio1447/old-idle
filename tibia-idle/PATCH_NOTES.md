@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Party quests: metade da sala intransitável (cerca de FOV)
+
+- **Hat of The Mad**: só a metade de baixo da sala era pisável — `huntMapBlocked` usava a janela de câmera 21×13 central (local y13–25) como **limite de movimento**, bloqueando a metade de cima da sala (y8–18). Mobs nasciam lá normalmente (o servidor nunca aplicou FOV — `questMapBlockedCells` usa só paredes/footprint) e ficavam inalcançáveis, parecendo "sumir".
+- **Fix**: `noFovBound: true` na quest — a câmera continua 21×13, mas a colisão passa a vir só das paredes do OTBM (paridade cliente×servidor). O campo agora é copiado do `QUEST_DEFS` para o descriptor da hunt (`game.js`), coisa que o `otbmhunt.js` já respeitava.
+- **Yalahar Quest**: mesmo bug latente (laboratório desce até local y26, FOV parava em y21) — corrigida junto. Annihilator já era coberta pelo caminho `walkFloors`.
+- Regressão: `test_hat_of_the_mad.js` agora valida `huntMapBlocked` com e sem `noFovBound` (metade de cima caminhável, bordas seguem bloqueadas).
+
+---
+
 ## 2026-11-27 — Guild War: reconexão devolve o controle de imediato
 
 - **Rejoin na guerra já funcionava** (aba fechada → instância PvP tem prioridade no `resolveInstanceRow`, boot resume e `pvpBackgroundSync` reentra sozinho), mas o **controle não voltava**: o char ficava em `AI_HARD` até o primeiro input — e, enquanto a IA do servidor o movia, o cliente mostrava o próprio char congelado e "teleportava" de volta ao assumir.
