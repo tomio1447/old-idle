@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-27 — Tela preta quando o lease da conta está em outra aba
+
+- **Sintoma**: jogador via a interface (menus, painéis) mas a área do jogo ficava 100% preta, no Edge e no Chrome. Causa: o `loop()` retornava antes de renderizar quando `accountLeaseAllowsSimulation()` era falso — a simulação pausava **e** a cena nunca era desenhada. Bastava o lease estar preso em outra aba/dispositivo (409 em `/api/lease/acquire`) ou órfão de uma sessão que caiu.
+- **Fix cliente**: a cena continua desenhada congelada (`dt=0`) — cidade, academia ou combate. O pause é de simulação, não de imagem.
+- **Retry passivo fora de combate**: aba pausada na cidade/templo não tinha quem revalidasse o lease (a recovery só existia dentro de combate autoritativo). Agora, após o `heldUntil` do holder expirar, a aba tenta `accountEnsureLease` de novo — **sem takeover** (`noTakeover`): não rouba o lease de um dono legítimo; quando ele fecha a aba e o TTL expira, esta volta sozinha. O `/api/lease/takeover` do servidor é incondicional — sem esse guard o retry automático geraria ping-pong de lease entre abas.
+- **Banner Reconnect**: o evento `tibia-idle-lease-lost` agora exibe o banner "Sessão online perdida" (antes era só um toast rápido); `accountLeaseApply` o esconde quando o controle volta. Só UI — não marca `SERVER_CONNECTION_OFFLINE` para não disparar auto-reconnect/reload em loop contra o dono legítimo.
+
+---
+
 ## 2026-11-27 — Party quests: metade da sala intransitável (cerca de FOV)
 
 - **Hat of The Mad**: só a metade de baixo da sala era pisável — `huntMapBlocked` usava a janela de câmera 21×13 central (local y13–25) como **limite de movimento**, bloqueando a metade de cima da sala (y8–18). Mobs nasciam lá normalmente (o servidor nunca aplicou FOV — `questMapBlockedCells` usa só paredes/footprint) e ficavam inalcançáveis, parecendo "sumir".

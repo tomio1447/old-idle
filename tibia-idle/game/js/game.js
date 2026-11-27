@@ -5064,6 +5064,13 @@ function bindServerStatusControls(){
   const btn=$("#btn-reconnect"),bannerBtn=$("#btn-reconnect-banner");
   if(btn)btn.addEventListener("click",clickReconnect);
   if(bannerBtn)bannerBtn.addEventListener("click",clickReconnect);
+  window.addEventListener("tibia-idle-lease-lost",()=>{
+    // Conta pausada (outra aba/dispositivo assumiu ou sessão expirou): sem o
+    // banner a cena congelava preta e o motivo ficava invisível. Só a UI —
+    // não marque SERVER_CONNECTION_OFFLINE senão o auto-reconnect entra em
+    // guerra de reload/takeover contra o dono legítimo do lease.
+    setServerReconnectBanner(false,{reason:"session"});
+  });
   window.addEventListener("tibia-idle-server-online",()=>{
     // Só limpa a UI OFFLINE após reconnect bem-sucedido (ou boot sem pending).
     if(G&&G.instanceReconnectPending)return;
@@ -6106,6 +6113,29 @@ function loop(ts) {
     // FPS continua vivo enquanto a autoridade está pausada; tente readquirir
     // o lease/runtime para o jogo não ficar visualmente fluido porém congelado.
     if(G.combat&&onlineAuthorityCombat())requestOnlineRuntimeRecovery();
+    else if(typeof accountEnsureLease==="function"&&Date.now()>=(G._leaseRetryAt||0)){
+      /* Retry PASSIVO (noTakeover): espera o TTL do holder expirar — se
+       * outra aba segura de verdade, não roubamos o lease dela; quando ela
+       * morre, esta aba volta sozinha em vez de ficar congelada para sempre. */
+      const heldMs=Math.max(0,(typeof ACCOUNT_LEASE!=="undefined"&&ACCOUNT_LEASE.heldUntil||0)-Date.now());
+      G._leaseRetryAt=Date.now()+Math.max(4000,heldMs+1500);
+      accountEnsureLease(sessionToken(),{silent:true,noTakeover:true}).then((r)=>{
+        if(r&&r.ok&&typeof accountLoadInstance==="function")
+          accountLoadInstance(sessionToken()).then((rem)=>{
+            if(rem&&rem.ok&&rem.instance&&typeof resumeIdleInstance==="function")
+              resumeIdleInstance(rem.instance);
+          });
+      });
+    }
+    /* O pause é de SIMULAÇÃO, não de imagem: desenha a cena congelada em
+     * vez de deixar o canvas preto (o preto escondia o motivo — conta
+     * ativa em outra aba — e parecia jogo quebrado). */
+    if(G.renderer){
+      G.renderer.resize();
+      if(G.training)G.renderer.drawAcademy(G.training,G.p,0);
+      else if(!G.combat)G.renderer.drawCityMap(G.p,0,G.walker,G.hoverNpc);
+      else G.renderer.draw(G.combat,G.p,0);
+    }
     G.last=ts;G.tickAcc=0;G.bgLast=Date.now();G.bgAcc=0;return;
   }
   // Alguns browsers ainda entregam rAF a 1fps em background. A simulação

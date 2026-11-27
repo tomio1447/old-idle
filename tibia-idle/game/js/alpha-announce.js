@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Tela preta quando a conta estava ativa em outra aba/dispositivo: o jogo agora mostra a cena congelada + banner Reconnect, e a aba retoma sozinha quando o outro holder fecha",
   "FIX — Hat of The Mad e Yalahar Quest: metade da sala estava intransitável (mobs nasciam lá e pareciam sumir) — agora a sala inteira é pisável",
   "FIX — Guild War: fechar e reabrir a aba durante a guerra devolve o controle imediato (o char não fica mais preso no modo IA nem 'teleporta' ao assumir)",
   "NOVO — 8 mini bosses novos a 0,01% nas hunts: Zunzu (Lizard Town), Burster (The Void), Chizzoron (Draken Walls), Dharalion (Elfs Yalahar), Furyosa (MOTA Ext.), Sir Leopold (Book World), The Welter (Banuta Deeper) e Tyrn (Elder Wyrm) — todos aparecem na seção MINI BOSSES do modal",

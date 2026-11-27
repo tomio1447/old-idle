@@ -217,6 +217,9 @@ function accountLeaseApply(token,data){
     accountId:accountLeaseAccountId(),holderId:ACCOUNT_LEASE.holder});}catch(e){}
   if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
   ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),Math.max(1000,Number(data.renewAfterMs)||30000));
+  // Lease (re)adquirido: esconde o banner "sessão perdida" exibido pelo
+  // pause (o servidor respondeu — a conexão está viva por definição).
+  if(typeof setServerReconnectBanner==="function")setServerReconnectBanner(true);
 }
 function accountLeaseClearSecret(){
   ACCOUNT_LEASE.token="";
@@ -255,7 +258,7 @@ async function accountAcquireLeaseRequest(token,takeover){
   return {ok:false,held:r.code===409&&r.data.error==="LEASE_HELD",expiresAt:r.data.expiresAt,
     msg:r.data.msg||"Não foi possível obter o controle da conta.",unauthorized:false};
 }
-async function accountAcquireLease(token,takeover){
+async function accountAcquireLease(token,takeover,options){
   token=accountSessionToken(token);
   if(takeover){
     ACCOUNT_LEASE.heldUntil=0;ACCOUNT_LEASE.authFailUntil=0;
@@ -277,11 +280,13 @@ async function accountAcquireLease(token,takeover){
         const until=new Date(result.expiresAt||0).getTime();
         ACCOUNT_LEASE.heldUntil=Math.max(Date.now()+2000,until||Date.now()+10000);
         // Lease órfão do MESMO navegador (restart dentro de instância/quest):
-        // o takeover valida previous_holder no servidor — retomamos o controle
-        // em vez de travar no splash com 409. Se outra aba realmente segura o
-        // lease e o servidor recusar, caímos no pause normal.
-        const takeover=await accountAcquireLeaseRequest(token,true);
-        if(takeover&&takeover.ok){ACCOUNT_LEASE.heldUntil=0;return takeover;}
+        // o takeover retoma o controle em vez de travar no splash com 409.
+        // Retry passivo (noTakeover — aba pausada observando o TTL) não pode
+        // roubar o lease de um dono legítimo: /takeover é incondicional.
+        if(!(options&&options.noTakeover)){
+          const taken=await accountAcquireLeaseRequest(token,true);
+          if(taken&&taken.ok){ACCOUNT_LEASE.heldUntil=0;return taken;}
+        }
       }
       return result;
     }finally{ACCOUNT_LEASE_INFLIGHT=null;}
@@ -332,7 +337,7 @@ async function accountRenewLease(token){
 }
 async function accountEnsureLease(token,options){
   if(accountLeaseAllowsSimulation())return {ok:true};
-  const acquired=await accountAcquireLease(token,false);
+  const acquired=await accountAcquireLease(token,false,options);
   if(acquired.ok||accountLeaseAllowsSimulation())return {ok:true,resumed:!!(acquired&&acquired.resumed)};
   // A recuperação automática roda periodicamente. Se outra aba é a dona
   // legítima, mantenha esta pausada sem apagar o segredo nem repetir o toast.
