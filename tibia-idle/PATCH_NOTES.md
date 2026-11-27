@@ -2914,3 +2914,17 @@ hunts 400+ recém-lançados e o boss final, com recompensas oficiais.
   `boss-room` agora rehidratam a colisão direto do OTBM (paredes/footprint,
   espelho do `huntMapBlocked` com `noFovBound`) a cada tick — pathfinding e
   respawns não ficam presos em cercas velhas de snapshots antigos.
+
+- **FIX — Loadscreen como cortina de fumaça no resume de instância**: ao
+  retomar uma caçada/boss (login, reabrir aba, takeover), o overlay de
+  carregamento agora permanece até a arena e as sprites de TODA criatura
+  viva do combate restaurado estarem carregadas — adds de mecânica
+  (Soulcages, Spirits, Enthralled Dragons...) e o pendingBoss segurado
+  fora de mobs não constam em hunt.monsters e pipocavam na tela. A barra
+  mostra o progresso N/M do preload. Sem a cortina a instância aparecia
+  "quebrada" (sprites faltando) logo após o build.
+- **FIX — Instância remota que quebra o resume não prende mais a conta**:
+  se `resumeIdleInstance` lança erro numa instância autoritativa, o
+  cliente agora encerra a instância no servidor ("resume-failed") em vez
+  de só limpar a sessão local — antes, cada login repetia o mesmo fetch
+  → throw → cidade, num ciclo sem saída.

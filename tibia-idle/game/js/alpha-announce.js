@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "27/11/2026 às 12:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Carregamento de instância blindado: a tela de loading agora só sai quando a arena e TODAS as sprites das criaturas vivas estão prontas (sem mais sprites pipocando ao voltar de uma caçada), e uma instância que quebra o resume é encerrada no servidor em vez de prender a conta num ciclo de falhas",
   "FIX — Bonelord's Phylactery não nascia após matar as Soulcages: o hit final que destruía a última cage saía antes do sincronismo e prendia o resto do HP compartilhado para sempre — a luta agora libera a fase do boss mesmo se as cages caírem no mesmo golpe",
   "NOVO — Tracking de itens cosméticos: itens de addon ganham moldura VERDE e itens de montaria moldura AZUL, com descrição no tooltip dizendo o que desbloqueiam e em qual NPC trocar (Addoner/Lothar)",
   "FIX — Salas de boss com movimento travado (Bonelord's Phylactery e outras 5): o jogador nascia fora da área transitável e só andava alguns SQMs — agora a arena inteira é pisável",

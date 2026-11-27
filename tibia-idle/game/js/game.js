@@ -428,8 +428,33 @@ function resumeIdleInstance(session){
         resolve({resumed:!!G.combat,ended:result.ended,elapsed,away});
       }catch(error){
         console.error("[idle] falha ao retomar instância",error);clearInstanceSession();G.combat=null;G.inCity=true;
+        /* Instância remota que quebra o resume toda vez prendia a conta num
+         * ciclo: login → fetch → throw → cidade → próximo login repete.
+         * Encerra no servidor de uma vez — progresso já foi checkpointado. */
+        if(session.authority&&typeof accountEndInstance==="function"&&
+           typeof sessionToken==="function")
+          accountEndInstance(sessionToken(),"resume-failed").catch(()=>{});
         resolve({resumed:false,ended:true,error});
-      }finally{if(typeof finishMapLoading==="function")finishMapLoading();}
+      }
+      /* Cortina de fumaça: o overlay só sai quando a arena e as sprites de
+       * TODA criatura viva do combate restaurado estiverem carregadas — adds
+       * de mecânica e o pendingBoss segurado fora de mobs não constam em
+       * hunt.monsters. Sem isso a tela revelava a instância com sprites
+       * pipocando — o "carregamento quebrado" reportado. */
+      let _assets=Promise.resolve();
+      if(G.combat&&hunt&&typeof preloadHuntMapAssets==="function"){
+        const _slugs=new Set(hunt.monsters||[]);
+        for(const _m of (G.combat.mobs||[]))if(_m&&_m.slug)_slugs.add(_m.slug);
+        for(const _sp of (G.combat.pendingSpawns||[]))
+          if(_sp&&_sp.mob&&_sp.mob.slug)_slugs.add(_sp.mob.slug);
+        for(const _st of [G.combat.bo,G.combat.ag,G.combat.mega].filter(Boolean))
+          if(_st.pendingBoss&&_st.pendingBoss.slug)_slugs.add(_st.pendingBoss.slug);
+        _assets=preloadHuntMapAssets(Object.assign({},hunt,{monsters:[..._slugs]}),
+          "Preparando "+(boss?boss.name:hunt.name));
+      }
+      Promise.resolve(_assets).finally(()=>{
+        if(typeof finishMapLoading==="function")finishMapLoading();
+      });
     };
     watchdog=setTimeout(build,7000);
     try{
