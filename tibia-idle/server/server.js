@@ -4179,8 +4179,17 @@ async function charmInstanceOp(db,body){
   const row=resolved.row;if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
     return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
-  let rejection=null,applied=null;
-  const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+  /* O version da instância sobe a cada tick (~1/s): o expected do cliente
+   * chega quase sempre velho em rede lenta e todo clique no modal de charms
+   * revertia (conflito → restore local). Mesmo retry do equip: re-resolve a
+   * row e reenvia com o version fresco — a mutação valida o estado vivo. */
+  let rejection=null,applied=null,result=null;
+  for(let attempt=0;attempt<4;attempt++){
+    const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
+    if(!current||current.status!=="active"||String(current.instance_id)!==instanceId){
+      result={ok:false,error:"INSTANCE_NOT_ACTIVE"};break;
+    }
+    result=await db.instancePatchState(current.account_id,acc.id,instanceId,Number(current.version),(serialized)=>{
     let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
     const item=descriptor.authority&&descriptor.authority.players&&
       descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
@@ -4209,7 +4218,9 @@ async function charmInstanceOp(db,body){
       }
     }
     descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
-  },lease);
+    },lease);
+    if(result.ok||result.error!=="INSTANCE_VERSION_CONFLICT")break;
+  }
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
     body:{ok:false,error:result.error,msg:rejection||"Não foi possível aplicar o charm",instance:instanceSummary(result.instance,true)}};
   await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),

@@ -834,12 +834,20 @@ function accountSelectInstanceAmmo(token,charId,slug,automatic){
 function accountSelectInstanceCharm(token,charId,charmId,race,op){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
-    const r=await _api("POST","/api/instance/charm",Object.assign({token,char_id:Number(charId),
-      charm:String(charmId||""),race:String(race||""),op:String(op||"assign"),
-      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
-    if(r.data.ok){accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance&&r.data.instance.state,id:r.data.charm};}
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
-    return {ok:false,msg:r.data.msg||"Não foi possível aplicar o charm",error:r.data.error};
+    /* Mesmo retry do equip: um tick bumpa a version entre o último apply e
+     * este request — o 409 traz a instância fresca e a retentativa vai com a
+     * versão certa. Sem isso todo clique no modal revertia em rede lenta. */
+    for(let attempt=0;attempt<2;attempt++){
+      const r=await _api("POST","/api/instance/charm",Object.assign({token,char_id:Number(charId),
+        charm:String(charmId||""),race:String(race||""),op:String(op||"assign"),
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+      if(r.data.ok){accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance&&r.data.instance.state,id:r.data.charm};}
+      if(r.code===423){accountLeaseMarkLost(r.data.msg);break;}
+      if(r.data.instance)accountInstanceApply(r.data.instance);
+      if(r.data.error!=="INSTANCE_VERSION_CONFLICT")
+        return {ok:false,msg:r.data.msg||"Não foi possível aplicar o charm",error:r.data.error};
+    }
+    return {ok:false,msg:"A instância foi alterada — tente de novo.",error:"INSTANCE_VERSION_CONFLICT"};
   });
 }
 /* Boss Slots — autoritativo no servidor (mesma cadeia da promoção): UMA

@@ -10,6 +10,7 @@ const ALPHA_UPDATE_AT = "28/11/2026 às 05:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Modal de Charms em tempo real: desbloquear, melhorar e associar runas durante a caçada não reverte mais — o clique agora aplica na primeira resposta (o servidor repete a operação com a versão fresca da instância em vez de devolver conflito)",
   "FIX — Exaltation Forge: a aba Conversion funciona de verdade — Increase Dust Limit, Dust→Slivers e Slivers→Exalted Core agora rodam no servidor (antes o clique mutava só a tela e o sync revertia: o limite subia 1× e voltava para 100 ao reabrir)",
   "FIX — Dupe de equipamento por lag eliminado: coletar reward do boss e equipar durante lag não grava mais 'equipado E na mochila' — uma cópia atrasada de outro char da conta não aceita mais instância já equipada, e contagem fantasma de bag nunca materializa item",
   "FIX — Modo de hunt (box/safe) agora é por personagem: trocar de char e escolher outro modo no Helper não muda mais o modo dos demais membros da party — cada um caça do jeito que foi configurado",

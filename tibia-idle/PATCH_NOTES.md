@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Modal de Charms responsivo em caçada online
+
+- **FIX — Cliques do Charm modal revertiam em caçada online**: durante a instância, o `version` da row sobe a cada tick (~1/s) — o `expected_version` do clique chegava velho em rede lenta e `POST /api/instance/charm` devolvia `INSTANCE_VERSION_CONFLICT` sem retry (o `charmInstanceOp` era um dos ~13 endpoints de patch sem o retry que o equip já tinha). Resultado: buy/upgrade revertiam via `restore()` e assign/clear não grudavam na autoridade. Agora o servidor re-resolve a row e reenvia com o version fresco (até 4×, mesmo padrão do equip) e o cliente retenta 1× com a instância do 409 — o clique aplica na primeira resposta.
+
+---
+
 ## 2026-11-28 — Forge Conversion: autoritativa no servidor
 
 - **FIX — Increase Dust Limit só subia 1× e resetava**: as três ações da aba Conversion (Increase Dust Limit, Dust→Slivers, Slivers→Exalted Core) eram 100% client-side — mutavam o espelho local sem nunca chegar ao servidor. O próximo sync do `shared_inventory` revertia Dust/limite/Slivers/Core (por isso o 2º clique "não subia" e reabrir o modal voltava o limite para 100). Agora roda em `POST /api/forge/conversion` (mesmo padrão da Fusion/Transfer: lease + save_version + só na cidade, persistido na conta). Offline mantém a via local.
