@@ -85,6 +85,7 @@ function pvpClientArenas() {
 
 let HELPER_FIELDS = [];
 try { HELPER_FIELDS = require("../game/js/helper-presets.js").HELPER_PRESET_CONFIG_FIELDS || []; } catch (e) { HELPER_FIELDS = []; }
+const StateCodec = require("./state_codec");
 
 /* Descritor autoritativo quente em memória, por instância de batalha.
  * Sem isso, cada tick de cada cliente (~35 req/s) lia 4.7MB do MySQL,
@@ -215,8 +216,7 @@ async function pvpResumeLiveOnBoot(db, now) {
     try {
       const row = await db.instanceGet(Number(b.host_account_id));
       if (!row || String(row.status) !== "active" || String(row.instance_id) !== String(b.instance_id)) continue;
-      let state = row.state;
-      if (typeof state === "string") state = JSON.parse(state);
+      const state = StateCodec.decodeInstanceRow(row);
       const pb = state && state.authority && state.authority.pvpBattle;
       if (!pb) continue;
       const cursor = new Date(row.worker_cursor_at || row.saved_at).getTime() || t;
@@ -698,8 +698,7 @@ function createPvpController(opts) {
     // Descritor quente em memória: a autoridade viva — sem parse de ~5MB
     // por segundo e sem o atraso do persist diferido no row.state.
     const hot = same ? pvpAuthCacheGet(row.instance_id) : null;
-    let state = hot ? hot.descriptor : (same ? row.state : null);
-    try { if (typeof state === "string") state = JSON.parse(state); } catch (e) { state = null; }
+    const state = hot ? hot.descriptor : (same ? StateCodec.decodeInstanceRow(row) : null);
     const auth = state && state.authority;
     const pb = auth && auth.pvpBattle;
     // O engine encerra a instância (status 'ended') ao decidir o placar:
@@ -896,8 +895,7 @@ function createPvpController(opts) {
         let state = hot ? hot.descriptor : null;
         if (!state && typeof db.instanceGet === "function") {
           const row = await db.instanceGet(share.ownerAccountId);
-          state = row && row.state;
-          try { if (typeof state === "string") state = JSON.parse(state); } catch (e) { state = null; }
+          state = row ? StateCodec.decodeInstanceRow(row) : null;
         }
         const pb = state && state.authority && state.authority.pvpBattle;
         if (pb) j.live = { scores: pb.scores || null, endsAt: pb.endsAt || 0,

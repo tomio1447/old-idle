@@ -36,6 +36,7 @@ const path = require("path");
 const vm = require("vm");
 const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
+const StateCodec = require("./state_codec");
 const { YANA_CATALOG, applyYanaPurchase } = require("./yana_catalog");
 const party = require("./party");   // lógica de PARTY multiplayer
 const guild = require("./guild");   // lógica de GUILDS (por conta)
@@ -1793,7 +1794,7 @@ async function enforceAuthoritativeProgress(db,accountId,prepared){
   const party=await db.partyFindByCharacter(prepared.save.id);
   if(party&&typeof db.instanceGetByParty==="function")row=await db.instanceGetByParty(party.id)||row;
   if(!row||row.status!=="active")return prepared;
-  let descriptor=null;try{descriptor=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){}
+  let descriptor=null;try{descriptor=StateCodec.decodeInstanceRow(row);}catch(e){}
   const player=protectedPlayer(descriptor,prepared.save.id);if(!player)return prepared;
   // Presets do Helper são preferências do cliente: a autoridade só os recebe
   // via tick. Um save entre a criação do preset e o próximo tick regravaria a
@@ -2070,13 +2071,12 @@ function instanceHotAuthApi(){
       let hot=pvpAuthCacheGet(row.instance_id);
       if(hot&&Number(hot.rowVersion)===Number(row.version))return hot;
       // Miss ou drift (escrita externa — patch/encerramento): recarrega.
-      const [s]=await conn.query("SELECT state FROM account_instances WHERE account_id=?",[Number(row.account_id)]);
-      const ser=s[0]?s[0].state:null;
-      if(ser==null)return hot;
-      let descriptor=typeof ser==="string"?JSON.parse(ser):ser;
+      const [s]=await conn.query("SELECT state,state_z FROM account_instances WHERE account_id=?",[Number(row.account_id)]);
+      let descriptor=s[0]?StateCodec.decodeInstanceRow(s[0]):null;
+      if(descriptor==null)return hot;
       // Blob thin (persist sem members[].p/state.players[].p): reconstrói
       // os derivados a partir de authority.players antes de servir.
-      if(pvpDescriptorThin(descriptor))descriptor=materializeAuthority(descriptor);
+      if(StateCodec.descriptorIsThin(descriptor))descriptor=materializeAuthority(descriptor);
       hot={descriptor,rowVersion:Number(row.version),savedAt:Date.now()};
       pvpAuthCacheSet(row.instance_id,hot);
       return hot;
@@ -2084,13 +2084,14 @@ function instanceHotAuthApi(){
 }
 /* Blob persistido thin (ver persist quente em db.js): authority.players
  * tem o p canônico; members[].p e state.players[].p vêm null e são
- * regenerados por materializeAuthority. */
-function pvpDescriptorThin(d){
-  return !!(d&&typeof d==="object"&&d.authority&&d.authority.pvpBattle&&
-    Array.isArray(d.members)&&d.members.some((m)=>m&&!m.p));
-}
+ * regenerados por materializeAuthority. Vale para QUALQUER instância
+ * agora — o codec thinifica em todo persist. */
+function pvpDescriptorThin(d){return StateCodec.descriptorIsThin(d);}
+/* Caminho quente para TODAS as instâncias: mutações vão no descritor vivo
+ * (marca dirty → persist no próximo cadence) em vez de reescrever o blob
+ * por clique. */
 function instancePatchHotOpts(resolved){
-  return (resolved&&(resolved.pvp||resolved.worldBoss))?{hotAuth:instanceHotAuthApi()}:null;
+  return resolved?{hotAuth:instanceHotAuthApi()}:null;
 }
 
 const TRAINING_STORE={exercise:{charges:14470,gold:10000000,tc:0,bonus:1.25},lasting:{charges:20000,gold:0,tc:150,bonus:1.5}};
@@ -3005,8 +3006,8 @@ function pvpSlimClientState(state,viewerAccountId,shared){
 }
 function instanceSummary(row,includeState,viewerAccountId,sharedSlim){
   if(!row)return null;let state=null;
-  if(includeState&&row.state){try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){state=null;}}
-  if(state&&String(row.kind||"")==="pvp"&&pvpDescriptorThin(state))
+  if(includeState&&(row.state||row.state_z)){state=StateCodec.decodeInstanceRow(row);}
+  if(state&&pvpDescriptorThin(state))
     state=materializeAuthority(state);
   if(state&&viewerAccountId&&String(row.kind||"")==="pvp")state=pvpSlimClientState(state,viewerAccountId,sharedSlim);
   return {id:row.instance_id,version:Number(row.version)||0,status:row.status,ownerAccountId:Number(row.account_id)||null,kind:row.kind,
@@ -3017,9 +3018,8 @@ function instanceSummary(row,includeState,viewerAccountId,sharedSlim){
     workerTotalMs:Number(row.worker_total_ms)||0,terminalReason:row.terminal_reason||null,state};
 }
 function instanceMemberIdSet(row){
-  if(!row||row.state==null)return null;
-  let state=row.state;
-  try{if(typeof state==="string")state=JSON.parse(state);}catch(e){return null;}
+  if(!row||(row.state==null&&row.state_z==null))return null;
+  let state=StateCodec.decodeInstanceRow(row);
   if(!state||typeof state!=="object")return null;
   const fromAuth=((state.authority&&state.authority.players)||[]).map((p)=>Number(p&&p.id)).filter((id)=>id>0);
   if(fromAuth.length)return new Set(fromAuth);
@@ -3067,7 +3067,7 @@ async function resolveInstanceRow(db,acc,charId){
   return {row:await db.instanceGet(acc.id),character,party,shared:false};
 }
 async function instanceCharactersForAccount(db,row,accountId){
-  let state=null;try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){}
+  let state=null;try{state=StateCodec.decodeInstanceRow(row);}catch(e){}
   const ids=((state&&state.authority&&state.authority.players)||[]).map((item)=>Number(item.id)),out=[];
   const ownerAcc=await db.findAccountById(accountId);
   const accGold=ownerAcc?Math.max(0,Math.floor(Number(ownerAcc.gold)||0)):undefined;
@@ -3111,11 +3111,11 @@ async function loadInstance(db,token,charId){
   const row=resolved.row;
   // Guerra: a rota usa cabeçalho sem blob — o estado vem do descritor quente
   // (ou do blob completo quando ainda não há cache, ex.: pré-primeiro tick).
-  if(row&&resolved.pvp&&row.state===undefined){
+  if(row&&row.state===undefined){
     const hot=pvpAuthCacheGet(row.instance_id);
     if(hot)row.state=hot.descriptor;
     else{const full=await db.instanceGet(row.account_id);if(full){
-      let st=full.state;try{st=typeof st==="string"?JSON.parse(st):st;}catch(_e){}
+      const st=StateCodec.decodeInstanceRow(full);
       row.state=pvpDescriptorThin(st)?materializeAuthority(st):st;}}
   }
   if(!row||row.status!=="active")return {code:200,body:{ok:true,instance:null,lastStatus:row?row.status:null,
@@ -3777,8 +3777,7 @@ async function syncWorldBossShared(db,event){
   if(!event||!event.hostAccountId||!event.instanceId)return;
   const row=await db.instanceGet(event.hostAccountId);
   if(!row)return;
-  let state=row.state;
-  try{if(typeof state==="string")state=JSON.parse(state);}catch(e){state=null;}
+  const state=StateCodec.decodeInstanceRow(row);
   const auth=state&&state.authority;
   const boss=auth&&Array.isArray(auth.mobs)?auth.mobs.find((m)=>m&&m.boss):null;
   const pending=auth&&auth.arenaBossSpawn&&auth.arenaBossSpawn.pending;
@@ -4041,12 +4040,12 @@ async function tickInstance(db,body){
   };
   const tickOpts={};
   if((resolved.worldBoss||resolved.pvp)&&Number(ownerId)!==Number(acc.id))tickOpts.leaseAccountId=acc.id;
-  // Batalha PvP e World Boss: descritor quente em memória (ver hotAuth em
-  // instanceAuthorityTick). A warzone tem M contas tickando a MESMA row do
-  // host — exatamente o cenário que o FOR UPDATE afogava (o servidor
-  // "travava" justo no last hit, quando o tick terminal encadeava a
-  // extração de N contas sob a lock).
-  if(resolved.pvp||resolved.worldBoss)tickOpts.hotAuth=instanceHotAuthApi();
+  // Descritor quente em memória para TODAS as instâncias (ver hotAuth em
+  // instanceAuthorityTick): o tick avança o objeto vivo e o blob thin+gzip
+  // só é persistido a cada persistMs — em vez de parse/stringify de
+  // ~580KB por tick de cada cliente. A serialização in-process
+  // (pvpAuthSerialize) substitui a lock FOR UPDATE da row.
+  tickOpts.hotAuth=instanceHotAuthApi();
   const runTick=()=>db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceWithVisuals,lease,
     Object.keys(tickOpts).length?tickOpts:undefined);
   /* Batalha: serialização in-process (mutex por conta-dono), NÃO pela lock
@@ -4737,7 +4736,7 @@ async function annihilatorLeverPull(db,body){
   if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
     return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
   if(body.preview===true){
-    let descriptor;try{descriptor=typeof row.state==="string"?JSON.parse(row.state):cloneJson(row.state);}catch(e){return {code:400,body:{ok:false,msg:"Instância inválida"}};}
+    const descriptor=StateCodec.decodeInstanceRow(row);if(!descriptor)return {code:400,body:{ok:false,msg:"Instância inválida"}};
     const offer=annihilatorRewardOffer(descriptor.authority,charId,previousClaims);
     return {code:offer.ok?200:409,body:{...offer,instance:instanceSummary(row,true)}};
   }
@@ -5072,7 +5071,7 @@ async function equipOtherCharacterItem(db,body){
   const resolved=await resolveInstanceRow(db,acc,sourceId);if(resolved.error)return resolved.error;
   const row=resolved.row;
   if(row&&row.status==="active"){
-    const state=typeof row.state==="string"?(()=>{try{return JSON.parse(row.state);}catch(e){return null;}})():row.state;
+    const state=StateCodec.decodeInstanceRow(row);
     const players=(state&&state.authority&&state.authority.players)||[];
     const targetInInstance=players.some((item)=>String(item&&item.id)===String(targetId));
     if(!targetInInstance)
@@ -5169,7 +5168,7 @@ async function useProficiencyCatalyst(db,body){
   const resolved=await resolveInstanceRow(db,acc,sourceId);if(resolved.error)return resolved.error;
   const row=resolved.row;
   if(row&&row.status==="active"){
-    const state=typeof row.state==="string"?(()=>{try{return JSON.parse(row.state);}catch(e){return null;}})():row.state;
+    const state=StateCodec.decodeInstanceRow(row);
     const players=(state&&state.authority&&state.authority.players)||[];
     const targetInInstance=players.some((item)=>String(item&&item.id)===String(targetId));
     if(!targetInInstance)
@@ -8565,8 +8564,8 @@ async function main() {
         // instância compartilhada já precisam estar em authority.players.
         try{
           const row=await db.instanceGet(acc.id);
-          if(row&&row.state&&String(row.instance_id)===String(body.instance_id)){
-            let state=typeof row.state==="string"?JSON.parse(row.state):row.state;
+          if(row&&(row.state||row.state_z)&&String(row.instance_id)===String(body.instance_id)){
+            let state=StateCodec.decodeInstanceRow(row);
             if(state&&state.authority){
               const auth=state.authority;
               auth.players=auth.players||[];
@@ -8731,8 +8730,8 @@ async function main() {
         // instância compartilhada já precisam estar em authority.players.
         try{
           const row=await db.instanceGet(acc.id);
-          if(row&&row.state&&String(row.instance_id)===String(body.instance_id)){
-            let state=typeof row.state==="string"?JSON.parse(row.state):row.state;
+          if(row&&(row.state||row.state_z)&&String(row.instance_id)===String(body.instance_id)){
+            let state=StateCodec.decodeInstanceRow(row);
             if(state&&state.authority){
               const auth=state.authority;
               auth.players=auth.players||[];

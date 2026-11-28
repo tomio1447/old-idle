@@ -28,9 +28,9 @@ const WORKER_CYCLE_BUDGET_MS=Math.max(100,Number(process.env.AUTH_WORKER_CYCLE_B
  * (taskKills acumulam num mapa pendente — espelho do hot.taskKills). */
 const WORKER_PERSIST_MS=Math.max(5000,Number(process.env.AUTH_WORKER_PERSIST_MS)||30000);
 
-function advanceInstanceClock(serialized,elapsed,checkpointAt){
+function advanceInstanceClock(serialized,elapsed,checkpointAt,hot){
   const authoritative=advanceAuthorityState(serialized,elapsed,checkpointAt,null,
-    {stepBudgetMs:WORKER_STEP_BUDGET_MS});
+    Object.assign({stepBudgetMs:WORKER_STEP_BUDGET_MS},hot?{inPlace:true,rawState:true}:null));
   if(authoritative)return authoritative;
   let state=serialized;
   if(typeof state==="string")state=JSON.parse(state);

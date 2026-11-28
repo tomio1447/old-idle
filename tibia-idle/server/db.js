@@ -12,6 +12,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const StateCodec = require("./state_codec");
 
 /* guild.js é usado para dia de server save, defs das tasks e nível.
  * Lazy: ele não require db.js de volta, então não há ciclo. */
@@ -1583,7 +1584,7 @@ JsonStore.prototype.socialPresence = function (accountIds) {
   for (const row of this.instances || []) {
     if (row.status !== "active") continue;
     let st = null;
-    try { st = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { st = null; }
+    try { st = StateCodec.decodeInstanceRow(row); } catch (e) { st = null; }
     const members = (st && st.members) || [];
     for (const m of members) {
       const accId = owner.get(Number(m && m.id));
@@ -1746,7 +1747,7 @@ JsonStore.prototype.instanceListActive = function () {
   const accs = new Map(this.accounts.map((a) => [Number(a.id), a]));
   return (this.instances || []).filter((row) => row.status === "active").map((row) => {
     let state = null;
-    try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+    try { state = StateCodec.decodeInstanceRow(row); } catch (e) { state = null; }
     const members = (((state || {}).members) || []).map((m) => {
       const ch = chars.get(Number(m && m.id));
       return { id: Number(m && m.id) || null,
@@ -2083,7 +2084,7 @@ JsonStore.prototype.onlineCount = function () {
   const accountsInInstances = new Set();
   for (const row of activeInstances) {
     let state = null;
-    try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+    try { state = StateCodec.decodeInstanceRow(row); } catch (e) { state = null; }
     const authPlayers = (state && state.authority && state.authority.players) || [];
     /* Mortos (ressurreição) NÃO contam como online: hp<=0, downUntil no
      * futuro (aguardando revive) ou permadead (boss). */
@@ -2161,7 +2162,7 @@ JsonStore.prototype.onlineList = function () {
   const accountsInInstances = new Set();
   for (const row of activeInstances) {
     let state = null;
-    try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+    try { state = StateCodec.decodeInstanceRow(row); } catch (e) { state = null; }
     const authPlayers = (state && state.authority && state.authority.players) || [];
     const alive = authPlayers
       .filter((item) => {
@@ -3358,10 +3359,10 @@ async function MysqlStore() {
         `SELECT id, account_id FROM characters WHERE account_id IN (${ph})`, ids);
       const owner = new Map(chars.map((c) => [Number(c.id), Number(c.account_id)]));
       const insts = await this.query(
-        "SELECT state FROM account_instances WHERE status = 'active'");
+        "SELECT state,state_z FROM account_instances WHERE status = 'active'");
       for (const row of insts) {
         let st = null;
-        try { st = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { st = null; }
+        try { st = StateCodec.decodeInstanceRow(row); } catch (e) { st = null; }
         const members = (st && st.members) || [];
         for (const m of members) {
           const accId = owner.get(Number(m && m.id));
@@ -3995,7 +3996,7 @@ async function MysqlStore() {
       const out = [];
       for (const row of rows) {
         let state = null;
-        try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+        try { state = StateCodec.decodeInstanceRow(row); } catch (e) { state = null; }
         const memberIds = (((state || {}).members) || []).map((m) => Number(m && m.id)).filter((id) => id > 0);
         let members = [];
         if (memberIds.length) {
@@ -4176,10 +4177,11 @@ async function MysqlStore() {
     },
     async instancePvpResume(accountId,instanceId,state,now){
       const at=new Date(Number(now)||Date.now());
+      const enc=StateCodec.encodeInstanceState(state);
       const result=await this.run(
-        "UPDATE account_instances SET state=?, version=version+1, saved_at=?, worker_cursor_at=?, updated_at=? "+
+        "UPDATE account_instances SET state=?, state_z=?, version=version+1, saved_at=?, worker_cursor_at=?, updated_at=? "+
         "WHERE account_id=? AND instance_id=? AND status='active'",
-        [state,at,at,at,Number(accountId),String(instanceId)]);
+        [enc.json,enc.z,at,at,at,Number(accountId),String(instanceId)]);
       return {ok:(result.affectedRows||0)>0};
     },
     /* Worker/tick de instância compartilhada (PvP/World Boss) segura gap
@@ -4294,16 +4296,17 @@ async function MysqlStore() {
         const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
         const current=rows[0]||null;
         state=await syncBlessWallets(conn,state);
+        const encState=StateCodec.encodeInstanceState(state);
         if(current&&current.status==="active"){
           if(Number(current.version)!==Number(expectedVersion)||String(current.instance_id)!==String(instanceId||"")){
             await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};
           }
           await conn.query(
             `UPDATE account_instances SET version=version+1,kind=?,hunt_id=?,boss_id=?,instance_mode=?,
-             party_id=?,party_version=?,active_character_id=?,state=?,saved_at=?,worker_cursor_at=?,status='active',
+             party_id=?,party_version=?,active_character_id=?,state=?,state_z=?,saved_at=?,worker_cursor_at=?,status='active',
              ended_at=NULL,terminal_reason=NULL WHERE account_id=?`,
             [meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,meta.party_id,meta.party_version,
-             meta.active_character_id,state,meta.saved_at,
+             meta.active_character_id,encState.json,encState.z,meta.saved_at,
              // Checkpoint com a authority do servidor: preserva o cursor da
              // simulação (ver JsonStore.instanceSave).
              meta.keep_worker_cursor?(current.worker_cursor_at||current.saved_at||meta.saved_at):meta.saved_at,
@@ -4317,16 +4320,17 @@ async function MysqlStore() {
           await conn.query(
             `INSERT INTO account_instances
              (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
-              party_version,active_character_id,state,saved_at,started_at,worker_cursor_at,worker_total_ms)
-             VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?,?,0)
+              party_version,active_character_id,state,state_z,saved_at,started_at,worker_cursor_at,worker_total_ms)
+             VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?,?,?,0)
              ON DUPLICATE KEY UPDATE instance_id=VALUES(instance_id),version=1,status='active',kind=VALUES(kind),
               hunt_id=VALUES(hunt_id),boss_id=VALUES(boss_id),instance_mode=VALUES(instance_mode),
               party_id=VALUES(party_id),party_version=VALUES(party_version),
-              active_character_id=VALUES(active_character_id),state=VALUES(state),saved_at=VALUES(saved_at),
+              active_character_id=VALUES(active_character_id),state=VALUES(state),state_z=VALUES(state_z),
+              saved_at=VALUES(saved_at),
               started_at=VALUES(started_at),worker_cursor_at=VALUES(worker_cursor_at),worker_total_ms=0,
               ended_at=NULL,terminal_reason=NULL`,
             [Number(accountId),instanceId,meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,
-             meta.party_id,meta.party_version,meta.active_character_id,state,meta.saved_at,startedAt,meta.saved_at]);
+             meta.party_id,meta.party_version,meta.active_character_id,encState.json,encState.z,meta.saved_at,startedAt,meta.saved_at]);
         }
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
         await conn.commit();return {ok:true,instance:saved[0]};
@@ -4376,9 +4380,10 @@ async function MysqlStore() {
           if(!row||row.status!=="active"){await conn.rollback();return {ok:false,error:"INSTANCE_NOT_ACTIVE"};}
           if(String(row.instance_id)!==String(instanceId||"")||Number(row.version)!==Number(expectedVersion)){
             await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};}
-          const next=patchState(row.state);if(!next){await conn.rollback();return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};}
-          await conn.query("UPDATE account_instances SET state=?,version=version+1,updated_at=? WHERE account_id=?",
-            [next,new Date(lease?lease.now:Date.now()),Number(ownerAccountId)]);
+          const next=patchState(StateCodec.decodeInstanceRow(row));if(!next){await conn.rollback();return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};}
+          const encPatch=StateCodec.encodeInstanceState(next);
+          await conn.query("UPDATE account_instances SET state=?,state_z=?,version=version+1,updated_at=? WHERE account_id=?",
+            [encPatch.json,encPatch.z,new Date(lease?lease.now:Date.now()),Number(ownerAccountId)]);
           const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(ownerAccountId)]);
           await conn.commit();return {ok:true,instance:saved[0]};
         }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
@@ -4402,7 +4407,15 @@ async function MysqlStore() {
         if(leases[0]&&new Date(leases[0].expires_at).getTime()>now){
           await conn.rollback();return {ok:false,skipped:"leased"};
         }
-        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        /* Head-only SELECT: sem o blob (~580KB) — com o descritor quente em
+         * cache, o claim sequer lê `state`; a leitura só acontece no seeding
+         * (miss) ou no drift de versão via hotApi.get. */
+        const hotApi=opts&&"hotAuth"in opts?opts.hotAuth
+          :(typeof this.instanceHotAuthApi==="function"?this.instanceHotAuthApi():null);
+        const [rows]=await conn.query(
+          `SELECT account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,party_version,
+           active_character_id,saved_at,started_at,worker_cursor_at,worker_total_ms,ended_at,terminal_reason
+           FROM account_instances WHERE account_id=? FOR UPDATE`,[Number(accountId)]);
         const row=rows[0];if(!row||row.status!=="active"){
           await conn.rollback();return {ok:false,skipped:"inactive"};
         }
@@ -4424,7 +4437,16 @@ async function MysqlStore() {
         if(elapsed<Math.max(1,Number(minStep)||500)){
           await conn.rollback();return {ok:false,skipped:"not-due"};
         }
-        const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
+        /* Descritor quente (mesmo cache do tick PvP/WB): o claim avança o
+         * objeto vivo em vez de parsear+serializar ~580KB a cada ~1.6s.
+         * hotApi.get já resolve drift por version (escrita externa recarrega). */
+        const hot=hotApi?await hotApi.get(row,conn):null;
+        let stateInput=hot?hot.descriptor:null;
+        if(!stateInput){
+          const [s]=await conn.query("SELECT state,state_z FROM account_instances WHERE account_id=?",[Number(accountId)]);
+          stateInput=s[0]?StateCodec.decodeInstanceRow(s[0]):null;
+        }
+        const checkpoint=cursor+elapsed,advanced=advanceState(stateInput,elapsed,checkpoint,hot);
         const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         /* Caminho leve: o tail pesado (bless wallets, pouch/forge→shared,
          * UPDATE por char, guild kills, wallet de gold) rodava a CADA claim
@@ -4445,13 +4467,15 @@ async function MysqlStore() {
             for(const k of Object.keys(tk))acc[k]=(Number(acc[k])||0)+(Number(tk[k])||0);
             this._workerPendingKills.set(Number(projection.id),acc);
           }
+          /* Incremental: entre persists só o cursor avança — sem blob de
+           * ~580KB e sem bump de version por claim (o version passa a
+           * representar a geração do blob, como no caminho quente do tick). */
           await conn.query(
-            `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,
-               worker_total_ms=worker_total_ms+?,status='active',terminal_reason=NULL,ended_at=NULL
-             WHERE account_id=?`,
-            [next.state,new Date(checkpoint),new Date(checkpoint),elapsed,Number(accountId)]);
+            `UPDATE account_instances SET saved_at=?,worker_cursor_at=?,
+               worker_total_ms=worker_total_ms+? WHERE account_id=?`,
+            [new Date(checkpoint),new Date(checkpoint),elapsed,Number(accountId)]);
           await conn.commit();return {ok:true,accountId:Number(accountId),elapsed,
-            version:Number(row.version)+1,terminalReason:null};
+            version:Number(row.version),terminalReason:null};
         }
         this._workerHeavyAt.set(accountId,now);
         if(this._workerPendingKills.size){
@@ -4514,11 +4538,14 @@ async function MysqlStore() {
         }
         for(const [aid,shared] of sharedByAcc.entries())
           await conn.query("UPDATE accounts SET shared_inventory=? WHERE id=?",[JSON.stringify(shared),aid]);
+        const encTick=StateCodec.encodeInstanceState(next.state);
         await conn.query(
-          `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,
+          `UPDATE account_instances SET state=?,state_z=?,version=version+1,saved_at=?,worker_cursor_at=?,
              worker_total_ms=worker_total_ms+?,status=?,terminal_reason=?,ended_at=? WHERE account_id=?`,
-          [next.state,new Date(checkpoint),new Date(checkpoint),elapsed,next.terminalReason?"ended":"active",
+          [encTick.json,encTick.z,new Date(checkpoint),new Date(checkpoint),elapsed,next.terminalReason?"ended":"active",
            next.terminalReason||null,next.terminalReason?new Date(checkpoint):null,Number(accountId)]);
+        if(hot){hot.savedAt=now;hot.rowVersion=Number(row.version)+1;
+          if(next.terminalReason&&hotApi&&typeof hotApi.drop==="function")hotApi.drop(row.instance_id);}
         await conn.commit();return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version)+1,
           terminalReason:next.terminalReason||null};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{
@@ -4576,7 +4603,7 @@ async function MysqlStore() {
         const hot=hotApi?await hotApi.get(row,conn):null;
         if(elapsed<50){await conn.commit();return {ok:true,
           instance:hot?Object.assign({},row,{state:hot.descriptor}):row,characters:[],elapsed:0};}
-        const advanced=advanceState(hot?hot.descriptor:row.state,elapsed,now,hot||undefined),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        const advanced=advanceState(hot?hot.descriptor:StateCodec.decodeInstanceRow(row),elapsed,now,hot||undefined),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
         /* Caminho quente: a cauda pesada (locks FOR UPDATE em characters/
          * accounts + writes por projeção) roda SÓ quando há o que persistir
@@ -4706,30 +4733,18 @@ async function MysqlStore() {
           const persist=!!next.terminalReason||(now-(Number(hot.savedAt)||0))>=persistMs||hot.dirty===true;
           if(persist){
             hot.dirty=false;
-            /* Guerra PvP: o p completo de ~40 chars era gravado 3×
-             * (authority + members + state.players → ~5MB, ~100ms de
-             * stringify na thread a cada 4s). members[].p e
-             * state.players[].p são regenerados por materializeAuthority
-             * a partir de authority.players no load — vão thin no blob.
-             * O descritor vivo NÃO é mutado (Object.assign em cima). */
-            const desc=next.state;
-            const slim=desc&&typeof desc==="object"&&desc.authority&&desc.authority.pvpBattle;
-            const str=typeof desc==="string"?desc:
-              slim?JSON.stringify(Object.assign({},desc,{
-                members:Array.isArray(desc.members)?desc.members.map((m)=>m&&m.p?{id:m.id,hp:m.hp,mp:m.mp}:m):desc.members,
-                state:desc.state&&typeof desc.state==="object"?Object.assign({},desc.state,{
-                  players:Array.isArray(desc.state.players)
-                    ?desc.state.players.map((e)=>e&&e.p?Object.assign({},e,{p:null}):e)
-                    :desc.state.players}):desc.state}))
-              :JSON.stringify(desc);
+            /* O blob thin é o mesmo do pvp: members[].p e state.players[].p
+             * são regenerados por materializeAuthority — vão null no encode.
+             * O descritor vivo NÃO é mutado (copy-on-write no codec). */
+            const encHot=StateCodec.encodeInstanceState(next.state);
             /* CAS por version: sem FOR UPDATE, uma escrita externa (checkpoint,
              * patch) podia commitar entre a leitura da head e este UPDATE.
              * Se alguém bumpou a versão, devolvemos conflito — o tick seguinte
              * recarrega o descritor pelo drift detect. */
             const [upd]=await conn.query(
-              `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
+              `UPDATE account_instances SET state=?,state_z=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
                  terminal_reason=?,ended_at=? WHERE account_id=? AND version=?`,
-              [str,new Date(now),new Date(now),next.terminalReason?"ended":"active",next.terminalReason||null,
+              [encHot.json,encHot.z,new Date(now),new Date(now),next.terminalReason?"ended":"active",next.terminalReason||null,
                next.terminalReason?new Date(now):null,Number(accountId),Number(row.version)]);
             if(!upd.affectedRows){
               if(typeof hotApi.drop==="function")hotApi.drop(row.instance_id);
@@ -4752,10 +4767,11 @@ async function MysqlStore() {
             `SELECT * FROM characters WHERE id IN (${marks})`,ids);}
           await conn.commit();return {ok:true,instance:saved,characters,elapsed,terminalReason:next.terminalReason||null};
         }
+        const encCold=StateCodec.encodeInstanceState(next.state);
         await conn.query(
-          `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
+          `UPDATE account_instances SET state=?,state_z=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
              terminal_reason=?,ended_at=? WHERE account_id=?`,
-          [next.state,new Date(now),new Date(now),next.terminalReason?"ended":"active",next.terminalReason||null,
+          [encCold.json,encCold.z,new Date(now),new Date(now),next.terminalReason?"ended":"active",next.terminalReason||null,
            next.terminalReason?new Date(now):null,Number(accountId)]);
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
         const ids=(next.characters||[]).map((p)=>Number(p.id));let characters=[];
@@ -4836,19 +4852,20 @@ async function MysqlStore() {
         await conn.beginTransaction();
         const savedAt=meta.saved_at||new Date();
         const startedAt=meta.started_at||meta.startedAt||savedAt||new Date();
+        const enc=StateCodec.encodeInstanceState(state);
         await conn.query(
           `INSERT INTO account_instances
            (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
-            party_version,active_character_id,state,saved_at,started_at,worker_cursor_at,worker_total_ms)
-           VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?,?,0)
+            party_version,active_character_id,state,state_z,saved_at,started_at,worker_cursor_at,worker_total_ms)
+           VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?,?,?,0)
            ON DUPLICATE KEY UPDATE instance_id=VALUES(instance_id),version=1,status='active',kind=VALUES(kind),
             hunt_id=VALUES(hunt_id),boss_id=VALUES(boss_id),instance_mode=VALUES(instance_mode),
             party_id=NULL,party_version=NULL,
-            active_character_id=VALUES(active_character_id),state=VALUES(state),saved_at=VALUES(saved_at),
+            active_character_id=VALUES(active_character_id),state=VALUES(state),state_z=VALUES(state_z),saved_at=VALUES(saved_at),
             started_at=VALUES(started_at),worker_cursor_at=VALUES(worker_cursor_at),worker_total_ms=0,
             ended_at=NULL,terminal_reason=NULL`,
           [Number(accountId),instanceId,meta.kind,meta.hunt_id||null,meta.boss_id,meta.instance_mode,
-           null,null,meta.active_character_id,state,savedAt,startedAt,savedAt]);
+           null,null,meta.active_character_id,enc.json,enc.z,savedAt,startedAt,savedAt]);
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
         await conn.commit();return {ok:true,instance:saved[0]};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
@@ -4877,18 +4894,18 @@ async function MysqlStore() {
         await conn.query(
           `INSERT INTO account_instances
             (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
-             party_version,active_character_id,state,saved_at,started_at,worker_cursor_at,worker_total_ms)
-           VALUES (?,?,?, 'active',?,?,?,?,?,?,?,?,?,?,?,?)
+             party_version,active_character_id,state,state_z,saved_at,started_at,worker_cursor_at,worker_total_ms)
+           VALUES (?,?,?, 'active',?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE instance_id=VALUES(instance_id),version=VALUES(version),status='active',
              kind=VALUES(kind),hunt_id=VALUES(hunt_id),boss_id=VALUES(boss_id),
              instance_mode=VALUES(instance_mode),party_id=VALUES(party_id),
              party_version=VALUES(party_version),active_character_id=VALUES(active_character_id),
-             state=VALUES(state),saved_at=VALUES(saved_at),started_at=VALUES(started_at),
+             state=VALUES(state),state_z=VALUES(state_z),saved_at=VALUES(saved_at),started_at=VALUES(started_at),
              worker_cursor_at=VALUES(worker_cursor_at),worker_total_ms=VALUES(worker_total_ms),
              ended_at=NULL,terminal_reason=NULL`,
           [toId, from.instance_id, from.version, from.kind, from.hunt_id, from.boss_id,
            from.instance_mode, from.party_id, from.party_version, from.active_character_id,
-           from.state, from.saved_at, from.started_at, from.worker_cursor_at,
+           from.state, from.state_z || null, from.saved_at, from.started_at, from.worker_cursor_at,
            Number(from.worker_total_ms) || 0]);
         await conn.query(
           "UPDATE account_instances SET version=version+1,status='ended',terminal_reason=?,ended_at=?,updated_at=? WHERE account_id=?",
@@ -5127,7 +5144,7 @@ async function MysqlStore() {
       const nowMs = Date.now();
       for (const row of activeInstances) {
         let state = null;
-        try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+        try { state = StateCodec.decodeInstanceRow(row); } catch (e) { state = null; }
         const authPlayers = (state && state.authority && state.authority.players) || [];
         /* Mortos (ressurreição) NÃO contam como online: hp<=0, downUntil
          * no futuro (aguardando revive) ou permadead (boss). */
@@ -5204,7 +5221,7 @@ async function MysqlStore() {
       const nowMs = Date.now();
       for (const row of activeInstances) {
         let state = null;
-        try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+        try { state = StateCodec.decodeInstanceRow(row); } catch (e) { state = null; }
         const authPlayers = (state && state.authority && state.authority.players) || [];
         const alive = authPlayers
           .filter((item) => {
