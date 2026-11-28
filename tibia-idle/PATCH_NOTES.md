@@ -4,6 +4,15 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Wyrms (Liberty Bay): mapa novo
+
+- **Mapa refeito**: a hunt Wyrms (50+, Liberty Bay) ganhou a área nova do OTBM — recorte maior (41×38, era 30×24) com a lagoa interna e a margem de água rasa.
+- **Respawn maior**: a zona de respawn agora cobre {1023,1024,7}→{1032,1034,7} (110 sqm, 102 caminháveis) — os wyrms espalham pela área inteira em vez do quadradinho antigo.
+- **Entrada nova**: o ponto de chegada mudou para {1029,1030,7} — dentro da área transitável e conectado ao respawn.
+- Margens de água rasa novas (ids 21478/21479) agora são pisáveis, igual às demais do mapa.
+
+---
+
 ## 2026-11-27 — Boss Slots: novo visual + 3º slot por 150 Tibia Coins
 
 - **Novo visual (modelo OTClient dark)**: a aba Boss Slots ganhou o layout do mockup — barra de resumo (boss points, bônus de loot, remoções), cards de slot em tema escuro e grade de bosses com cores de categoria (Bane verde, Archfoe azul, Nemesis vermelho).

@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "27/11/2026 às 17:00";
+const ALPHA_UPDATE_AT = "28/11/2026 às 02:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Wyrms (Liberty Bay) com o mapa novo: a área da hunt foi refeita no OTBM — recorte maior com a lagoa interna, entrada em ponto novo e zona de respawn cobrindo a área inteira (os wyrms espalham muito mais)",
   "NOVO — Boss Slots repaginado + 3º slot por 150 Tibia Coins: visual novo no modelo OTClient (card de alvo SELECIONADO, picker sempre aberto com busca, bosses marcados 'Ativo' com borda verde) — clicar num slot escolhe o alvo e clicar num boss atribui; o 3º slot desbloqueia num clique com 150 TC por conta e o card do Boss do Dia segue mostrando o boosted ao lado",
   "FIX — O boss SEMPRE nasce: o contador zerando não trava mais a sala — se a instância perder o spawn (checkpoint corrompido, bug de mecânica), a autoridade refabrica e respawna o boss sozinha. E o cooldown agora só conta DEPOIS que o boss nasceu: instância quebrada e dano de adds nunca mais queimam a tentativa",
   "FIX — Mini bosses da Falcon Bastion na taxa real: o sorteio dava 4% de chance por slot (1% a cada um dos 4) e chovia Grand Commander Soeren / Preceptor Lazare / Grand Chaplain Gaunder / Grand Canon Dominus — agora 0,01% combinado por spawn, raridade de verdade",

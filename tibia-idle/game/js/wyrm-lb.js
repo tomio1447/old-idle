@@ -1,9 +1,9 @@
 /* wyrm-lb.js — HUNT Wyrms (nível 50+, Liberty Bay).
- * Mapa: game/maps/wyrm_lb.otbm (30×24, z=7).
+ * Mapa: game/maps/wyrm_lb.otbm (41×38, z=7).
  * Criaturas: apenas Wyrms (4 a 6 por onda).
  * Coordenadas RME informadas:
- *   centerroom {1019,1024,7}
- *   mobbounds  {1015,1021,7} → {1023,1028,7}
+ *   playerspawn {1029,1030,7}
+ *   respawn     {1023,1024,7} → {1032,1034,7}
  */
 "use strict";
 
@@ -25,11 +25,12 @@
     otbm: "wyrm_lb",
     otbmFloor: 7,
     // Sem otbmBounds: o .otbm já é o recorte da área.
-    otbmSpawn: { x: 1019, y: 1024, z: 7 },
-    otbmMobBounds: { x: 1015, y: 1021, w: 9, h: 8, z: 7 },
+    otbmSpawn: { x: 1029, y: 1030, z: 7 },
+    otbmMobBounds: { x: 1023, y: 1024, w: 10, h: 11, z: 7 },
     // Pisos do mapa: 1128/439x = terra/relva, 10553/2147x = margens/água rasa.
     walkFloors: [1128, 4394, 4396, 4397, 4398, 4399, 4400, 4401, 4402,
-      4403, 4404, 4405, 4406, 4407, 4408, 4409, 4410, 10553, 21477, 21481, 21482],
+      4403, 4404, 4405, 4406, 4407, 4408, 4409, 4410, 10553, 21477,
+      21478, 21479, 21481, 21482],
     avgHp: 1825,
     avgExp: 1550,
     avgDamage: 250,
