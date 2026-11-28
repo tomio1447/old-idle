@@ -1,6 +1,7 @@
 # Verification
 
 Run from `tibia-idle/`:
+- `node tools/test_hunt_mode_per_char.js`: modo de hunt (box/safe) por personagem — `formationMode`/`huntModeOf` sem fallback de party (c.huntMode/auth.huntMode), troca de piloto não reescreve o modo dos demais, tick sem herança de combat.huntMode.
 - `node tools/test_wyrm_lb.js`: Wyrms — Liberty Bay (HUNTS 50+, low; hunt de patch hidratada via `captureAuthHuntDef`, não existe em hunts.json), OTBM `wyrm_lb` 41×38 z=7 (byte-igual de `beta-maps/`, bounds 1010..1050 × 1014..1051, 1449 cells/149 ids), playerspawn {1029,1030,7}→local (19,16), respawn rect {1023,1024}–{1032,1034} (110 sqm: 102 caminháveis+conectadas — 8 cells da lagoa bloqueadas), componente 189, walkFloors libera 45 legs (margens 21478/21479 novos), PNG+catálogo RME de todos os ids.
 - `node tools/test_gnomprona.js`: all three Gnomprona hunts, OTBM bounds/connected spawn areas, modal rendering, monster/loot assets and prices, account hazard, Primal Bag and equipment parity.
 - `node tools/test_glooth_cave.js`: Glooth Cave - Oramond (150+), OTBM bounds/connected spawn, 6–12 pack, modal card, monster sheets vs Canary data, all 34 loot items with sprite and official NPC prices, new amulet accessories and authoritative engine parity.

@@ -6,8 +6,8 @@
  *    fora do centro;
  * 2) safeTargetCell: retorna um CANTO da tela, longe da box, mas com mobs
  *    no range das spells (7 SQM);
- * 3) formationMode: "box"/"safe" vêm do config OU do c.huntMode (modal de
- *    instância) — vale para a party;
+ * 3) formationMode: "box"/"safe" vêm SÓ do config do próprio personagem —
+ *    por char, sem herdar o modo da party (c.huntMode);
  * 4) fonte: seletor de Modo de Hunt no topo da aba Ataque e no modal de
  *    instância (data-hunt-mode).
  */
@@ -125,15 +125,19 @@ setTimeout(() => {
         ok.push("modo SAFE: canto da tela, longe da box, mobs no range das spells");
       }
 
-      // ---------- 3) formationMode: config OU c.huntMode ----------
+      // ---------- 3) formationMode: só o attackMode do PRÓPRIO char ----------
       {
-        if (formationMode({ huntMode: "box" }, { p: { config: { attackMode: "chase" } } }) !== "box")
-          fail("formationMode deveria ler o c.huntMode (modal de instância)");
+        // c.huntMode é o modo do último char pilotado — membro sem modo
+        // próprio NÃO pode herdar (bug: trocar de char mudava o modo dos outros).
+        if (formationMode({ huntMode: "box" }, { p: { config: { attackMode: "chase" } } }) !== "")
+          fail("formationMode não pode herdar o c.huntMode de outro personagem");
+        if (formationMode({ huntMode: "safe" }, { p: { config: { attackMode: "box" } } }) !== "box")
+          fail("formationMode deveria manter o box do próprio char");
         if (formationMode({}, { p: { config: { attackMode: "safe" } } }) !== "safe")
           fail("formationMode deveria ler o attackMode do personagem");
         if (formationMode({}, { p: { config: { attackMode: "chase" } } }) !== "")
           fail("formationMode deveria ser vazio sem box/safe");
-        ok.push("formationMode: box/safe vêm do config ou do c.huntMode (party inteira)");
+        ok.push("formationMode: box/safe por personagem (sem herdar o modo da party)");
       }
 
       console.log("  - " + ok.join("\\n  - "));

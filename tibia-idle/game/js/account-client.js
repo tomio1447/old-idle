@@ -606,7 +606,10 @@ function accountAuthorityVisualState(){
           visual.imbuements=helperPresetClone(cfgSrc.imbuements);
       }
       if(cfgSrc&&cfgSrc.config){
-        const mode=cfgSrc.config.attackMode||(combat&&combat.huntMode)||"kiting";
+        /* Modo de hunt é por personagem: nunca herda combat.huntMode (é o
+         * modo do último char pilotado — gravava o modo de um no config
+         * do outro via challenge.huntMode). */
+        const mode=cfgSrc.config.attackMode||"kiting";
         visual.autoWalk=typeof playerAutoWalkOn==="function"?playerAutoWalkOn(cfgSrc):cfgSrc.config.autoWalk!==false;
         if(typeof vipManualControlAllowed==="function"&&!vipManualControlAllowed()){
           visual.autoWalk=true;

@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Modo de hunt por personagem
+
+- **FIX — Helper (box/safe) por char**: setar um modo de hunt num personagem e trocar para outro não altera mais o modo do anterior. O modo compartilhado da party (o último escolhido pelo char pilotado) vazava para os demais membros — agora cada personagem caça com o seu próprio `attackMode`, sem fallback de party no cliente (`formationMode`) nem no servidor (`huntModeOf`), e o tick não envia mais o modo do outro char no challenge.
+
+---
+
 ## 2026-11-28 — Wyrms (Liberty Bay): mapa novo
 
 - **Mapa refeito**: a hunt Wyrms (50+, Liberty Bay) ganhou a área nova do OTBM — recorte maior (41×38, era 30×24) com a lagoa interna e a margem de água rasa.

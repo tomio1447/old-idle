@@ -6,10 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "28/11/2026 às 02:00";
+const ALPHA_UPDATE_AT = "28/11/2026 às 04:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Modo de hunt (box/safe) agora é por personagem: trocar de char e escolher outro modo no Helper não muda mais o modo dos demais membros da party — cada um caça do jeito que foi configurado",
   "NOVO — Wyrms (Liberty Bay) com o mapa novo: a área da hunt foi refeita no OTBM — recorte maior com a lagoa interna, entrada em ponto novo e zona de respawn cobrindo a área inteira (os wyrms espalham muito mais)",
   "NOVO — Boss Slots repaginado + 3º slot por 150 Tibia Coins: visual novo no modelo OTClient (card de alvo SELECIONADO, picker sempre aberto com busca, bosses marcados 'Ativo' com borda verde) — clicar num slot escolhe o alvo e clicar num boss atribui; o 3º slot desbloqueia num clique com 150 TC por conta e o card do Boss do Dia segue mostrando o boosted ao lado",
   "FIX — O boss SEMPRE nasce: o contador zerando não trava mais a sala — se a instância perder o spawn (checkpoint corrompido, bug de mecânica), a autoridade refabrica e respawna o boss sozinha. E o cooldown agora só conta DEPOIS que o boss nasceu: instância quebrada e dano de adds nunca mais queimam a tentativa",

@@ -337,14 +337,12 @@ function boxCellLivre(cx, cy, occ) {
 }
 
 /* MODO DE HUNT ativo para uma entidade: "box", "safe" ou "" (nenhum).
- * O modo pode vir do config do personagem OU do modo escolhido no modal de
- * instância da hunt (c.huntMode) — vale para a party inteira. */
+ * O modo é do PRÓPRIO personagem (p.config.attackMode — escolhido no
+ * Helper ou no modal de instância). Não cai no modo da party: cada char
+ * mantém o seu, senão trocar de personagem reescrevia o modo dos outros. */
 function formationMode(c, ent) {
   const m = ent && ent.p && ent.p.config ? ent.p.config.attackMode : "";
   if (m === "box" || m === "safe") return m;
-  if (c && c.huntMode && (c.huntMode === "box" || c.huntMode === "safe")) {
-    return c.huntMode;
-  }
   return "";
 }
 

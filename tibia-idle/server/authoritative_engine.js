@@ -9726,10 +9726,11 @@ function pvpAttackRangeSQM(auth,item){
   return base;
 }
 function huntModeOf(auth,item){
+  /* Modo de hunt é por personagem: só o attackMode gravado no config do
+   * próprio char conta. auth.huntMode é o do último self que tickou —
+   * herdá-lo fazia o modo escolhido num char trocar o de outro. */
   const m=item&&item.p&&item.p.config?String(item.p.config.attackMode||""):"";
   if(m==="box"||m==="safe")return m;
-  const party=auth?String(auth.huntMode||""):"";
-  if(party==="box"||party==="safe")return party;
   return m==="kiting"?"kiting":"";
 }
 function boxCenter(auth){
