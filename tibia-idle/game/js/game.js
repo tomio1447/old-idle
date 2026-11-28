@@ -5009,7 +5009,7 @@ function serverDisconnectCopy(reason){
       title:typeof t==="function"?t("maint.title"):"Manutenção em breve",
       msg:typeof t==="function"?t("maint.msg"):
         "O servidor será desligado para atualização. Conecte-se novamente após o restart.",
-      toast:typeof t==="function"?t("server.lostToast"):"SERVIDOR OFF. Use Reconnect quando a API voltar.",
+      toast:typeof t==="function"?t("server.lostToast"):"SERVIDOR OFF. Use Reconectar quando a API voltar.",
     };
   }
   const restarted=why==="restart";
@@ -5017,26 +5017,26 @@ function serverDisconnectCopy(reason){
     return {
       title:typeof t==="function"?t("server.restartTitle"):"Servidor reiniciou",
       msg:typeof t==="function"?t("server.restartMsg"):
-        "O servidor reiniciou. A caçada ficou pausada nesta aba — use Reconnect quando a API voltar.",
+        "O servidor reiniciou. A caçada ficou pausada nesta aba — use Reconectar quando a API voltar.",
       toast:typeof t==="function"?t("server.restartToast"):
-        "Servidor reiniciou. Use Reconnect para retomar.",
+        "Servidor reiniciou. Use Reconectar para retomar.",
     };
   }
   if(why==="session"){
     return {
       title:typeof t==="function"?t("server.sessionTitle"):"Sessão online perdida",
       msg:typeof t==="function"?t("server.sessionMsg"):
-        "O controle online expirou (restart ou sessão inválida). Use Reconnect; se falhar, entre novamente.",
+        "O controle online expirou (restart ou sessão inválida). Use Reconectar; se falhar, entre novamente.",
       toast:typeof t==="function"?t("server.sessionToast"):
-        "Sessão/lease inválidos. Use Reconnect.",
+        "Sessão/lease inválidos. Use Reconectar.",
     };
   }
   return {
     title:typeof t==="function"?t("server.lostTitle"):"Conexão perdida",
     msg:typeof t==="function"?t("server.lostMsg"):
-      "Servidor indisponível. A caçada permanece pausada nesta aba — use Reconnect quando a API voltar.",
+      "Servidor indisponível. A caçada permanece pausada nesta aba — use Reconectar quando a API voltar.",
     toast:typeof t==="function"?t("server.lostToast"):
-      "SERVIDOR OFF. Use Reconnect quando a API voltar.",
+      "SERVIDOR OFF. Use Reconectar quando a API voltar.",
   };
 }
 function setServerPowerBadge(powerOn){
@@ -5046,8 +5046,10 @@ function setServerPowerBadge(powerOn){
   badge.classList.toggle("on",on);
   badge.classList.toggle("off",!on);
   const key=on?"server.on":"server.off";
-  badge.setAttribute("data-i18n",key);
-  badge.textContent=typeof t==="function"?t(key):(on?"SERVIDOR ON":"SERVIDOR OFF");
+  // O texto vai no label interno — textContent no badge apagaria o dot.
+  const label=badge.querySelector(".server-power-label")||badge;
+  label.setAttribute("data-i18n",key);
+  label.textContent=typeof t==="function"?t(key):(on?"SERVIDOR ON":"SERVIDOR OFF");
 }
 function setServerPowerStatus(powerOn){
   const box=$("#server-status"),text=$("#server-status-text");
@@ -5167,7 +5169,7 @@ function bindServerStatusControls(){
     const hint=$("#server-reconnect-error");
     if(hint&&!SERVER_CONNECTION_ONLINE){
       hint.hidden=false;
-      hint.textContent=typeof t==="function"?t("server.readyHint"):"SERVIDOR ON — clique em Reconnect.";
+      hint.textContent=typeof t==="function"?t("server.readyHint"):"SERVIDOR ON — clique em Reconectar.";
       hint.classList.remove("bad");hint.classList.add("good");
     }
     // AUTO-RECONNECT (opt-in no CONFIG): com o servidor saudável de novo,
@@ -5233,7 +5235,7 @@ window.maybeAutoReconnect=maybeAutoReconnect;
 async function reconnectOnlineRuntime(){
   const btn=$("#btn-reconnect"),bannerBtn=$("#btn-reconnect-banner");
   const err=$("#server-reconnect-error");
-  const label=(typeof t==="function"?t("server.reconnect"):"Reconnect")+"...";
+  const label=typeof t==="function"?t("server.reconnecting"):"Reconectando...";
   const setBusy=(busy)=>{
     if(btn){btn.disabled=busy;btn.textContent=busy?label:(typeof t==="function"?t("server.reconnect"):"Reconnect");}
     if(bannerBtn){bannerBtn.disabled=busy;bannerBtn.textContent=busy?label:(typeof t==="function"?t("server.reconnect"):"Reconnect");}

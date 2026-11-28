@@ -247,49 +247,108 @@ canvas { image-rendering: pixelated; }
 .server-reconnect-banner {
   position: fixed; inset: 0; z-index: 9200;
   display: flex; align-items: center; justify-content: center;
-  padding: 16px; background: rgba(0, 0, 0, .55);
+  padding: 20px; background: rgba(4, 6, 10, .5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   pointer-events: auto;
 }
 .server-reconnect-banner[hidden] { display: none !important; }
 .server-reconnect-banner-inner {
-  width: min(420px, 100%);
-  padding: 18px 20px;
-  border: 1px solid var(--border-out, #5a5346);
-  background: #1a1814;
-  color: #e6dfd2;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+  position: relative;
+  width: min(500px, 100%);
+  padding: 22px 26px 20px;
+  border: 1px solid rgba(212, 175, 55, .36);
+  border-radius: 6px;
+  background: rgba(20, 23, 30, .94);
+  color: #f1f5f9;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, .9),
+    0 20px 50px rgba(0, 0, 0, .85),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
   text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+/* Filete interno discreto — profundidade de moldura RPG */
+.server-reconnect-banner-inner::before {
+  content: ""; position: absolute; inset: 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  pointer-events: none;
 }
 .server-power-badge {
-  display: inline-block;
-  margin-bottom: 10px;
-  padding: 4px 12px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px;
   border: 1px solid #5a5346;
-  font-size: 13px;
+  border-radius: 3px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: .6px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.server-power-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  flex: none;
 }
 .server-power-badge.on {
-  color: #9ce84a;
-  border-color: #4a7a2a;
-  background: rgba(60, 110, 30, .25);
+  color: #86efac;
+  border-color: rgba(74, 222, 128, .45);
+  background: rgba(21, 128, 61, .22);
+}
+.server-power-badge.on .server-power-dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  animation: server-power-pulse 1.6s ease-in-out infinite;
 }
 .server-power-badge.off {
   color: #f0b4b4;
   border-color: #8a3a3a;
   background: rgba(120, 30, 30, .28);
 }
+.server-power-badge.off .server-power-dot {
+  background: #e25b5b;
+  box-shadow: 0 0 6px #e25b5b;
+}
+@keyframes server-power-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px #22c55e; }
+  50% { opacity: .45; box-shadow: 0 0 2px #22c55e; }
+}
 .server-reconnect-banner-inner strong {
-  display: block; font-size: 16px; color: #f0b4b4; margin-bottom: 8px;
+  display: block; font-size: 22px; font-weight: 800; letter-spacing: .01em;
+  color: #f87171; text-shadow: 0 2px 8px rgba(0, 0, 0, .75);
 }
 .server-reconnect-banner-inner p {
-  margin: 0 0 14px; font-size: 13px; line-height: 1.45; color: #c8c0b0;
+  margin: 0; max-width: 410px; font-size: 13px; line-height: 1.5; color: #cbd5e1;
 }
 .server-reconnect-banner-inner #btn-reconnect-banner {
-  min-width: 140px; min-height: 34px;
+  margin-top: 4px;
+  min-width: 176px; min-height: 38px;
+  padding: 10px 24px;
+  border-radius: 4px;
+  border: 1px solid #7890d6;
+  background: linear-gradient(180deg, #5369a8 0%, #3b4c7e 100%);
+  color: #fff;
+  font-size: 13px; font-weight: 700; letter-spacing: .02em;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, .5),
+    inset 0 1px 0 rgba(255, 255, 255, .22);
+  transition: filter .14s ease, transform .1s ease;
 }
-.server-reconnect-banner-inner #server-reconnect-error.bad { color: #f0b4b4; }
-.server-reconnect-banner-inner #server-reconnect-error.good { color: #9ce84a; }
+.server-reconnect-banner-inner #btn-reconnect-banner:hover:not(:disabled) {
+  background: linear-gradient(180deg, #5369a8 0%, #3b4c7e 100%);
+  filter: brightness(1.12);
+  border-color: #7890d6;
+}
+.server-reconnect-banner-inner #btn-reconnect-banner:active:not(:disabled) {
+  transform: translateY(1px);
+  border-color: #7890d6;
+  padding: 10px 24px;
+}
+.server-reconnect-banner-inner #btn-reconnect-banner:disabled {
+  opacity: .75; cursor: wait;
+}
+.server-reconnect-banner-inner #server-reconnect-error { font-weight: 600; }
+.server-reconnect-banner-inner #server-reconnect-error.bad { color: #f87171; }
+.server-reconnect-banner-inner #server-reconnect-error.good { color: #86efac; }
 
 /* ---- Alpha announce (pré-login) + banner in-game ---- */
 #alpha-announce-modal {

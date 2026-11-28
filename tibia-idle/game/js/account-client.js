@@ -330,7 +330,7 @@ async function accountRenewLease(token){
     if(typeof accountForceServerDisconnect==="function")
       accountForceServerDisconnect("session");
     if(typeof toast==="function")
-      toast(r.data.msg||"Controle online expirado. Use Reconnect.","bad");
+      toast(r.data.msg||"Controle online expirado. Use Reconectar.","bad");
     return {ok:false,unauthorized:true,lost:true,msg:r.data.msg||"Sessão online expirada. Entre novamente."};
   }
   accountLeaseMarkLost(r.data.msg);return {ok:false,lost:true};

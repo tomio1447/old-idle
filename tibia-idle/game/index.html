@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=active-preys-v1">
+  <link rel="stylesheet" href="css/layout.css?v=restart-modal-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wod-cidade-v1">
@@ -654,11 +654,14 @@
 <div id="tooltip"></div>
 <div id="toasts"></div>
 <div id="server-reconnect-banner" class="server-reconnect-banner" hidden>
-  <div class="server-reconnect-banner-inner">
-    <div class="server-power-badge off" id="server-power-badge" data-i18n="server.off">SERVIDOR OFF</div>
+  <div class="server-reconnect-banner-inner" role="dialog" aria-modal="true" aria-labelledby="server-reconnect-title">
+    <div class="server-power-badge off" id="server-power-badge">
+      <span class="server-power-dot" aria-hidden="true"></span>
+      <span class="server-power-label" data-i18n="server.off">SERVIDOR OFF</span>
+    </div>
     <strong id="server-reconnect-title" data-i18n="server.lostTitle">Conexão perdida</strong>
-    <p id="server-reconnect-msg" data-i18n="server.lostMsg">Servidor indisponível. A caçada permanece pausada nesta aba — use Reconnect quando a API voltar.</p>
-    <button class="primary" id="btn-reconnect-banner" type="button" data-i18n="server.reconnect">Reconnect</button>
+    <p id="server-reconnect-msg" data-i18n="server.lostMsg">Servidor indisponível. A caçada permanece pausada nesta aba — use Reconectar quando a API voltar.</p>
+    <button class="primary" id="btn-reconnect-banner" type="button" data-i18n="server.reconnect">Reconectar</button>
     <div class="tiny dim mt8" id="server-reconnect-error" hidden></div>
   </div>
 </div>
@@ -761,7 +764,7 @@
 <script src="js/hunt-sections.js?v=miniboss-v1"></script>
 <script src="js/ui.js?v=supply-items-v1"></script>
 <script src="js/helper-presets.js?v=autosell-sync-v1"></script>
-<script src="js/i18n.js?v=reward-shrine-v1"></script>
+<script src="js/i18n.js?v=restart-modal-v1"></script>
 <script src="js/alpha-announce.js?v=huntmode-perchar-v1"></script>
 <script src="js/settings.js?v=tfa-method-v1"></script>
 <script src="js/ui-mode.js?v=mobile-topbar-v1"></script>
@@ -790,7 +793,7 @@
 <script src="js/active-boosts.js?v=train-fix-v1"></script>
 <script src="js/active-preys.js?v=active-preys-v1"></script>
 <script src="js/player-profile.js?v=guild-req-tab-v1"></script>
-<script src="js/account-client.js?v=charm-instance-retry-v1"></script>
+<script src="js/account-client.js?v=restart-modal-v1"></script>
 <script src="js/chat.js?v=chat-dock-v1"></script>
 <script src="js/marketdata.js?v=arcane-staff-v1"></script>
 <script src="js/market-ui.js?v=rmt-pix-ico-v1"></script>
@@ -814,7 +817,7 @@
 <script src="js/guild-ui.js?v=guild-redesign-v1"></script>
 <script src="js/pvp-ui.js?v=deploy-2911-push"></script>
 <script src="js/preload.js?v=mounted-mask-v1"></script>
-<script src="js/game.js?v=boss-always-spawns-v1"></script>
+<script src="js/game.js?v=restart-modal-v1"></script>
 <script src="js/scarlett-boss.js?v=deploy-2411-v1"></script>
 <script src="js/brain-head-boss.js?v=nomove-v1"></script>
 <script src="js/feast-of-souls.js?v=deploy-2411-v1"></script>

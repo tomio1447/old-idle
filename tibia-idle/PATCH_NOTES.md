@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Modal de reconexão repaginado
+
+- **VISUAL — Banner "servidor reiniciou/conexão perdida"**: moldura dourada com filete interno e sombra profunda sobre o jogo desfocado (backdrop blur); badge de status agora é pill com ponto pulsante (verde ON / vermelho OFF); botão Reconectar com gradiente, hover mais claro e estado "Reconectando..."; textos padronizados em português (Reconnect → Reconectar no idioma PT).
+
+---
+
 ## 2026-11-28 — Painel PREYS ATIVAS
 
 - **NOVO — Preys ativas visíveis na lateral**: novo painel "PREYS ATIVAS" (mesmo chrome do Bônus Ativos/Daily Boost) lista cada prey ativa do char: sprite do monstro, ícone do tipo de prey (dano/defesa/exp/loot), estrelas do nível (grade oficial 5×2), valor do bônus e tempo restante. Minimizar fica salvo.
