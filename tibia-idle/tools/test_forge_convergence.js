@@ -150,5 +150,29 @@ console.log("== Transfer regular: perda de 1 tier preservada ==");
   must(!r.ok && /mesma classificação/i.test(r.msg), "classificações diferentes rejeitadas");
 }
 
+console.log("\n== Conversion of Dust and Slivers (autoritativo, era só client-side) ==");
+{
+  // Bug relatado: cap subia 1× no espelho local e o sync do shared revertia.
+  const p = mkP([], { dust: 75, dustLimit: 100, slivers: 60, exaltedCores: 0 });
+  let r = forge.forgeConversionAuth(p, "cap");
+  must(r.ok && p.dustLimit === 101 && p.dust === 50, "cap: 100→101 por 25 Dust (custo = limit−75)");
+  r = forge.forgeConversionAuth(p, "cap");
+  must(r.ok && p.dustLimit === 102 && p.dust === 24, "cap: 101→102 por 26 Dust — o 2º clique sobe");
+  r = forge.forgeConversionAuth(p, "cap");
+  must(!r.ok && p.dustLimit === 102 && p.dust === 24, "dust insuficiente nega sem cobrar");
+  r = forge.forgeConversionAuth(p, "dust-to-slivers");
+  must(!r.ok && p.dust === 24, "dust→slivers exige 60 Dust");
+  p.dust = 120;
+  r = forge.forgeConversionAuth(p, "dust-to-slivers");
+  must(r.ok && p.dust === 60 && p.slivers === 63, "60 Dust → 3 Slivers");
+  r = forge.forgeConversionAuth(p, "slivers-to-core");
+  must(r.ok && p.slivers === 13 && p.exaltedCores === 1, "50 Slivers → 1 Exalted Core");
+  const max = mkP([], { dust: 999, dustLimit: 325 });
+  r = forge.forgeConversionAuth(max, "cap");
+  must(!r.ok && max.dust === 999 && max.dustLimit === 325, "cap máximo 325 nega sem cobrar");
+  r = forge.forgeConversionAuth(max, "bogus");
+  must(!r.ok, "ação desconhecida rejeitada");
+}
+
 if (failures) { console.error(`\n${failures} FALHA(S)`); process.exit(1); }
 console.log("\nALL CONVERGENCE FORGE TESTS PASSED");

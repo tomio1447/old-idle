@@ -703,29 +703,42 @@ function bindForgeModal() {
     openForgeModal();
   });
 
-  var incCap = body.querySelector('#forge-inc-cap');
-  if (incCap) incCap.addEventListener('click', function() {
-    var r = forgeIncreaseDustLimit(G.p);
+  /* Conversion: online é AUTORITATIVO no servidor — mutar só o espelho
+   * local revertia no próximo sync do shared_inventory (dust/limit/slivers
+   * voltavam: "subiu 1 vez, depois resetou"). Offline mantém a via local. */
+  function forgeRunConversion(btn, action, localFn) {
+    var token = typeof accountSessionToken === 'function' ? accountSessionToken() : '';
+    if (token && typeof accountForgeConversion === 'function' && G.p && G.p.id) {
+      btn.disabled = true;
+      accountForgeConversion(token, G.p.id, action).then(function(r) {
+        if (r.ok) forgeRememberHistory(G.p, r.msg);
+        if (typeof toast === 'function') toast(r.msg || 'A conversão falhou', r.ok ? 'ok' : 'err');
+        if (typeof renderAll === 'function') renderAll();
+        openForgeModal();
+      }).catch(function() {
+        if (typeof toast === 'function') toast('Falha de conexão na conversão.', 'err');
+        openForgeModal();
+      });
+      return;
+    }
+    var r = localFn(G.p);
     if (r.ok) forgeRememberHistory(G.p, r.msg);
     if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+    if (r.ok && typeof save === 'function') save();
     if (typeof renderAll === 'function') renderAll();
     openForgeModal();
+  }
+  var incCap = body.querySelector('#forge-inc-cap');
+  if (incCap) incCap.addEventListener('click', function() {
+    forgeRunConversion(incCap, 'cap', forgeIncreaseDustLimit);
   });
   var convDust = body.querySelector('#forge-conv-dust');
   if (convDust) convDust.addEventListener('click', function() {
-    var r = forgeConvergenceDustToSlivers(G.p);
-    if (r.ok) forgeRememberHistory(G.p, r.msg);
-    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
-    if (typeof renderAll === 'function') renderAll();
-    openForgeModal();
+    forgeRunConversion(convDust, 'dust-to-slivers', forgeConvergenceDustToSlivers);
   });
   var convCore = body.querySelector('#forge-conv-core');
   if (convCore) convCore.addEventListener('click', function() {
-    var r = forgeConvergenceSliversToCore(G.p);
-    if (r.ok) forgeRememberHistory(G.p, r.msg);
-    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
-    if (typeof renderAll === 'function') renderAll();
-    openForgeModal();
+    forgeRunConversion(convCore, 'slivers-to-core', forgeConvergenceSliversToCore);
   });
 
   var close = body.querySelector('#forge-close');

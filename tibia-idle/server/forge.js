@@ -46,6 +46,49 @@ const FORGE_TRANSFER_COST = {
   },
 };
 
+/* Convergence of Dust and Slivers — espelho das constantes do cliente
+ * (game/js/forgedata.js FORGE_CONVERGENCE + forge.js forgeDustLimitCost).
+ * Recursos são DA CONTA (shared_inventory) — a aba Conversion era só
+ * client-side e o sync do shared revertia o gasto no próximo /api/me. */
+const FORGE_CONVERGENCE = {
+  dustToSlivers: { dust: 60, slivers: 3 },
+  sliversToCore: { slivers: 50, cores: 1 },
+};
+const FORGE_DUST_LIMIT = { min: 100, max: 325 };
+
+function forgeConversionAuth(p, action) {
+  if (!p || typeof p !== "object") return { ok: false, msg: "Conversão inválida." };
+  p.dust = Math.max(0, Math.floor(Number(p.dust) || 0));
+  p.slivers = Math.max(0, Math.floor(Number(p.slivers) || 0));
+  p.exaltedCores = Math.max(0, Math.floor(Number(p.exaltedCores) || 0));
+  p.dustLimit = Math.max(FORGE_DUST_LIMIT.min,
+    Math.min(FORGE_DUST_LIMIT.max, Math.floor(Number(p.dustLimit) || FORGE_DUST_LIMIT.min)));
+  if (action === "cap") {
+    if (p.dustLimit >= FORGE_DUST_LIMIT.max)
+      return { ok: false, msg: "Dust limit já está no máximo (" + FORGE_DUST_LIMIT.max + ")." };
+    const cost = Math.max(1, p.dustLimit - 75);
+    if (p.dust < cost) return { ok: false, msg: "Precisa de " + cost + " Dust para aumentar o limite." };
+    p.dust -= cost;
+    p.dustLimit += 1;
+    return { ok: true, msg: "Dust limit aumentado para " + p.dustLimit + "." };
+  }
+  if (action === "dust-to-slivers") {
+    const c = FORGE_CONVERGENCE.dustToSlivers;
+    if (p.dust < c.dust) return { ok: false, msg: "Precisa de " + c.dust + " Dust." };
+    p.dust -= c.dust;
+    p.slivers += c.slivers;
+    return { ok: true, msg: "+" + c.slivers + " Slivers criados." };
+  }
+  if (action === "slivers-to-core") {
+    const c = FORGE_CONVERGENCE.sliversToCore;
+    if (p.slivers < c.slivers) return { ok: false, msg: "Precisa de " + c.slivers + " Slivers." };
+    p.slivers -= c.slivers;
+    p.exaltedCores += c.cores;
+    return { ok: true, msg: "+1 Exalted Core criado." };
+  }
+  return { ok: false, msg: "Conversão inválida." };
+}
+
 /* Convergence (WU23): exclusivo de classificação 4 — espelho das tabelas
  * oficiais do crystalserver (item_tiers.lua, addTier). */
 const FORGE_CONVERGENCE_FUSION = { dustCost: 130 };
@@ -328,7 +371,9 @@ function forgeTransferAuth(p, donorId, targetId, convergence, ITEMS) {
 
 module.exports = {
   FORGE_FUSION, FORGE_MAX_TIER, FORGE_SLOTS,
+  FORGE_CONVERGENCE, FORGE_DUST_LIMIT,
   forgeCanFuse, forgeFuseAuth,
   forgeCanConvergeFuse, forgeConvergeFuseAuth,
   forgeCanTransfer, forgeTransferAuth,
+  forgeConversionAuth,
 };

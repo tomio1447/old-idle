@@ -6,10 +6,12 @@ const ALPHA_DISCORD_URL = "https://discord.gg/82Z4j9H3UF";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "28/11/2026 às 04:00";
+const ALPHA_UPDATE_AT = "28/11/2026 às 05:00";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "FIX — Exaltation Forge: a aba Conversion funciona de verdade — Increase Dust Limit, Dust→Slivers e Slivers→Exalted Core agora rodam no servidor (antes o clique mutava só a tela e o sync revertia: o limite subia 1× e voltava para 100 ao reabrir)",
+  "FIX — Dupe de equipamento por lag eliminado: coletar reward do boss e equipar durante lag não grava mais 'equipado E na mochila' — uma cópia atrasada de outro char da conta não aceita mais instância já equipada, e contagem fantasma de bag nunca materializa item",
   "FIX — Modo de hunt (box/safe) agora é por personagem: trocar de char e escolher outro modo no Helper não muda mais o modo dos demais membros da party — cada um caça do jeito que foi configurado",
   "NOVO — Wyrms (Liberty Bay) com o mapa novo: a área da hunt foi refeita no OTBM — recorte maior com a lagoa interna, entrada em ponto novo e zona de respawn cobrindo a área inteira (os wyrms espalham muito mais)",
   "NOVO — Boss Slots repaginado + 3º slot por 150 Tibia Coins: visual novo no modelo OTClient (card de alvo SELECIONADO, picker sempre aberto com busca, bosses marcados 'Ativo' com borda verde) — clicar num slot escolhe o alvo e clicar num boss atribui; o 3º slot desbloqueia num clique com 150 TC por conta e o card do Boss do Dia segue mostrando o boosted ao lado",

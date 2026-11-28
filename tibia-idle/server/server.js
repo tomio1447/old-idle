@@ -55,7 +55,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   assignCharm: authAssignCharm, clearCharm: authClearCharm,
   buyCharm: authBuyCharm, upgradeCharm: authUpgradeCharm,
   authBossSlotAssign, authBossSlotRemove, BOSS_SLOT3_COINS } = require("./authoritative_engine");
-const { forgeCanFuse, forgeFuseAuth, forgeConvergeFuseAuth, forgeTransferAuth } = require("./forge");
+const { forgeCanFuse, forgeFuseAuth, forgeConvergeFuseAuth, forgeTransferAuth, forgeConversionAuth } = require("./forge");
 /* Catalisadores de Weapon Proficiency — tabela + lógica compartilhada com
  * o cliente. O require interno de proficiency.js resolve os globals que o
  * engine acabou de ligar (window.PROFDATA, GAMEDATA.items, itemLiberado). */
@@ -2197,6 +2197,36 @@ async function forgeFuseApi(db,body){
     success:!!result.success,tier:result.tier,slug:result.slug,msg:result.msg,
     gold:p.gold,dust:p.dust,slivers:p.slivers,exaltedCores:p.exaltedCores,
     bag:p.bag||{},itemInstances:p.itemInstances||[]})};
+}
+
+/* Conversion of Dust and Slivers — autoritativa pelo mesmo motivo: a aba
+ * só mutava o espelho local; o próximo sync do shared_inventory revertia
+ * Dust/limit/Slivers/Core (clique 2 não subia, reopen resetava p/ 100). */
+async function forgeConversionApi(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version);
+  const action=String(body.action||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1
+    ||["cap","dust-to-slivers","slivers-to-core"].indexOf(action)<0)
+    return {code:400,body:{ok:false,error:"FORGE_INVALID_CONVERSION",msg:"Conversão inválida."}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  if(Number(character.save_version)!==expected)
+    return {code:409,body:{ok:false,error:"SAVE_CONFLICT",msg:"Save alterado em outra sessão.",characters:[accountCharacterSummary(character,acc.gold)]}};
+  const active=await resolveInstanceRow(db,acc,charId);
+  if(active.error)return active.error;
+  if(active.row&&active.row.status==="active")
+    return {code:409,body:{ok:false,error:"FORGE_IN_INSTANCE",msg:"A Exaltation Forge só funciona na cidade."}};
+  const p=await loadCityPlayer(db,acc,character);
+  const result=forgeConversionAuth(p,action);
+  if(!result.ok)return {code:400,body:Object.assign({error:"FORGE_CONVERSION_DENIED"},result)};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,msg:result.msg,
+    dust:p.dust,dustLimit:p.dustLimit,slivers:p.slivers,exaltedCores:p.exaltedCores})};
 }
 
 /* Transfer (regular e Convergence) — autoritativo pelo mesmo motivo da
@@ -7453,6 +7483,9 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/forge/transfer") {
         const r = await forgeTransferApi(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/forge/conversion") {
+        const r = await forgeConversionApi(db, await readBody(req));return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/training/buy") {
         const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);

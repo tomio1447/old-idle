@@ -1620,6 +1620,34 @@ function accountForgeTransfer(token,charId,opts){
     return {ok:false,msg:r.data.msg||"A transferência falhou",code:r.code};
   });
 }
+/** Conversion of Dust and Slivers — autoritativa no servidor (mesmo motivo
+ * da fusion/transfer: mutar o espelho local revertia no próximo sync do
+ * shared — o Dust gasto voltava e o limite resetava p/ 100). Só na cidade. */
+function accountForgeConversion(token,charId,action){
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),action:String(action||""),
+      expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/forge/conversion",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.dust!==undefined)G.p.dust=Math.max(0,Number(r.data.dust)||0);
+        if(r.data.dustLimit!==undefined)G.p.dustLimit=Math.max(100,Math.min(325,Math.floor(Number(r.data.dustLimit)||100)));
+        if(r.data.slivers!==undefined)G.p.slivers=Math.max(0,Number(r.data.slivers)||0);
+        if(r.data.exaltedCores!==undefined)G.p.exaltedCores=Math.max(0,Number(r.data.exaltedCores)||0);
+      }
+      return {ok:true,msg:r.data.msg,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"A conversão falhou",code:r.code};
+  });
+}
 /** Retira da Supply Stash (bag/pouch/destroy). supplyStash é protected no PUT. */
 function accountWithdrawFromSupplyStash(token,charId,opts){
   opts=opts||{};

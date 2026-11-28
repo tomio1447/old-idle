@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Forge Conversion: autoritativa no servidor
+
+- **FIX — Increase Dust Limit só subia 1× e resetava**: as três ações da aba Conversion (Increase Dust Limit, Dust→Slivers, Slivers→Exalted Core) eram 100% client-side — mutavam o espelho local sem nunca chegar ao servidor. O próximo sync do `shared_inventory` revertia Dust/limite/Slivers/Core (por isso o 2º clique "não subia" e reabrir o modal voltava o limite para 100). Agora roda em `POST /api/forge/conversion` (mesmo padrão da Fusion/Transfer: lease + save_version + só na cidade, persistido na conta). Offline mantém a via local.
+
+---
+
 ## 2026-11-28 — FIX crítico: item duplicado por lag (equipado + mochila)
 
 - **FIX — Dupe de equipamento**: coletar a reward do boss e equipar/mover entre backpack e loot pouch durante lag podia gravar o estado "equipado E na mochila" — após restart o item aparecia nos dois lugares. A causa era a cópia atrasada de outro personagem da mesma conta: ela ainda trazia a instância do item na bag, e o merge do inventário compartilhado a aceitava (instância + contagem) mesmo com o mesmo `instId` já equipado em outra cópia.
