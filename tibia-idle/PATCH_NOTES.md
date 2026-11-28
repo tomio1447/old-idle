@@ -4,6 +4,13 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Aggro: monstro preso foca o jogador alcançável mais perto
+
+- **AJUSTE — Retarget por alcançabilidade (Crystal server)**: no combate local, `partyNearestTarget` honrava o alvo focado (`targetId`/challenge) sem checar rota — um monstro ficava "colado" num jogador inalcançável (atrás de parede/corredor) em vez de atacar quem consegue alcançar. Agora espelha `authorityMobTarget` (servidor): o foco só vale enquanto o monstro consegue agir sobre o alvo (dentro do alcance ou com rota A*); preso por ~400ms ele foca o jogador **alcançável** mais perto — com fallback pro mais perto de todos. No online o `targetId` já vem da autoridade com a mesma regra — o cliente só aplica o gate no combate offline.
+- **Nota**: o servidor já fazia o retarget (`authorityMobTarget`: stuck por 2 evals → mais perto alcançável, troca quando outro char está ≥3 SQM mais perto, reavalia a cada 5–10s). O ajuste alinha o cliente à mesma regra do Crystal server.
+
+---
+
 ## 2026-11-28 — Modal de Charms responsivo em caçada online
 
 - **FIX — Cliques do Charm modal revertiam em caçada online**: durante a instância, o `version` da row sobe a cada tick (~1/s) — o `expected_version` do clique chegava velho em rede lenta e `POST /api/instance/charm` devolvia `INSTANCE_VERSION_CONFLICT` sem retry (o `charmInstanceOp` era um dos ~13 endpoints de patch sem o retry que o equip já tinha). Resultado: buy/upgrade revertiam via `restore()` e assign/clear não grudavam na autoridade. Agora o servidor re-resolve a row e reenvia com o version fresco (até 4×, mesmo padrão do equip) e o cliente retenta 1× com a instância do 409 — o clique aplica na primeira resposta.

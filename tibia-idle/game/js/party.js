@@ -1184,19 +1184,53 @@ function partyCombatPlace(c, spawnCx, spawnCy) {
   });
 }
 
+/* O mob consegue agir sobre essa entidade? Espelha authorityMobHasFollowPath
+ * do servidor: dentro do alcance de ataque OU existe rota A*. Memo de 300ms
+ * por (celula do mob > celula do alvo) — igual ao _reachKey/_hasFollowPath
+ * do engine (400ms) — para o A* não rodar em todo tick de combate. */
+function mobTargetReachable(c, mob, ent) {
+  if (!mob || mob.cx === undefined || !ent || ent.cx === undefined) return true;
+  const range = typeof monsterRangeSQM === "function" ? monsterRangeSQM(mob) : 1;
+  if (typeof sqmDistance === "function" && sqmDistance(mob, ent) <= range) return true;
+  if (typeof findPathGrid !== "function" || typeof buildOccupancy !== "function") return true;
+  const agora = Date.now();
+  const memo = mob._reach || (mob._reach = { at: 0, occ: null, map: {} });
+  if (agora - memo.at > 300) { memo.at = agora; memo.occ = null; memo.map = {}; }
+  const key = mob.cx + ":" + mob.cy + ">" + ent.cx + ":" + ent.cy;
+  if (memo.map[key] === undefined) {
+    if (!memo.occ) memo.occ = buildOccupancy(c, mob);
+    memo.map[key] = !!findPathGrid(mob, ent.cx, ent.cy, memo.occ);
+  }
+  return memo.map[key];
+}
+
 /* Entidade viva mais próxima de um monstro (alvo do ataque). */
 function partyNearestTarget(c, mob) {
   if (!c.players || c.players.length < 2) return c.player || null;
   const now = Date.now();
+  /* Crystal server (searchTargetImmediate): quando o monstro NÃO consegue
+   * chegar no alvo ele foca o jogador alcançável mais perto — mesma regra
+   * do authorityMobTarget (servidor). No online o targetId já vem da
+   * autoridade com essa regra aplicada; o gate de alcançabilidade só roda
+   * no combate local, onde o cliente é a autoridade. */
+  const online = typeof partyOnlineMode === "function" && partyOnlineMode();
   const focusId = (mob && Number(mob.challengedUntil || 0) > now && mob.challengeTargetId) ||
     (mob && mob.targetId) || "";
   if (focusId) {
     const focused = c.players.find((ent) =>
       String(ent && (ent.id || (ent.p && ent.p.id))) === String(focusId) &&
       ent.p && ent.p.hp > 0);
-    if (focused) return focused;
+    if (focused && online) return focused;
+    if (focused) {
+      if (mobTargetReachable(c, mob, focused)) { mob._focusFailAt = 0; return focused; }
+      // Histerese do engine: 2 avaliações presas (~400ms) antes de soltar
+      // o alvo — evita flicker quando a rota falha por 1 tick (desvio).
+      if (!mob._focusFailAt) mob._focusFailAt = now;
+      if (now - mob._focusFailAt < 400) return focused;
+      mob._focusFailAt = 0;
+    }
   }
-  let best = null, bestD = Infinity;
+  let best = null, bestD = Infinity, reach = null, reachD = Infinity;
   for (const ent of c.players) {
     if (!ent.p || ent.p.hp <= 0) continue;
     let d;
@@ -1209,8 +1243,11 @@ function partyNearestTarget(c, mob) {
                    Math.abs((ent.y || 0) - (mob.y || 0)));
     }
     if (d < bestD) { bestD = d; best = ent; }
+    if (!online && d < reachD && mobTargetReachable(c, mob, ent)) {
+      reachD = d; reach = ent;
+    }
   }
-  return best || c.player || null;
+  return reach || best || c.player || null;
 }
 
 function partyCombatFindPlayer(id){
