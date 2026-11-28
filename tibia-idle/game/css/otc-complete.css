@@ -655,13 +655,19 @@ input:focus, textarea:focus, select:focus {
 .stance-sq img { max-width: 16px; max-height: 16px; }
 
 /* ═══════════════════ MISSION BOX ═══════════════ */
+/* Só altura do conteúdo: esta regra rodava DEPOIS do layout.css (top/right),
+ * somando bottom:8px e esticando o box da linha do topo até o fim da tela —
+ * a faixa escura cobria metade da arena sem informação. bottom:auto devolve
+ * o tamanho ao conteúdo; max-height é o teto para missões com muitas tasks. */
 .mission-box {
-  position: absolute; bottom: 8px; left: 4px; z-index: 6;
+  position: absolute; top: 8px; bottom: auto; left: 4px; right: auto; z-index: 6;
   background: rgba(0,0,0,.85);
   border: 1px solid var(--otc-border);
   padding: 4px 6px; max-width: 280px; font-size: 10px;
+  max-height: calc(100% - 20px); overflow-y: auto;
 }
 .mission-box.collapsed {
+  width: auto;
   background: transparent;
   border-color: transparent;
 }

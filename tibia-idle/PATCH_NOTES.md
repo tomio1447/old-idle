@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Painel de missão com tamanho do conteúdo
+
+- **FIX — Painel "Missão:" cobria uma faixa enorme da arena**: duas regras de `.mission-box` em CSS diferentes se somavam (`top`/`right` do layout.css + `bottom`/`left` do otc-complete.css) — com `top+bottom` setados e altura automática, o box esticava da linha do topo até o fim da tela, exibindo informação só no topo e o resto como faixa escura. Agora `bottom`/`right` são `auto` — o painel fica no canto superior esquerdo ocupando só o tamanho do conteúdo (com `max-height` + scroll como teto para missões de muitas tasks). Colapsada também encolhe ao cabeçalho em vez de virar uma barra transparente full-width.
+
+---
+
 ## 2026-11-28 — Modal de reconexão repaginado
 
 - **VISUAL — Banner "servidor reiniciou/conexão perdida"**: moldura dourada com filete interno e sombra profunda sobre o jogo desfocado (backdrop blur); badge de status agora é pill com ponto pulsante (verde ON / vermelho OFF); botão Reconectar com gradiente, hover mais claro e estado "Reconectando..."; textos padronizados em português (Reconnect → Reconectar no idioma PT).
