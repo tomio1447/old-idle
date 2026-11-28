@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Ticks resilientes a deadlock
+
+- **FIX — Erro 500 no tick**: ticks de instâncias diferentes travavam as linhas de `characters`/`accounts` (gold e inventário por conta) em ordens distintas e caíam em deadlock no MySQL — visível como "Failed to load resource: 500" no tick. A transação é idempotente e agora repete automaticamente até 3× com jitter em deadlock/lock-wait/record-changed (mesmo padrão do `leaseAcquire`).
+
+---
+
 ## 2026-11-28 — Modo de hunt por personagem
 
 - **FIX — Helper (box/safe) por char**: setar um modo de hunt num personagem e trocar para outro não altera mais o modo do anterior. O modo compartilhado da party (o último escolhido pelo char pilotado) vazava para os demais membros — agora cada personagem caça com o seu próprio `attackMode`, sem fallback de party no cliente (`formationMode`) nem no servidor (`huntModeOf`), e o tick não envia mais o modo do outro char no challenge.

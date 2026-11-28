@@ -4490,7 +4490,24 @@ async function MysqlStore() {
         try{await conn.query("SELECT RELEASE_LOCK(?)",[lockName]);}catch(e){}conn.release();
       }
     },
-    async instanceAuthorityTick(accountId,expectedVersion,now,maxStep,advanceState,lease,opts){
+    /* Ticks de instâncias distintas concorrem pelas rows de characters/
+     * accounts (gold e shared_inventory por conta) em ordens diferentes —
+     * sob CPU escassa as transações longas caem em deadlock (1213), lock
+     * wait (1205) ou "record changed" (1020). O corpo é idempotente: cada
+     * tentativa relê a row e re-executa o avanço — repete até 3x. */
+    async instanceAuthorityTick(...args){
+      for(let attempt=0;;attempt++){
+        try{return await this._instanceAuthorityTickOnce(...args);}
+        catch(error){
+          const retryable=error&&(error.code==="ER_LOCK_DEADLOCK"||
+            error.code==="ER_LOCK_WAIT_TIMEOUT"||error.code==="ER_CHECKREAD"||
+            error.errno===1213||error.errno===1205||error.errno===1020);
+          if(!retryable||attempt>=2)throw error;
+          await new Promise((r)=>setTimeout(r,25+Math.floor(Math.random()*50)));
+        }
+      }
+    },
+    async _instanceAuthorityTickOnce(accountId,expectedVersion,now,maxStep,advanceState,lease,opts){
       const conn=await pool.getConnection();
       const leaseAcc=(opts&&opts.leaseAccountId!=null)?opts.leaseAccountId:accountId;
       // Batalha PvP compartilhada: `opts.hotAuth` mantém o descritor vivo em
