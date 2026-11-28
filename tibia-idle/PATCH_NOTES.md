@@ -4,6 +4,12 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — Painel PREYS ATIVAS
+
+- **NOVO — Preys ativas visíveis na lateral**: novo painel "PREYS ATIVAS" (mesmo chrome do Bônus Ativos/Daily Boost) lista cada prey ativa do char: sprite do monstro, ícone do tipo de prey (dano/defesa/exp/loot), estrelas do nível (grade oficial 5×2), valor do bônus e tempo restante. Minimizar fica salvo.
+
+---
+
 ## 2026-11-28 — Aggro: monstro preso foca o jogador alcançável mais perto
 
 - **AJUSTE — Retarget por alcançabilidade (Crystal server)**: no combate local, `partyNearestTarget` honrava o alvo focado (`targetId`/challenge) sem checar rota — um monstro ficava "colado" num jogador inalcançável (atrás de parede/corredor) em vez de atacar quem consegue alcançar. Agora espelha `authorityMobTarget` (servidor): o foco só vale enquanto o monstro consegue agir sobre o alvo (dentro do alcance ou com rota A*); preso por ~400ms ele foca o jogador **alcançável** mais perto — com fallback pro mais perto de todos. No online o `targetId` já vem da autoridade com a mesma regra — o cliente só aplica o gate no combate offline.

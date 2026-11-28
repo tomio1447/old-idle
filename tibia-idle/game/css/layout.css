@@ -231,6 +231,19 @@ canvas { image-rendering: pixelated; }
 }
 .active-boosts-panel .daily-boost-bonus { color: #ffd65a; }
 
+/* Preys ativas — mesmo chrome das células daily-boost; ícone small da
+ * prey no kind e a grade de estrelas inline no bônus. */
+.active-preys-panel .daily-boost-bonus { color: #ffd65a; }
+.active-prey-icon {
+  width: 14px; height: 14px; vertical-align: -2px;
+  image-rendering: pixelated; object-fit: contain;
+}
+.active-prey-sprite { width: 44px; height: 44px; display: flex;
+  align-items: center; justify-content: center; }
+.active-prey-bonus { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+.active-prey-bonus .prey-stars-grid { display: inline-grid; margin: 0; }
+.active-prey-value { font-weight: bold; }
+
 .server-reconnect-banner {
   position: fixed; inset: 0; z-index: 9200;
   display: flex; align-items: center; justify-content: center;
