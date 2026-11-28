@@ -73,6 +73,10 @@ const { createQuestController, QUEST_DEFS } = require("./quest_controller");
 // os personagens). Pure module — db.js persiste accounts.shared_inventory.
 let SharedInv = null;
 try { SharedInv = require("./shared_inventory"); } catch (e) { SharedInv = null; }
+// Lookup do engine para a regra de acessório chargeable na reconciliação
+// de bag — processo único, db.js herda sem importar o engine.
+if (SharedInv && SharedInv.setSharedItemLookup)
+  SharedInv.setSharedItemLookup((slug) => ITEMS[slug]);
 const store = require("./store");
 const rmt = require("./rmt");
 const twitch = require("./twitch");
@@ -4481,6 +4485,7 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
   const finalInsts=(Array.isArray(seller.p.itemInstances)?seller.p.itemInstances:[])
     .filter((i)=>i&&i.loc&&String(i.loc).indexOf("equip:")!==0)
     .map((i)=>Object.assign({},i));
+  const equippedSlugs=new Set();
   for(const entry of players){
     if(!entry||!entry.p)continue;
     if(Number(entry.accountId||(entry.p&&entry.p.accountId)||0)!==sellerAcc)continue;
@@ -4505,13 +4510,18 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
     const ownEquip=(Array.isArray(entry.p.itemInstances)?entry.p.itemInstances:[])
       .filter((i)=>i&&i.loc&&String(i.loc).indexOf("equip:")===0);
     entry.p.itemInstances=finalInsts.map((i)=>Object.assign({},i)).concat(ownEquip);
+    // Slugs equipados na conta — a reconciliação de bag no shared precisa
+    // saber que o slug é instanciado mesmo sem instância visível no shared.
+    for(const slot of Object.keys(entry.p.equip||{})){
+      const e=entry.p.equip[slot];if(e&&e.item)equippedSlugs.add(String(e.item));}
+    for(const inst of ownEquip)if(inst&&inst.slug)equippedSlugs.add(String(inst.slug));
     /* Baseline da pouch acompanha o estado sincronizado: a extração
      * terminal só aplica o delta POSTERIOR a este sync (loot novo), sem
      * descontar de novo o que já foi gravado no shared. */
     entry.p._pouchBase=Object.assign({},finalPouch);
   }
   return {pouch:finalPouch,bag:finalBag,supplyStash:Object.assign({},live.p.supplyStash||{}),instances:finalInsts,
-    ...(finalDepot?{depot:finalDepot}:{})};
+    equippedSlugs:[...equippedSlugs],...(finalDepot?{depot:finalDepot}:{})};
 }
 
 /* Grava o resultado sincronizado de uma mutação de pouch no shared da conta
@@ -4529,6 +4539,11 @@ async function persistSharedPouchSync(db,acc,synced){
       if(synced.supplyStash)shared.supplyStash=Object.assign({},synced.supplyStash);
       if(Array.isArray(synced.instances))
         shared.itemInstances=synced.instances.map((i)=>Object.assign({},i));
+      /* Anti-dupe: contagem de bag de slug instanciado nunca passa do nº
+       * real de instâncias — um count fantasma persistido aqui virava item
+       * na hidratação mesmo com o id já equipado (o dupe relatado). */
+      if(typeof SharedInv.reconcileInstancedBagCounts==="function")
+        SharedInv.reconcileInstancedBagCounts(shared.bag,shared.itemInstances,synced.equippedSlugs||[]);
     };
     /* Mesma tx FOR UPDATE do split: sem isso o read-modify-write solto era
      * last-writer-wins contra o claim — o blob velho sobrescrevia o baú

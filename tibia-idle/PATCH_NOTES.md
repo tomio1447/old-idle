@@ -4,6 +4,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-28 — FIX crítico: item duplicado por lag (equipado + mochila)
+
+- **FIX — Dupe de equipamento**: coletar a reward do boss e equipar/mover entre backpack e loot pouch durante lag podia gravar o estado "equipado E na mochila" — após restart o item aparecia nos dois lugares. A causa era a cópia atrasada de outro personagem da mesma conta: ela ainda trazia a instância do item na bag, e o merge do inventário compartilhado a aceitava (instância + contagem) mesmo com o mesmo `instId` já equipado em outra cópia.
+- **Invariante permanente**: um `instId` vive num único lugar — instância equipada em QUALQUER cópia da conta nunca entra no inventário compartilhado, e a contagem `bag[slug]` de item instanciado nunca passa do número real de instâncias (contagem fantasma morre no merge/save/hidratação em vez de materializar item novo).
+- Grants legítimos (admin/SQL gravando só `bag[slug]` sem instância) e contagens de stackable/chargeable seguem intactos — a reconciliação só toca em slugs genuinamente instanciados.
+
+---
+
 ## 2026-11-28 — Ticks resilientes a deadlock
 
 - **FIX — Erro 500 no tick**: ticks de instâncias diferentes travavam as linhas de `characters`/`accounts` (gold e inventário por conta) em ordens distintas e caíam em deadlock no MySQL — visível como "Failed to load resource: 500" no tick. A transação é idempotente e agora repete automaticamente até 3× com jitter em deadlock/lock-wait/record-changed (mesmo padrão do `leaseAcquire`).

@@ -316,6 +316,16 @@ function applySharedToPlayer(p, shared) {
     sharedDedup.push(Object.assign({}, inst));
   }
   p.itemInstances = sharedDedup.concat(equippedDedup);
+  /* Contagem fantasma já gravada no shared.bag (bug antigo): sem o clamp,
+   * o count sem instância chegava ao cliente e a materialização de órfãos
+   * mintava um item que já estava equipado — o dupe relatado. */
+  const equippedSlugs = new Set();
+  for (const inst of equippedDedup) if (inst && inst.slug) equippedSlugs.add(String(inst.slug));
+  for (const slot of Object.keys(p.equip || {})) {
+    const e = p.equip[slot];
+    if (e && e.item) equippedSlugs.add(String(e.item));
+  }
+  reconcileInstancedBagCounts(p.bag, p.itemInstances, equippedSlugs);
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
   // Baseline da pouch: o conteúdo compartilhado no momento da hidratação.
   // A extração usa (cópia − base) como DELTA sobre o shared atual — assim
@@ -453,6 +463,89 @@ function forgeResourcesDelta(shared, p, fallbackMax) {
   }
 }
 
+/* IDs/slugs de itens EQUIPADOS de um player — um instId vive num único
+ * lugar: se está equipado, qualquer instância bag/depot com o mesmo id é
+ * espelho stale de uma cópia atrasada e não pode entrar no shared
+ * (equipado + mochila = dupe de equipamento). */
+function equippedIdsAndSlugs(p) {
+  const ids = new Set(), slugs = new Set();
+  for (const slot of Object.keys((p && p.equip) || {})) {
+    const e = p.equip[slot];
+    if (!e || !e.item) continue;
+    slugs.add(String(e.item));
+    if (e.instId !== undefined && e.instId !== null) ids.add(String(e.instId));
+  }
+  for (const inst of (p && p.itemInstances) || []) {
+    if (!inst || typeof inst !== "object") continue;
+    if (!String(inst.loc || "").startsWith("equip:")) continue;
+    if (inst.slug) slugs.add(String(inst.slug));
+    if (inst.id !== undefined && inst.id !== null) ids.add(String(inst.id));
+  }
+  return { ids, slugs };
+}
+
+/* Lookup de definição de item injetado pelo processo (server.js liga o
+ * ITEMS do engine no boot). Mantém o módulo puro — sem I/O. */
+let _itemLookup = null;
+function setSharedItemLookup(fn) { _itemLookup = (typeof fn === "function") ? fn : null; }
+
+/* Espelho do authItemNeedsBagInstance/AUTH_INSTANCE_SLOTS do engine —
+ * manter sincronizado: é ele que decide quais slugs vivem como instância
+ * (a contagem bag[slug] deles é derivada, nunca authored). */
+const _INSTANCE_SLOTS = new Set(["weapon", "armor", "legs", "helmet", "boots",
+  "shield", "ring", "amulet", "backpack", "quiver"]);
+function _slugNeedsBagInstance(slug) {
+  const it = _itemLookup ? _itemLookup(String(slug)) : null;
+  if (!it || !it.s || it.s === "ammo") return false;
+  if (it.t === "distance" && !it.imbSlots) return false;
+  if (it.charges && (it.s === "ring" || it.s === "amulet" || it.s === "boots") && !it.imbSlots) return false;
+  return _INSTANCE_SLOTS.has(it.s);
+}
+
+/* Mesma regra do authSyncBagCountsFromInstances: acessório chargeable
+ * (ring/amulet/boots com charges, sem imbSlots) com carga PARCIAL fica só
+ * como instância — não conta no stack bag[slug]. */
+function _instCountsTowardBag(inst) {
+  const it = _itemLookup && inst && inst.slug ? _itemLookup(String(inst.slug)) : null;
+  const chargeable = !!(it && it.charges && (it.s === "ring" || it.s === "amulet" || it.s === "boots") && !it.imbSlots);
+  if (chargeable) {
+    const full = Math.floor(Number(it.charges) || 0);
+    const ch = inst.charges == null ? full : Math.floor(Number(inst.charges) || 0);
+    if (full > 0 && ch > 0 && ch < full) return false;
+  }
+  return true;
+}
+
+/* A contagem bag[slug] de item INSTANCIADO é DERIVADA das instâncias com
+ * loc "bag". Um count maior que o nº de instâncias é contagem fantasma —
+ * merge atrasado, preview de lag, save corrido — e materializaria um item
+ * que não existe na próxima hidratação (o "equipado E na mochila" do dupe).
+ * O clamp só toca em slug instanciado com instância conhecida ou equipado
+ * na conta: grants de admin/SQL que gravam só bag[slug] sem instância, e
+ * contagens de stackable/chargeable (que são authored de verdade), seguem
+ * intactos para a materialização de órfãos/uso normal. */
+function reconcileInstancedBagCounts(bag, insts, extraSlugs) {
+  if (!bag || typeof bag !== "object" || Array.isArray(bag)) return bag;
+  const perSlug = {}, instanced = new Set();
+  for (const s of extraSlugs || []) {
+    if (_slugNeedsBagInstance(s)) instanced.add(String(s));
+  }
+  for (const inst of Array.isArray(insts) ? insts : []) {
+    if (!inst || typeof inst !== "object" || !inst.slug) continue;
+    if (!_slugNeedsBagInstance(inst.slug)) continue;
+    instanced.add(String(inst.slug));
+    if (String(inst.loc || "") === "bag" && _instCountsTowardBag(inst))
+      perSlug[inst.slug] = (Number(perSlug[inst.slug]) || 0) + 1;
+  }
+  for (const slug of instanced) {
+    const have = Math.max(0, Math.floor(Number(bag[slug]) || 0));
+    const real = Number(perSlug[slug]) || 0;
+    if (have <= real) continue;
+    if (real > 0) bag[slug] = real; else delete bag[slug];
+  }
+  return bag;
+}
+
 /* Extrai os containers de um player para o shared (oposto do apply). O
  * player fica com os containers zerados e só as instâncias equipadas. */
 function extractSharedFromPlayer(p, shared) {
@@ -466,9 +559,12 @@ function extractSharedFromPlayer(p, shared) {
   shared.rewardChestBundles = Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles.slice() : [];
   forgeResourcesDelta(shared, p, false);
   const insts = Array.isArray(p.itemInstances) ? p.itemInstances : [];
+  const eq = equippedIdsAndSlugs(p);
   shared.itemInstances = insts
     .filter((i) => i && typeof i === "object" && !String(i.loc || "").startsWith("equip:"))
+    .filter((i) => !(i.id !== undefined && i.id !== null && eq.ids.has(String(i.id))))
     .map((i) => Object.assign({}, i));
+  reconcileInstancedBagCounts(shared.bag, shared.itemInstances, eq.slugs);
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
   if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
   mergeSharedCharms(p, shared);
@@ -516,11 +612,20 @@ function mergeSharedFromPlayer(p, shared, opts) {
     }
     shared[key] = dst;
   }
+  /* InstId é identidade única: se o id está equipado em QUALQUER cópia do
+   * personagem/conta nesta extração (opts.equipped* vem do scan de todas as
+   * projeções), uma entrada não-equipada com o mesmo id é espelho stale de
+   * uma cópia atrasada — entrar no shared duplicava o item físico. */
+  const eq = equippedIdsAndSlugs(p);
+  const equippedIds = new Set(eq.ids), equippedSlugs = new Set(eq.slugs);
+  for (const id of (opts && opts.equippedIds) || []) equippedIds.add(String(id));
+  for (const s of (opts && opts.equippedSlugs) || []) equippedSlugs.add(String(s));
   const byId = new Map((shared.itemInstances || []).map((i) => [String(i && i.id), i]));
   for (const inst of Array.isArray(p.itemInstances) ? p.itemInstances : []) {
     if (!inst || typeof inst !== "object" || !inst.slug) continue;
     if (String(inst.loc || "").startsWith("equip:")) continue;
     const id = String(inst.id || "");
+    if (id && equippedIds.has(id)) continue;
     const prev = id ? byId.get(id) : null;
     if (prev) {
       /* União por id mantém a identidade/posição do shared (depot/market
@@ -538,6 +643,10 @@ function mergeSharedFromPlayer(p, shared, opts) {
     shared.itemInstances.push(copy);
   }
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
+  /* Após a união: a contagem de bag de slug instanciado/equipado nunca
+   * passa do nº real de instâncias em bag — contagem fantasma de cópia
+   * atrasada morre aqui em vez de virar item na hidratação. */
+  reconcileInstancedBagCounts(shared.bag, shared.itemInstances, equippedSlugs);
   forgeResourcesDelta(shared, p, true);
   if (p.prey && (Array.isArray(p.prey.slots) || Number(p.prey.wildcards) > 0)) shared.prey = p.prey;
   mergeSharedCharms(p, shared);
@@ -565,6 +674,9 @@ module.exports = {
   forgeResourcesDelta,
   pouchDelta,
   mergeSharedFromPlayer,
+  equippedIdsAndSlugs,
+  reconcileInstancedBagCounts,
+  setSharedItemLookup,
   mergeMissionEntry,
   mergeMissionMaps,
   mergeFlagMap,

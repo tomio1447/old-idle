@@ -508,12 +508,28 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   // Inventário da conta: tick terminal extrai containers para o shared.
-  const sharedByAcc=new Map(),sharedMirror=new Map();
+  const sharedByAcc=new Map(),sharedMirror=new Map(),equippedByAcc=new Map();
   if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
     const tickInstanceId=String(row.instance_id||"");
+    /* 1ª passada: coleta todos os equipados por conta — o merge precisa do
+     * conjunto completo antes de rodar (cópia atrasada pode trazer em bag o
+     * instId que outra cópia já equipou → dupe de equipamento). */
+    const projInfos=[];
     for(const projection of next.characters||[]){
-      const c=this.findCharacter(projection.id);if(!c)continue;
-      const aid=Number(c.account_id);if(!aid)continue;
+      const c=this.findCharacter(projection.id);
+      const aid=c?Number(c.account_id):null;
+      projInfos.push({projection,aid});
+      if(!aid||!SharedInv.equippedIdsAndSlugs)continue;
+      let pd=projection&&projection.data;
+      if(typeof pd==="string"){try{pd=JSON.parse(pd);}catch(e){pd=null;}}
+      if(!pd)continue;
+      const eq=SharedInv.equippedIdsAndSlugs(pd);
+      let acc=equippedByAcc.get(aid);
+      if(!acc){acc={ids:new Set(),slugs:new Set()};equippedByAcc.set(aid,acc);}
+      for(const id of eq.ids)acc.ids.add(id);for(const s of eq.slugs)acc.slugs.add(s);
+    }
+    for(const info of projInfos){
+      const projection=info.projection,aid=info.aid;if(!aid)continue;
       if(aid!==Number(accountId)){
         const ownInst=this.instanceGet(aid);
         if(ownInst&&ownInst.status==="active"&&String(ownInst.instance_id)!==tickInstanceId)continue;
@@ -529,7 +545,8 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
         sharedByAcc.set(aid,shared);
       }
       if(next.terminalReason)
-        sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
+        sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc,
+          equippedByAcc.get(aid)));
       else{
         if(dirty.pouch.has(Number(projection.id)))sharedInvPouchDirtyFlush(shared,projection.data);
         if(dirty.forge.has(Number(projection.id)))sharedInvForgeDirtyFlush(shared,projection.data);
@@ -566,12 +583,28 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(now).toISOString();row.worker_cursor_at=row.saved_at;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   // Inventário da conta: tick terminal extrai containers para o shared.
-  const sharedByAcc=new Map(),sharedMirror=new Map();
+  const sharedByAcc=new Map(),sharedMirror=new Map(),equippedByAcc=new Map();
   if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
     const tickInstanceId=String(row.instance_id||"");
+    /* 1ª passada: coleta todos os equipados por conta — o merge precisa do
+     * conjunto completo antes de rodar (cópia atrasada pode trazer em bag o
+     * instId que outra cópia já equipou → dupe de equipamento). */
+    const projInfos=[];
     for(const projection of next.characters||[]){
-      const c=this.findCharacter(projection.id);if(!c)continue;
-      const aid=Number(c.account_id);if(!aid)continue;
+      const c=this.findCharacter(projection.id);
+      const aid=c?Number(c.account_id):null;
+      projInfos.push({projection,aid});
+      if(!aid||!SharedInv.equippedIdsAndSlugs)continue;
+      let pd=projection&&projection.data;
+      if(typeof pd==="string"){try{pd=JSON.parse(pd);}catch(e){pd=null;}}
+      if(!pd)continue;
+      const eq=SharedInv.equippedIdsAndSlugs(pd);
+      let acc=equippedByAcc.get(aid);
+      if(!acc){acc={ids:new Set(),slugs:new Set()};equippedByAcc.set(aid,acc);}
+      for(const id of eq.ids)acc.ids.add(id);for(const s of eq.slugs)acc.slugs.add(s);
+    }
+    for(const info of projInfos){
+      const projection=info.projection,aid=info.aid;if(!aid)continue;
       if(aid!==Number(accountId)){
         const ownInst=this.instanceGet(aid);
         if(ownInst&&ownInst.status==="active"&&String(ownInst.instance_id)!==tickInstanceId)continue;
@@ -587,7 +620,8 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
         sharedByAcc.set(aid,shared);
       }
       if(next.terminalReason)
-        sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
+        sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc,
+          equippedByAcc.get(aid)));
       else{
         if(dirty.pouch.has(Number(projection.id)))sharedInvPouchDirtyFlush(shared,projection.data);
         if(dirty.forge.has(Number(projection.id)))sharedInvForgeDirtyFlush(shared,projection.data);
@@ -1319,7 +1353,7 @@ function sharedInvForgeDirtyFlush(shared, data) {
   if (!p || typeof p !== "object" || Array.isArray(p)) return;
   SharedInv.forgeResourcesDelta(shared, p, true);
 }
-function sharedInvExtractMirror(shared, data, terminal, mergePouch) {
+function sharedInvExtractMirror(shared, data, terminal, mergePouch, equipped) {
   if (!SharedInv) return data;
   const p = typeof data === "string"
     ? (() => { try { return JSON.parse(data); } catch (e) { return null; } })()
@@ -1348,7 +1382,8 @@ function sharedInvExtractMirror(shared, data, terminal, mergePouch) {
     // id; o loot do combate (lootPouch da cópia) é somado ao que já havia.
     /* Loot Pouch: merge por delta só na PRIMEIRA projeção da conta —
      * as cópias compartilham referência; repetir dobraria o delta. */
-    SharedInv.mergeSharedFromPlayer(p, shared, { pouchDelta: mergePouch !== false });
+    SharedInv.mergeSharedFromPlayer(p, shared, { pouchDelta: mergePouch !== false,
+      equippedIds: equipped && equipped.ids, equippedSlugs: equipped && equipped.slugs });
   } else {
     SharedInv.extractSharedFromPlayer(p, shared);
     shared.lootPouch = keep.lootPouch;
@@ -4580,12 +4615,29 @@ async function MysqlStore() {
         // Inventário da conta: no tick TERMINAL, extrai bag/lootPouch/depot dos
         // personagens para accounts.shared_inventory e espelha o shared no data
         // salvo de cada um (containers são da conta, não do personagem).
-        const sharedByAcc=new Map(),sharedMirror=new Map();
+        const sharedByAcc=new Map(),sharedMirror=new Map(),equippedByAcc=new Map();
         if(heavy&&(next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
+          /* 1ª passada: resolve a conta e coleta TODOS os itens equipados por
+           * conta — uma cópia atrasada pode trazer como instância de bag o id
+           * que OUTRA cópia já equipou; o merge precisa do conjunto completo
+           * antes de rodar (senão a ordem das projeções deixava o dupe). */
+          const projInfos=[];
           for(const projection of next.characters||[]){
             const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
-            const aid=acctRows[0]?Number(acctRows[0].account_id):null;if(!aid)continue;
+            const aid=acctRows[0]?Number(acctRows[0].account_id):null;
+            projInfos.push({projection,aid});
+            if(!aid||!SharedInv.equippedIdsAndSlugs)continue;
+            let pd=projection&&projection.data;
+            if(typeof pd==="string"){try{pd=JSON.parse(pd);}catch(e){pd=null;}}
+            if(!pd)continue;
+            const eq=SharedInv.equippedIdsAndSlugs(pd);
+            let acc=equippedByAcc.get(aid);
+            if(!acc){acc={ids:new Set(),slugs:new Set()};equippedByAcc.set(aid,acc);}
+            for(const id of eq.ids)acc.ids.add(id);for(const s of eq.slugs)acc.slugs.add(s);
+          }
+          for(const info of projInfos){
+            const projection=info.projection,aid=info.aid;if(!aid)continue;
             if(aid!==Number(accountId)){
               // Convidado: preserva se a conta tiver OUTRA instância ativa
               // (corrida rara: 2 chars da mesma conta em instâncias distintas).
@@ -4603,7 +4655,8 @@ async function MysqlStore() {
               sharedByAcc.set(aid,shared);
             }
             if(next.terminalReason)
-              sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
+              sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc,
+                equippedByAcc.get(aid)));
             else{
               if(dirty.pouch.has(Number(projection.id)))sharedInvPouchDirtyFlush(shared,projection.data);
               if(dirty.forge.has(Number(projection.id)))sharedInvForgeDirtyFlush(shared,projection.data);

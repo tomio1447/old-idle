@@ -206,4 +206,80 @@ sharedInv.applySharedToPlayer(sp2, shared);
 must(sp2.itemInstances.length === 1 && sp2.itemInstances[0].loc === "equip:weapon",
   "shared merge: cópia bag stale do mesmo id é descartada (fica a equipada)");
 
+/* ── Dupe relatado (lag): reward equipada durante lag — a cópia do char A
+ * gravou equip:weapon + instId, mas a cópia atrasada do char B (mesma
+ * conta) ainda tinha a instância em bag e bag[slug]=1. O merge terminal
+ * por conta NÃO pode deixar o instId equipado entrar no shared nem a
+ * contagem fantasma sobreviver — senão a hidratação materializava o item
+ * de novo (equipado E na mochila). ── */
+sharedInv.setSharedItemLookup((slug) => ({
+  "falcon-bow": { s: "weapon", t: "distance", imbSlots: 2 },   // instanciado
+  "time-ring": { s: "ring", charges: 200 },                    // chargeable, não instanciado
+  "mana-potion": { s: "supply" },                              // stackable authored
+}[slug] || null));
+const accCopyB_stale = {  // char B, espelho de ANTES do equip
+  bag: { "falcon-bow": 1 }, lootPouch: {}, supplyStash: {},
+  itemInstances: [{ id: "it-x", slug: "falcon-bow", loc: "bag", tier: 0 }],
+  equip: {},
+};
+const accCopyA = {  // char A, estado fresco pós-equip
+  bag: {}, lootPouch: {}, supplyStash: {},
+  itemInstances: [{ id: "it-x", slug: "falcon-bow", loc: "equip:weapon", tier: 0 }],
+  equip: { weapon: { item: "falcon-bow", count: 1, instId: "it-x" } },
+};
+const eqAll = sharedInv.equippedIdsAndSlugs(accCopyA);
+const shared2 = sharedInv.emptySharedInventory();
+// Ordem adversa: a cópia STALE mergea primeiro (era o vetor do dupe).
+sharedInv.mergeSharedFromPlayer(accCopyB_stale, shared2,
+  { equippedIds: eqAll.ids, equippedSlugs: eqAll.slugs });
+sharedInv.mergeSharedFromPlayer(accCopyA, shared2,
+  { equippedIds: eqAll.ids, equippedSlugs: eqAll.slugs });
+must(!shared2.itemInstances.some((i) => i && i.id === "it-x"),
+  "dupe: instId equipado nunca entra no shared (cópia stale filtrada)");
+must(!(shared2.bag["falcon-bow"] > 0),
+  "dupe: contagem fantasma de bag morre no merge (clamped a 0)");
+// Hidratação do shared resultante: nada de item novo na mochila.
+const hyd = { itemInstances: [], equip: {} };
+sharedInv.applySharedToPlayer(hyd, shared2);
+must(!hyd.itemInstances.some((i) => i && i.id === "it-x") && !(hyd.bag["falcon-bow"] > 0),
+  "dupe: hidratação não materializa o item equipado");
+
+// extractSharedFromPlayer (save de cidade) também filtra id equipado.
+const pCity = {
+  bag: { "falcon-bow": 1 },
+  itemInstances: [
+    { id: "it-y", slug: "falcon-bow", loc: "bag", tier: 0 },       // espelho stale
+    { id: "it-y", slug: "falcon-bow", loc: "equip:weapon", tier: 0 },
+  ],
+  equip: { weapon: { item: "falcon-bow", count: 1, instId: "it-y" } },
+};
+const shared3 = sharedInv.emptySharedInventory();
+sharedInv.extractSharedFromPlayer(pCity, shared3);
+must(!shared3.itemInstances.some((i) => i && i.id === "it-y") && !(shared3.bag["falcon-bow"] > 0),
+  "dupe: extract de cidade descarta inst equipada + count órfã");
+
+// Grant legítimo (bag[slug] sem instância e sem equip) NÃO é clamped —
+// a materialização de órfãos repara depois.
+const shared4 = sharedInv.emptySharedInventory();
+sharedInv.mergeSharedFromPlayer({ bag: { "falcon-bow": 2 }, itemInstances: [] }, shared4);
+must(shared4.bag["falcon-bow"] === 2,
+  "grant sem instância/equip mantém a contagem (órfão reparável)");
+
+// Chargeable NÃO instanciado: anéis full vivem como contagem authored sem
+// instância — o reconcile não clampa, mesmo com inst parcial presente.
+const shared5 = sharedInv.emptySharedInventory();
+sharedInv.mergeSharedFromPlayer({
+  bag: { "time-ring": 1 },
+  itemInstances: [{ id: "tr-1", slug: "time-ring", loc: "bag", charges: 120 }],
+}, shared5);
+must(shared5.bag["time-ring"] === 1,
+  "chargeable não instanciado: contagem authored preservada (sem clamp)");
+must(shared5.itemInstances.some((i) => i && i.id === "tr-1"),
+  "inst parcial de chargeable preservada no shared");
+// Stackable authored: contagem sem instância também não é clampada.
+const shared6 = sharedInv.emptySharedInventory();
+sharedInv.mergeSharedFromPlayer({ bag: { "mana-potion": 5 }, itemInstances: [] }, shared6);
+must(shared6.bag["mana-potion"] === 5, "stackable authored: contagem preservada");
+sharedInv.setSharedItemLookup(null);
+
 console.log("\nAll orphan bag instance checks passed.");
